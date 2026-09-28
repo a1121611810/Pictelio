@@ -20,6 +20,14 @@ android {
         versionCode 60100
         versionName "6.1.0"
         buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
+        // 沙盒 #610：client flavor 维度下线（WebView/Capacitor 线整体删除），
+        // 入口写死 Lynx。占位符机制保留但不再按 flavor 注入。
+        manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
+        // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）。
+        // ADR-0164：CLIENT_KINDS[0] 是 Java 侧缺省引擎的单一事实来源。
+        // 单引擎后取值塌缩为 {"lynx"}，但**机制与消费方一律保留**——
+        // WebView 线是暂时下线后重写（非永久废弃），重写回归时该机制原样可用。
+        buildConfigField "String[]", "CLIENT_KINDS", '{"lynx"}'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -28,43 +36,18 @@ android {
         }
     }
 
-    // ── Product Flavors（#116：三分包）──────────────────────────
-    flavorDimensions "client"
-    productFlavors {
-        full {
-            dimension "client"
-            manifestPlaceholders = [launcherActivity: ".MainActivity", appClass: ".PictelioApp"]
-            // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）
-            // ADR-0164：CLIENT_KINDS[0] 是 Java 侧缺省引擎的单一事实来源——
-            // 首选键 pictelio_client_kind 缺省时归一化为 kinds 含 lynx → LYNX（翻转，T2）。
-            buildConfigField "String[]", "CLIENT_KINDS", '{"lynx", "webview"}'
-        }
-        webview {
-            dimension "client"
-            manifestPlaceholders = [launcherActivity: ".MainActivityWebview", appClass: ".PictelioAppWebview"]
-            buildConfigField "String[]", "CLIENT_KINDS", '{"webview"}'
-        }
-        lynx {
-            dimension "client"
-            manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
-            buildConfigField "String[]", "CLIENT_KINDS", '{"lynx"}'
-        }
-    }
-
+    // ── Source sets（沙盒 #610：单引擎）───────────────────────
+    // 原 lynx flavor 的 srcDir 提升为 main 的附加目录：类路径与包名不动，
+    // 只改编译归属。保留目录形态（而非把文件搬进 src/main/java），
+    // 是为了 WebView 重写回归时能原样切回 flavor 结构。
     sourceSets {
-        // webview flavor：Capacitor 插件 + MainActivity + PictelioApp(webview)
-        webview {
-            java.srcDir 'src/webview/java'
-        }
-        // lynx flavor：Lynx Native Modules + LynxActivity + PictelioApp(lynx)
-        lynx {
+        main {
             java.srcDir 'src/lynx/java'
         }
-        // full flavor：双 client 合并 + PictelioApp(full 条件分支)
-        full {
-            java.srcDir 'src/webview/java'
-            java.srcDir 'src/lynx/java'
-            java.srcDir 'src/full/java'
+        // 沙盒 #610：testFull 的 Lynx 模块测试并入 test（single variant 编译时
+        // test 源集即可看到 main 里的 Lynx 类）。
+        test {
+            java.srcDir 'src/testLynx/java'
         }
     }
 
@@ -97,14 +80,8 @@ android {
     }
 }
 
-// APK 输出按 flavor 重命名（#118）：pictelio-{versionName}-{flavor}.apk
-// webview flavor 同时排除 lynx bundle
 androidComponents {
     onVariants(selector().all()) { variant ->
-        def flavorName = variant.flavorName
-        if (flavorName == 'webview') {
-            variant.packaging.resources.excludes.add('main.lynx.bundle')
-        }
         // bcprov multi-release jar 的 META-INF/versions/9 对 Android 运行时无效
         // （#248：AGP 对 MRJAR 重复路径冲突的预案，docs/research/ota-ed25519-android.md §3.1）
         variant.packaging.resources.excludes.add('META-INF/versions/9/**')
@@ -112,83 +89,42 @@ androidComponents {
 }
 
 // ── APK 输出改名（#118）────────────────────────────────────
-// AGP 9：variant.outputs 的 outputFileName 只读，改用 variant.name 派生目录，
-// 并在 package 任务后复制/重命名。此处直接配置输出目录命名由 AGP 生成
-// app-{flavor}-{buildType}.apk，发布脚本按此模式定位即可——
-// 为保持 spec 约定的 pictelio-{version}-{flavor}.apk，用 task 重命名。
-def flavorNames = ['full', 'webview', 'lynx']
+// 沙盒 #610：flavor 维度下线，variant 名退化为纯 buildType（debug / release）。
+// 命名保留 buildType 段以区分调试包与签名包：
+// pictelio-{versionName}-{buildType}.apk
 def buildTypeList2 = ['debug', 'release']
 
-flavorNames.each { flavor ->
-    buildTypeList2.each { bt ->
-        def variantName = "${flavor}${bt.capitalize()}"
-        def assembleTaskName = "assemble${variantName.capitalize()}"
-        def renameTaskName = "rename${variantName.capitalize()}Apk"
+buildTypeList2.each { bt ->
+    def variantName = bt
+    def assembleTaskName = "assemble${bt.capitalize()}"
+    def renameTaskName = "rename${bt.capitalize()}Apk"
 
-        def apkDirStr = "${project.layout.buildDirectory.get()}/outputs/apk/${flavor}/${bt}"
-        def versionName = android.defaultConfig.versionName
-        tasks.register(renameTaskName) {
-            dependsOn assembleTaskName
-            // 每次构建都重命名最新产物（覆盖旧的 pictelio-*.apk），避免发布旧包
-            outputs.upToDateWhen { false }
-            doLast {
-                def srcApk = new File("${apkDirStr}/app-${flavor}-${bt}.apk")
-                def destApk = new File("${apkDirStr}/pictelio-${versionName}-${flavor}.apk")
-                if (srcApk.exists()) {
-                    if (destApk.exists()) {
-                        destApk.delete()
-                    }
-                    if (!srcApk.renameTo(destApk)) {
-                        throw new GradleException("APK 重命名失败: ${srcApk.name} -> ${destApk.name}")
-                    }
-                    println "Renamed: ${srcApk.name} -> ${destApk.name}"
+    def apkDirStr = "${project.layout.buildDirectory.get()}/outputs/apk/${bt}"
+    def versionName = android.defaultConfig.versionName
+    tasks.register(renameTaskName) {
+        dependsOn assembleTaskName
+        // 每次构建都重命名最新产物（覆盖旧的 pictelio-*.apk），避免发布旧包
+        outputs.upToDateWhen { false }
+        doLast {
+            def srcApk = new File("${apkDirStr}/app-${bt}.apk")
+            def destApk = new File("${apkDirStr}/pictelio-${versionName}-${bt}.apk")
+            if (srcApk.exists()) {
+                if (destApk.exists()) {
+                    destApk.delete()
                 }
+                if (!srcApk.renameTo(destApk)) {
+                    throw new GradleException("APK 重命名失败: ${srcApk.name} -> ${destApk.name}")
+                }
+                println "Renamed: ${srcApk.name} -> ${destApk.name}"
             }
         }
     }
 }
 
-// ── Assets 裁剪（#118）──────────────────────────────────────
-// webview：从 assets 中排除 lynx bundle
-// lynx：从 assets 中排除 web public/ 和 capacitor 配置
-// 原理：clean task 删除 merge 输出中的多余文件 + 删除 compress 的整个输出目录
-//       （输出目录丢失 → Gradle 强制 compress 重跑 → 打包读取干净产物）
-def flavorList = ['webview', 'lynx']
-def buildTypeList = ['debug', 'release']
-
-flavorList.each { flavor ->
-    buildTypeList.each { bt ->
-        def variantName = "${flavor}${bt.capitalize()}"
-        def mergeTaskName = "merge${variantName.capitalize()}Assets"
-        def compressTaskName = "compress${variantName.capitalize()}Assets"
-        def cleanTaskName = "clean${variantName.capitalize()}Assets"
-        def assetsDir = "${layout.buildDirectory.get()}/intermediates/assets/${variantName}/${mergeTaskName}"
-        def compressedDir = "${layout.buildDirectory.get()}/intermediates/compressed_assets/${variantName}/${compressTaskName}/out"
-
-        tasks.register(cleanTaskName, Delete) {
-            // 清 merge 产物中的多余文件
-            if (flavor == 'webview') {
-                delete "${assetsDir}/main.lynx.bundle"
-            } else if (flavor == 'lynx') {
-                delete "${assetsDir}/public"
-                delete "${assetsDir}/capacitor.config.json"
-                delete "${assetsDir}/capacitor.plugins.json"
-            }
-            // 删 compress 整个输出目录 → 强制 compress 重跑
-            delete compressedDir
-        }
-
-        // clean 在 merge 之后、compress 之前执行
-        tasks.matching { it.name == mergeTaskName }.configureEach {
-            finalizedBy cleanTaskName
-        }
-        tasks.matching { it.name == compressTaskName }.configureEach {
-            mustRunAfter cleanTaskName
-            // 禁用 build cache：clean 删除了中间产物，compress 必须重跑读干净输入
-            outputs.cacheIf { false }
-        }
-    }
-}
+// 沙盒 #610：原「Assets 裁剪」整块下线。webview 变体排除 lynx bundle、
+// lynx 变体排除 public/ 与 capacitor 配置——两者都随 cap:sync 与 webview
+// flavor 一并消失，assets 只剩 main.lynx.bundle（sync-android-assets 注入），
+// 无需再靠 clean task 裁剪。
 
 // 仅在执行 Release 构建时校验签名凭据，避免 Debug 构建需要环境变量
 def validateReleaseSigning() {
@@ -206,8 +142,7 @@ def validateReleaseSigning() {
 }
 
 gradle.taskGraph.whenReady { graph ->
-    def releaseTasks = [':app:assembleRelease', ':app:packageRelease', ':app:bundleRelease', ':app:signReleaseApk', ':app:signReleaseBundle',
-                        ':app:assembleFullRelease', ':app:assembleWebviewRelease', ':app:assembleLynxRelease']
+    def releaseTasks = [':app:assembleRelease', ':app:packageRelease', ':app:bundleRelease', ':app:signReleaseApk', ':app:signReleaseBundle']
     if (graph.allTasks.any { it.path in releaseTasks }) {
         validateReleaseSigning()
     }
@@ -217,53 +152,29 @@ repositories {
 }
 
 dependencies {
-    // ── Shared（双端共用）──
+    // ── Shared ──
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // ── WebView-only（Capacitor 系）──
-    webviewImplementation fileTree(include: ['*.jar', '*.aar'], dir: '../capacitor-cordova-android-plugins/src/main/libs')
-    webviewImplementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    webviewImplementation project(':capacitor-android')
-    webviewImplementation project(':capacitor-cordova-android-plugins')
-    // OTA web bundle Ed25519 验签（#248）：bcprov lightweight API（不注册 JCA provider，
-    // 绕开 Android 内置裁剪版 BC 冲突与 API 33+ 文档陷阱，docs/research/ota-ed25519-android.md）。
-    // full flavor 编译 src/webview/java 源集 → 两个 flavor 都要挂。
-    webviewImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
-    // WorkManager（#252 OTA 慢通道）
-    webviewImplementation "androidx.work:work-runtime:2.10.0"
-
-    // ── Lynx-only ──
+    // ── Lynx ──
+    // 沙盒 #610：原 lynxImplementation 随 flavor 维度下线一并提升为 implementation。
     // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
-    lynxImplementation "org.lynxsdk.lynx:lynx:4.0.1"
+    implementation "org.lynxsdk.lynx:lynx:4.0.1"
     // Lynx Service（官方集成要求，#51 补充）：
     // - lynx-service-http：lynx.fetch 依赖（未注册则原生 fetch 不可用 → API/OAuth 断）
     // - lynx-service-log：日志服务（官方基线）
     // 图片服务（lynx-service-image/Fresco）不引入——i.pximg.net 需 Referer 头，
     // Fresco 默认不传 customParam 为 header（403），自研 ILynxImageService（#54）
-    lynxImplementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
-    lynxImplementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
+    implementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
+    implementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
     // XElement（官方扩展元件，#51 真机实测必需）：
     // 基础 xelement 提供扩展 behaviors；xelement-input 提供 <input>/<textarea>
     // （LynxError 990200 "No BehaviorController defined for class input"，
     //  真机 2026-08-01 Login.vue 输入框渲染失败 → 补依赖 + LynxActivity addBehaviors）
-    lynxImplementation "org.lynxsdk.lynx:xelement:4.0.1"
-    lynxImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
-
-    // ── Full = webview + lynx 并集 ──
-    fullImplementation fileTree(include: ['*.jar', '*.aar'], dir: '../capacitor-cordova-android-plugins/src/main/libs')
-    fullImplementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    fullImplementation project(':capacitor-android')
-    fullImplementation project(':capacitor-cordova-android-plugins')
-    fullImplementation "org.lynxsdk.lynx:lynx:4.0.1"
-    fullImplementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
-    fullImplementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
-    fullImplementation "org.lynxsdk.lynx:xelement:4.0.1"
-    fullImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
-    fullImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
-    fullImplementation "androidx.work:work-runtime:2.10.0"
+    implementation "org.lynxsdk.lynx:xelement:4.0.1"
+    implementation "org.lynxsdk.lynx:xelement-input:4.0.1"
 
     // ── Test ──
     testImplementation "junit:junit:$junitVersion"
@@ -276,8 +187,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
 }
-
-apply from: 'capacitor.build.gradle'
 
 try {
     def servicesJSON = file('google-services.json')

@@ -11,7 +11,6 @@ import com.lynx.jsbridge.LynxModule;
 import com.lynx.react.bridge.Callback;
 import com.lynx.tasm.behavior.LynxContext;
 
-import io.pictelio.app.engine.EnginePrefs;
 
 import org.json.JSONArray;
 
@@ -31,19 +30,28 @@ import org.json.JSONArray;
  *       （T0-DIAG 临时通道：无可用分享应用时日志已写盘，回调可读提示而非失败）</li>
  * </ul>
  *
- * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"}（键/文件常量
- * 别名 {@link EnginePrefs}——引擎键唯一所有者，ADR-0164 决策 3）——
- * 与 {@code @capacitor/preferences} 默认 group、MainActivity 分发读取的是同一文件，
- * 保证 webview/lynx 两侧读到同一开关。
+ * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"}（沙盒 #610：
+ * 原别名 {@code EnginePrefs} 随引擎机制整体下线，改指向存活的单一所有者
+ * {@link PictelioPrefsModule#PREFS_FILE}，取值逐字不变，存量用户配置零迁移）——
+ * 与 {@code @capacitor/preferences} 默认 group 是同一文件。
  */
 public class PictelioAppModule extends LynxModule {
 
     private static final String TAG = "PictelioAppModule";
 
-    /** SharedPreferences 文件（@capacitor/preferences 默认 group，勿改；别名 EnginePrefs 单一所有者） */
-    public static final String CLIENT_PREFS = EnginePrefs.PREFS_FILE;
-    /** client 开关 key（app-lynx clientSwitchStore 同名；别名 EnginePrefs 单一所有者） */
-    public static final String CLIENT_KEY = EnginePrefs.KEY_PREFERRED_KIND;
+    /** SharedPreferences 文件（@capacitor/preferences 默认 group，勿改；红线：存量用户配置所在文件） */
+    public static final String CLIENT_PREFS = PictelioPrefsModule.PREFS_FILE;
+    /**
+     * client 开关 key（app-lynx clientSwitchStore 同名）。
+     * 沙盒 #610：原所有者 EnginePrefs 随引擎机制下线，键名字面量在此就地保留——
+     * 存量 SharedPreferences 里已有该键，删之即丢用户选择。取值未变。
+     */
+    public static final String CLIENT_KEY = "pictelio_client_kind";
+    /**
+     * 失败记忆键（沙盒 #610 后已无写入方，仅在 setClientKind 中作为陈旧键清理）。
+     * 取值与原 EnginePrefs.KEY_FAILURE_MEMORY 逐字一致。
+     */
+    private static final String KEY_LYNX_FAILURE_MEMORY = "pictelio_engine_lynx_failure_version";
 
     /** httpGet 线程池（阻塞 IO 不占 Lynx 调用线程；同 PictelioApiModule 模式） */
     private static final java.util.concurrent.ExecutorService HTTP_EXECUTOR =
@@ -85,12 +93,17 @@ public class PictelioAppModule extends LynxModule {
                     .edit()
                     .putString(CLIENT_KEY, kind)
                     .apply();
-            // S12（ADR-0164 决策 9）：显式选择清失败记忆——否则残留记忆会在下次启动
-            // 被 S4 弹回 webview，显式选择失效。
+            // 沙盒 #610：原 EnginePrefs.clearLynxFailure 内联为陈旧键清理。
+            // 该键（pictelio_engine_lynx_failure_version）属失败记忆机制，已随引擎
+            // 机制下线——不再有写入方，但存量 SharedPreferences 里可能残留，就地移除。
             try {
-                EnginePrefs.clearLynxFailure(appContext());
+                appContext()
+                        .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+                        .edit()
+                        .remove(KEY_LYNX_FAILURE_MEMORY)
+                        .apply();
             } catch (Exception clearEx) {
-                Log.w(TAG, "clearLynxFailure 失败（显式选择可能被失败记忆覆盖）", clearEx);
+                Log.w(TAG, "陈旧失败记忆键清理失败", clearEx);
             }
             callback.invoke();
         } catch (Exception e) {

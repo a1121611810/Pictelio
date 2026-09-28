@@ -1,7 +1,16 @@
 // WebDAV 桥跨语言契约一致性（spec docs/specs/webdav-backup.md §4 / ADR-0156 D1）
 // 差分 oracle：Java 侧 Kind 枚举与两个 TS 桥的 WEBDAV_ERROR_KINDS 必须逐字一致；
-// 四个文件（Java 插件/模块 + 双端 TS 桥）必须暴露同一组动词；注册点必须存在。
+// 各桥文件必须暴露同一组动词；Lynx 注册点必须存在。
 // 任一漂移 = 桥静默失效（TS 调不存在的方法 / kind 映射落到 SERVER 兜底）。
+//
+// #808 步 2（#610 手术）适配：webview flavor 整体下线，以下三个源已随手术删除，
+// 其断言一并摘除——**不是**因为契约不重要，而是被测对象不存在了：
+//   - WebDavPlugin.java        （src/webview）→ 插件层无 Lynx 对应物，
+//     桥层实现在 PictelioWebDavModule + WebDavClient
+//   - MainActivity.java        （src/full）
+//   - MainActivityWebview.java （src/webview）
+// 存活的防线（Kind 枚举 oracle、错误 payload 键、Callback 双参契约、
+// WebDavClient 协议常量）全部保留，见各用例。
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -12,17 +21,10 @@ const read = (...p: string[]) => readFileSync(path.resolve(testDir, ...p), "utf8
 
 const appBridge = read("../../../src/native/WebDav.ts");
 const lynxBridge = read("../../../../app-lynx/src/utils/webDavBridge.ts");
-const webDavPlugin = read(
-  "../../../android/app/src/webview/java/io/pictelio/app/WebDavPlugin.java",
-);
 const webDavModule = read(
   "../../../android/app/src/lynx/java/io/pictelio/app/PictelioWebDavModule.java",
 );
 const clientJava = read("../../../android/app/src/main/java/io/pictelio/app/WebDavClient.java");
-const mainActivity = read("../../../android/app/src/full/java/io/pictelio/app/MainActivity.java");
-const mainActivityWebview = read(
-  "../../../android/app/src/webview/java/io/pictelio/app/MainActivityWebview.java",
-);
 const lynxInitializer = read(
   "../../../android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java",
 );
@@ -81,19 +83,17 @@ describe("WebDAV 桥跨语言契约", () => {
     expect(appBridge).toContain("WebDavErrorKind");
   });
 
-  it("四个桥文件暴露同一组动词", () => {
+  it("各桥文件暴露同一组动词", () => {
     for (const verb of VERBS) {
-      expect(webDavPlugin, `WebDavPlugin 缺 ${verb}`).toContain(`void ${verb}(`);
       expect(webDavModule, `PictelioWebDavModule 缺 ${verb}`).toContain(`void ${verb}(`);
       expect(appBridge, `app 桥缺 ${verb}`).toContain(`${verb}(`);
       expect(lynxBridge, `lynx 桥缺 ${verb}`).toContain(`${verb}(`);
     }
   });
 
-  it("注册点存在（漏注册 = 桥静默失效；两个 flavor 都要）", () => {
-    // B1 防线：webview-only flavor（MainActivityWebview）与 full flavor 都必须注册
-    expect(mainActivity).toContain("registerPlugin(WebDavPlugin.class)");
-    expect(mainActivityWebview).toContain("registerPlugin(WebDavPlugin.class)");
+  it("注册点存在（漏注册 = 桥静默失效）", () => {
+    // B1 防线：手术后只剩 Lynx 一条注册路径（webview / full 的 registerPlugin 已随
+    // 对应 Activity 删除）。#610 前的双注册检查在单引擎下已无被测对象。
     expect(lynxInitializer).toContain(
       'registerModule("PictelioWebDav", PictelioWebDavModule.class)',
     );
@@ -111,9 +111,7 @@ describe("WebDAV 桥跨语言契约", () => {
   it("协议子集常量与 spec §5 固定值一致（3 次重试 / 保留 10 份）", () => {
     expect(clientJava).toContain("VERIFY_MAX_ATTEMPTS = 3");
     expect(clientJava).toContain("KEEP_BACKUPS = 10");
-    // 插件默认值引用常量而非字面量（防两处漂移）
-    expect(webDavPlugin).toContain("WebDavClient.VERIFY_MAX_ATTEMPTS");
-    expect(webDavPlugin).toContain("WebDavClient.KEEP_BACKUPS");
+    // 桥层引用常量而非字面量（防与 WebDavClient 漂移）
     expect(webDavModule).toContain("WebDavClient.VERIFY_MAX_ATTEMPTS");
     expect(webDavModule).toContain("WebDavClient.KEEP_BACKUPS");
   });

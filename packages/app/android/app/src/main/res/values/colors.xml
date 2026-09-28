@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      沙盒 #610：Capacitor 依赖下线后，这三个颜色原先由 @capacitor/android 的
+      res/values/colors.xml 提供（styles.xml 的 AppTheme 引用它们）。Capacitor 已整体
+      移除，故就地承接为应用自有资源。
+
+      取值**逐字沿用** Capacitor 8.5.2 的默认值（#3F51B5 / #303F9F / #FF4081）——
+      目的是零视觉增量，而非引入新配色。它们只作用于 AppTheme（AppCompat
+      Light.DarkActionBar 底板）；Lynx 端的实际配色由 app-lynx 自身的 M3 令牌
+      （packages/app-lynx）决定，与这三个值无关。
+    -->
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+</resources>
