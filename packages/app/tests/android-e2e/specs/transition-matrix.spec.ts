@@ -103,15 +103,31 @@ if (SKIPPED) {
 //   **sort 行**（最新/最早/热门）——两行仅差约 84px，必须按实测取。
 // - 轮播收藏行（♥ + 收藏数）实机 y≈1915..1975；首跑窗口 1955..2070 只覆盖数字下缘 →
 //   窗口内几乎全是 scrim 渐变背景 → 三帧恒等误报（R3 失败实因，非 props 冻结缺陷）。
-// 推导模型 = fab-hit-testing-regression 同款 vw 几何（其 FAB_TAP=(953,2033)/ME_RING_TAP=
-// (576,2020) 已实弹验证，反推锚点 (0,0) = 屏幕物理原点、H = 200vw，非「LynxView 顶 = 72」口径）：
+// 推导模型 = fab-hit-testing-regression 同款 vw 几何。
+//
+// ⚠️ 2026-09-28 口径订正（转场矩阵复跑 3 红时定位）：本段原按 **H = 200vw（全屏 2160）** 推导
+// FAB 中心 → y=2033，但**实现不是这个口径**。`GlobalFab.vue` 的
+// `screenHeightVw(contentSize, …)`（`viewportGeometry.ts:35-41`）在 `contentSize` 命中时返回
+// `(contentSize.h / contentSize.w) * 100`，而 `contentSize.h` 是**稳定区**高度，不是全屏：
+//     dumpsys window displays → app=1080x2088 / rng=1080x936-2160x2016 ⇒ contentSize.h = 2016
+// 三种口径的 FAB 中心：
+//     全屏 2160 → 2033（本段原值，错）   app 2088 → 1961   稳定区 2016 → 1889 ← 实现口径
+// 像素级实测（canvas 扫 FAB 浅蓝底色，band 高 161px = 精确直径）：
+//     浅蓝带 y 1808..1969 → 中心 **1889**，与「稳定区 2016」逐位吻合，与全屏口径差 144px
+//     （= 状态栏 72 + 手势条 72）。原 tap 点落在 FAB 盒外 → 放射菜单从未展开（R2 红实因，
+//     before/after FAB 浅蓝像素数逐位相同 = 纹丝未动）。
+// ⇒ FAB_TAP 的 y 由 2033 改为 1889。`assertDeviceGeometry` 已加系统栏校验：
+//   换 ROM / 换导航模式（gestural↔threebutton）导致稳定区高度变化时**快速失败**，
+//   而非静默点到空处——原实现只校验分辨率/密度，漏掉了这一维。
+//
 // - 放射 FAB（menu 模式，/illusts 为 4 顶层 tab 之一）：fabCx = 100-4.267-14.933/2 = 88.2665vw，
-//   fabCy = 200-4.267-14.933/2 = 188.2665vw → (953, 2033)（与 fab spec 实测常量逐位一致）；
+//   fabCy = 201.6-4.267-14.933/2 = 188.2665vw（201.6vw = 稳定区 2016px / 1080px 宽 × 100）
+//   → (953, 1889)；
 // - SearchSheet 底部面板 = 80vh：vh 基准存在 2088（= 2160-72）/2016（再减手势条 72）两种实测口径，
 //   面板顶分别为 490/547 —— 下列输入框坐标取两种口径的交集规避；
 // - 轮播滑动起点取封面图区（scrim 遮罩 pointer-events 不生效、不响应滑动——Recommended.vue 真机修复注记）。
-/** 放射 FAB 主按钮（menu 模式，fab spec 已实弹验证的同款常量） */
-const FAB_TAP = { x: 953, y: 2033 };
+/** 放射 FAB 主按钮（menu 模式；y 按稳定区 2016 口径，见上方订正） */
+const FAB_TAP = { x: 953, y: 1889 };
 /** 内环「搜索」项（首跑校准：实机 (906,1760)，几何推导值偏低 64px 会落到环项之间） */
 const FAB_SEARCH_ITEM_TAP = { x: 906, y: 1760 };
 /** SearchSheet 输入框（两种 vh 口径下均落在输入行内：617..795 的交集 674..738 附近） */
@@ -148,17 +164,30 @@ interface Region {
   x1: number;
   y1: number;
 }
+/**
+ * 内容区底界（= 稳定区高度 2016 = Lynx contentSize.h 口径）。
+ *
+ * ⚠️ 2026-09-28：以下各采样窗口原按 **2080 / 2140** 取 y1，越过了内容区底界。
+ * 越界部分落在**恒定不变的系统栏/手势条**上——那部分像素在任意两帧间都相同，
+ * 会按比例**稀释帧对比差异**，让「内容确实变了」被判成「没变」：
+ *   - `REGION_RESULTS_BOTTOM` 原 1850..2140（高 290）中 124px 是死像素，占 **43%**；
+ *   - `REGION_RESULTS` / `REGION_BANNER_SCAN` 原 1270..2140 / 1850..2140，越界 124px；
+ *   - `REGION_TOPREF` 原 1200..2080，越界 64px。
+ * 全部钳到 `CONTENT_BOTTOM` 后，窗口内全部是真实内容像素。
+ * （`REGION_BOOKMARK_ROOM` 1905..1990 本就在区内，未越界，故不动。）
+ */
+const CONTENT_BOTTOM = 2016;
 /** R1「未回顶」对比窗口（首跑校准：榜单入口大卡是 RefreshableList 兄弟节点、恒占
  *  y≈380..1150 且永不滚动——旧窗 400..1040 整块落在静态卡上 → 差异恒 ≈0，与列表位置
- *  无关（首跑/二跑 R1 失败实因）。列表真实视口 = 榜单卡之下 1150..2088） */
-const REGION_TOPREF: Region = { x0: 0, y0: 1200, x1: 1080, y1: 2080 };
-/** R2 结果列表区（关键词输入后 scope/sort/filter 行以下、面板底以上；vh 两口径的下方交集） */
-const REGION_RESULTS: Region = { x0: 0, y0: 1270, x1: 1080, y1: 2140 };
+ *  无关（首跑/二跑 R1 失败实因）。列表真实视口 = 榜单卡之下 1150..2016） */
+const REGION_TOPREF: Region = { x0: 0, y0: 1200, x1: 1080, y1: CONTENT_BOTTOM };
+/** R2 结果列表区（关键词输入后 scope/sort/filter 行以下、面板底以上） */
+const REGION_RESULTS: Region = { x0: 0, y0: 1270, x1: 1080, y1: CONTENT_BOTTOM };
 /** R2 触底判定带（三跑校准）：结果列表**底部带**——只在「新行进入视口」时变化，
  *  比整结果区稳定（中部懒加载缩略图会持续造成整区差异 → 永不停滞） */
-const REGION_RESULTS_BOTTOM: Region = { x0: 0, y0: 1850, x1: 1080, y1: 2140 };
+const REGION_RESULTS_BOTTOM: Region = { x0: 0, y0: 1850, x1: 1080, y1: CONTENT_BOTTOM };
 /** R2「加载更多失败」红色文字扫描窗（横幅 flex 居中；避开行首缩略图列 x<200） */
-const REGION_BANNER_SCAN: Region = { x0: 200, y0: 1850, x1: 1040, y1: 2140 };
+const REGION_BANNER_SCAN: Region = { x0: 200, y0: 1850, x1: 1040, y1: CONTENT_BOTTOM };
 /** R3 轮播封面图区（scrim 顶部最高约 1191，本窗口恒在 scrim 之上） */
 const REGION_CAROUSEL_IMAGE: Region = { x0: 0, y0: 300, x1: 1080, y1: 1150 };
 /** R3 scrim 收藏行窗口（首跑校准：♥+收藏数实机在 y≈1915..1975；旧窗 1955..2070 只覆盖
@@ -184,12 +213,45 @@ let serial = "";
 
 // ─── 设备侧基建（lynx-bookmark-tags / fab 回归同款内联实现）───
 
-/** 校验目标 AVD 分辨率/密度（坐标推导依赖；漂移时快速失败而非静默错点）。 */
+/**
+ * 校验目标 AVD 分辨率/密度/**稳定区高度**（坐标推导依赖这三者；漂移时快速失败而非静默错点）。
+ *
+ * ⚠️ 2026-09-28 增补第三项：原实现只校验 `wm size` / `wm density`，漏掉了系统栏高度——
+ * 而 FAB 等常量按「稳定区 2016px」推导（见上方口径订正）。换 ROM 或切换导航模式
+ * （gestural ↔ threebutton）会让稳定区高度变化，此时旧常量会**静默点到空处**
+ * （2026-09-28 实测：全屏口径 2033 vs 实际 1889，偏 144px，落在 FAB 盒外）。
+ * 像素级 UI 断言在坐标错位时表现为「功能坏了」，极易被误判为产品回归。
+ */
 function assertDeviceGeometry(s: string): void {
   const size = runCapture(adbPath(), ["-s", s, "shell", "wm", "size"]).stdout;
   const density = runCapture(adbPath(), ["-s", s, "shell", "wm", "density"]).stdout;
   expect(size).toMatch(/1080x2160/u);
   expect(density).toMatch(/480/u);
+
+  // 稳定区高度（= Lynx contentSize.h 口径，也是 FAB 等坐标常量的 H 基准）
+  const displays = runCapture(adbPath(), [
+    "-s",
+    s,
+    "shell",
+    "dumpsys",
+    "window",
+    "displays",
+  ]).stdout;
+  const rng = /rng=\d+x\d+-\d+x(\d+)/u.exec(displays);
+  expect(
+    rng,
+    `无法从 dumpsys window displays 解析稳定区高度（坐标常量依赖它）。原始输出片段：${displays
+      .split("\n")
+      .find((l) => l.includes("rng="))
+      ?.trim()}`,
+  ).not.toBeNull();
+  const contentHeight = Number(rng?.[1]);
+  expect(
+    contentHeight,
+    `稳定区高度应为 2016（状态栏 72 + 手势条 72 之外）；实测 ${contentHeight}。` +
+      `本 spec 的 FAB / 采样窗口常量按 2016 校准，换 ROM 或切换导航模式后需重新校准` +
+      `（gestural ↔ threebutton 会改变底部系统条高度）。`,
+  ).toBe(2016);
 }
 
 /** APK 内 lynx bundle 必须含 benchNav 深链钩子（BENCH_NAV=1 整链构建），否则快速失败并给指令。 */
