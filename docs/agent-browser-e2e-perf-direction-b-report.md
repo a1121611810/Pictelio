@@ -1,5 +1,11 @@
 # 提速方向 B（固定 SLEEP → 条件等待）可行性实测报告
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端的运行时已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 下线，其**源码、构建配置、依赖与专属测试**
+> 已随 [ADR-0203](adr/ADR-0203-webview-client-source-removal.md) 整包删除。
+> 本文正文**一字未改**，保留供决策史参考；其中的路径、命令与文件清单**均已失效**，勿照抄执行。
+> 当前形态见 [glossary-webview-client-removal](adr/glossary-webview-client-removal.md)。
+
 > 状态：实测完成。本报告回答 `docs/agent-browser-e2e-perf-analysis.md` 第 3 节「方向 B」的
 > 可行性问题，并按 **高可维护性 / 高性能 / 高安全性 / 低内存占用** 四个维度给出结论。
 > 配套一次性原型：`packages/app/tests/agent-browser/prototype/`（含 `sleep-vs-wait.prototype.test.ts`

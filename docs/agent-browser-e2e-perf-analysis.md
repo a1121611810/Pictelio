@@ -1,5 +1,11 @@
 # agent-browser E2E 全量运行耗时分析与提速实验清单
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端的运行时已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 下线，其**源码、构建配置、依赖与专属测试**
+> 已随 [ADR-0203](adr/ADR-0203-webview-client-source-removal.md) 整包删除。
+> 本文正文**一字未改**，保留供决策史参考；其中的路径、命令与文件清单**均已失效**，勿照抄执行。
+> 当前形态见 [glossary-webview-client-removal](adr/glossary-webview-client-removal.md)。
+
 > 状态：分析完成，未改任何代码。本文档用于在独立会话中逐项实验提速方案。
 > 分析日期：2026-02（agent-browser ^0.34.0，Vitest 4.1，specs 位于 `packages/app/tests/agent-browser/specs/`）
 

@@ -20,9 +20,9 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
+    "canvas": "^3.2.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1",
-    "webdriverio": "^9.32.0",
-    "canvas": "^3.2.3"
+    "webdriverio": "^9.32.0"
   }
 }

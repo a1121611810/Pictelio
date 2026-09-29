@@ -1,5 +1,11 @@
 # 统一存储抽象层设计方案（最终版）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端的运行时已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 下线，其**源码、构建配置、依赖与专属测试**
+> 已随 [ADR-0203](adr/ADR-0203-webview-client-source-removal.md) 整包删除。
+> 本文正文**一字未改**，保留供决策史参考；其中的路径、命令与文件清单**均已失效**，勿照抄执行。
+> 当前形态见 [glossary-webview-client-removal](adr/glossary-webview-client-removal.md)。
+
 > **决策记录**：2026-08 经 grill-with-docs + codebase-design（DESIGN-IT-TWICE）确定最终设计。
 > 4 个设计变体对比见 `docs/design-variants/`：
 > - `minimal-interface.md`（变体 1：极简 3 入口）

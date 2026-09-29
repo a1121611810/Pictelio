@@ -98,7 +98,10 @@ import {
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 证据落盘目录（被 gitignore，仅本地取证用） */
-const EVIDENCE_DIR = resolve(REPO_ROOT, "packages/android-host/test-results/android-e2e/lynx-bookmark-tags");
+const EVIDENCE_DIR = resolve(
+  REPO_ROOT,
+  "packages/android-host/test-results/android-e2e/lynx-bookmark-tags",
+);
 mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 fab 回归 / switch-client-roundtrip-low）：坐标常量绑定 pictelio_ui ──

@@ -1,14 +1,14 @@
 # Pictelio
 
-Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），经 Gradle 构建链直接产出 Android 原生应用（构建链已去 Capacitor 化）。自 v6.3.0 起为唯一运行时形态，WebView 客户端已随 #610 下线。
+Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），经 Gradle 构建链直接产出 Android 原生应用。WebView 客户端的运行时随 #610 下线，其源码与依赖随 ADR-0203 删除，仓库中不再保留（术语见 `docs/adr/glossary-webview-client-removal.md`）。
 
 ## 项目概览
 
-- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3（vite-plus 1.0-rc 统一工具链）+ UnoCSS 66.10 + Capacitor 8.5（源码引用，运行时已下线）；小说正文布局用 `@chenglou/pretext`
-- **Monorepo**: pnpm workspace 九子包：`pictelio-app` / `pictelio-app-lynx` / `@pictelio/{ugoira,update-check,novel-export,search-core,ranking-core,net-diagnostics}` / `pictelio-website`
-- **入口**: `packages/app/src/main.tsx`（settings 同步、Fluent 主题、渲染、auth 恢复）→ `App.tsx` → `router.tsx`（路由定义与 App 分离）
-- **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）
-- **Pixiv API**: `src/api/client.ts` 双模式客户端（Web fetch + Vite 代理 / Native bridge → `PixivApiPlugin`），401 自动刷新 + 防死循环
+- **技术栈**: vue-lynx + Vue 3.5 + TypeScript 7.0 (strict) + rspeedy/rspeedy-plugin-livereload + Tailwind CSS 3.4；宿主侧 Java 21 / AGP 9.2.1 / Lynx SDK 4.0.1
+- **Monorepo**: pnpm workspace：`pictelio-app-lynx`（唯一客户端）/ `@pictelio/android-host`（构建宿主）/ `@pictelio/{ugoira,update-check,novel-export,search-core,ranking-core,net-diagnostics}`（共享纯逻辑）/ `pictelio-website`
+- **入口**: `packages/app-lynx/src/index.ts` → `App.vue` → `src/router.ts`（vue-router）
+- **设计系统**: `pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）。**Fluent Design 2 章节为历史存档**：它服务的是已删除的 WebView 客户端
+- **Pixiv API**: `packages/app-lynx/src/api/` 经原生模块 `PictelioApiModule` 走 `PixivApiCore`，401 自动刷新 + 防死循环
 
 ## 工具触发协议（任务开始第一步，违反视为架构违规）
 
@@ -137,16 +137,16 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 
 ## 命令
 
-项目根目录执行，pnpm workspace 委托（ADR-0059，权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；其余裸命令 → `pictelio-app`；`<命令>:<包名>` → 对应包；`:all` → 并行全部：
+项目根目录执行，pnpm workspace 委托（裸名指向见 ADR-0204，取代 ADR-0059 的委托部分；权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；五条裸命令（`dev` / `build` / `check` / `test` / `preview`）→ `pictelio-app-lynx`；**宿主包动作一律显式命名**，不占用裸名（`pnpm <命令>:android-host`）；`<命令>:<包名>` → 对应包；`:all` → 并行全部：
 
 | 命令 | 说明 |
 | --- | --- |
-| `pnpm dev` / `build` / `check` / `test` | app：dev(5173) / 构建 / fmt+lint+tsc / Vitest |
+| `pnpm dev` / `build` / `check` / `test` | 唯一客户端 app-lynx：开发服务器 / 构建 / vue-tsc / Vitest |
 | `pnpm lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
 | `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 并行全部 |
-| `pnpm dev:android` / `build:android(:release)` | 热重载 / Debug 或签名 Release APK（需密码环境变量） |
-| `pnpm test:agent-browser` / `test:android:e2e` | AI E2E（入门禁）/ 模拟器 E2E（手动按需） |
-| `pnpm release` / `deploy(:dry)` | 交互式发布 / 落地页预览 |
+| `pnpm dev:android-host` / `build:android-host(:release)` | 宿主：安装调试包 / Debug 或签名 Release APK（需密码环境变量） |
+| `pnpm test:android-host` / `:unit` / `:e2e` | 宿主单测 / JVM(Robolectric) 单测 / 模拟器 E2E（手动按需） |
+| `pnpm release:android-host` / `deploy(:dry)` | 交互式发布 / 落地页预览 |
 
 ## Monorepo 结构
 
@@ -154,14 +154,15 @@ monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monor
 
 ## 架构
 
-`packages/app/src/` 分层（逐文件清单 → `openwiki/architecture/overview.md` §Component Architecture）：
+`packages/app-lynx/src/` 分层（逐文件清单 → `openwiki/architecture/overview.md` §Component Architecture）：
 
-- `api/` — Pixiv API 层（OAuth、双模式客户端、作品/小说/搜索/用户/评论）
-- `stores/` — SolidJS 状态（Feed、收藏、设置、主题等；顶层导出）
-- `routes/` — 页面组件；路由定义在独立的 `src/router.tsx`
-- `components/` — 可复用 UI（卡片、图片、查看器、面板、骨架屏等）
-- `primitives/` — 无 UI 逻辑原语（虚拟滚动、下拉刷新、滚动行为、小说布局/翻译等）
-- `native/` — 留存 WebView 桥接层（见 Notes）；`services/` 服务；`settings/` 设置；`utils/` 工具
+- `api/` — Pixiv API 层（OAuth、作品/小说/搜索/用户/评论；经原生模块出网）
+- `stores/` — Pinia 状态（Feed、收藏、设置、主题、更新、翻译等）
+- `pages/` / `components/` — 页面与可复用 UI；路由定义在独立的 `src/router.ts`
+- `primitives/` — 无 UI 逻辑原语（虚拟滚动、分页、图片构建、翻译器等）
+- `composables/` — 组合式逻辑；`utils/` 工具；`services/` 服务
+
+原生侧在 `@pictelio/android-host/android/app/src/`：`lynx/java/` 放 Lynx 原生模块（`LynxActivity`、各 `Pictelio*Module`），`main/java/` 放跨端共享核心（`PixivApiCore`、`SecureStorageCompat`、各编码器）。**「宿主包」不是客户端**——它只负责把客户端产物装进 APK 并发出去。
 
 ## 关键设计决策
 
@@ -219,6 +220,10 @@ Grill 澄清 → to-spec → to-tickets → implement
 **自我监督规则**：AI Agent 在收到任务后必须判断当前处于上述流程的哪个阶段，且只执行该阶段规定的行为。如果后续用户指令试图跨越阶段（例如 Grill 未完成就要求生成代码），Agent 必须主动指出阶段冲突并提醒正确流程，**不得静默违规、不得跳过环节**。
 
 ## Fluent Design 规范
+
+> ⚠️ **历史存档（ADR-0203）**：本章服务的是已删除的 WebView 客户端。
+> 唯一客户端 `pictelio-app-lynx` 使用 **Material Design 3**（见「约定」app-lynx 样式）。
+> 本章保留供决策史参考，**对新代码不具约束力**。
 
 本项目**强制**遵循 Microsoft Fluent Design System 2。以下规则无例外。
 
@@ -284,20 +289,20 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## 约定
 
-- **TS / 组件 / 状态 / 别名**：`strict: true`（+ noUnusedLocals 等 4 项，ESNext / bundler）；SolidJS 函数组件 `Component<Props>`、默认导出；createSignal / createStore 顶层导出；`@/` → `src/`
+- **TS / 组件 / 状态**：`strict: true`（+ noUnusedLocals 等 4 项，ESNext / bundler）；Vue 3 SFC + `<script setup lang="ts">`；Pinia store 顶层导出
 - **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 样式**默认优先 Tailwind utility**（`tailwind.config.ts`：spacing=vw / fontSize=rpx / M3 色板）；禁止手写 scoped CSS；特殊语义用 arbitrary utility（`min-h-[40vw]`、`[max-line:1]`）；web-core 预览禁 rem
 - **注释 / 命名**：中文注释为主（API 层与类型定义偏英文）；组件 PascalCase、工具/API/primitives camelCase
 - **Lint / 格式化**：vite-plus 内置 oxlint / oxfmt，唯一配置源 = 仓库根 `vite.config.ts`（correctness=error；app-lynx / website / docs / `**/*.md` 等豁免 → ADR-0185）
-- **Android**：`minSdkVersion = 28`（`variables.gradle`）；`SplashScreen.installSplashScreen()` **必须在 `super.onCreate()` 之前**（AndroidX 要求，见 `LynxActivity.java`）；平台要求 / WebView 门槛 / 引擎降级矩阵 → `docs/platform-compatibility.md`
-- **发布签名**：Release 用 `android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
+- **Android**：`minSdkVersion = 28`（`variables.gradle`）；`SplashScreen.installSplashScreen()` **必须在 `super.onCreate()` 之前**（AndroidX 要求，见 `LynxActivity.java`）；平台要求 → `docs/platform-compatibility.md`
+- **发布签名**：Release 用 `@pictelio/android-host/android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`
 - **Node**：22.22.2+（ADR-0080），pnpm 11.9.0（`devEngines` 强制校验）
 
 ## 测试
 
-- **框架**：Vitest 5.0.1（`vp test`）+ `happy-dom`（SolidJS server 姿态问题，ADR-0144）
-- **位置**：`tests/unit/**`（按源目录）、`tests/android-e2e/unit/**`（随 CI 跑）、`tests/agent-browser/specs/**`、`src/**/*.test.ts`；编写约定详版 = `packages/app/tests/TESTING.md`（本节为摘要）
-- **E2E 编排**：agent-browser 12 spec 本地门禁（pre-push 静态锚点）；android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/app/tests/android-e2e/specs/`
+- **框架**：Vitest 5.0.1（`vp test`）
+- **位置**：客户端 `packages/app-lynx/{src,tests}/**`；宿主 `packages/android-host/tests/{unit,android-e2e}/**`；编写约定详版 = `docs/testing/conventions.md`（本节为摘要）
+- **E2E 编排**：android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`。**agent-browser 套件已随 WebView 客户端删除，无替代**
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
 
 ### 门禁边界（#539 拍板，2026-09-15）
@@ -305,7 +310,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
-### 测试硬约束（违反视为架构违规；详版见 `packages/app/tests/TESTING.md`，编号一一对应）
+### 测试硬约束（违反视为架构违规；详版见 `docs/testing/conventions.md`，编号一一对应）
 
 1. **IO 边界测试强制覆盖**：外部数据读取函数必须有成功 + 失败/降级双路径单测
 2. **契约测试必须使用真实样例**：mock 来自真实数据源，禁手写自洽字段（`backupRulesConsistency.test.ts` 模式）
@@ -342,7 +347,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - 项目必须符合 Microsoft Fluent Design 风格；目录名为 `pixivizer`，项目名/包名为 Pictelio
 - 图片 CDN 走 `/pixiv-img/` 代理路径访问 `i.pximg.net`，非直连；**不要**在 HTML/CSS/JS 中硬编码 Pixiv CDN URL（`i.pximg.net`、`app-api.pixiv.net`）
-- `packages/app/src/native/` 属留存 WebView 客户端，无 Activity 承载，不参与构建与运行；Android 侧桥接实为 `android/app/src/lynx/java/` 原生模块
+- `packages/app/` 整包已随 ADR-0203 删除（WebView 客户端的源码、构建配置、依赖与专属测试）。Android 侧桥接实为 `@pictelio/android-host/android/app/src/lynx/java/` 原生模块；`capacitor-storage_` / `CapacitorStorage` 是**存量用户数据格式**，一字不改（ADR-0050）
 - **Conventional Commits**：commit-msg hook 经 commitlint 强制；type ∈ feat / fix / docs / style / refactor / perf / test / build / ci / chore / revert
 
 <!-- OPENWIKI:START -->

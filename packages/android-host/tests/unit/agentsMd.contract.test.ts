@@ -45,8 +45,13 @@ const agentsMd = readFileSync(join(REPO_ROOT, "AGENTS.md"), "utf8");
 const byteLength = Buffer.byteLength(agentsMd, "utf8");
 
 describe("AGENTS.md 契约（体积门禁）", () => {
-  it("总字节 ≤ 28,672B（28KiB 硬门槛，wayfinder #599）", () => {
-    expect(byteLength).toBeLessThanOrEqual(28_672);
+  // 阈值从 28,672 抬到 30,720（28KiB → 30KiB），ADR-0203 决策 2 的直接后果：
+  // 文档需新增宿主包（构建/发布/E2E 宿主）这一此前不存在的角色，
+  // 并把命令表与架构分层改指唯一客户端——净变化方向不定（加长与删行相互抵消）。
+  // **不得**因此把门禁放宽到失去约束力：它的存在意义是阻止本文件无限膨胀，
+  // 而「每次都调阈值」会让它退化成装饰。抬到 30KiB 已给足本次改写的余量。
+  it("总字节 ≤ 30,720B（30KiB 硬门槛，ADR-0203 后重设）", () => {
+    expect(byteLength).toBeLessThanOrEqual(30_720);
   });
 
   it("行数锚点：~300 行观察指标（#599 双锚之观察项，不设硬门禁，超阈仅提示）", () => {
@@ -182,9 +187,14 @@ describe("AGENTS.md 契约（单引擎门面，ADR-0201）", () => {
   // 本断言把「锚点存在且逐字」变成门禁。oracle = ADR-0201 决策 2 + glossary §措辞锚点 首句。
   // ⚠️ 覆盖面仅 AGENTS.md 一处：落地页与 README 无测试接缝，改动它们仍须人工比对术语文档
   //    （缺口已由 glossary §措辞锚点 的「机器强制」表与 ADR-0201 后果段显式披露，非静默）。
-  it("措辞锚点逐字存活（AGENTS.md 侧防门面分叉，ADR-0201 决策 2）", () => {
-    expect(agentsMd).toContain("WebView 客户端已随 #610 下线");
-    expect(agentsMd).toContain("唯一运行时形态");
+  //
+  // ADR-0203 起锚点改用 `glossary-webview-client-removal.md` §措辞锚点 的新表述：
+  // 旧锚点「WebView 客户端已随 #610 下线 / 唯一运行时形态」只描述**运行时**下线，
+  // 在源码删除后是不完整的——它会让人以为源码还在。ADR-0203 把它扩为
+  // 「运行时随 #610 下线 + 源码与依赖随 ADR-0203 删除」两段式，正是为了堵这个缺口。
+  it("措辞锚点逐字存活（AGENTS.md 侧防门面分叉，ADR-0201 决策 2 + ADR-0203 扩写）", () => {
+    expect(agentsMd).toContain("WebView 客户端的运行时随 #610 下线");
+    expect(agentsMd).toContain("其源码与依赖随 ADR-0203 删除");
   });
 });
 
@@ -215,11 +225,12 @@ describe("AGENTS.md 契约（单引擎门面，ADR-0201）", () => {
  * 该规则是**语义**判定（后缀 vs 命令）而非字面量匹配，字段改名不会让它漏过。
  */
 describe("AGENTS.md 契约（根命令表可达性，spec 用户故事 16）", () => {
-  const rootScripts = (
-    JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
-      scripts?: Record<string, string>;
-    }
-  ).scripts ?? {};
+  const rootScripts =
+    (
+      JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
+        scripts?: Record<string, string>;
+      }
+    ).scripts ?? {};
 
   /**
    * 从「## 命令」小节的表格行里抽出所有具体命令名（去重、保序）。

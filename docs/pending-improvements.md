@@ -1,5 +1,11 @@
 # 待改进项
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端的运行时已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 下线，其**源码、构建配置、依赖与专属测试**
+> 已随 [ADR-0203](adr/ADR-0203-webview-client-source-removal.md) 整包删除。
+> 本文正文**一字未改**，保留供决策史参考；其中的路径、命令与文件清单**均已失效**，勿照抄执行。
+> 当前形态见 [glossary-webview-client-removal](adr/glossary-webview-client-removal.md)。
+
 本文件记录项目中已识别但尚未实施的体验改进与已知问题，便于后续单独跟进。
 
 ## 代理/网络错误反馈未闭环

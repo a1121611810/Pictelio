@@ -39,14 +39,7 @@
  * 必须报出行号与码位。扫描逻辑日后被重构，这条也跟着一起验。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,11 +92,13 @@ function firstControlChar(text: string): { line: number; code: number } | undefi
 
 /** 把一批文件跑一遍检测，返回违规清单（与上面那条全称断言同一个函数）。 */
 function scanOffenders(paths: string[]): { f: string; hit: { line: number; code: number } }[] {
-  return paths
-    .map((f) => ({ f, hit: firstControlChar(readFileSync(f, "utf8")) }))
-    // ⚠️ 必须用**类型谓词**而不是 `.filter((x) => x.hit !== undefined)`：
-    // 后者不收窄类型，TS 仍认为 hit 可能是 undefined，调用方 `.map` 取 line/code 即报错。
-    .filter((x): x is { f: string; hit: { line: number; code: number } } => x.hit !== undefined);
+  return (
+    paths
+      .map((f) => ({ f, hit: firstControlChar(readFileSync(f, "utf8")) }))
+      // ⚠️ 必须用**类型谓词**而不是 `.filter((x) => x.hit !== undefined)`：
+      // 后者不收窄类型，TS 仍认为 hit 可能是 undefined，调用方 `.map` 取 line/code 即报错。
+      .filter((x): x is { f: string; hit: { line: number; code: number } } => x.hit !== undefined)
+  );
 }
 
 describe("源码控制字节防线（裸 NUL 会让 grep 对该文件后半段静默失明）", () => {
@@ -162,7 +157,11 @@ describe("阳性对照：检测式本身必须能抓到裸 NUL（改动前就已
     // 逐字符写入，避免任何 shell / 编辑器转义把 NUL 吃掉——本仓的原始事故
     // 就是「以为写进去了、实际没写进去」才逃过 grep 的。
     // NUL 放在**第 2 行**：若行号恒返回 1，本断言也会绿——那就不是真在数行。
-    writeFileSync(victim, `const HEADER = "ok";\nconst SENTINEL = "${NUL}";\nconst AFTER = 1;\n`, "utf8");
+    writeFileSync(
+      victim,
+      `const HEADER = "ok";\nconst SENTINEL = "${NUL}";\nconst AFTER = 1;\n`,
+      "utf8",
+    );
   });
 
   afterAll(() => {

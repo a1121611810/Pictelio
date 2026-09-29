@@ -115,6 +115,13 @@ dev:android、build:android、test:agent-browser、test:android:e2e、release
 入口行指向 `packages/app-lynx` 且不含 `packages/app/src`。
 注意纯负面断言会被「删掉整行」骗过，所以**必须保留正向点名**。
 
+**订正 3：存档横幅只加在操作文档，不做全量覆盖。**
+按「正文含 `packages/app` 即加横幅」做机械匹配会命中 218 篇，
+其中大量是 Lynx 侧**仍然有效**的 ADR（引擎决策、图像流水线、鉴权流程等）。
+给它们挂「已随 WebView 客户端下线」的横幅，是把当前有效文档误标为已废止——
+比不改更坏。实际只对 14 篇操作文档（Quick Start 手册、发布清单、测试约定等）加横幅，
+其余留待逐篇人工判读。
+
 ## 反例警示
 
 - **不得**断言「全仓 `capacitor` 字样为 0」。

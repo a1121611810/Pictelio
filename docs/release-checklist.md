@@ -54,17 +54,19 @@
 | 验证项             | 命令                                                | 结果                                                         |
 | ------------------ | --------------------------------------------------- | ------------------------------------------------------------ |
 | 格式化             | `pnpm fmt`                                          | ✅ 通过（134 文件，863 ms）                                  |
-| 类型检查与代码检查 | `pnpm check`                                        | ✅ 通过（格式化 + lint 均无问题）                            |
-| 单元测试           | `pnpm test -- --run`                                | ✅ 通过（6 个测试文件，48 个测试）                           |
-| 生产构建           | `pnpm build`                                        | ✅ 成功生成 `dist/`                                          |
-| Android Debug 构建 | `cd android && ./gradlew assembleDebug --no-daemon` | ✅ `BUILD SUCCESSFUL`（213 个任务，27 执行，186 up-to-date） |
+| 类型检查与代码检查 | `pnpm check` / `pnpm check:android-host`             | ✅ 通过（格式化 + lint 均无问题）                            |
+| 单元测试           | `pnpm test`                                         | ✅ 通过（客户端 + 宿主包）                                   |
+| 仓库不变量总闸     | `pnpm test:android-host`                            | ✅ 7 组不变量全绿（WebView 客户端已删除的权威判据）           |
+| 生产构建           | `pnpm build`                                        | ✅ 成功生成客户端产物                                        |
+| Android Debug 构建 | `pnpm build:android-host`                           | ✅ 产出可安装 APK                                            |
 
-> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release` 生成**单个**签名 APK。
+> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android-host:release` 生成**单个**签名 APK。
 >
-> 注（单引擎）：`build:android:release` 已内置 Lynx bundle 构建与同步（`pnpm --dir ../app-lynx run build` → `node ../app-lynx/scripts/sync-android-assets.mjs`）。若 APK 缺 `main.lynx.bundle`，LynxActivity 将加载失败（历史白屏问题，见 #51）；构建完成后可检查 `packages/app/android/app/src/main/assets/main.lynx.bundle` 是否存在。
+> 注（单引擎）：`build:android:release` 已内置 Lynx bundle 构建与同步（`pnpm --dir ../app-lynx run build` → `node ../app-lynx/scripts/sync-android-assets.mjs`）。若 APK 缺 `main.lynx.bundle`，LynxActivity 将加载失败（历史白屏问题，见 #51）；构建完成后可检查 `packages/android-host/android/app/src/main/assets/main.lynx.bundle` 是否存在，并确认 APK 内**不含** `assets/public/`（WebView web 产物，已随 ADR-0203 彻底下线）。
 >
 > ⚠️ **2026-09-28 单引擎化后变更**（[c6ade216](https://github.com/a1121611810/Pictelio/pull/810)）：`full` / `webview` flavor 与 WebView / Capacitor 构建链已整体删除。
 > - `pnpm build:android:release:all`（三 APK）与 `pnpm cap:sync` **已不存在**，照抄会 command not found。
+> - **2026-09-29（ADR-0203）**：WebView 客户端整包删除后，裸命令一律指向唯一客户端；宿主包动作全部显式命名为 `*:android-host`（见 ADR-0204）。`pnpm test:agent-browser` 随套件删除，无替代。
 > - 一个版本只产**一个** APK，无「选哪个包发布」这一步。
 
 ---
@@ -131,7 +133,7 @@ GitHub Release 已发布完成。
 - **命令**：`PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 pnpm run release`（交互流程与其余步骤完全不变）。
 - **三处一并切换**：分支校验、远端分叉预检（`origin/<branch>`）、step 5 `git push origin <branch> --tags`。**必须一起切**——只放开 push 而预检仍比对 main，就会产生 P2 注释要防的故障：tag 指向一个远端不存在的 commit。
 - **安全约束**：不设变量时行为与从前逐字相同（恒为 `main`）；设了变量**仍强制**人必须处在该分支上（不会出现「人在 A 分支、发到 B 分支」）；非 main 时在分支校验处与发布确认页各打一条 ⚠ 告警，确认页会显式列出「目标分支」。
-- **不适用**：`pnpm release -o` 覆盖发布不动 tag/commit，无需此开关。
+- **不适用**：`pnpm release:android-host -o` 覆盖发布不动 tag/commit，无需此开关。
 - 单测：`tests/unit/scripts/release-branch.test.ts`（开关解析/校验/告警）+ `release-preflight.test.ts`（非 main 分支的真 git 拓扑，含「指定分支分叉但 main 干净」的阳性/阴性对照，证明参数确实换了被检引用）。
 
 ## 上传网络说明（2026-08 研究结论，详见 `docs/research/github-release-upload-acceleration.md` 与 ADR-0067）

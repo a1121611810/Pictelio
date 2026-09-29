@@ -134,8 +134,7 @@ describe("收集防线：android-e2e 契约单测必须进 pnpm test → test:al
     const regexes = globs.map(globToRegExp);
 
     const notCollected = CONTRACT_UNIT_TESTS.filter(
-      (t) =>
-        !regexes.some((re) => re.test(`${CONTRACT_DIR_REL}/${t.file}`)),
+      (t) => !regexes.some((re) => re.test(`${CONTRACT_DIR_REL}/${t.file}`)),
     ).map((t) => t.file);
     expect(
       notCollected,

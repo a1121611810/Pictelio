@@ -72,7 +72,10 @@ let ctx: AndroidE2eContext;
 
 /** APK 内 bundle 必须含详情页深链钩子（BENCH_NAV=1 整链构建），否则 spec 红并给指令 */
 function assertDeepLinkHookPresent(): void {
-  const bundle = resolve(REPO_ROOT, "packages/android-host/android/app/src/main/assets/main.lynx.bundle");
+  const bundle = resolve(
+    REPO_ROOT,
+    "packages/android-host/android/app/src/main/assets/main.lynx.bundle",
+  );
   const r = runCapture("grep", ["-a", "-c", "pictelioBenchNavIllustDetail", bundle]);
   if (r.stdout.trim() === "0") {
     throw new Error(

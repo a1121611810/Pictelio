@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="packages/app/assets/logo/pictelio-logo.svg" width="120" height="120" alt="Pictelio Logo">
+  <img src="assets/brand/pictelio-logo.svg" width="120" height="120" alt="Pictelio Logo">
   <h1 align="center">Pictelio</h1>
   <p align="center">
     <strong>A third-party Pixiv browser</strong>
     <br>
-    Pictelio 自 v6.3.0 起为 <strong>Lynx 单引擎</strong>客户端，原 WebView 客户端已随 #610 整体下线。
+    Pictelio 是 <strong>Lynx 单引擎</strong>客户端。WebView 客户端的运行时随 #610 下线，
     <br>
-    该客户端为唯一运行时形态；<code>packages/app/src/</code> 中的 WebView 源码仍在库中但不参与构建与运行。
+    其源码与依赖随 ADR-0203 删除，仓库中不再保留。
   </p>
   <p align="center">
     <a href="https://github.com/a1121611810/pixivizer/blob/main/LICENSE">
@@ -67,24 +67,23 @@
 
 ```bash
 pnpm install
-pnpm dev          # Vite dev server at localhost:5173
+pnpm dev          # Lynx 客户端开发服务器
 ```
 
-> `pnpm dev` is the retained WebView client dev server (`pictelio-app`); its sources stay in the repo but are not
-> built or shipped (see the single-engine note at the top). Browser development of the Lynx client — the shipping
-> app — uses `pnpm dev:app-lynx`. Both reach Pixiv over an HTTP proxy: the project reads `https_proxy` / `HTTP_PROXY`
-> env vars and falls back to `http://127.0.0.1:7897`.
+> 裸命令（`dev` / `build` / `check` / `test` / `preview`）一律指向唯一客户端 `pictelio-app-lynx`（ADR-0204）。
+> 客户端经 HTTP 代理访问 Pixiv：项目读取 `https_proxy` / `HTTP_PROXY` 环境变量，
+> 回退 `http://127.0.0.1:7897`。
 
 ```
-https_proxy=http://127.0.0.1:7890 pnpm dev:app-lynx
+https_proxy=http://127.0.0.1:7890 pnpm dev
 ```
 
 **Build APK:** Requires Android Studio, JDK 21, Android SDK (minSdkLevel=28).
 
 ```bash
-pnpm build:android          # Debug APK
-pnpm build:android:release  # Signed Release APK
-pnpm dev:android            # Hot-reload development
+pnpm build:android-host          # Debug APK
+pnpm build:android-host:release  # Signed Release APK
+pnpm dev:android-host            # 构建并安装调试包到设备
 ```
 
 See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platform requirements and [`docs/release-signing.md`](docs/release-signing.md) for release signing.
@@ -102,8 +101,8 @@ See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platf
 ```
 pixivizer/
 ├── packages/
-│   ├── app/               # pictelio-app — SolidJS SPA sources, retained in-repo but not built or shipped
-│   ├── app-lynx/          # pictelio-app-lynx — vue-lynx client, the shipping app (login / recommended / novel / profile)
+│   ├── app-lynx/          # pictelio-app-lynx — vue-lynx 客户端，唯一运行时形态（登录 / 推荐 / 小说 / 我的）
+│   ├── android-host/      # @pictelio/android-host — 构建宿主：Gradle 工程 / 发布脚本 / 原生 E2E（不是客户端）
 │   ├── ugoira/            # @pictelio/ugoira — Ugoira (Pixiv animated illust) zip frame-processing pure functions
 │   ├── update-check/      # @pictelio/update-check — shared update-check library (version compare / version.json fetch)
 │   ├── novel-export/      # @pictelio/novel-export — shared novel multi-format export library (extract / block parse / payload)
@@ -123,36 +122,36 @@ pixivizer/
 <details>
 <summary>Click to expand</summary>
 
-Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): the root `package.json` is the authoritative
-script list. A bare command targets `pictelio-app` by default, `<command>:<package-dir>` targets the matching workspace
-package, and `<command>:all` runs every package that has that script, in parallel. `lint` / `fmt` / `fmt:check` /
-`outdated` are the exceptions: they are repo-wide single commands with no `<command>:<package>` variant.
+Command convention (see `docs/adr/ADR-0204-root-command-naming.md`): the root `package.json` is the authoritative
+script list. The five **bare** commands (`dev` / `build` / `check` / `test` / `preview`) target the only client,
+`pictelio-app-lynx`. Host-package actions are **always explicitly named** with an `:android-host` suffix and never take
+a bare name — building an APK is not "developing the app", and the command name should say so.
+`<command>:<package-dir>` targets the matching workspace package, and `<command>:all` runs every package that has that
+script, in parallel. `lint` / `fmt` / `fmt:check` / `outdated` are repo-wide single commands with no package variant.
 
 | Command | Description |
 |:--------|:------------|
-| `pnpm dev` | Start `pictelio-app` Vite dev server (localhost:5173) |
-| `pnpm dev:app` | Same as `pnpm dev` (explicit alias) |
-| `pnpm dev:app-lynx` | Start `pictelio-app-lynx` dev server |
+| `pnpm dev` | Start the `pictelio-app-lynx` dev server (the only client) |
+| `pnpm dev:app-lynx` | Same as `pnpm dev` (explicit alias) |
 | `pnpm dev:website` | Start landing page (Astro) dev server |
 | `pnpm dev:all` | Start all dev servers in parallel |
-| `pnpm build` | Vite build via vite-plus (`pictelio-app`); use `pnpm check` for type-check |
-| `pnpm build:app-lynx` | Build `pictelio-app-lynx` |
+| `pnpm build` | Build `pictelio-app-lynx` |
 | `pnpm build:website` | Build landing page |
-| `pnpm check` | TypeScript type-check only (`pictelio-app`) |
-| `pnpm check:app-lynx` | Type-check `pictelio-app-lynx` |
-| `pnpm check:ugoira` | Type-check `@pictelio/ugoira` |
+| `pnpm check` | Type-check `pictelio-app-lynx` |
+| `pnpm check:android-host` | Type-check the host package |
 | `pnpm check:all` | Type-check all packages in parallel |
-| `pnpm preview` | Preview production build (`pictelio-app`) |
-| `pnpm test` | Run Vitest unit tests (`pictelio-app`) |
+| `pnpm preview` | Preview the production build of `pictelio-app-lynx` |
+| `pnpm test` | Run `pictelio-app-lynx` Vitest unit tests |
+| `pnpm test:android-host` | Run host package unit tests (incl. the repo-invariant contract gate) |
+| `pnpm test:android-host:unit` | Run JVM / Robolectric native unit tests |
+| `pnpm test:android-host:e2e` | Run Appium E2E tests on the Android emulator (manual) |
 | `pnpm test:all` | Run all packages' unit tests in parallel |
-| `pnpm test:app:all` | Run `pictelio-app` unit tests + agent-browser E2E |
-| `pnpm test:agent-browser` | Run AI-driven E2E browser tests |
-| `pnpm test:android:e2e` | Run Appium E2E tests on the Android emulator |
 | `pnpm lint` | Run oxlint across the repo (single config source: root `vite.config.ts`) |
 | `pnpm fmt` | Run oxfmt formatter across the repo |
-| `pnpm build:android` | Build Debug APK |
-| `pnpm build:android:release` | Build signed Release APK |
-| `pnpm dev:android` | Hot-reload Android development |
+| `pnpm build:android-host` | Build Debug APK |
+| `pnpm build:android-host:release` | Build signed Release APK |
+| `pnpm dev:android-host` | Build the debug APK and install it on the connected device |
+| `pnpm release:android-host` | Interactive release flow |
 | `pnpm sync:app-lynx-bundle` | Sync lynx bundle into Android assets |
 | `pnpm release` | Interactive one-shot release (bump version → build → tag → GitHub Release) |
 | `pnpm deploy` | Preview landing page to `_site/` |

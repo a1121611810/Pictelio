@@ -15,13 +15,17 @@
 
 | 层级         | 配置                             | 命令                      | 用途                                                             | 速度 |
 | ------------ | -------------------------------- | ------------------------- | ---------------------------------------------------------------- | ---- |
-| **单元测试** | `vitest.config.ts`               | `pnpm test`               | 纯逻辑：store、utils、API 参数验证                               | 快   |
-| **E2E 测试** | `vitest.agent-browser.config.ts` | `pnpm test:agent-browser` | AI 驱动 E2E：用户流、页面渲染、交互                              | 慢   |
-| **全量**     | —                                | `pnpm test:app:all`       | app 单测 + agent-browser E2E（所有包单测并行用 `pnpm test:all`） | —    |
+| **单元测试** | `vitest.config.ts`               | `pnpm test`               | 纯逻辑：store、utils、API 参数验证（唯一客户端）                 | 快   |
+| **仓库不变量** | `packages/android-host/vitest.config.ts` | `pnpm test:android-host` | WebView 客户端是否已彻底删除的权威判据（7 组不变量） | 快 |
+| **E2E 测试** | `vitest.agent-browser.config.ts` | ~~`pnpm test:agent-browser`~~ | ~~AI 驱动 E2E~~ **已随客户端删除**                   | —    |
+| **全量**     | —                                | `pnpm test:all`           | 所有包单测并行                                                    | —    |
 
 > **命令失效提示**：`pnpm test:agent-browser` 与 `pnpm test:app:all` 依赖 WebView 客户端的
 > Vite dev server（端口 5173），随客户端删除**整轮不可用**，无替代实现
 > （见 ADR-0203 §后果第 4 条）。本表中标注 WebView-only 的章节同理。
+>
+> 替代入口：模拟器 E2E 走 `pnpm test:android-host:e2e`（手动），
+> JVM / Robolectric 原生单测走 `pnpm test:android-host:unit`（随 CI 跑）。
 
 ### app-lynx 侧的单测与 E2E
 

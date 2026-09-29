@@ -108,7 +108,10 @@ import {
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 证据落盘目录（被 gitignore，仅本地取证用） */
-const EVIDENCE_DIR = resolve(REPO_ROOT, "packages/android-host/test-results/android-e2e/transition-matrix");
+const EVIDENCE_DIR = resolve(
+  REPO_ROOT,
+  "packages/android-host/test-results/android-e2e/transition-matrix",
+);
 mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 lynx-bookmark-tags / fab 回归）：坐标常量绑定 pictelio_ui ──
@@ -362,7 +365,10 @@ function assertDeviceGeometry(s: string): void {
 
 /** APK 内 lynx bundle 必须含 benchNav 深链钩子（BENCH_NAV=1 整链构建），否则快速失败并给指令。 */
 function assertDeepLinkHookPresent(): void {
-  const bundle = resolve(REPO_ROOT, "packages/android-host/android/app/src/main/assets/main.lynx.bundle");
+  const bundle = resolve(
+    REPO_ROOT,
+    "packages/android-host/android/app/src/main/assets/main.lynx.bundle",
+  );
   for (const hook of ["pictelioBenchNavIllust", "pictelioBenchNavCarousel"]) {
     const r = runCapture("grep", ["-a", "-c", hook, bundle]);
     if (r.stdout.trim() === "0") {

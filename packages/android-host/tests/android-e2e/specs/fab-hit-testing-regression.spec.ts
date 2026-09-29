@@ -187,7 +187,10 @@ function assertLynxActivityForeground(serial: string, context: string): void {
 }
 
 /** 证据落盘目录（被 gitignore，仅本地取证用） */
-const EVIDENCE_DIR = resolve(REPO_ROOT, "packages/android-host/test-results/android-e2e/fab-hit-testing");
+const EVIDENCE_DIR = resolve(
+  REPO_ROOT,
+  "packages/android-host/test-results/android-e2e/fab-hit-testing",
+);
 mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 /**
