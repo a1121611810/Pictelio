@@ -1,15 +1,21 @@
 ---
 type: Concept
 title: Testing Strategy
-description: Two testing tiers — unit tests (Vitest) and AI agent-driven browser E2E tests (agent-browser). Component tests and Playwright E2E have been migrated to agent-browser per ADR-0034/ADR-0035.
-tags: [testing, vitest, agent-browser, e2e, unit-tests]
+description: Two testing tiers after the single-engine consolidation — unit tests (app-lynx + android-host Vitest/JVM) and Android emulator E2E (Appium + WebdriverIO). The agent-browser and Playwright/component suites were removed with the WebView client in ADR-0203.
+tags: [testing, vitest, e2e, unit-tests, android-host, app-lynx]
 ---
 
 # Testing Strategy
 
-Pictelio uses three active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). The third tier (Android emulator E2E) was introduced in v4.0.0 per [ADR-0061](/docs/adr/ADR-0061-android-emulator-e2e-gate.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
+Pictelio now has **two active testing tiers** after the single-engine consolidation ([ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md)): **unit tests** (`pictelio-app-lynx` Vitest + `@pictelio/android-host` Vitest/JVM) and **Android emulator E2E** (Appium + WebdriverIO under `packages/android-host/tests/android-e2e/`). The former agent-browser (AI-driven browser E2E) suite and the Playwright/component suites were removed with the WebView client (`packages/app`) — the section below documenting them is retained as history.
 
-The `app-lynx` package has its own separate test suite — ~260 unit test cases covering image URL rewriting, error classification, OAuth error recognition, novel body extraction (incl. `requestRaw`), route matching, `isRestricted` R18/R18G mask logic, `createMixFeed` merging, comment primitives, and error presentation (Vitest, run via `pnpm --filter pictelio-app-lynx test`). The `vitest.config.ts` `include` pattern covers both `tests/**/*.test.ts` and `src/**/*.test.ts` (extended in issue #91 for co-located store tests). Key test files:
+The `app-lynx` package has its own separate unit test suite — ~260 cases covering image URL rewriting, error classification, OAuth error recognition, novel body extraction (incl. `requestRaw`), route matching, `isRestricted` R18/R18G mask logic, `createMixFeed` merging, comment primitives, and error presentation (Vitest, run via `pnpm test`).
+
+```mermaid
+flowchart TD
+    U["Unit Tests (app-lynx + android-host Vitest)"] --> S["Pure logic: API, utils, stores, router"]
+    E["Android E2E Tests (android-host)"] --> EMU["Appium + WebdriverIO on Android emulator / physical device"]
+```
 - [`lynx-device-check.sh`](/packages/app-lynx/scripts/lynx-device-check.sh) — automated login→recommended page→image ratio check via adb
 - [`lynx-flow-check.sh`](/packages/app-lynx/scripts/lynx-flow-check.sh) — comprehensive full-process device flow check: login → feed scroll → bookmark → illust detail → novel list/reader → Me/R18 toggle → settings page scroll (issue #90). Features resolution-adaptive coordinate scaling and `SETTINGS_ONLY=1` for targeted regression.
 - [`lynx-screen-analyze.py`](/packages/app-lynx/scripts/lynx-screen-analyze.py) — PNG screenshot analyzer with `classify` (page-state identification), `login-elements` (input/button detection), and `topbar-nav` (dynamic top-bar text block detection for resolution-independent tab targeting) modes
@@ -24,15 +30,16 @@ flowchart TD
 
 ## Test Tiers
 
-### 1. Unit Tests (`tests/unit/`)
+### 1. Unit Tests (app-lynx + android-host)
 
-- **Runner:** Vitest (`vitest.config.ts`)
+- **Runners:** `pnpm test` (app-lynx Vitest, co-located `tests/**/*.test.ts` + `src/**/*.test.ts`), `pnpm test:android-host` (android-host Vitest), and `pnpm test:android-host:unit` (android-host JVM/Gradle `testDebugUnitTest`).
 - **Scope:** Pure logic — API layer, utilities, stores, router definitions, services, primitives
-- **No DOM required** — tests run in Node.js
-- **Key pattern:** `createManualFetch` (`/packages/app/src/primitives/createManualFetch.ts`) — a test-oriented primitive that allows injecting mock responses into the API client, simulating any Pixiv API response without actual network calls
-- Runs via: `pnpm test`
+- **No DOM required** — tests run in Node.js (plus Robolectric/JVM for android-host Java unit tests)
+- Runs via: `pnpm test` (app-lynx) / `pnpm test:android-host` / `pnpm test:android-host:unit`
 
-### 2. Agent-Browser E2E Tests (`tests/agent-browser/`)
+### 2. Agent-Browser E2E Tests — REMOVED (ADR-0203)
+
+> **Removed** with the WebView client (`packages/app/tests/agent-browser/`, 16 spec files) in [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md). The `pnpm test:agent-browser` script no longer exists. The detailed documentation below is retained for history only.
 
 - **Runner:** Vitest (`vitest.agent-browser.config.ts`)
 - **Scope:** AI-driven user flow verification — covers core user flows, UI component behavior, page navigation, and settings
@@ -67,19 +74,21 @@ Previously Pictelio had:
 
 Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
 
-### 3. Android E2E Tests (`tests/android-e2e/`)
+### 3. Android E2E Tests (`packages/android-host/tests/android-e2e/`)
 
-- **Runner:** Vitest (`vitest.config.ts` via `pnpm --filter pictelio-app test -- --project android-e2e`)
-- **Scope:** On-device testing via Appium + WebdriverIO on Android emulator (or physical device), verifying APK build→install→Activity assertion→WebView context switch workflows
+- **Runner:** Vitest via `pnpm test:android-host:e2e` (or `pnpm --filter @pictelio/android-host exec vitest run -c tests/android-e2e/vitest.config.ts`).
+- **Scope:** On-device testing via Appium + WebdriverIO on an Android emulator (or physical device) — APK build → install → Activity assertion. Single-engine: `LynxActivity` is the only entry (`MainActivity`/`MainActivityWebview` removed with the WebView client), so there is no WebView↔native context switching.
+- **Manual:** [`packages/android-host/tests/android-e2e/README.md`](/packages/android-host/tests/android-e2e/README.md) — AVD setup (`pictelio_ui`/`pictelio_low`), env vars (`ANDROID_E2E_AVD`, `ANDROID_E2E_SKIP_BUILD`, …), and the `BENCH_NAV=1` deep-link hook.
 - **Infrastructure:** [ADR-0061](/docs/adr/ADR-0061-android-emulator-e2e-gate.md), specs at `/docs/specs/android-emulator-e2e-gate.md`
-- **Key specs:**
-  - `smoke.spec.ts` — APK install + main Activity assertion
-  - `client-kind-contract.spec.ts` — Verifies `ClientInfoPlugin.getClientKinds()` per-flavor
-  - `switch-client-oneway.spec.ts` — WebView → Lynx one-way switch, verifying SharedPreferences write via polling
-  - `switch-client-roundtrip.spec.ts` / `switch-client-roundtrip-low.spec.ts` — Full round-trip switch
-- **APK path (v4.0.0+):** `android/app/build/outputs/apk/full/debug/app-full-debug.apk` — reflects the Gradle flavor split (previously `app-debug.apk` under `apk/debug/`)
-- **Physical device support (issue #120):** Set `ANDROID_E2E_SERIAL` to target a connected physical device (e.g., OPPO R11s) instead of an emulator. Physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs. On physical devices, APK install is skipped (ColorOS "PC install attack" blocks adb install), and `pm clear` is replaced with `run-as` data directory cleanup.
-- **Polling-based write verification (`switch-client-oneway.spec.ts`):** SharedPreferences write via Capacitor bridge is async (`apply`, not `commit`). A fixed 2s sleep was unreliable on slow emulators. Now uses a 15s polling loop (1s interval) to wait for `pictelio_client_kind=lynx` to appear.
+- **Key specs (10):**
+  - `smoke.spec.ts` — APK install + `LynxActivity` assertion
+  - `background-resume.spec.ts` — 缩小恢复 (liveness) guard: background → tap icon → still the same `LynxActivity` task-root instance (no stacking, no new JS runtime, PID unchanged; ADR-0102)
+  - `transition-matrix.spec.ts` — `@release-gate` content-comparison matrix (list surface × user action × engine × assertion; ADR-0163)
+  - `webdav-backup-lynx.spec.ts` — lynx WebDAV backup chain, default-skipped (`WEBDAV_E2E_ENABLED=1`)
+  - `fab-hit-testing-regression.spec.ts`, `lynx-bookmark-tags.spec.ts`, `lynx-boot-renders.spec.ts`, `lynx-detail-image-probe.spec.ts`, `lynx-network-check.spec.ts`, `settings-sync-contract.spec.ts`
+- **Removed specs:** `client-kind-contract.spec.ts` and the `switch-client-*` family were deleted with the client-switch capability (ADR-0203 decision 7).
+- **APK path:** `build.gradle` no longer has product flavors — the single flavor produces `app-debug.apk` / `app-release.apk`.
+- **Physical device support:** set `ANDROID_E2E_SERIAL` (plus `ANDROID_E2E_AVD`) to target a connected physical device; physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs.
 - **System bars acceptance workflow (ADR-0168, v5.3.0):** a separate manual [`sysbars-acceptance.yml`](/.github/workflows/sysbars-acceptance.yml) runs the lynx system-bars acceptance matrix on a GitHub runner (KVM emulator, API 35/36 input) — the escape hatch when the local network to `dl.google.com` is blocked. It is **assertion-based** (any failing assertion red-lights the job, not a passive recorder) and covers the API 36 gap that the local T4 matrix could not run. The local matrix lives in [`docs/research/lynx-systembars-t4-acceptance.md`](/docs/research/lynx-systembars-t4-acceptance.md).
 
 ## CI & E2E Drift Prevention (ADR-0084, ADR-0085)
@@ -98,7 +107,9 @@ An audit ([`agent-browser-e2e-perf-direction-c-feasibility.md`](/docs/agent-brow
 
 ### Static anchor validation
 
-The `.husky/pre-push` hook delegates to [`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) (ADR-0142), which runs [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touches `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracts anchors referenced in the specs and verifies them against `src/`:
+> **Post-ADR-0203:** the WebView E2E-anchor domain (`packages/app` → `check-e2e-anchors.mjs`) was **removed** with the WebView client; its `data-testid`/`aria-label`/route hard checks are historical. The remaining pre-push gates are the app-lynx anchor check and the `.agents/` skill check (see below).
+
+The `.husky/pre-push` hook delegates to [`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) (ADR-0142), which previously ran [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touched `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracted anchors referenced in the specs and verified them against `src/`:
 
 - **Hard checks (failure blocks push):** `data-testid` references, `aria-label` / `placeholder` attribute selectors, route paths (segment-matched against `src/router.tsx`, with a `KNOWN_CATCH_ALL_PATHS` whitelist), and element tag selectors.
 - **Soft checks (warning only):** CSS class selectors (UnoCSS builds classes dynamically) and `clickReliable`/`clickButtonByText` key text.
@@ -107,7 +118,7 @@ The `.husky/pre-push` hook delegates to [`scripts/check-push-refs.mjs`](/scripts
 
 ### Pre-push orchestration & app-lynx gate (ADR-0141 F4, ADR-0142)
 
-[`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) is the pre-push orchestration layer: `.husky/pre-push` is now only a thin shell passing the pre-push protocol through. It runs three domain checks based on the touched paths — app (the E2E-anchor check above), **app-lynx** ([`check-app-lynx-anchors.mjs`](/packages/app-lynx/scripts/check-app-lynx-anchors.mjs), running `pnpm test` over `packages/app-lynx`; closes the ADR-0141 F4 gap where app-lynx test failures passed silently), and `.agents/` (`verify-agent-skills.mjs`). It also handles the remote ref: a locally-missing `remote_sha` triggers a precise `git fetch` retry (then fail-open with a warn if fetch fails), and true divergence fails closed with a human-readable rebase/force-push hint — the fix for the `fatal: Invalid revision range` failure that broke `pnpm release` before the OpenWiki CI merged a docs commit (ADR-0142). Shared git primitives (`hasCommitObject`/`fetchRemoteRef`/`isAncestor`/`diffNames`/`mergeBase`/`diffTreeNames`) live in [`packages/app/scripts/lib/git-refs.mjs`](/packages/app/scripts/lib/git-refs.mjs); the app-lynx migration also landed with `50 files / 804 tests` green and `1103` workspace tests.
+[`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) is the pre-push orchestration layer: `.husky/pre-push` is now only a thin shell passing the pre-push protocol through. It runs a **format gate** (ADR-0195) plus **two domain checks** based on the touched paths — **app-lynx** ([`check-app-lynx-anchors.mjs`](/packages/app-lynx/scripts/check-app-lynx-anchors.mjs), running `pnpm test` over `packages/app-lynx`; closes the ADR-0141 F4 gap where app-lynx test failures passed silently) and `.agents/` (`verify-agent-skills.mjs`). The WebView E2E-anchor domain was removed in ADR-0203. It also handles the remote ref: a locally-missing `remote_sha` triggers a precise `git fetch` retry (then fail-open with a warn if fetch fails), and true divergence fails closed with a human-readable rebase/force-push hint — the fix for the `fatal: Invalid revision range` failure that broke `pnpm release` before the OpenWiki CI merged a docs commit (ADR-0142). Shared git primitives (`hasCommitObject`/`fetchRemoteRef`/`isAncestor`/`diffNames`/`mergeBase`/`diffTreeNames`) live in [`packages/android-host/scripts/lib/git-refs.mjs`](/packages/android-host/scripts/lib/git-refs.mjs) (moved from `packages/app` in ADR-0203).
 
 ## AI-Generated Test Quality & Cross-Engine Consistency (ADR-0097, ADR-0098, ADR-0101)
 
@@ -139,7 +150,7 @@ StrykerJS (with the official vitest runner) is a **local, non-CI** sensitivity g
 
 Four real-device interaction defects (2026-09-15/16) exposed a shared blind spot: **unit tests green + code review passed, yet the defect only surfaced on-device during a state transition** (back / scope switch / page-turn / card-swipe). All four sat in two layers code review and state-level unit tests structurally cannot see — the **Lynx runtime-semantics layer** (`URL` polyfill `.hostname`=undefined broke search pagination) and the **cross-component contract layer** (`BookmarkButton` init-only props froze the bookmark count across carousel slides). [ADR-0163](/docs/adr/ADR-0163-qa-defense-lines.md) ([spec](/docs/specs/qa-defense-lines.md)) erects three defense lines reusing existing infra, plus one review discipline:
 
-- **Transition matrix (real-device conversion matrix)** — [`transition-matrix.spec.ts`](/packages/app/tests/android-e2e/specs/transition-matrix.spec.ts), a `@release-gate` android-e2e spec parameterizing `list surface × user action × engine × content assertion`. Its first four rows each regression one of the closed defects (R1 detail-return related-works section + scroll preservation; R2 search pagination + scope switch; R3 carousel card-swipe bookmark-count change; R4 webview search as baseline control). **Assertions must be content comparison, not single-frame existence** (revising the #374 existence-check doctrine); lynx-side assertions are region-scoped frame diffs because native LynxView exposes no accessibility tree. Not in per-PR CI (#539) — release-gate plus big-PR manual trigger.
+- **Transition matrix (real-device conversion matrix)** — [`transition-matrix.spec.ts`](/packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts), a `@release-gate` android-e2e spec parameterizing `list surface × user action × engine × content assertion`. Its first four rows each regression one of the closed defects (R1 detail-return related-works section + scroll preservation; R2 search pagination + scope switch; R3 carousel card-swipe bookmark-count change; R4 webview search as baseline control — R4 now historical post-ADR-0203). **Assertions must be content comparison, not single-frame existence** (revising the #374 existence-check doctrine); lynx-side assertions are region-scoped frame diffs because native LynxView exposes no accessibility tree. Not in per-PR CI (#539) — release-gate plus big-PR manual trigger.
 - **Host-matrix contract test** — [`BookmarkButton.host-matrix.test.ts`](/packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts) compiles the real `BookmarkButton.vue` (vue/compiler-sfc + a custom `createRenderer` nodeOps) to assert the init-only-props contract across host forms: a reused carousel host must remount per work (`:key`) or the state freezes on the first card — locking the ADR-0163 contract so a future silent semantics change fails.
 - **Platform consistency self-check page** — [`PlatformCheck.vue`](/packages/app-lynx/src/pages/PlatformCheck.vue) (benchNav-only `/platform-check` route, no nav entry) renders a spec-derived PASS/FAIL matrix for the platform APIs the project depends on (URL parsing, `URLSearchParams` round-trip, bridge callback quote contract) on the **real Lynx runtime**. Backed by the [`safeParseUrl.ts`](/packages/app-lynx/src/utils/safeParseUrl.ts) consolidation (`extractHostname`/`extractAuthority`) — the single URL-domain-parse entry for new lynx code, guarded by a template test forbidding bare `new URL(`.
 - **code-review third audit axis** — `.agents/skills/code-review/SKILL.md` adds platform & host contract checks: native `<list>` structure changes require epoch defense / spike; new Lynx global-API usage requires device probe + source guard; init-only components into a new host require a host-matrix test.

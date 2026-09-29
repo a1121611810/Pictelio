@@ -1,17 +1,19 @@
 ---
 type: Concept
 title: Android Native & Build
-description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota, plus v5.0.0's GallerySaver/WebDav/download-executor surface), Lynx Native Modules, shared Java utilities (PixivImageLoader, SecureStorageCompat, NovelExporter, WebDavClient), engine availability fallback, Gradle build pipeline, release signing, and WebView configuration.
-tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
+description: The Android native runtime layer for the single-engine Lynx client, now living under packages/android-host (Gradle project, Java native modules, release scripts). Covers Lynx Native Modules (PictelioApi, PictelioAuth, PictelioImageService, etc.), shared Java utilities (PixivImageLoader, SecureStorageCompat, NovelExporter, WebDavClient), Keystore token encryption, Gradle build pipeline, release signing, and version sync. The former Capacitor plugin layer and three-flavor architecture were removed with the WebView client (ADR-0203).
+tags: [android, native, gradle, build, lynx, android-host, pixiv-api-gateway]
 ---
 
 # Android Native & Build
 
-Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with six custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
+Pictelio now ships a **single Lynx engine**: `@pictelio/android-host` packages the `pictelio-app-lynx` bundle into an APK via a Gradle project + Java native modules. The former Capacitor plugin layer (`AuthPlugin`, `ImageCachePlugin`, `OAuthPlugin`, `PixivApiPlugin`, `ClientInfoPlugin`, `OtaPlugin`) and the **three-flavor Gradle architecture** (full/webview/lynx) were **deleted** with the WebView client in [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md). The Java production code (22,559 lines) was moved verbatim from `packages/app/android/` to `packages/android-host/android/`.
 
-## Three-Flavor Architecture (v4.0.0+)
+## Three-Flavor Architecture (v4.0.0+ — REMOVED in ADR-0203)
 
-Since v4.0.0 (issues #115–#119), the Android project uses **Gradle product flavors** to produce three separate APKs from a single codebase:
+> **Removed.** Since ADR-0203 the Android project has **no product flavors** — `build.gradle` builds a single `lynx` engine with `LynxActivity` as the only launcher entry (`MainActivity`/`MainActivityWebview` deleted). The historical three-flavor layout below is retained for reference only.
+
+Since v4.0.0 (issues #115–#119), the Android project used **Gradle product flavors** to produce three separate APKs from a single codebase:
 
 | Flavor | Client engines | Launcher Activity | Application class |
 |--------|---------------|-------------------|-------------------|
