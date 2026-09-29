@@ -36,7 +36,9 @@ const row = (label: string, judged: number, skipped: number): OutcomeRow => [
 describe("发版门外层三态门 · 台账分类", () => {
   it("judged > 0：既不判红、也不算未验证（行真跑了并给出判定）", () => {
     // 依据：qa-defense-lines 三态表第 1 行「正常判红（断言不通过时）」
-    const r = classifyOutcomeRows([row("R1 断言③「相关作品」段注入", 1, 0)]);
+    const r = classifyOutcomeRows([
+      row("R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）", 1, 0),
+    ]);
     expect(r.silent).toEqual([]);
     expect(r.unverified).toEqual([]);
   });
@@ -50,13 +52,17 @@ describe("发版门外层三态门 · 台账分类", () => {
 
   it("judged = 0, skipped = 0：既没判定也没声明 ⇒ 判红", () => {
     // 依据：qa-defense-lines 三态表第 3 行「**判红**」
-    const r = classifyOutcomeRows([row("R1 断言③「相关作品」段注入", 0, 0)]);
-    expect(r.silent).toEqual(["R1 断言③「相关作品」段注入"]);
+    const r = classifyOutcomeRows([
+      row("R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）", 0, 0),
+    ]);
+    expect(r.silent).toEqual(["R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）"]);
     // ⚠️ 这条**不是**抄自三态表第 3 行（那里只写「判红」），而是由 warn 的筛选条件
     // `judged === 0` 推出：双 0 必然满足 judged === 0 ⇒ 也进 warn 名单。
     // 生产里这条**观察不到**——`fail` 先抛，warn 根本走不到；单测替身不抛才看得见。
     // 顺序本身另有一条用例钉住（见「收尾与执行顺序」组）。
-    expect(r.unverified).toEqual(["R1 断言③「相关作品」段注入"]);
+    expect(r.unverified).toEqual([
+      "R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）",
+    ]);
   });
 
   it("逐行判定：R3 判过不能替 R1 背书（这正是首版「求和 > 0」被弃用的理由）", () => {
@@ -81,7 +87,7 @@ describe("发版门外层三态门 · 台账分类", () => {
  */
 describe("发版门外层三态门 · 判红文案", () => {
   const rows: OutcomeRow[] = [
-    row("R1 断言③「相关作品」段注入", 0, 0),
+    row("R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）", 0, 0),
     row("R3「收藏行」两两不同", 2, 0),
   ];
   const msg = buildGateFailureMessage(rows, classifyOutcomeRows(rows));
@@ -107,7 +113,7 @@ describe("发版门外层三态门 · 判红文案", () => {
 
   it("逐行列出本轮台账，读者不查源码就能自查", () => {
     // 两行都要出现，且带各自计数——判红时台账对象不在 vitest 输出里。
-    expect(msg).toMatch(/R1 断言③「相关作品」段注入/);
+    expect(msg).toMatch(/R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）/);
     expect(msg).toMatch(/judged=0\/skipped=0/);
     expect(msg).toMatch(/R3「收藏行」两两不同/);
     expect(msg).toMatch(/judged=2\/skipped=0/);
@@ -208,6 +214,30 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     // 不断言 events 的完整集合：合法地新增一个收尾动作就会让 `toEqual` 误伤。
     // 这里要表达的是「门没开口」，故只断言门的两类事件都没出现。
     expect(events.some((e) => e.startsWith("fail:") || e.startsWith("warn:"))).toBe(false);
+  });
+
+  it("⚠️ fail 收到的必须是**分类出的那份** silent 名单，而不是空名单/别的名单", async () => {
+    // 实测过的洞：把 runReleaseGate 里的 `deps.fail(classification.silent, …)`
+    // 改成 `deps.fail([], …)`，**全部 25 例照样绿** —— 因为调用方绑的是
+    // `expect(silent, msg).toEqual([])`，空数组对空数组恒过 ⇒ 门永不判红。
+    // 接线契约（读 spec 源码）抓不到这一条：退化发生在 **runReleaseGate 内部**。
+    // 故这里是**行为**断言：fail 的第一个参数必须与 classifyOutcomeRows 的 silent 同值，
+    // 且必须等于「台账里双 0 的那些行」。
+    const seen: (readonly string[])[] = [];
+    const rows: OutcomeRow[] = [row("R1", 0, 0), row("R3", 2, 0)];
+    await runReleaseGate({
+      teardown: async () => {},
+      forceStop: () => {},
+      serial: "emulator-5554",
+      rows,
+      warn: () => {},
+      fail: (silent) => {
+        seen.push(silent);
+      },
+    });
+    expect(seen, "双 0 时 fail 必须被调用一次").toHaveLength(1);
+    expect(seen[0], "fail 拿到的必须正是双 0 的行，且非空").toEqual(["R1"]);
+    expect(seen[0]).toEqual(classifyOutcomeRows(rows).silent);
   });
 
   it("⚠️ 门必须排在收尾**之后**（台账要能触发门，否则断言退化成假绿）", async () => {
