@@ -1,5 +1,12 @@
 # 客户端切换（引擎切换）— 术语表
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文记录的引擎切换机制、`CLIENT_KINDS` 多 flavor 能力表与切换入口**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 > 范围：`pictelio-app`（webview 客户端）与 `app-lynx`（Lynx 客户端）双端共有的引擎切换机制、UI 入口与错误处理概念。配套 ADR：[ADR-0062-single-engine-client-switch-hiding.md](./ADR-0062-single-engine-client-switch-hiding.md)、[ADR-0064-engine-switch-experience-fix.md](./ADR-0064-engine-switch-experience-fix.md)、[ADR-0153-engine-availability-fallback.md](./ADR-0153-engine-availability-fallback.md)、[ADR-0159-bridge-thread-unblocking.md](./ADR-0159-bridge-thread-unblocking.md)、[ADR-0164-default-engine-lynx-bidirectional-fallback.md](./ADR-0164-default-engine-lynx-bidirectional-fallback.md)。
 
 ## 核心术语

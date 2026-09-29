@@ -1,5 +1,12 @@
 # 平台兼容性
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；下文以 WebView 主版本号为门槛的降级矩阵与「webview / lynx 单引擎包」表述**均已失效**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./adr/glossary-single-engine-facade.md)。
+
 ## 最低要求
 
 | 层级 | 最低版本 | 检测方式 | 不满足时的行为 |

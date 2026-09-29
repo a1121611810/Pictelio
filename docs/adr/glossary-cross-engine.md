@@ -1,5 +1,12 @@
 # 跨引擎统一术语文档（glossary-cross-engine）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的「同语义双实现 / 差分测试」词表当前仅 lynx 一个消费方。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 > 状态：已定稿（供差分测试 / 属性测试 / 测试加固 initiative 作为共享词汇基准）。
 > 本文档**不改变任何代码**，只统一说话方式；涉及的行为分歧仅作记录与建议，是否修改由对应 ADR 拍板。
 > 覆盖范围：`packages/app`（webview 客户端，SolidJS）与 `packages/app-lynx`（lynx 客户端，vue-lynx）之间的同语义双实现。

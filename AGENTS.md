@@ -1,11 +1,11 @@
 # Pictelio
 
-Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），经 Gradle 构建链直接产出 Android 原生应用（构建链已去 Capacitor 化）。
+Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），经 Gradle 构建链直接产出 Android 原生应用（构建链已去 Capacitor 化）。自 v6.3.0 起为唯一运行时形态，WebView 客户端已随 #610 下线。
 
 ## 项目概览
 
-- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3（vite-plus 1.0-rc 统一工具链）+ UnoCSS 66.10 + Capacitor 8.5；小说正文布局用 `@chenglou/pretext`
-- **Monorepo**: pnpm workspace 五子包：`pictelio-app`（SolidJS 主体）/ `pictelio-app-lynx` / `@pictelio/ugoira` / `@pictelio/update-check` / `pictelio-website`
+- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3（vite-plus 1.0-rc 统一工具链）+ UnoCSS 66.10 + Capacitor 8.5（源码引用，运行时已下线）；小说正文布局用 `@chenglou/pretext`
+- **Monorepo**: pnpm workspace 九子包：`pictelio-app` / `pictelio-app-lynx` / `@pictelio/{ugoira,update-check,novel-export,search-core,ranking-core,net-diagnostics}` / `pictelio-website`
 - **入口**: `packages/app/src/main.tsx`（settings 同步、Fluent 主题、渲染、auth 恢复）→ `App.tsx` → `router.tsx`（路由定义与 App 分离）
 - **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）
 - **Pixiv API**: `src/api/client.ts` 双模式客户端（Web fetch + Vite 代理 / Native bridge → `PixivApiPlugin`），401 自动刷新 + 防死循环
@@ -92,7 +92,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 | 场景 | 第一优先 | 第二优先 |
 |------|---------|---------|
-| 库/框架文档（SolidJS、TanStack、Capacitor、Vite 等） | `mcp__context7__*` | `web_fetch`（官网） |
+| 库/框架文档（SolidJS、TanStack、Vite 等） | `mcp__context7__*` | `web_fetch`（官网） |
 | 浏览器标准 API（`fetch`、`Headers`、`Promise`、CSS 属性等） | `mcp__mdn__*` | `web_fetch`（MDN 页面） |
 | 其他技术文档（非库/非浏览器标准） | `mcp__context7__*` 尝试 | `web_fetch`（官方文档） |
 
@@ -122,7 +122,7 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | 图片流水线（缓存、代理、CDN） | `openwiki/architecture/image-pipeline.md` | 三层缓存架构 |
 | Feed 与浏览（推荐、虚拟滚动、R18 过滤） | `openwiki/domain/feed-and-browsing.md` | 业务逻辑与数据流 |
 | 小说阅读器（虚拟布局、搜索、系列导航） | `openwiki/domain/novel-reader.md` | 核心交互流程 |
-| Android 原生集成（Capacitor 插件、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
+| Android 原生集成（Lynx 原生模块、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
 | 测试策略（单元测试、E2E 测试） | `openwiki/testing/overview.md` | 测试分层与工具链 |
 
 ### 与 CodeGraph 的协作规则（强制路由，违反视为架构违规）
@@ -161,7 +161,7 @@ monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monor
 - `routes/` — 页面组件；路由定义在独立的 `src/router.tsx`
 - `components/` — 可复用 UI（卡片、图片、查看器、面板、骨架屏等）
 - `primitives/` — 无 UI 逻辑原语（虚拟滚动、下拉刷新、滚动行为、小说布局/翻译等）
-- `native/` — Android 原生桥接（仅原生构建生效）；`services/` 服务；`settings/` 设置；`utils/` 工具
+- `native/` — 留存 WebView 桥接层（见 Notes）；`services/` 服务；`settings/` 设置；`utils/` 工具
 
 ## 关键设计决策
 
@@ -169,7 +169,7 @@ monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monor
 
 - **PixivApiPlugin 网关** → `openwiki/architecture/api-layer.md` + ADR-0037
 - **图片流水线三层缓存** → `openwiki/architecture/image-pipeline.md` + ADR-0090
-- **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、`src/native/` 桥接）→ `openwiki/integrations/android-native.md`
+- **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、Java 原生模块）→ `openwiki/integrations/android-native.md`
 - **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳 → `openwiki/integrations/android-native.md` §Engine Availability Fallback + ADR-0164
 - **安全存储**（refresh_token 走 Keystore，首启迁移）→ `openwiki/integrations/android-native.md`
 - **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）→ `openwiki/domain/feed-and-browsing.md`
@@ -288,7 +288,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 样式**默认优先 Tailwind utility**（`tailwind.config.ts`：spacing=vw / fontSize=rpx / M3 色板）；禁止手写 scoped CSS；特殊语义用 arbitrary utility（`min-h-[40vw]`、`[max-line:1]`）；web-core 预览禁 rem
 - **注释 / 命名**：中文注释为主（API 层与类型定义偏英文）；组件 PascalCase、工具/API/primitives camelCase
 - **Lint / 格式化**：vite-plus 内置 oxlint / oxfmt，唯一配置源 = 仓库根 `vite.config.ts`（correctness=error；app-lynx / website / docs / `**/*.md` 等豁免 → ADR-0185）
-- **Android**：`minSdkVersion = 28`（`variables.gradle`）；自定义 Capacitor 插件在 `MainActivity.java` 经 `registerPlugin()` 注册（**必须在 `super.onCreate()` 之前**）；平台要求 / WebView 门槛 / 引擎降级矩阵 → `docs/platform-compatibility.md`
+- **Android**：`minSdkVersion = 28`（`variables.gradle`）；`SplashScreen.installSplashScreen()` **必须在 `super.onCreate()` 之前**（AndroidX 要求，见 `LynxActivity.java`）；平台要求 / WebView 门槛 / 引擎降级矩阵 → `docs/platform-compatibility.md`
 - **发布签名**：Release 用 `android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`
 - **Node**：22.22.2+（ADR-0080），pnpm 11.9.0（`devEngines` 强制校验）
@@ -342,7 +342,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - 项目必须符合 Microsoft Fluent Design 风格；目录名为 `pixivizer`，项目名/包名为 Pictelio
 - 图片 CDN 走 `/pixiv-img/` 代理路径访问 `i.pximg.net`，非直连；**不要**在 HTML/CSS/JS 中硬编码 Pixiv CDN URL（`i.pximg.net`、`app-api.pixiv.net`）
-- `src/native/` 原生桥接仅 Android 构建生效，Web 开发环境不加载
+- `packages/app/src/native/` 属留存 WebView 客户端，无 Activity 承载，不参与构建与运行；Android 侧桥接实为 `android/app/src/lynx/java/` 原生模块
 - **Conventional Commits**：commit-msg hook 经 commitlint 强制；type ∈ feat / fix / docs / style / refactor / perf / test / build / ci / chore / revert
 
 <!-- OPENWIKI:START -->
@@ -359,10 +359,7 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 
 ### 强制约束（违反视为违规）
 
-- **任何涉及架构概览、领域概念、集成方式、测试指南的问题，必须先读取 `openwiki/` 对应页面再深入代码。**
-- **禁止**在未查阅对应 OpenWiki 页面的情况下，直接使用 CodeGraph / Read 从零摸索架构层面问题。
-- 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
-- 违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
+- **架构概览 / 领域概念 / 集成方式 / 测试指南类问题，必须先读 `openwiki/` 对应页面再深入代码**；**禁止**未查阅即用 CodeGraph / Read 从零摸索。违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
 
 ### 更新维护
 - **禁止** AI Agent 本地执行 `pnpm openwiki:update`（含修改 `src/`/`packages/` 后）。openwiki/ 是生成文档，由 GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每日自动重生成并提交 PR，无需也不应本地触发。

@@ -1,5 +1,12 @@
 # ADR-0159: 插件桥线程卸载与引擎切换线 E2E 契约修复
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的 Capacitor 插件桥线程与引擎切换线 E2E 契约**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 - 状态：accepted
 - 日期：2026-09-13
 - 关联：ADR-0061（Android 模拟器 E2E 门禁）、ADR-0062（单引擎包隐藏切换 UI）、ADR-0064（引擎切换体验修复）、ADR-0103（跨 client 设置同步）、ADR-0153（引擎可用性判定与降级）、`docs/android-e2e-engine-switch-known-failures.md`（失败移交记录）、`docs/adr/glossary-client-switch.md`（新增词条：插件桥线程 / 桥线程阻塞 / 契约层 / UI 路径 / E2E 钩子 / DOM 契约 / 渲染就绪信号）

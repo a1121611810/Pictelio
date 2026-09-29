@@ -1,5 +1,12 @@
 # Spec: 引擎切换线 E2E 恢复（桥线程卸载 + 测试契约刷新）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的引擎切换线 E2E 契约（oneway / roundtrip 等 spec）**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态：implemented（2026-09-14；分支 fix/engine-switch-e2e-recovery，T1-T7 全部落地 + code-review 双轮 PASS。E2E 验收：最终 APK 下 oneway / roundtrip / 3x / settings-sync-contract 18/18 绿、roundtrip-low 2/2 绿（ADR-0153 降级实测通过）、fab-hit-testing 2/2 绿（该套件自 2026-08-30 以来首次完整跑通）——移交清单 10 failed → 0 failed、连带的 fab 跳过转绿。工程门禁：check:all / lint:all 绿；单测 app 1752 / lynx 1221 / ugoira 等全绿（根 test:all 并发下 relatedInjectionStore 有与本 effort 无关的既有 flake，单跑稳定）。agent-browser 套件的失败已做基线 bisect 实证：在分叉点 0e6bba07 复跑同样 4 spec 得到逐字一致的 9 失败（横向溢出 600>360、Feed 空、保存失败等）——为分支既有的内容/UI 问题，非本 effort 回归，见 #528）
 - 日期：2026-09-13
 - 决策依据：ADR-0159（插件桥线程卸载与引擎切换线 E2E 契约修复）

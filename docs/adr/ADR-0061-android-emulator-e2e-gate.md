@@ -1,5 +1,12 @@
 # ADR 0061: Android 模拟器 E2E 测试纳入门禁——「切换渲染引擎」链路真机验证
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的门禁对象「切换渲染引擎」链路**整体下线**，所依赖的 spec 与源码多数已不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 ## 状态
 
 已采纳（待 `/to-spec` → `/to-tickets` → `/implement` 落地）

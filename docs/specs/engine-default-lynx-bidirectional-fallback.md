@@ -1,5 +1,12 @@
 # Spec: 引擎缺省翻转为 Lynx 与双向引擎降级
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的双向引擎降级机制（预检 + 运行时两层定义、反向降级、E2E 取证格表）**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态：specified（2026-09-16）
 - 日期：2026-09-16
 - 关联：ADR-0164（本方案决策）、ADR-0153 / ADR-0062 / ADR-0064 / ADR-0102 / ADR-0136 / ADR-0159 / ADR-0163、`docs/adr/glossary-client-switch.md`（词条：引擎决策模块 / 自动回退开关 / 失败记忆 / 生效状态快照 / 降级原因码 / 强制 WebView / 双失败 / 无障碍回退 / E2E 降级取证键）

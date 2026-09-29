@@ -1,5 +1,12 @@
 # ADR-0153: 引擎可用性判定与降级（WebView 不可用时优先 Lynx）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的双引擎可用性判定与「WebView 不可用 → Lynx」降级链路**整体下线**（无第二个引擎可降级）。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 - 状态：accepted
 - 日期：2026-09-11
 - 关联：ADR-0061（Android 模拟器 E2E 门禁——本决策推翻其记录的 pictelio_low「切回停升级页」行为）、ADR-0062（单引擎包隐藏切换 UI）、ADR-0064（Lynx 渲染错误兜底页）、ADR-0102（Lynx task 恢复）、`docs/specs/engine-availability-fallback.md`、`packages/app/CONTEXT.md`（新增词条：首选引擎 / 生效引擎 / 引擎可用性 / 引擎降级）

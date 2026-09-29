@@ -42,23 +42,6 @@ const features = [
   },
 ];
 
-const engines = [
-  {
-    name: "WebView 客户端",
-    tag: "功能全量",
-    details:
-      "SolidJS + Microsoft Fluent 2 设计系统，覆盖全部功能：搜索、小说阅读与 AI 翻译、收藏、历史、设置与自定义。",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>`,
-  },
-  {
-    name: "vue-lynx 原生客户端",
-    tag: "更轻更快",
-    details:
-      "Lynx 原生渲染引擎，覆盖推荐/小说/个人中心核心路径，启动更快、滚动更顺滑，体验接近原生应用。",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
-  },
-];
-
 const security = [
   {
     title: "令牌零泄漏",
@@ -85,7 +68,6 @@ const screenshots = [
   { src: `${base}screenshots/02_detail.png`, alt: "作品详情页面" },
   { src: `${base}screenshots/03_novel.png`, alt: "小说阅读器" },
   { src: `${base}screenshots/04_translate.png`, alt: "小说 AI 翻译对照" },
-  { src: `${base}screenshots/05_client_switch.png`, alt: "引擎切换说明页" },
   { src: `${base}screenshots/06_settings.png`, alt: "设置页面" },
   { src: `${base}screenshots/07_login.png`, alt: "登录页面" },
 ];
@@ -102,7 +84,7 @@ const screenshots = [
             第三方客户端
           </div>
           <h1 class="vc-title vc-reveal vc-reveal-delay-1">Pictelio</h1>
-          <p class="vc-sub vc-reveal vc-reveal-delay-2">插画与小说的双世界，AI 翻译 + 双客户端引擎 — 为 Android 而生的 Pixiv 浏览体验。</p>
+          <p class="vc-sub vc-reveal vc-reveal-delay-2">插画与小说的双世界，Lynx 原生引擎 + AI 翻译 — 为 Android 而生的 Pixiv 浏览体验。</p>
           <div class="vc-actions vc-reveal vc-reveal-delay-3">
             <div class="vc-actions-buttons">
               <a href="https://github.com/a1121611810/Pictelio/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
@@ -131,27 +113,12 @@ const screenshots = [
       </div>
     </section>
 
-    <!-- Dual engine (架构差异化卖点，紧随 Hero) -->
-    <section class="vc-engines">
-      <h2 class="vc-engines-title vc-reveal">双引擎，随心切换</h2>
-      <p class="vc-engines-sub vc-reveal vc-reveal-delay-1">同一应用，两种渲染内核，随你切换</p>
-      <div class="vc-engine-grid">
-        {engines.map((e, i) => (
-          <div class="vc-engine-card vc-reveal" class:list={{ [`vc-reveal-delay-${i + 1}`]: true }}>
-            <div class="vc-engine-card-head">
-              <div class="vc-card-icon" set:html={e.icon} />
-              <span class="vc-engine-tag">{e.tag}</span>
-            </div>
-            <h3 class="vc-engine-name">{e.name}</h3>
-            <p class="vc-engine-desc">{e.details}</p>
-          </div>
-        ))}
-      </div>
-      <p class="vc-engine-note vc-reveal">
-        在设置中一键切换引擎，切换说明页会明确两种引擎的差异与注意事项，切换即时生效。
-      </p>
+    <!-- Single engine（单引擎事实，措辞逐字复用 docs/adr/glossary-single-engine-facade.md 锚点） -->
+    <section class="vc-features">
+      <h2 class="vc-features-title vc-reveal">单引擎形态</h2>
+      <p class="vc-features-sub vc-reveal vc-reveal-delay-1">Pictelio 自 v6.3.0 起为 <strong>Lynx 单引擎</strong>客户端，原 WebView 客户端已随 #610 整体下线。</p>
 
-      <!-- Security（架构级安全设计，收在引擎区块内） -->
+      <!-- Security（架构级安全设计） -->
       <div class="vc-security">
         <h3 class="vc-security-head vc-reveal">安全设计</h3>
         <div class="vc-security-grid">

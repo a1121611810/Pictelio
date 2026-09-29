@@ -1,5 +1,12 @@
 # Spec: 引擎可用性与降级（WebView 不可用时优先 Lynx）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的「WebView 不可用 → Lynx」降级链路与 `full` 包三场景验收**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态：implemented（2026-09-11；app 1431 / app-lynx 993 / Java testFull 全绿；pictelio_low full 2/2 + webview 1/1 + pictelio_ui 6/6 E2E 通过；并已用模拟器手工截图三场景复核：pictelio_ui 正常路径、pictelio_low full 自动降级+提示条+键消费、pictelio_low webview-only 升级页。仅真机硬件批次待跑）
 - 日期：2026-09-11
 - 关联：ADR-0153（本方案决策）、ADR-0061 / ADR-0062 / ADR-0064 / ADR-0102、`packages/app/CONTEXT.md`（词条：首选引擎 / 生效引擎 / 引擎可用性 / 引擎降级）

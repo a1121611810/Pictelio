@@ -1,5 +1,12 @@
 # 前后台与任务恢复统一术语文档（glossary-android-lifecycle-restore）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的「双 client 共用」原生宿主语义当前仅 lynx 一个消费方。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 > 状态：已定稿（app-lynx 缩小恢复修复 initiative 的共享词汇基准，配合 ADR-0102）。
 > 本文档**不改变任何代码**，只统一说话方式。
 > 覆盖范围：`packages/app`（webview 客户端）、`packages/app-lynx`（lynx 客户端）与 `packages/app/android`（Android 原生宿主，双 client 共用）之间的 Android 前后台 / task 恢复语义。

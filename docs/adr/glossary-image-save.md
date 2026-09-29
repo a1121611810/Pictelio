@@ -1,5 +1,12 @@
 # 作品图片保存（单图保存 / 多图选页 / 批量下载）— 术语表
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的「双端共有」保存桥契约当前仅 lynx 一个消费方。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 > 范围：`pictelio-app`（webview 客户端）与 `app-lynx`（Lynx 客户端）双端共有的作品图片保存能力、原生落盘深模块、保存桥契约与选页编排概念。配套：[ADR-0145-image-save-download.md](./ADR-0145-image-save-download.md)、[spec image-save-download](../specs/image-save-download.md)。
 
 ## 核心术语

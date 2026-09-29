@@ -2,7 +2,7 @@
   "name": "pictelio-app-lynx",
   "version": "0.1.0",
   "private": true,
-  "description": "Pictelio Lynx client - vue-lynx MVP (login / recommended illusts / novel / profile + client switch)",
+  "description": "Pictelio Lynx client - vue-lynx (login / recommended / illust detail / novel + AI translation / global search / comment / bookmark / follow / user home)",
   "type": "module",
   "scripts": {
     "dev": "PICTELIO_LYNX_DEV=1 rspeedy dev",

@@ -1,10 +1,13 @@
-# pictelio-app-lynx — Pictelio Lynx Client（vue-lynx MVP）
+# pictelio-app-lynx — Pictelio Lynx Client（vue-lynx）
 
-基于 **vue-lynx**（Vue 3 custom renderer on ReactLynx runtime）的第二个渲染 Client。
-与现有 `pictelio-app`（SolidJS + Capacitor WebView）共存，复用同一 Pixiv 后端 / API / 凭证。
+基于 **vue-lynx**（Vue 3 custom renderer on ReactLynx runtime）的渲染 Client。
+Pictelio 自 v6.3.0 起为 **Lynx 单引擎**客户端，本包是唯一运行时形态；`packages/app/` 下的
+SolidJS WebView 源码仍在库中但不参与构建与运行（清理见 #819 第 4 项）。
+与 WebView 侧复用同一 Pixiv 后端 / API / 凭证（跨引擎共享存储契约仍然成立）。
 
-> 状态：**MVP 可行性验证**（Pre-Alpha 技术栈，见 `docs/research/vue-lynx-production-readiness.md`）
-> 目标：验证「登录 → 推荐插画 → 插画详情 → 小说列表 → 小说详情 → 个人中心 + Client 切换」全链路。
+> 状态：已过 MVP 可行性验证。当前覆盖登录 / 推荐 / 插画详情 / 小说阅读与翻译 / 全局搜索 /
+> 评论 / 收藏 / 关注 / 追更 / 用户主页 / 更新 / 错误页。
+> 领域术语与平台事实见 `CONTEXT.md`（尤其「平台约束」与「真机导航钩子」两节）。
 
 ## 快速开始
 
@@ -33,7 +36,7 @@ src/
 ├── router.ts           # 手写内存路由（组件表 + 导航）
 ├── routerCore.ts       # 路由匹配纯逻辑（可单测）
 ├── api/                # Pixiv API（types/client/auth/illust/novel/userAgent）
-├── stores/             # authStore（登录态）、clientSwitchStore（Client 切换）
+├── stores/             # authStore（登录态）、settingsStore 等；clientSwitchStore 为 #819-3 挂账的遗留（读点无写入方）
 ├── pages/              # Login / Recommended / IllustDetail / NovelList / NovelDetail / Me
 ├── utils/              # fetchWrapper（worker fetch 适配）、imageUrl（代理 URL）、errors
 └── styles/tokens.css   # Fluent 2 令牌（Lynx CSS 子集）
@@ -55,7 +58,7 @@ src/
 - **token 持久化**：安全设计——refresh_token 仅存内存（Web 模式不写 localStorage，防 XSS 窃取）→ 刷新页面需重新登录。原生生产环境由 ticket #41 迁移到 Native Module 安全存储（Android Keystore）。
 - **列表回收**：vue-lynx #302 cell 回收 no-op，5k 条内安全（实测）。
 - **图片**：原生端需自研 ILynxImageService（Referer 注入），Web 端走代理已可用。
-- **登录页 PKCE**：MVP 仅 refresh_token / 密码登录；PKCE OAuth WebView 需原生集成。
+- **登录页 PKCE**：目前仅 refresh_token / 密码登录；PKCE OAuth WebView 需原生集成。
 
 ## 测试
 

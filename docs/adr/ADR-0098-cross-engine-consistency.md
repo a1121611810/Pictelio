@@ -1,5 +1,12 @@
 # ADR 0098：跨引擎一致性保障——差分测试 + 属性测试 + OAuth 400 识别修复
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的跨引擎差分测试 / 属性测试失去被测对侧，当前仅 lynx 一个消费方。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 **状态**：待批准（草案，供评审）
 **日期**：2026-08
 **决策者**：团队成员 + grill-with-docs / to-spec 会话

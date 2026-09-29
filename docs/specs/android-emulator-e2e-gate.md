@@ -1,5 +1,12 @@
 # Android 模拟器 E2E 门禁 —— 「切换渲染引擎」链路真机验证 —— 功能规格
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的「切换渲染引擎」链路规格**整体下线**，所依赖的 Capacitor 桥与 Activity 入口多数已不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 来源：grill-with-docs 会话（2026-08-04）；ADR：[ADR-0061-android-emulator-e2e-gate.md](../adr/ADR-0061-android-emulator-e2e-gate.md)；术语表：[glossary-android-emulator-e2e.md](../adr/glossary-android-emulator-e2e.md)；调研：[android-e2e-framework-selection.md](../research/android-e2e-framework-selection.md)
 > 状态：ready-for-agent
 

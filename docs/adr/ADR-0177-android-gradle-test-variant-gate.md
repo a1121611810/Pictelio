@@ -1,5 +1,12 @@
 # ADR-0177: Android Gradle 单测变体门禁（`./gradlew test|build|check` 恒红陷阱收口）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的 `productFlavors` 多变体与 `testFullDebugUnitTest` 变体门禁前提**已失效**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 - **状态**：accepted（2026-09-20，用户 review 通过）
 - **日期**：2026-09-20
 - **关联**：wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾，#655 为本 ADR 父 ticket）；决策 ticket [#655](https://github.com/a1121611810/Pictelio/issues/655)（wayfinder:grilling）；研究 [#646](https://github.com/a1121611810/Pictelio/issues/646) §2.2（机制证明 + 上一 session 误诊证伪，本 ADR 唯一事实来源）；[`packages/app/android/app/build.gradle`](../../packages/app/android/app/build.gradle) flavor / sourceSets / dependencies 三段（`:54-69` / `:240-265` / `:268-275`）；[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) `android-unit-test` job（`:64-105`，门禁即 `./gradlew testFullDebugUnitTest`）；ADR-0170（姊妹 ADR：跨端信封契约——本 ADR 收敛其单元测试可达性）；ADR-0174（Java translate 终态契约测试——已先于本 ADR 落地，证明 C 可行）

@@ -1,5 +1,12 @@
 # Capacitor Image Handling — Official Best Practices
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文中的 Capacitor 桥与 WebView 图片通道不再参与运行时。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./adr/glossary-single-engine-facade.md)。
+
 > **Context**: Hybrid mobile app (Pixiv image viewer) using Capacitor.  
 > **Capacitor version documented**: v8 (current as of July 2025).  
 > **Primary Source Docs**: [capacitorjs.com/docs](https://capacitorjs.com/docs)

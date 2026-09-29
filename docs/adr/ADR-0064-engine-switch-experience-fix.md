@@ -1,5 +1,12 @@
 # ADR-0064：引擎切换体验修复（说明页确认 + 即时反馈 + R8 白屏根治）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文记录的引擎切换说明页、即时反馈与「返回 WebView」出口**整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 ## 背景
 
 full 包用户从设置页"切换渲染引擎"切入 Lynx 客户端时，存在两个确定性缺陷（issue #132，2026-08-06 真机 adb 实证）：
