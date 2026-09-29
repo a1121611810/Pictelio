@@ -14,8 +14,14 @@
 //   ① 断言常量 = 原文剥注释；
 //   ② 行为形态断言落在**方法体内**的具体调用组合上（而非全文件 toContain）；
 //   ③ 每个检测器带夹具自检（真实形态夹具命中 + 注释夹具剥注释后不命中）。
+//
+// Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
+// 本文件在 `src/utils/`（深两级），故 `../../../` 到 `packages/`，再进 `android-host/android/app/`。
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+
+/** 宿主 Android 源码根（ADR-0203 决策 2：packages/app/android → packages/android-host/android） */
+const HOST_APP = new URL('../../../android-host/android/app/src/', import.meta.url)
 
 /**
  * 剥注释：块注释 → XML 注释 → 行注释（口径同 tests/hardcodeColorGate.test.ts 的 source-scan 模式）。
@@ -34,22 +40,10 @@ function stripComments(source: string): string {
 
 // ── 源文件（全部 = 原文剥注释；断言只用 *_CODE，禁用原文）──
 const LYNX_ACTIVITY_CODE = stripComments(
-  readFileSync(
-    new URL(
-      '../../../app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java',
-      import.meta.url,
-    ),
-    'utf8',
-  ),
+  readFileSync(new URL('lynx/java/io/pictelio/app/LynxActivity.java', HOST_APP), 'utf8'),
 )
 const APP_MODULE_CODE = stripComments(
-  readFileSync(
-    new URL(
-      '../../../app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java',
-      import.meta.url,
-    ),
-    'utf8',
-  ),
+  readFileSync(new URL('lynx/java/io/pictelio/app/PictelioAppModule.java', HOST_APP), 'utf8'),
 )
 const DARK_MODE_CODE = stripComments(
   readFileSync(new URL('./darkMode.ts', import.meta.url), 'utf8'),
@@ -61,16 +55,10 @@ const SETTINGS_STORE_CODE = stripComments(
 // 但下面对 `.theme-sky.dark` 块抽取的切片仍先剥注释（防「注释里的 hex 顶替真值」）。
 const TOKENS_CSS = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8')
 const VALUES_STYLES_CODE = stripComments(
-  readFileSync(
-    new URL('../../../app/android/app/src/main/res/values/styles.xml', import.meta.url),
-    'utf8',
-  ),
+  readFileSync(new URL('main/res/values/styles.xml', HOST_APP), 'utf8'),
 )
 const VALUES_NIGHT_STYLES_CODE = stripComments(
-  readFileSync(
-    new URL('../../../app/android/app/src/main/res/values-night/styles.xml', import.meta.url),
-    'utf8',
-  ),
+  readFileSync(new URL('main/res/values-night/styles.xml', HOST_APP), 'utf8'),
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════

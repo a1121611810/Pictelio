@@ -91,11 +91,12 @@ jobs:
       # 预装 Android SDK；Robolectric 的 android-all 依赖经 maven 拉取。
       # 沙盒 #610：Web 构建与 Capacitor sync 随 WebView 线整体下线。
       # gradle 配置依赖 gitignored 生成物（OAuthConfig），先按 build:android 同款流程生成。
+      # ADR-0203 宿主迁移：Gradle 工程与凭证/版本同步脚本归 packages/android-host。
       - name: Generate credentials config
-        run: pnpm --dir packages/app run sync:credentials
+        run: pnpm --dir packages/android-host run sync:credentials
 
       # 沙盒 #610：flavor 维度下线后 variant 退化为纯 buildType，闸门任务随之更名
       # （ADR-0177 D2 的任务名随之更新，门禁范围不变）。
       - name: Gradle unit tests (testDebugUnitTest)
-        working-directory: packages/app/android
+        working-directory: packages/android-host/android
         run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-daemon

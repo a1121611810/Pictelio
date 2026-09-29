@@ -6,6 +6,9 @@
 // 历史缺陷：T4（/later）/ T7（/mypixiv）只注册了 ①，漏 ② → 深链静默不导航（模拟器首跑暴露）。
 // 本测试钉死：router.ts 里每个 pictelioBenchNav* 事件名必须以字符串字面量出现在 LynxActivity.java，
 // 反向不需要对称（Java payload 通道 illust-detail/novel-detail 不走 TARGETS）。
+//
+// Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
+// 本文件在 `tests/`（比 `src/utils/` 浅一级），故 `../../` 到 `packages/`，再进 `android-host/android/app/`。
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -16,7 +19,10 @@ const routerSource = readFileSync(
 )
 const lynxActivitySource = readFileSync(
   fileURLToPath(
-    new URL('../../app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java', import.meta.url),
+    new URL(
+      '../../android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java',
+      import.meta.url,
+    ),
   ),
   'utf8',
 )

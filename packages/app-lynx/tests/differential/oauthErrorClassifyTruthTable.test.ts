@@ -1,14 +1,14 @@
-// lynx 侧 classifyError 差分测试：以共享差分契约表为 oracle。
-// 期望值来源 = 真实 OAuth 快照（pixivpy#374 / gallery-dl#9331）+ 共享差分契约表
-// （sharedOAuthErrorCases.ts；app ↔ app-lynx 同语义模块差分，ticket #194；与 app 侧
-// 逐字节一致，oauthErrorCasesConsistency.test.ts 守护）。
-// 断言用枚举成员 ApiErrorType[key]（T4 已统一两端枚举为大写），规避历史大小写差异。
+// Lynx 单端行为基准：classifyError 以 OAuth 错误真值表为 oracle。
+// 形态说明（ADR-0203 决策 5）：WebView 客户端删除后差分对侧消失，本文件只断言 Lynx 侧。
+// 期望值来源 = 真实 OAuth 快照（pixivpy#374 / gallery-dl#9331）+ sharedOAuthErrorCases.ts
+// （独立 oracle），fixture 为 Lynx 唯一事实源。
+// 断言用枚举成员 ApiErrorType[key]（枚举成员名已统一为大写），规避大小写差异。
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { classifyError } from '../../src/api/client'
 import { ApiErrorType } from '../../src/api/types'
 import { OAUTH_ERROR_CLASSIFY_CASES } from './sharedOAuthErrorCases'
 
-describe('classifyError × 共享差分契约表（OAuth 400 错误分类差分）', () => {
+describe('Lynx 单端行为基准：classifyError × OAuth 400 错误分类真值表（7 例）', () => {
   beforeEach(() => {
     vi.stubGlobal('NativeModules', undefined)
   })

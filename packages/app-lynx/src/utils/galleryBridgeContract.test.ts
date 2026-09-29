@@ -12,20 +12,26 @@
 // ⑤ 下载队列桥（T6）：PictelioDownloaderModule.start 载荷 dir 参数（可选、缺省空串）、
 //    TS 执行器 lynxDownloadExecutor 逐字透传 task.dir、深模块 PictelioDownloader 三入口
 //    dir 重载交给 GallerySaver subPath（图片链 Pictures/Pictelio、导出链 Downloads/Pictelio）。
+//
+// Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
+// 本文件在 `src/utils/`（深两级），故 `../../../` 到 `packages/`，再进 `android-host/android/app/`。
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+/** 宿主 Android 源码根（ADR-0203 决策 2：packages/app/android → packages/android-host/android） */
+const HOST_APP = new URL('../../../android-host/android/app/src/', import.meta.url)
+
 const javaModule = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/lynx/java/io/pictelio/app/PictelioGalleryModule.java', import.meta.url)),
+  fileURLToPath(new URL('lynx/java/io/pictelio/app/PictelioGalleryModule.java', HOST_APP)),
   'utf8',
 )
 const javaInitializer = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java', import.meta.url)),
+  fileURLToPath(new URL('lynx/java/io/pictelio/app/LynxRuntimeInitializer.java', HOST_APP)),
   'utf8',
 )
 const javaDeepModule = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/main/java/io/pictelio/app/GallerySaver.java', import.meta.url)),
+  fileURLToPath(new URL('main/java/io/pictelio/app/GallerySaver.java', HOST_APP)),
   'utf8',
 )
 // #610：WebView/Capacitor 线整体下线，GallerySaverPlugin.java 随之删除。
@@ -34,11 +40,11 @@ const javaDeepModule = readFileSync(
 const tsAdapter = readFileSync(fileURLToPath(new URL('./gallerySaver.ts', import.meta.url)), 'utf8')
 const tsNaming = readFileSync(fileURLToPath(new URL('./galleryDownload.ts', import.meta.url)), 'utf8')
 const javaDownloaderModule = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/lynx/java/io/pictelio/app/PictelioDownloaderModule.java', import.meta.url)),
+  fileURLToPath(new URL('lynx/java/io/pictelio/app/PictelioDownloaderModule.java', HOST_APP)),
   'utf8',
 )
 const javaDownloaderDeep = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/main/java/io/pictelio/app/PictelioDownloader.java', import.meta.url)),
+  fileURLToPath(new URL('main/java/io/pictelio/app/PictelioDownloader.java', HOST_APP)),
   'utf8',
 )
 const tsExecutor = readFileSync(fileURLToPath(new URL('./lynxDownloadExecutor.ts', import.meta.url)), 'utf8')

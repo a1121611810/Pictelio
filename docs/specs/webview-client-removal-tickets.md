@@ -49,6 +49,31 @@ Wave 6-7
 4. **T06 必须在 T11 之前完成。**
    AGENTS.md 体积门禁的守门人住在待删包里。先改文档、后迁守门人，会出现一段 CI 红窗口。
 
+## 实施期订正（2026-09-29）
+
+**订正 1：连带项是 7 个文件，不是 spec 写的 1 个。**
+spec「Further Notes」只点了 i18n 契约测试会「从对面炸回来」。
+实测：Android 工程迁移后，**7 个存活测试**仍用旧 Java 路径，全部 ENOENT：
+
+```
+packages/app-lynx/src/utils/clientSwitchJavaContract.test.ts
+packages/app-lynx/src/utils/clipboardBridgeContract.test.ts
+packages/app-lynx/src/utils/darkModeJavaContract.test.ts
+packages/app-lynx/src/utils/galleryBridgeContract.test.ts
+packages/app-lynx/src/utils/safeAreaJavaContract.test.ts
+packages/app-lynx/tests/benchnav-parity.test.ts
+packages/app-lynx/tests/differential/i18nLanguageKeyContract.test.ts
+```
+
+**教训**：spec 点名某一个文件时，要假设它是一类而非一个。
+判据应是「凡是跨包读被迁移对象的，全部算」，
+而不是「spec 点名的那个」——后者会在实施期漏掉其余六个。
+
+**订正 2：`differential/` 目录名在 T08 后已失实。**
+对侧消失后，迁入的断言要么是「与 Java/spec 的契约」，要么是「单端基准」，
+两者都不是「差分」。目录整体应改名为 `contract/` 或 `baseline/`。
+原目录在 T08 的文件所有权之外，未能重命名。
+
 ## 反例警示
 
 - **不得**断言「全仓 `capacitor` 字样为 0」。

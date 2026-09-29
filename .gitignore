@@ -29,10 +29,19 @@ packages/website/docs/.vitepress/dist/
 packages/website/task-*-report.md
 
 # Android signing secrets
+# ADR-0203 宿主迁移：Gradle 工程从 packages/app/android 迁到 packages/android-host/android，
+# keystore / jks / release 产物随工程一起走——忽略规则必须跟着换路径，
+# 否则新路径下的签名材料将失去 ignore 保护（本地已存在的 pictelio-release.keystore 即证）。
+packages/android-host/android/app/*.keystore
+packages/android-host/android/app/*.jks
+packages/android-host/android/app/release/
+# 旧宿主路径在 T10 删包前保留（T10 删除 packages/app 后这两行可一并清理）
 packages/app/android/app/*.keystore
 packages/app/android/app/*.jks
 packages/app/android/app/release/
 packages/app/.env
+# ADR-0203 决策 3：凭证事实源迁到 app-lynx；发布文案的 AI 配置随发布脚本迁到宿主包
+packages/android-host/.env
 packages/app-lynx/.env
 packages/app/test-results/
 # android-e2e 快照目录以 process.cwd() 定位，从仓库根误跑时会在根目录生成

@@ -13,9 +13,27 @@ export default defineConfig({
   lint: {
     ignorePatterns: [
       "**/dist/**",
-      // 收窄到 app 的 android 平台目录（ADR-0186 review P2）：通配 **/android/** 会
-      // 误伤 packages/app/tests/unit/android/ 的 R8 keep 规则契约测试
-      "packages/app/android/**",
+      // ADR-0203 宿主迁移：Gradle 工程从 packages/app/android 迁到 packages/android-host/android。
+      // 仍按**具体路径**收窄（ADR-0186 review P2：通配 **/android/** 会误伤
+      // packages/android-host/tests/unit/android/ 的 R8 keep 规则契约测试）。
+      // 逐条列出的理由——oxfmt/oxlint 不读 .gitignore，故生成物必须显式排除：
+      //   ① .gradle/ 是 GRADLE_USER_HOME，内含整个 Gradle 发行版的 HTML 文档
+      //   ② **/build/ 是 AGP 构建产物
+      //   ③ 源树里 oxfmt 真正会碰的只有两类：res/raw/upgrade.html（Android 资源，
+      //      随 APK 分发）与 src/test/resources/*.json（Java 测试资源，与
+      //      novel-export payload 逐字节比对，重排即破契约）
+      // Java / .gradle / .pro / .xml 不在两者的支持面内，不列。
+      "packages/android-host/android/.gradle/**",
+      "packages/android-host/android/**/build/**",
+      "packages/android-host/android/**/*.html",
+      "packages/android-host/android/**/*.json",
+      // 旧宿主路径：T10 删包前仍有本机 git-ignored 的 Gradle 缓存与 Capacitor 生成物
+      // 残留（glossary §口径纠正：那是未清理的磁盘垃圾，不是状态）。oxfmt/oxlint 不读
+      // .gitignore，故同样按生成物目录 + 文件类型排除；T10 删包后整条可清理。
+      "packages/app/android/.gradle/**",
+      "packages/app/android/**/build/**",
+      "packages/app/android/**/*.html",
+      "packages/app/android/**/*.json",
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",
@@ -129,9 +147,23 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       "**/dist/**",
-      // 收窄到 app 的 android 平台目录（ADR-0186 review P2）：通配 **/android/** 会
-      // 误伤 packages/app/tests/unit/android/ 的 R8 keep 规则契约测试
-      "packages/app/android/**",
+      // ADR-0203 宿主迁移：Gradle 工程从 packages/app/android 迁到 packages/android-host/android。
+      // 与上方 lint 块同一条收窄纪律（ADR-0186 review P2：不能用 **/android/** 通配，
+      // 那会误伤 packages/android-host/tests/unit/android/ 的 R8 keep 规则契约测试），
+      // 逐条理由见上：oxfmt 不读 .gitignore，故 .gradle/ 与 **/build/ 显式排除；
+      // 源树里只有 res/raw/upgrade.html 与 src/test/resources/*.json 两类会被碰。
+      "packages/android-host/android/.gradle/**",
+      "packages/android-host/android/**/build/**",
+      "packages/android-host/android/**/*.html",
+      "packages/android-host/android/**/*.json",
+      // 旧宿主路径：T10 删包前的本机 git-ignored 残留，同上方 lint 块的理由；删包后可清理。
+      // 其中 assets/public/ 是 #610 前 Web 客户端打进 APK 的 web 产物（spec 决策九
+      // 列为「本机未追踪的残留」，gradle 早已不裁剪 assets）——本机垃圾，不是源码。
+      "packages/app/android/.gradle/**",
+      "packages/app/android/**/build/**",
+      "packages/app/android/app/src/main/assets/public/**",
+      "packages/app/android/**/*.html",
+      "packages/app/android/**/*.json",
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",

@@ -2,14 +2,15 @@
 // ─── app-lynx bundle → Android assets 同步（#51） ───
 // 用法：node scripts/sync-android-assets.mjs
 // 将 packages/app-lynx/dist/main.lynx.bundle 拷贝到
-// packages/app/android/app/src/main/assets/main.lynx.bundle（含大小校验）。
+// packages/android-host/android/app/src/main/assets/main.lynx.bundle（含大小校验）。
+// ADR-0203 宿主迁移：Gradle 工程随 Android 原生资产迁到宿主包 packages/android-host。
 import { copyFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "dist", "main.lynx.bundle");
-const destDir = join(root, "..", "app", "android", "app", "src", "main", "assets");
+const destDir = join(root, "..", "android-host", "android", "app", "src", "main", "assets");
 const dest = join(destDir, "main.lynx.bundle");
 
 if (!existsSync(src)) {

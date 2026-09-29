@@ -1,5 +1,6 @@
-// lynx 侧消费共享 AI 真值表：经 isAiRestricted / isAiOnlyFiltered 断言与 fixture 一致。
-// fixture 与 app 侧逐字节一致（app.tests/unit/differential/aiFilterTruthTableConsistency.test.ts 守护）。
+// Lynx 单端行为基准：settingsStore 以 AI 真值表 fixture 为 oracle。
+// 形态说明（ADR-0203 决策 5）：WebView 客户端删除后差分对侧消失，本文件只断言 Lynx 侧。
+// fixture 为 Lynx 唯一事实源（其自洽门见 truthTableFixtureIntegrity.test.ts）。
 // 期望值 oracle = ADR-0155 三态语义（独立来源）。
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
@@ -18,7 +19,7 @@ beforeEach(() => {
   store = useSettingsStore();
 });
 
-describe("settingsStore × 共享 AI truth table（12 例差分 fixture）", () => {
+describe('Lynx 单端行为基准：settingsStore × AI truth table（12 例）', () => {
   it("fixture 覆盖 3 模式 × 4 值 = 12 例唯一组合", () => {
     const keys = AI_FILTER_TRUTH_TABLE.map((c) => `${c.mode}:${String(c.aiType)}`);
     expect(new Set(keys).size).toBe(12);

@@ -2,19 +2,22 @@
 // 模式 = backupRulesConsistency.test.ts（Java 源码字面量提取，任一侧漂移即红灯）。
 // oracle = spec §4.3 契约锚点：事件名 / 载荷顺序 / 拉取方法 / 设置键。
 // Java 侧由 LynxSystemBarsTest.contractConstants_matchSpecAnchors 钉同一组字面量。
+//
+// Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
+// 本文件在 `src/utils/`（深两级），故 `../../../` 到 `packages/`，再进 `android-host/android/app/`。
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const LYNX_ACTIVITY = readFileSync(
   new URL(
-    '../../../app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java',
+    '../../../android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java',
     import.meta.url,
   ),
   'utf8',
 )
 const APP_MODULE = readFileSync(
   new URL(
-    '../../../app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java',
+    '../../../android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java',
     import.meta.url,
   ),
   'utf8',

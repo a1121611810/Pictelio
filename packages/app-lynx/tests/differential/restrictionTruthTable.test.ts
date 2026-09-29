@@ -1,6 +1,7 @@
-// lynx 侧 isRestricted 12 例参数化测试：以共享 truth-table fixture 为 oracle。
-// fixture 与 app 侧逐字节一致（restrictionTruthTableConsistency.test.ts 守护），
-// 期望值来源 = x_restrict 契约语义（0=全年龄 / 1=R-18 / 2=R-18G），独立 oracle。
+// Lynx 单端行为基准：isRestricted 12 例参数化测试，以真值表 fixture 为 oracle。
+// 形态说明（ADR-0203 决策 5）：WebView 客户端删除后差分对侧消失，本文件只断言 Lynx 侧。
+// fixture 为 Lynx 唯一事实源；期望值来源 = x_restrict 契约语义（0=全年龄 / 1=R-18 /
+// 2=R-18G），独立 oracle。
 // isRestricted 直接可测（settingsStore.test.ts 模式）：setShowR18/setShowR18G 注入开关态。
 // Pinia 化（ADR-0139/T5）：从具名 import 改为 useSettingsStore()（setActivePinia 隔离）。
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,7 @@ beforeEach(() => {
   store = useSettingsStore()
 })
 
-describe('settingsStore.isRestricted × 共享 truth table（12 例差分 fixture）', () => {
+describe('Lynx 单端行为基准：settingsStore.isRestricted × 限制真值表（12 例）', () => {
   it.each(RESTRICTION_TRUTH_TABLE)(
     'x_restrict=$x_restrict, showR18=$showR18, showR18G=$showR18G → restricted=$expectedRestricted',
     ({ x_restrict, showR18: s18, showR18G: s18g, expectedRestricted }) => {

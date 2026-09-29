@@ -5,8 +5,7 @@
 //      （push 本身必联网，fetch 失败时 push 也必失败，fail-open 不会放行坏代码）
 //   2) 真分叉（remote_sha 非 local_sha 祖先）→ fail-closed 人话报错（exit 1）
 //   3) fmt 门禁：被推文件过 oxfmt（对齐 CI check job；路径无关，故不并入下面的按目录域）
-//   4) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
-//      packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
+//   4) 两域触碰校验：packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
 // .husky/pre-push 为透传 stdin 的薄壳；本脚本承载全部逻辑以便单测（真实 git fixture）。
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -19,24 +18,17 @@ import {
   diffNames,
   mergeBase,
   diffTreeNames,
-} from "../packages/app/scripts/lib/git-refs.mjs";
+} from "../packages/android-host/scripts/lib/git-refs.mjs";
 
 const MODULE = "[check-push-refs]";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ZERO = "0000000000000000000000000000000000000000";
 
-// 三域配置：文案与原 .husky/pre-push 逐字一致（行为不变约束）
+// 按目录域配置：文案与原 .husky/pre-push 逐字一致（行为不变约束）
+// ADR-0203：原「packages/app/(src|tests/agent-browser) → E2E 锚点静态校验」一域整体移除
+// ——其被调脚本锚定已删的 WebView 源码目录，且 WebView 客户端随包删除（决策九：
+// 「E2E 锚点静态校验脚本」列为无被测对象资产）。保留它会让每次 push 调一个不存在的脚本。
 const DOMAINS = [
-  {
-    key: "app",
-    pattern: /^packages\/app\/(src\/|tests\/agent-browser\/)/u,
-    script: "packages/app/scripts/check-e2e-anchors.mjs",
-    banner: "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…",
-    failGuidance:
-      "❌ E2E 锚点静态校验失败\n" +
-      "  - 修复失效锚点（同步 spec 或 src）后重试\n" +
-      "  - 确认为误报时可用 git push --no-verify 绕过",
-  },
   {
     key: "app-lynx",
     pattern: /^packages\/app-lynx\/(src\/|tests\/)/u,

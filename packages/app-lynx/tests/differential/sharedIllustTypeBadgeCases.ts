@@ -1,11 +1,9 @@
-// 共享 truth-table fixture：类型角标判定（动图/多图）7 例矩阵。
+// 行为真值表 fixture：类型角标判定（动图/多图）7 例矩阵（Lynx 侧唯一事实源）。
 // 期望值来源 = spec（docs/specs/work-type-badges.md）决策 1 + ADR-0113 决策 2（独立 oracle，
 // 非从实现反推）：type === 'ugoira' → 动图标；page_count > 1 → 多图标；独立判定、允许并存、
 // 动图在前；page_count <= 1 无多图标。
-// 本文件在 app（packages/app/tests/unit/differential/）与 app-lynx
-// （packages/app-lynx/tests/differential/）各存一份，内容须逐字节一致；
-// 一致性由 illustTypeBadgeCasesConsistency.test.ts（readFileSync 比对）守护。
-// 纯 TS、零框架依赖（不 import vue/solid/@capacitor）——两端测试直接消费。
+// 本文件为 Lynx 侧唯一副本（WebView 副本随 packages/app 删除，ADR-0203 决策 5），
+// 纯 TS、零框架依赖（不 import vue/solid/@capacitor）——本包测试直接消费。
 export interface IllustTypeBadgeCase {
   type: string;
   page_count: number;

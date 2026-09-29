@@ -1,14 +1,12 @@
-// 共享差分契约表：classifyError（OAuth 400 错误分类）输入 → 期望 type。
+// 行为真值表 fixture：classifyError（OAuth 400 错误分类）输入 → 期望 type
+// （Lynx 侧唯一事实源，ADR-0203 决策 5：WebView 副本随包删除后无对侧可比）。
 // 期望值来源 = 真实 OAuth 快照（pixivpy#374 / gallery-dl#9331）+ 契约语义
 // （独立 oracle，非从实现反推）：字符串 error 形态 invalid_grant 与对象形态
-// （error.message 含 OAuth/invalid_request/invalid_grant）→ UNAUTHORIZED（两端一致）；
+// （error.message 含 OAuth/invalid_request/invalid_grant）→ UNAUTHORIZED；
 // 非 OAuth 400 → 非 UNAUTHORIZED（UNKNOWN）；proxy_error → PROXY；TypeError → NETWORK。
-// 期望 type 以字符串键记录（UNAUTHORIZED/UNKNOWN/PROXY/NETWORK），两端测试用
-// ApiErrorType[key] 映射为枚举成员断言（T4 已统一两端枚举为大写，规避历史大小写差异）。
-// 本文件在 app（packages/app/tests/unit/differential/）与 app-lynx
-// （packages/app-lynx/tests/differential/）各存一份，内容须逐字节一致；
-// 一致性由 oauthErrorCasesConsistency.test.ts（readFileSync 比对）守护。
-// 纯 TS、零框架依赖（不 import vue/solid/@capacitor）——两端测试直接消费。
+// 期望 type 以字符串键记录（UNAUTHORIZED/UNKNOWN/PROXY/NETWORK），本包测试用
+// ApiErrorType[key] 映射为枚举成员断言（枚举成员名已统一为大写）。
+// 纯 TS、零框架依赖（不 import vue/solid/@capacitor）——本包测试直接消费。
 
 /** 真实 Pixiv OAuth 400 快照原始字节（refresh_token 失效，pixivpy#374 / gallery-dl#9331） */
 export const PIXIV_OAUTH_400_RAW_SNAPSHOT =

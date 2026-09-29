@@ -1,9 +1,7 @@
-// lynx 侧标签静音真值表（ADR-0187 D2/D4 / #732）：以共享 fixture 为 oracle 参数化断言
-// settingsStore.isTagMuted（真实实现，restrictionTruthTable.test.ts 同模式）。
-// 双端语义一致性：用例集为 webview sharedTagMuteTruthTable.ts 的独立等价拷贝——
-// webview 侧（r18Filter.hasMutedTag 经 filterFeedIllusts，见 app 包 tagMuteTruthTable.test.ts）
-// 与 lynx 侧（本文件）对同一组用例必须给出相同判定；ADR-0187 D6 不做共享包，
-// 双端各自实现 + differential 真值表互为镜像。
+// Lynx 单端行为基准：标签静音真值表（ADR-0187 D2/D4 / #732），以 fixture 为 oracle
+// 参数化断言 settingsStore.isTagMuted（真实实现）。
+// 形态说明（ADR-0203 决策 5）：WebView 客户端删除后差分对侧消失，ADR-0187 D6「双端各自
+// 实现 + 差分真值表互为镜像」已无成立对象，本文件只断言 Lynx 侧。
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
@@ -36,7 +34,7 @@ beforeEach(() => {
   store = useSettingsStore()
 })
 
-describe('settingsStore.isTagMuted × 共享 truth table（9 例差分 fixture，ADR-0187）', () => {
+describe('Lynx 单端行为基准：settingsStore.isTagMuted × 标签静音真值表（9 例，ADR-0187）', () => {
   it.each(TAG_MUTE_TRUTH_TABLE)(
     'muted=$muted, tags=$tags → muted=$expectedMuted',
     ({ muted: tableMuted, tags, expectedMuted }) => {

@@ -43,8 +43,9 @@ jobs:
 
       # 沙盒 #610：Web 构建与 Capacitor sync 随 WebView 线整体下线。
       # 与 ci.yml android-unit-test 同款前置（gradle 配置依赖 gitignored 生成物）
+      # ADR-0203 宿主迁移：Gradle 工程与凭证/版本同步脚本归 packages/android-host。
       - name: Generate credentials config
-        run: pnpm --dir packages/app run sync:credentials
+        run: pnpm --dir packages/android-host run sync:credentials
 
       # lynx 客户端本体：rspeedy bundle → android assets（LynxActivity 加载的就是它）。
       # 直调包级脚本——root 的 build:app-lynx 走全局 vp（CI 无此工具，vp-skew 教训）
@@ -56,7 +57,7 @@ jobs:
 
       # 沙盒 #610：flavor 维度下线，单 variant。旧 assembleFullDebug 任务已不存在。
       - name: Build debug APK
-        working-directory: packages/app/android
+        working-directory: packages/android-host/android
         run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug --no-daemon
 
       - name: Install emulator image
@@ -105,7 +106,7 @@ jobs:
           echo "boot timeout"; tail -20 /tmp/emulator.log; exit 1
 
       - name: Acceptance matrix (assertive)
-        working-directory: packages/app/android/app/build/outputs/apk/debug
+        working-directory: packages/android-host/android/app/build/outputs/apk/debug
         run: |
           set -euo pipefail
           export PATH="$ANDROID_HOME/platform-tools:$PATH"

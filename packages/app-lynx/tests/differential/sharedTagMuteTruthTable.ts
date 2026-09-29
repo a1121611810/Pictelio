@@ -1,13 +1,9 @@
 // 标签静音匹配语义真值表（ADR-0187 D2 / spec docs/specs/tag-mute.md 边界条件）。
-// 双端 differential 共用 fixture：webview 与 lynx 各自实现的谓词必须对同一组
-// 用例给出一致判定（r18FilterTruthTable 的 sharedRestrictionTruthTable 先例）。
+// **单端**：WebView 客户端随 ADR-0203 删除后对侧消失，跨端互为镜像的约定
+// （ADR-0187 D6「双端各自实现 + 差分真值表」）已无成立对象，本表自此是
+// Lynx settingsStore.isTagMuted 的行为基准。
 // 语义：tags[].name 经 trim 后与静音集合精确相等；不匹配 translated_name；
 // 空集合 / 空 tags / undefined tags 一律放行。
-//
-// 双端语义一致性（#732）：本文件为 webview packages/app/tests/unit/differential/
-// sharedTagMuteTruthTable.ts 的**独立等价拷贝**（ADR-0187 D6 不做共享包； lynx 侧
-// 禁止跨包 import）——用例集与判定语义逐条对齐，两侧实现（webview r18Filter.hasMutedTag
-// / lynx settingsStore.isTagMuted）对同一用例必须给出相同 expectedMuted。
 
 export interface TagMuteCase {
   /** 静音集合（存储态：元素均已 trim） */

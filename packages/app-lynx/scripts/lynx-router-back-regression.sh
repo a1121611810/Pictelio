@@ -13,8 +13,8 @@
 #   - adb（platform-tools）；像素分析复用仓库自有 scripts/lynx-screen-analyze.py 的
 #     纯标准库 PNG 解码（importlib 加载，零第三方依赖，无需 PIL）
 #   - app-lynx bundle 已同步到 android assets（pnpm sync:app-lynx-bundle），
-#     APK：packages/app/android/app/build/outputs/apk/full/debug/app-full-debug.apk
-#     （本脚本只跑 gradle assembleFullDebug，不重新构建 bundle）
+#     APK：packages/android-host/android/app/build/outputs/apk/debug/app-debug.apk
+#     （本脚本只跑 gradle assembleDebug，不重新构建 bundle）
 #   - .env 的 PIXIV_REFRESH_TOKEN（S5 登出后 / 首次运行的自助登录）
 #
 # ADR-0137 采样方法（证据链 + 时机）：
@@ -69,7 +69,7 @@ cd "$(dirname "$0")/.." # packages/app-lynx
 # ─── 参数区（环境变量可覆盖） ─────────────────────────────────────────────
 ADB_SERIAL="${ADB_SERIAL:-emulator-5554}"
 APP_ID="${APP_ID:-io.pictelio.app}"
-APK_PATH="${APK_PATH:-../app/android/app/build/outputs/apk/full/debug/app-full-debug.apk}"
+APK_PATH="${APK_PATH:-../android-host/android/app/build/outputs/apk/debug/app-debug.apk}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}" # 1 = 跳过 assembleDebug + adb install
 S1="${S1:-1}"; S2="${S2:-1}"; S3="${S3:-1}"; S4="${S4:-1}"; S5="${S5:-1}"; S6="${S6:-1}"
 
@@ -632,10 +632,12 @@ say "═ 0. 前置 ═"
 if [ "$SKIP_INSTALL" != "1" ]; then
   local_apk="$(pwd)/${APK_PATH}" # APK_PATH 为相对 packages/app-lynx 的路径
   if [ ! -f "$local_apk" ]; then
-    say "   …APK 不存在，先构建（gradlew assembleFullDebug）"
-    ( cd ../app/android && ./gradlew -q assembleFullDebug )
+    # ADR-0203 决策 2 宿主迁移 + #610 flavor 维度下线：Gradle 工程在
+    # packages/android-host/android/，variant 退化为纯 buildType（assembleDebug）。
+    say "   …APK 不存在，先构建（gradlew assembleDebug）"
+    ( cd ../android-host/android && ./gradlew -q assembleDebug )
   fi
-  [ -f "$local_apk" ] || { say "❌ APK 仍不存在：$local_apk（assembleFullDebug 未产出，或 APK_PATH 配置错误）"; exit 1; }
+  [ -f "$local_apk" ] || { say "❌ APK 仍不存在：$local_apk（assembleDebug 未产出，或 APK_PATH 配置错误）"; exit 1; }
   say "   …安装 $APK_PATH"
   adb install -r "$local_apk" >/dev/null 2>&1 || { say "❌ adb install 失败"; exit 1; }
 else

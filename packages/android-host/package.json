@@ -5,7 +5,18 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "sync:android-version": "node scripts/sync-android-version.mjs",
+    "sync:credentials": "node scripts/sync-credentials.mjs",
+    "release": "node scripts/release.mjs",
+    "dev:android": "node scripts/dev-android.mjs",
+    "test:android:unit": "cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest",
+    "build:android": "npm run sync:android-version && npm run sync:credentials && NODE_ENV=production pnpm --dir ../app-lynx run build && node ../app-lynx/scripts/sync-android-assets.mjs && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
+    "build:android:release": "npm run sync:android-version && npm run sync:credentials && NODE_ENV=production pnpm --dir ../app-lynx run build && node ../app-lynx/scripts/sync-android-assets.mjs && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleRelease renameReleaseApk"
+  },
+  "dependencies": {
+    "json5": "^2.2.3",
+    "ora": "^9.4.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

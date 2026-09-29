@@ -18,6 +18,9 @@
 //
 // 断言纪律：断言一律跑在 stripComments 之后的文本上（下方 *_CODE），禁用原文——
 // 否则「删实现、只在注释里留一句」照样全绿。
+//
+// Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
+// 本文件在 `src/utils/`（深两级），故 `../../../` 到 `packages/`，再进 `android-host/android/app/`。
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -33,7 +36,10 @@ function stripComments(source: string): string {
 const APP_MODULE_CODE = stripComments(
   readFileSync(
     fileURLToPath(
-      new URL('../../../app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java', import.meta.url),
+      new URL(
+        '../../../android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java',
+        import.meta.url,
+      ),
     ),
     'utf8',
   ),
@@ -41,7 +47,7 @@ const APP_MODULE_CODE = stripComments(
 
 const APP_BUILD_GRADLE_CODE = stripComments(
   readFileSync(
-    fileURLToPath(new URL('../../../app/android/app/build.gradle', import.meta.url)),
+    fileURLToPath(new URL('../../../android-host/android/app/build.gradle', import.meta.url)),
     'utf8',
   ),
 )

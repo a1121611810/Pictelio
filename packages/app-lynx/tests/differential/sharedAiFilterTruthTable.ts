@@ -1,5 +1,6 @@
-// AI 三态 × ai_type 真值表（app 与 app-lynx 各一份、逐字节一致，由
-// aiFilterTruthTableConsistency.test.ts readFileSync 守护防漂移）。
+// 行为真值表 fixture：AI 三态 × ai_type（Lynx 侧唯一事实源）。
+// WebView 副本随 packages/app 删除后，跨端逐字节比对的对侧消失（ADR-0203 决策 5），
+// 本表自此只服务 Lynx 单端行为基准；其自洽门在 truthTableFixtureIntegrity.test.ts。
 //
 // 期望值 oracle：ADR-0155 三态语义表 + Pixiv ai_type 0/1/2 契约：
 //   ai_type: 0/undefined=非 AI，1=AI 辅助，2=纯 AI（>=1 为 AI 作品）

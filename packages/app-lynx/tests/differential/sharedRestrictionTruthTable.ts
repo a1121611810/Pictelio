@@ -1,11 +1,9 @@
-// 共享 truth-table fixture：isRestricted 谓词（R18/R18G 开关判定）12 例全矩阵。
+// 行为真值表 fixture：isRestricted 谓词（R18/R18G 开关判定）12 例全矩阵
+// （Lynx 侧唯一事实源，ADR-0203 决策 5：WebView 副本随包删除后无对侧可比）。
 // 期望值来源 = x_restrict 契约语义（独立 oracle，非从实现反推）：
 //   x_restrict: 0=全年龄 / 1=R-18 / 2=R-18G
 //   谓词语义：!showR18 && x_restrict===1 → restricted；!showR18G && x_restrict===2 → restricted；否则 false
-// 本文件在 app（packages/app/tests/unit/differential/）与 app-lynx
-// （packages/app-lynx/tests/differential/）各存一份，内容须逐字节一致；
-// 一致性由 restrictionTruthTableConsistency.test.ts（readFileSync 比对）守护。
-// 纯 TS、零框架依赖（不 import vue/solid/@capacitor）——两端测试直接消费。
+// 本文件为 Lynx 侧唯一副本，纯 TS、零框架依赖（不 import vue/solid/@capacitor）。
 export interface RestrictionTruthCase {
   x_restrict: number;
   showR18: boolean;
