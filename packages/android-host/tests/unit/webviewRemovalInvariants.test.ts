@@ -2,7 +2,7 @@
  * 仓库不变量契约：WebView 客户端「删干净了吗」——本轮唯一总闸（spec 核心缝 / ADR-0203）
  *
  * ## 判据来源（oracle 溯源，禁自洽反推）
- * - 不变量清单（已扩至 9 组，见文件末尾「不变量 ↔ 决策」表）：`docs/specs/webview-client-removal.md` §Testing Decisions「核心缝：单一仓库不变量契约测试」
+ * - 不变量清单（已扩至 10 组，见文件末尾「不变量 ↔ 决策」表）：`docs/specs/webview-client-removal.md` §Testing Decisions「核心缝：单一仓库不变量契约测试」
  * - 术语与「存量格式契约」定义：`docs/adr/glossary-webview-client-removal.md`
  *   （§三「必须分清的三类 capacitor 字样」、§风险与易错点 1）
  * - 宿主包新身份与复核命令：`docs/adr/ADR-0203-webview-client-source-removal.md` §决策 2 + §复核判据
@@ -15,7 +15,7 @@
  * ## 阳性对照（强制项，不是加分项）
  * 本仓此前多条防线在「改动前就已经绿」，是恒真的假防线（spec 核心缝「阳性对照是强制项」）。
  * 唯一能识破的办法是反事实。本文件底部 describe「检测式阳性对照」把反事实**常驻**成测试：
- * 在 `os.tmpdir()` 造一棵合规仓库树（应九组全绿），再逐条塞回违规（应各自转红），
+ * 在 `os.tmpdir()` 造一棵合规仓库树（应十组全绿），再逐条塞回违规（应各自转红），
  * 跑的就是上面那**同一个** `evaluateInvariants`，所以后人重构扫描逻辑也逃不掉。
  *
  * 2026-09-29 首次执行（`pnpm --filter @pictelio/android-host test`）结果，7 / 7 全部转红：
@@ -42,10 +42,11 @@
  * 「依赖声明 = 0」**且**「存量格式契约命中 ≥ 1」——本文件的不变量 2 + 4 就是这一对。
  *
  * ## 当前状态（2026-09-29，T13 交付后）
- * **全绿**：9 组不变量全部满足（`pnpm --filter @pictelio/android-host test` 实测通过）。
+ * **全绿**：10 组不变量全部满足（`pnpm --filter @pictelio/android-host test` 实测通过）。
  * 本段曾记录「T01 交付时刻意为红（7 failed | 8 passed）」的快照——那是**写门禁阶段**的
  * 中间态（先立红再实现），现已失效。保留此行只为提醒：这份文件的绿是**实现的结果**，
- * 不是它一开始就是绿的；是否真在守，由下方 13 条反事实注入当场证明。
+ * 不是它一开始就是绿的；是否真在守，由下方 17 条反事实注入当场证明。
+ * 另有 2 条「扫描覆盖」断言，钉住扫描根/排除清单本身不失效。
  *
  * | 不变量 | 守什么 | 对应反事实注入 |
  * | --- | --- | --- |
@@ -58,6 +59,7 @@
  * | 7 | 门面措辞收敛 | 对照 7 |
  * | 8 | 客户端切换能力已下线（决策 7） | 对照 8a / 8b / 8c / 8d |
  * | 9 | gradle 入口自带生成物前置（决策 8） | 对照 9a / 9b |
+ * | 10 | pnpm 调用点在其**解析目标包**里存在（决策 2 改名须同步调用点） | 对照 10a / 10b / 10c / 10d |
  */
 import {
   existsSync,
@@ -70,7 +72,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
@@ -287,6 +289,104 @@ function stripJsComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 }
 
+/**
+ * 根命令调用点完备性（不变量 10；ADR-0204 §决策 2「改名必须同步调用点」）。
+ *
+ * 背景：本轮**两次**栽在同一形态上——
+ * ① T07 把根 `build:android` 改名为 `build:android-host`（ADR-0204），
+ *    却漏了 `tests/android-e2e/build-install.ts` 的调用点 ⇒ `pnpm test:android-host:e2e`
+ *    100% 失败于 `Missing script: build:android`；
+ * ② T05 迁移时 `packages/app` 的 devDependencies 没跟着搬，`appium` 整个丢失。
+ * 两者都不是「代码写错」，是**改名/迁移时漏了另一端**——缺席的文件不进 diff，
+ * 逐行评审与全绿门禁都看不到。
+ *
+ * ## 判据：按**解析目标包**查表——「取 workspace 并集」与「统一查根」都是错解
+ *
+ * `pnpm run <name>` 查的是**进程 cwd 所在**的 package.json。本仓两个真实调用恰好分处两端：
+ * - `build-install.ts` 以 `cwd: REPO_ROOT` 起 pnpm ⇒ 只能查**根** package.json。
+ *   而 `build:android` 这个名字**仍然活在宿主包内部**（根 `build:android-host` 正是委托给它），
+ *   所以**取并集会让刚修好的缺陷原样放行**——恒真的假防线，正是本条最危险的形态。
+ * - `release-build-steps.mjs` 的 `["run","sync:credentials"]` 继承进程 cwd（宿主包），
+ *   而**根** package.json 里没有 `sync:credentials` ⇒ **统一查根会误报**。
+ * 两个方向同时有真实反例，故只能逐调用点解析目标包。
+ *
+ * 目标包判定顺序（先命中先算）：
+ * 1. `["--dir", "<rel>", "run", "<name>"]` ⇒ `<rel>` 相对**文件所属包的目录**解析；
+ * 2. 文件里出现 `cwd: REPO_ROOT` ⇒ 目标 = 仓库根；
+ * 3. 其余 ⇒ 目标 = 文件所属包（pnpm 以 `--filter` 起包内脚本时 cwd 即该包目录）。
+ *
+ * 两条**已知局限**，方向都是「响的」而非「静默的」：
+ * - cwd 识别按**文件**粒度且只认 `cwd: REPO_ROOT` 这一种写法。同一个文件里若出现
+ *   「一部分步骤带自定义 cwd、另一部分不带」，会被判成所属包 ⇒ 可能误报（红），不会漏报。
+ * - 不解析 `pnpm run ${x}` 这类字符串拼接（静态不可知），也不解析 shell 字符串形态
+ *   （如根 package.json 里的 `vp run --filter X build`）。本仓所有 pnpm 调用点均为
+ *   数组字面量（已实测，见下方扫描覆盖断言）。
+ */
+
+/** `["run", "<name>"]` —— 目标包 = 显式 cwd（若指向仓库根），否则文件所属包。 */
+const PNPM_RUN_ARRAY_RE = /\[\s*"run",\s*"([^"]+)"\s*\]/g;
+
+/** `["--dir", "<rel>", "run", "<name>"]` —— 目标包 = `<rel>` 相对**所属包目录**解析。 */
+const PNPM_DIR_RUN_RE = /\[\s*"--dir",\s*"([^"]+)",\s*"run",\s*"([^"]+)"\s*\]/g;
+
+/** 显式把 cwd 指向仓库根的写法（本仓唯一形态，见 `build-install.ts`）。 */
+const PNPM_CWD_ROOT_RE = /\bcwd:\s*REPO_ROOT\b/;
+
+/** 扫描根：真正会 shell out 跑 pnpm 的源码位置。 */
+const INV10_SCAN_ROOTS = [
+  "packages/android-host/scripts",
+  "packages/android-host/tests/android-e2e",
+  "packages/app-lynx/src",
+] as const;
+
+/**
+ * 刻意排除 `packages/android-host/tests/unit/**`：那里存的是**历史形态 / 改名复活**的
+ * 负样本 fixture（如 `["run","build:web"]` 断言它**不得**复活），本就该引用已不存在的名字。
+ * 排除本身是个洞，所以配一条「扫描覆盖」断言（见 describe「不变量 10：扫描覆盖」）：
+ * 全仓命中若落在扫描根之外，必须全部落在这一条排除清单里，且排除清单不得空转。
+ */
+const INV10_EXCLUDED_ROOTS = ["packages/android-host/tests/unit"] as const;
+
+/** 配对正面锚点：扫到的 pnpm 数组调用点下界（防「零调用点」让全称断言静默恒真）。 */
+const INV10_CALLSITE_MIN = 2;
+
+interface PkgNode {
+  /** 包目录（绝对路径） */
+  dir: string;
+  /** 相对仓库根，用于报错 */
+  rel: string;
+  scripts: Set<string>;
+}
+
+/** 载入根 + packages/ 下所有 package.json。解析失败不静默：登记空集 ⇒ 该包的名字全判「不存在」。 */
+function loadWorkspacePackages(l: Layout, rel: (p: string) => string): PkgNode[] {
+  const files = [
+    join(l.repoRoot, "package.json"),
+    ...walkFiles(l.packagesDir, (f) => f.endsWith("package.json")),
+  ];
+  const out: PkgNode[] = [];
+  for (const f of files) {
+    const dir = dirname(f);
+    let scripts: Set<string>;
+    try {
+      const parsed = JSON.parse(readFileSync(f, "utf8")) as { scripts?: Record<string, string> };
+      scripts = new Set(Object.keys(parsed.scripts ?? {}));
+    } catch {
+      scripts = new Set();
+      console.warn(`[webviewRemovalInvariants] 不变量 10 解析失败：${rel(f)}`);
+    }
+    out.push({ dir, rel: rel(dir), scripts });
+  }
+  return out;
+}
+
+/** 最近的祖先包（dir 是 fromDir 的前缀，取最长者）。 */
+function nearestPackage(pkgs: PkgNode[], fromDir: string): PkgNode | undefined {
+  return pkgs
+    .filter((p) => fromDir === p.dir || fromDir.startsWith(p.dir + sep))
+    .toSorted((a, b) => b.dir.length - a.dir.length)[0];
+}
+
 interface Layout {
   repoRoot: string;
   packagesDir: string;
@@ -360,7 +460,7 @@ function deletedPkgRefsInText(text: string): string[] {
   return hits;
 }
 
-type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 type Verdict = Record<InvariantId, string[]>;
 
 /**
@@ -368,9 +468,9 @@ type Verdict = Record<InvariantId, string[]>;
  * 加第 10 条时只改这里；「N 组」文案由 `ALL_INVARIANTS.length` 派生，不再各处各写一份计数
  * ——计数散落正是本文件头曾与实现漂移的成因。
  */
-const ALL_INVARIANTS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[];
+const ALL_INVARIANTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as InvariantId[];
 
-/** 逐条求值八组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
+/** 逐条求值十组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
 function evaluateInvariants(l: Layout): Verdict {
   const rel = (p: string) => relative(l.repoRoot, p);
   const verdict = {
@@ -383,6 +483,7 @@ function evaluateInvariants(l: Layout): Verdict {
     7: [] as string[],
     8: [] as string[],
     9: [] as string[],
+    10: [] as string[],
   };
 
   // 不变量 1 —— packages/app 目录不存在（ADR-0203 决策 2 + 复核判据 `test ! -d packages/app`）
@@ -670,6 +771,71 @@ function evaluateInvariants(l: Layout): Verdict {
     }
   }
 
+  // 不变量 10 —— 根命令调用点完备性（改名/迁移不得漏掉另一端）
+  // 逐调用点解析「pnpm 到底查哪份 package.json」，理由见 PNPM_RUN_ARRAY_RE 上方注释：
+  // 取并集会让 `build:android`（仍活在宿主包内、根上已改名）原样放行；统一查根则误报
+  // `sync:credentials`（只在宿主包、继承宿主 cwd）。两个方向都有真实反例。
+  const pkgs = loadWorkspacePackages(l, rel);
+  const rootPkg = pkgs.find((p) => p.dir === l.repoRoot);
+  if (!rootPkg) verdict[10].push("[检测式不可信] 未找到根 package.json，调用点检测式空转");
+  if (pkgs.filter((p) => p.scripts.size > 0).length === 0) {
+    verdict[10].push("[检测式不可信] 未解析到任何非空 scripts 表，调用点检测式空转");
+  }
+  let callSiteCount = 0;
+  for (const scanRel of INV10_SCAN_ROOTS) {
+    for (const f of walkFiles(join(l.repoRoot, ...scanRel.split("/")), (x) => {
+      const e = x.endsWith(".ts") || x.endsWith(".mjs");
+      return e;
+    })) {
+      const stripped = stripJsComments(readFileSync(f, "utf8"));
+      const owning = nearestPackage(pkgs, dirname(f));
+      const cwdIsRoot = PNPM_CWD_ROOT_RE.test(stripped);
+
+      // 形态 1：`["--dir", "<rel>", "run", "<name>"]`，目标包由 <rel> 决定
+      for (const m of stripped.matchAll(PNPM_DIR_RUN_RE)) {
+        const [, dirArg, script] = m;
+        if (script === undefined || dirArg === undefined) continue;
+        callSiteCount++;
+        const target = nearestPackage(pkgs, resolve(owning?.dir ?? l.repoRoot, dirArg));
+        if (!target) {
+          verdict[10].push(
+            `${rel(f)} 调用 \`pnpm --dir ${dirArg} run ${script}\`，但 ${dirArg} 解析不到任何 workspace 包` +
+              `（目标包静态不可知 ⇒ 判红，不放行）`,
+          );
+        } else if (!target.scripts.has(script)) {
+          verdict[10].push(
+            `${rel(f)} 调用 \`pnpm --dir ${dirArg} run ${script}\`，但 ${target.rel} 无此脚本` +
+              `（ADR-0204：改名须同步所有调用点）`,
+          );
+        }
+      }
+
+      // 形态 2：`["run", "<name>"]`，目标包 = 显式根 cwd，否则文件所属包
+      for (const m of stripped.matchAll(PNPM_RUN_ARRAY_RE)) {
+        const script = m[1];
+        if (script === undefined) continue;
+        callSiteCount++;
+        const target = cwdIsRoot ? rootPkg : owning;
+        if (!target) {
+          verdict[10].push(
+            `${rel(f)} 调用 \`pnpm run ${script}\`，但无法判定其解析目标包 ⇒ 判红，不放行`,
+          );
+        } else if (!target.scripts.has(script)) {
+          verdict[10].push(
+            `${rel(f)} 调用 \`pnpm run ${script}\`（cwd ${cwdIsRoot ? "= 仓库根" : `= ${target.rel}`}），` +
+              `但该 package.json 无此脚本` +
+              `（ADR-0204：宿主动作一律 :android-host 显式命名；改名须同步所有调用点）`,
+          );
+        }
+      }
+    }
+  }
+  // 配对正面锚点：扫描集不能空，否则「零调用点」会让全称断言静默恒真
+  if (callSiteCount < INV10_CALLSITE_MIN) {
+    verdict[10].push(
+      `[配对正面锚点失效] 只扫到 ${callSiteCount} 处 pnpm 数组调用 < ${INV10_CALLSITE_MIN}，调用点检测式可能已失明`,
+    );
+  }
   return verdict;
 }
 
@@ -728,8 +894,51 @@ describe("不变量 9：gradle 入口自带生成物前置（ADR-0203 §决策 8
     assertSatisfied(9));
 });
 
+describe("不变量 10：pnpm 调用点完备性（ADR-0204 §决策 2「改名必须同步调用点」）", () => {
+  it("每个 pnpm 数组调用在其**解析目标包**的 package.json 里都存在，且调用点数不低于下界（配对正面锚点）", () =>
+    assertSatisfied(10));
+});
+
+describe("不变量 10：扫描覆盖（防止「扫描根」本身变成失明的洞）", () => {
+  // 排除 tests/unit 是**刻意**的（那里是「改名复活」负样本 fixture，本就该引用已不存在的名字），
+  // 但排除清单天然是洞：新增的扫描根若忘了加、或调用点长在别处，就静默失明了。
+  // 故：全仓搜同一批形态，扫描根之外的命中必须全部落在排除清单里，且排除清单不得空转。
+  const scanRootAbs = INV10_SCAN_ROOTS.map((r) => join(LAYOUT.repoRoot, ...r.split("/")));
+  const excludedAbs = INV10_EXCLUDED_ROOTS.map((r) => join(LAYOUT.repoRoot, ...r.split("/")));
+
+  function classify(absFile: string): "scan" | "excluded" | "stray" {
+    if (scanRootAbs.some((r) => absFile.startsWith(r + sep))) return "scan";
+    if (excludedAbs.some((r) => absFile.startsWith(r + sep))) return "excluded";
+    return "stray";
+  }
+
+  const allHits: Array<{ file: string; kind: ReturnType<typeof classify> }> = [];
+  for (const f of walkFiles(LAYOUT.repoRoot, (x) => {
+    return (
+      (x.endsWith(".ts") || x.endsWith(".mjs")) &&
+      // 判据自测文件本身必然含这两个形态（正例 + 反事实注入），否则本断言自指失败
+      basename(x) !== "webviewRemovalInvariants.test.ts"
+    );
+  })) {
+    const src = stripJsComments(readFileSync(f, "utf8"));
+    const hit = PNPM_RUN_ARRAY_RE.test(src) || PNPM_DIR_RUN_RE.test(src);
+    PNPM_RUN_ARRAY_RE.lastIndex = 0;
+    PNPM_DIR_RUN_RE.lastIndex = 0;
+    if (hit) allHits.push({ file: relative(LAYOUT.repoRoot, f), kind: classify(f) });
+  }
+
+  it("扫描根之外没有漏网的 pnpm 数组调用（否则不变量 10 对该文件完全失明）", () => {
+    expect(allHits.filter((h) => h.kind === "stray").map((h) => h.file)).toEqual([]);
+  });
+
+  it("配对正面锚点：扫描集非空、排除集非空（证明两条清单都真的在承担判定，不是空转）", () => {
+    expect(allHits.filter((h) => h.kind === "scan").length).toBeGreaterThan(0);
+    expect(allHits.filter((h) => h.kind === "excluded").length).toBeGreaterThan(0);
+  });
+});
+
 // ── 阳性对照：真实临时目录 + 同一批扫描函数 ──────────────────────────────────
-// 目的：证明上面八条**不是恒绿假防线**。做法是造一棵合规仓库树（应全绿），
+// 目的：证明上面十条**不是恒绿假防线**。做法是造一棵合规仓库树（应全绿），
 // 再逐条塞回违规（应各自转红），跑的就是上面那个 evaluateInvariants。
 const TMP_ROOTS: string[] = [];
 
@@ -743,7 +952,7 @@ function removeFixtureFile(root: string, relPath: string): void {
   rmSync(join(root, ...relPath.split("/")), { force: true, recursive: true });
 }
 
-/** 造一棵「删除已完成」的合规仓库树：满足全部九组不变量。 */
+/** 造一棵「删除已完成」的合规仓库树：满足全部十组不变量。 */
 function writeCompliantFixture(root: string): void {
   writeFixtureFile(
     root,
@@ -770,6 +979,7 @@ function writeCompliantFixture(root: string): void {
           check: "vp run --filter pictelio-app-lynx check",
           test: "vp run --filter pictelio-app-lynx test",
           preview: "vp run --filter pictelio-app-lynx preview",
+          "build:android-host": "vp run --filter @pictelio/android-host build:android",
         },
       },
       null,
@@ -858,16 +1068,42 @@ function writeCompliantFixture(root: string): void {
     "packages/android-host/package.json",
     JSON.stringify({
       name: "@pictelio/android-host",
-      scripts: Object.fromEntries(
-        Array.from({ length: GRADLE_ENTRY_MIN }, (_, i) => [
-          `gradleTask${i}`,
-          `npm run ${CREDENTIALS_SYNC} && ./gradlew task${i}`,
-        ]),
-      ),
+      scripts: {
+        // 不变量 9 的前置脚本（`npm run ${CREDENTIALS_SYNC}` 引用的就是它）
+        [CREDENTIALS_SYNC]: "node scripts/sync-credentials.mjs",
+        // ⚠️ 刻意保留包内的 `build:android`：**它仍然活着**（根 `build:android-host` 委托给它）。
+        // 这正是「取 workspace 并集」会漏掉真缺陷的陷阱载体——对照 10a/10b 就靠它。
+        "build:android": `npm run ${CREDENTIALS_SYNC} && ./gradlew assembleDebug`,
+        ...Object.fromEntries(
+          Array.from({ length: GRADLE_ENTRY_MIN }, (_, i) => [
+            `gradleTask${i}`,
+            `npm run ${CREDENTIALS_SYNC} && ./gradlew task${i}`,
+          ]),
+        ),
+      },
     }),
   );
   writeFixtureFile(root, "packages/android-host/tsconfig.json", "{}\n");
   writeFixtureFile(root, "packages/android-host/vitest.config.ts", "export default {};\n");
+
+  // 不变量 10 的两个调用点载体：① cwd=REPO_ROOT ⇒ 目标包是**根**；② --dir ⇒ 目标包是 app-lynx。
+  // 二者的目标包刻意不同，正是「统一查根」「取并集」两种简化判据都会出错的根据。
+  writeFixtureFile(
+    root,
+    "packages/android-host/tests/android-e2e/build-install.ts",
+    [
+      'import { spawn } from "node:child_process";',
+      'import { REPO_ROOT } from "./env";',
+      'const buildArgs = ["run", "build:android-host"];',
+      'spawn("pnpm", buildArgs, { cwd: REPO_ROOT });',
+      "",
+    ].join("\n"),
+  );
+  writeFixtureFile(
+    root,
+    "packages/android-host/scripts/pnpmDirCall.mjs",
+    'await run("pnpm", ["--dir", "../app-lynx", "run", "build"]);\n',
+  );
 
   // 唯一客户端：无跨包引用
   writeFixtureFile(
@@ -878,7 +1114,7 @@ function writeCompliantFixture(root: string): void {
   writeFixtureFile(
     root,
     "packages/app-lynx/package.json",
-    JSON.stringify({ name: "pictelio-app-lynx" }),
+    JSON.stringify({ name: "pictelio-app-lynx", scripts: { dev: "", build: "", test: "" } }),
   );
 
   // 其余 workspace 包（保证不变量 2 的「扫描到 ≥5 份 package.json」非空转锚点成立）
@@ -905,7 +1141,7 @@ function evaluateFixture(mutate: (root: string) => void): Verdict {
   }
 }
 
-/** 合规树必须九组全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
+/** 合规树必须十组全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
 function expectOnly(target: Verdict, id: InvariantId, minHits: number): void {
   for (const key of ALL_INVARIANTS) {
     if (key === id) {
@@ -923,8 +1159,8 @@ afterAll(() => {
   for (const root of TMP_ROOTS) rmSync(root, { recursive: true, force: true });
 });
 
-describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明九组不是恒绿假防线）", () => {
-  it("基线：合规仓库树九组全绿", () => {
+describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明十组不是恒绿假防线）", () => {
+  it("基线：合规仓库树十组全绿", () => {
     const v = evaluateFixture(() => {});
     for (const key of ALL_INVARIANTS) {
       expect(v[key], `合规树的不变量 ${key} 不该红：${v[key].join("；")}`).toEqual([]);
@@ -941,16 +1177,15 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
 
   it("对照 2：加回 @capacitor/core 依赖声明 → 不变量 2 转红", () => {
     expectOnly(
-      evaluateFixture((r) =>
-        writeFixtureFile(
-          r,
-          "packages/app-lynx/package.json",
-          JSON.stringify({
-            name: "pictelio-app-lynx",
-            dependencies: { "@capacitor/core": "^8.5.2" },
-          }),
-        ),
-      ),
+      evaluateFixture((r) => {
+        // 合并而非整份覆盖：scripts 是不变量 10 的载体，整份重写会把别的注入也搅进来
+        const abs = join(r, "packages/app-lynx/package.json");
+        const parsed = JSON.parse(readFileSync(abs, "utf8")) as {
+          dependencies?: Record<string, string>;
+        };
+        parsed.dependencies = { ...parsed.dependencies, "@capacitor/core": "^8.5.2" };
+        writeFileSync(abs, JSON.stringify(parsed), "utf8");
+      }),
       2,
       1,
     );
@@ -1123,7 +1358,13 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
         const parsed = JSON.parse(readFileSync(abs, "utf8")) as {
           scripts: Record<string, string>;
         };
-        parsed.scripts = { onlyOne: `npm run ${CREDENTIALS_SYNC} && ./gradlew onlyOne` };
+        // 保留 sync:credentials 与 build:android：它们是不变量 10 的载体，
+        // 删掉会把「gradle 入口数跌破下界」这一个注入，扩散成两条不变量同时红。
+        parsed.scripts = {
+          [CREDENTIALS_SYNC]: "node scripts/sync-credentials.mjs",
+          "build:android": `npm run ${CREDENTIALS_SYNC} && ./gradlew assembleDebug`,
+          onlyOne: `npm run ${CREDENTIALS_SYNC} && ./gradlew onlyOne`,
+        };
         writeFileSync(abs, JSON.stringify(parsed), "utf8");
       }),
       9,
@@ -1148,6 +1389,109 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
         );
       }),
       8,
+      1,
+    );
+  });
+
+  // ── 不变量 10 的四条反事实 ────────────────────────────────────────────────
+  // 10a 是**本轮真缺陷的原样复现**：`build-install.ts` 以 cwd=REPO_ROOT 起 pnpm，
+  // 却引用了只在宿主包内活着的 `build:android` ⇒ 运行时 `Missing script`。
+  it("对照 10a：把根 cwd 的调用点改回包内旧名 build:android → 不变量 10 转红", () => {
+    expectOnly(
+      evaluateFixture((r) =>
+        writeFixtureFile(
+          r,
+          "packages/android-host/tests/android-e2e/build-install.ts",
+          [
+            'import { spawn } from "node:child_process";',
+            'import { REPO_ROOT } from "./env";',
+            // 缺陷形态：这个名字**在宿主包 package.json 里确实存在**，只因 cwd 是仓库根才失败
+            'const buildArgs = ["run", "build:android"];',
+            'spawn("pnpm", buildArgs, { cwd: REPO_ROOT });',
+            "",
+          ].join("\n"),
+        ),
+      ),
+      10,
+      1,
+    );
+  });
+
+  // 10b 是**「取并集」这种错解的反事实**：把脚本名搬到另一个包里去（于是并集里能找到它），
+  // 目标包依然没有 ⇒ 仍须转红。若这条转绿，说明判据偷偷退化成了「workspace 并集」，
+  // 也就是本轮真缺陷会被原样放行的那条假防线。
+  it("对照 10b：把脚本挪到**别的**包（并集里有、目标包里没有）→ 不变量 10 仍转红（证明没在取并集）", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const rootAbs = join(r, "package.json");
+        const rootPkg = JSON.parse(readFileSync(rootAbs, "utf8")) as {
+          scripts: Record<string, string>;
+        };
+        delete rootPkg.scripts["build:android-host"];
+        writeFileSync(rootAbs, JSON.stringify(rootPkg), "utf8");
+
+        const hostAbs = join(r, "packages/android-host/package.json");
+        const hostPkg = JSON.parse(readFileSync(hostAbs, "utf8")) as {
+          scripts: Record<string, string>;
+        };
+        // 刻意用**不含 gradlew** 的值：否则会连带触发不变量 9，注入就不干净了
+        hostPkg.scripts["build:android-host"] = "echo moved";
+        writeFileSync(hostAbs, JSON.stringify(hostPkg), "utf8");
+      }),
+      10,
+      1,
+    );
+  });
+
+  // 10c `--dir` 形态的反事实：证明「目标包由 --dir 决定」这条分支真的在断，
+  // 而非所有 `--dir` 调用都被当成宿主包从而恒绿。
+  it("对照 10c：--dir 指向一个没有该脚本的包 → 不变量 10 转红", () => {
+    expectOnly(
+      evaluateFixture((r) =>
+        writeFixtureFile(
+          r,
+          "packages/android-host/scripts/pnpmDirCall.mjs",
+          'await run("pnpm", ["--dir", "../ugoira", "run", "build"]);\n',
+        ),
+      ),
+      10,
+      1,
+    );
+  });
+
+  // 10d 配对正面锚点：把 4 处 pnpm 数组调用点全部撤掉，证明「查表」不是对着空表恒绿。
+  // 改写而非删文件：HOST_ASSETS 有 .mjs/.ts 数量下界，删文件会连带触发不变量 3。
+  // mjsGradleA/C 改用「直调脚本」形态——不变量 9 认的是「同步先于 gradlew」的文本序，不认调用形态。
+  it("对照 10d：撤掉全部 pnpm 数组调用点 → 不变量 10 转红（配对正面锚点在断）", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        writeFixtureFile(
+          r,
+          "packages/android-host/tests/android-e2e/build-install.ts",
+          [
+            'import { spawn } from "node:child_process";',
+            'import { REPO_ROOT } from "./env";',
+            'spawn("pnpm", ["exec", "true"], { cwd: REPO_ROOT });',
+            "",
+          ].join("\n"),
+        );
+        writeFixtureFile(
+          r,
+          "packages/android-host/scripts/pnpmDirCall.mjs",
+          'await run("pnpm", ["--dir", "../app-lynx", "exec", "true"]);\n',
+        );
+        writeFixtureFile(
+          r,
+          "packages/android-host/scripts/mjsGradleA.mjs",
+          'await run("node", ["scripts/sync-credentials.mjs"]);\nawait run("./gradlew", ["assembleDebug"]);\n',
+        );
+        writeFixtureFile(
+          r,
+          "packages/android-host/scripts/lib/mjsGradleC.mjs",
+          'steps = [["同步", "node", ["../../scripts/sync-credentials.mjs"]], ["./gradlew", "assembleRelease"]];\n',
+        );
+      }),
+      10,
       1,
     );
   });
