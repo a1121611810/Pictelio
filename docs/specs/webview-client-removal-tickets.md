@@ -74,6 +74,47 @@ packages/app-lynx/tests/differential/i18nLanguageKeyContract.test.ts
 两者都不是「差分」。目录整体应改名为 `contract/` 或 `baseline/`。
 原目录在 T08 的文件所有权之外，未能重命名。
 
+## 交接给 T11 的清单（实测产出，非推测）
+
+### 1. `AGENTS.md` 命令表有 5 条命令已不存在
+
+由 `packages/android-host/tests/unit/agentsMd.contract.test.ts` 的
+「根命令表可达性」断言钉住（oracle = spec 用户故事 16：教人跑空即红）。
+当前实测报错原文：
+
+```
+AGENTS.md 命令表里这些命令在根 package.json 中不存在：
+dev:android、build:android、test:agent-browser、test:android:e2e、release
+```
+
+对应改法（见 ADR-0204 决策 2）：
+
+| AGENTS.md 现写法 | 改为 |
+| --- | --- |
+| `dev:android` | `dev:android-host` |
+| `build:android` | `build:android-host` |
+| `build:android:release` | `build:android-host:release` |
+| `test:android:e2e` | `test:android-host:e2e` |
+| `release` | `release:android-host` |
+| `test:agent-browser` | **删除**（套件已随 WebView 客户端删除） |
+
+### 2. ⚠️ AGENTS.md 体积门禁只有 26 B 余量——必须先抬阈值再改正文
+
+当前 28,646 B / 上限 28,672 B。T11 要往命令表加 `android-host` 后缀、
+删掉 agent-browser 行，**净变化方向不确定**（加长与删行相互抵消）。
+
+**正确顺序**：先在 `packages/android-host/tests/unit/agentsMd.contract.test.ts`
+把阈值抬到有真实余量的值，**再**改 `AGENTS.md`。
+反序会撞上一段「文档已改、门禁已红」的窗口。
+
+阈值不得放宽到失去约束力——它本来就是为了防止 AGENTS.md 无限膨胀。
+
+### 3. 技术栈行与入口行
+
+不变量 7 要求：技术栈行**不含** `Capacitor` / `SolidJS` 且**点名 Lynx**；
+入口行指向 `packages/app-lynx` 且不含 `packages/app/src`。
+注意纯负面断言会被「删掉整行」骗过，所以**必须保留正向点名**。
+
 ## 反例警示
 
 - **不得**断言「全仓 `capacitor` 字样为 0」。

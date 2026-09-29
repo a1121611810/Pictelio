@@ -10,5 +10,17 @@
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["vitest.config.ts", "tests"]
+  // 门禁范围与迁移前**逐项对齐**，不扩大也不缩小（ADR-0203 决策 2「保真迁移 = 逐件搬走，不改写」）。
+  //
+  // 迁移前 `packages/app/tsconfig.json` 的 include 是 ["src", "tests/android-e2e"]：
+  //   · src          —— WebView 客户端源码，随整包删除（决策 2）
+  //   · tests/android-e2e —— 原生 E2E，已迁入本包
+  // ⇒ 本包 include 相应去掉 src、保留 android-e2e。
+  //
+  // ⚠️ **tests/unit 有意不在类型检查面内**：它在本仓历史上**从未**被 tsc 检查过
+  // （旧 include 不含它），现存约 225 处隐式 any / 缺声明的存量欠账。
+  // 把它拉进检查面会让本轮迁移立刻背上一个与本次重构无关的失败集，
+  // 属范围蔓延。**该欠账是独立工作项**，不是本 ADR 的后果，也不是本轮的遗漏。
+  // 处置见 docs/specs/webview-client-removal-tickets.md §实施期订正。
+  "include": ["vitest.config.ts", "tests/android-e2e"]
 }

@@ -101,7 +101,9 @@ function firstControlChar(text: string): { line: number; code: number } | undefi
 function scanOffenders(paths: string[]): { f: string; hit: { line: number; code: number } }[] {
   return paths
     .map((f) => ({ f, hit: firstControlChar(readFileSync(f, "utf8")) }))
-    .filter((x) => x.hit !== undefined);
+    // ⚠️ 必须用**类型谓词**而不是 `.filter((x) => x.hit !== undefined)`：
+    // 后者不收窄类型，TS 仍认为 hit 可能是 undefined，调用方 `.map` 取 line/code 即报错。
+    .filter((x): x is { f: string; hit: { line: number; code: number } } => x.hit !== undefined);
 }
 
 describe("源码控制字节防线（裸 NUL 会让 grep 对该文件后半段静默失明）", () => {
