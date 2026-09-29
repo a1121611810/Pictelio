@@ -348,6 +348,11 @@ async function execute<T>(
   // ⚠️ 门只收 GET，POST 不设门（#819 补注）：`loginWithRefreshToken` 不经本客户端，
   // 启动窗口内没有走本客户端的 POST 读路径；给 POST 加门会给恢复期的写操作
   // 引入额外延迟。若将来新增经本客户端的启动期 POST，须重新评估。
+  //
+  // ℹ️ 已知冗余（web 模式，本轮不修）：原生分支下方另有第二道同款就绪门 + 未登录 throw，
+  // 与本门在 web 模式重复过闸；且 authStore.restoreToken 的去重闩锁 `_restoreInFlight`
+  // 在 finally 里清空（不记忆化），故恢复失败路径会真的跑两次 `loadRefreshToken`。
+  // 修它要动认证时序且 web 分支无单测覆盖 → 已挂 #819 第 6 项待办。
   if (method === "GET" && !accessToken) {
     await awaitAuthReady()
   }
@@ -446,6 +451,13 @@ async function executeRaw(
   // 原生分支在下方 `return new Promise(api.request)` 处提前返回，末尾的 awaitAuthReady
   // 永远到不了 ⇒ 启动窗口内的请求裸奔（access_token 尚未由异步 OAuth 交换产出）
   // → 401 → 401 handler 读空内存 → 永久失效。故提到分支之前统一把关。
+  //
+  // ⚠️ 门只收 GET，POST 不设门（判据与 execute 顶部同款，#819 补注）：`loginWithRefreshToken`
+  // 经 auth.ts 的 `oauthTokenRequest` → `requestFetch` 直连 OAuth 端点，不经本客户端的
+  // execute / executeRaw ⇒ 启动窗口内没有走本客户端的 POST 读路径；本函数的生产调用方
+  // 只有 api/novel.ts 的 fetchNovelText / fetchNovelData（均为 GET），`apiClient.post`
+  // 的调用方则全是用户点击触发的写操作（收藏 / 追更 / 评论 / 关注）。给 POST 加门会给
+  // 恢复期的写操作引入额外延迟。若将来新增经本客户端的启动期 POST，须重新评估。
   if (method === "GET" && !accessToken) {
     await awaitAuthReady()
   }
