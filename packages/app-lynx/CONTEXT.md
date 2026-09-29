@@ -654,6 +654,14 @@ _Avoid_: 对 list 结构变更做「就地 patch + 祈祷」；用 scroll API �
 注入类增强内容（如相关作品）在瀑布流中的渲染形态：作为**锚点卡 list-item 内部的条件段**（`openDetail` 冒泡域外的兄弟位），**不**作为独立 list-item 织入列表。紧贴锚点成立、滚动位置保留、绕开插入丢弃。先例：`RelatedInlineSection`（spec related-injection §5.2 v2）。
 _Avoid_: 向原生瀑布流中途插入 list-item（必丢，ADR-0162）；横滑条（原生 waterfall list-item 内不可靠，spec §5.2 v1 已证）
 
+**测试约定（testing conventions）**：
+本包编写/修改测试前必读的**仓库级准绳**：[`docs/testing/conventions.md`](../../docs/testing/conventions.md)
+——自 `packages/app/tests/TESTING.md` 逐字提升（该文件随 WebView 客户端删除，见 [ADR-0203](../../adr/ADR-0203-webview-client-source-removal.md)）。
+其中「**6 条强制约束**」对本包全部适用：①IO 边界测试强制覆盖 ②契约测试必须使用真实样例
+③禁止静默降级 ④重构行为不变约束 ⑤期望值出处可追溯（oracle 溯源）⑥**异步测试确定性**
+（禁止固定墙钟等待；本包的 `novelTranslateStore.test.ts` 时序档是该条的常驻防线先例）。
+_Avoid_: 照搬 `AGENTS.md` 摘要版（编号与详版有既有偏移，引用时以详版条文内容为准）
+
 ### 系统栏（System bars）【2026-09-19 新增，spec docs/specs/lynx-systembars.md，ADR 编号落地时定】
 
 **基底边到边（edge-to-edge base）**：
@@ -681,3 +689,38 @@ _Avoid_: ActionMode（被替换的引擎自带菜单）；Toast（lynx 原生无
 **选中文本通道（selection channels）**：
 把选中文字送出去的出口。**复制** = 自建原生模块 `PictelioClipboard.setText`（Lynx JS 运行时**没有 `navigator`**，也无内置剪贴板 API）；**搜索** = 全局搜索弹层 `openSearch(关键词)`（跳搜索页 + 预填 + 一次性消费，长文本先截断到首行/上限）。两者失败都**必须可见**（禁止静默降级与假成功反馈）。
 _Avoid_: 用 `navigator.clipboard`（运行时不存在的对象，可选链会静默失败）；把「搜索」落到新路由页（搜索是弹层，没有 `/search` 路由）
+
+### 搜索（Search）
+
+> 本节自 `packages/app/CONTEXT.md`「搜索」节**逐字搬运**（WebView 客户端源码随 ADR-0203 删除，原位置不再存在）。
+> 来源：`packages/app/CONTEXT.md` §搜索；原实测日期 **2026-09-27**。
+> 未搬运的同节其余词条（搜索范围 / 搜索排序 / 搜索目标 / 搜索建议 / 搜索历史 / 搜索结果混排 / 结果类型筛选 / 导航中心钮 / 标签导航 / 搜索合流）判定为**已存在于他处**，未重复搬运，见 `docs/specs/webview-client-knowledge-migration.md` §3 盘点表。
+
+**搜索关键词（Search Query）**：
+用户输入的搜索文本，即 Pixiv API 的 `word` 参数。**只匹配标签**（在不传 `search_target` 时额外并入标题/简介命中）。搜索历史以关键词为单位持久化。
+
+**关键词的两个硬约束（2026-09-27 实测，勿再推翻）**：
+1. **空格是 AND 分隔符，不是普通字符。** `原神 HoYoverse` = 两个标签同时命中（配 `search_target=exact_match_for_tags`）。由此派生一个**已知失配面**：若 `tags[i].name` 自身含空格（如 `川崎 Sera`），按空格拼接传出会被拆成两个标签 → 实测 0 条；`"川崎 Sera"` 加引号**同样无效**（0 条）。**跟随 Pixiv 官方行为即可，不要自创引号语法。**
+2. **标签与画师名不可混搜，二者是互斥通路。** `/v1/search/illust` 的 `word` 只认标签：实测 `原神 <画师名>` = **0 条**（画师名被当标签筛），纯画师名亦 0 条。画师名必须走**独立端点** `/v1/search/user`（实测 `ソーダ豆汁` 在 user 端点命中 1 个用户）。要「看某画师的其他作品」应走 `/v2/illust/related` 或用户主页作品列表，**不是往作品搜索里掺画师名**。
+_Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `word`、为含空格标签自造引号语法
+
+### 图床缓存契约（Image host cache contract）
+
+> 本节自 `packages/app/CONTEXT.md`「图床」节**逐字搬运**（同上，WebView 客户端源码随 ADR-0203 删除）。
+> 来源：`packages/app/CONTEXT.md` §图床；原实测日期 **2026-09-06**。
+> **为什么必须搬**：app-lynx 侧原生读端**正在执行**这个契约（`PictelioImageService` / Java 下载层），而它的文档在被删目录里。
+
+**缓存键（Cache key）**【2026-09-06 新增，跨上下文】：
+图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip 三链路共用同一键空间。
+_Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历史 bug 根源，已由 anti-drift 测试把守）
+
+**源无关命中（Source-agnostic hit）**【2026-09-06 新增，跨上下文】：
+缓存命中判定只依赖「该图是否曾以任意来源缓存过」，与当前图床开关、模式、host 选择完全无关。切换图床/换镜像不失效、不重下；同一图全生命周期只有一个缓存条目。
+_Avoid_: 按来源分柜缓存（同图多份、切源即 miss——反模式）
+
+**下载源（Download source）**【2026-09-06 新增，跨上下文】：
+缓存 miss 时由图床模式（单一/负载均衡/最快 IP）选定的**实际取数渠道**（官方 CDN 或镜像图床）。决策点收敛在 Java 下载层（双引擎共享），显示 URL 不受其影响。镜像下载失败回退官方重试一次。
+_Avoid_: 图床 URL（易与缓存键混淆——下载源只在 miss 时被咨询，不参与寻址）
+
+> 决策全文：[ADR-0143](../../adr/ADR-0143-imagehost-download-source-java-sink.md) §D2（缓存键恒官方 URL 的不变量）；
+> 实施规格：`docs/specs/imagehost-native-fix.md` §缓存键契约。
