@@ -55,7 +55,7 @@ export function resolveOtaPrivateKeyPath(home = homedir()) {
  */
 export const DOMAIN_PREFIX = "Pictelio-OTA-bundle-v1\n";
 
-/** 三件套文件名（命名对齐 pictelio-<version>-<flavor>.apk 惯例） */
+/** 三件套文件名（命名对齐 build.gradle rename task 的 pictelio-<version>-<buildType>.apk 惯例） */
 export function bundleNames(version) {
   return {
     zip: `pictelio-${version}-web-bundle.zip`,

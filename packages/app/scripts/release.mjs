@@ -59,6 +59,7 @@ import {
 } from "./lib/release-utils.mjs";
 import { truncateChangelog } from "./lib/changelog.mjs";
 import { bundlePathsFor, resolveOtaPrivateKeyPath } from "./lib/release-bundle-core.mjs";
+import { releaseBuildSteps } from "./lib/release-build-steps.mjs";
 import { parseWebOnlyArgs, buildVersionJson } from "./lib/release-webonly.mjs";
 import { assertReleaseBranchNotDiverged } from "./lib/release-preflight.mjs";
 import {
@@ -627,46 +628,10 @@ async function runBuildSteps(buildSteps) {
 }
 
 // 构建 Release APK（正常发布 step 3 与覆盖发布重建共用）
+// 步骤表在 lib/release-build-steps.mjs（纯函数，可单测）；#610 单引擎化后
+// 「变体」= buildType，唯一值 release，见该文件的 RELEASE_BUILD_TYPES 注释。
 async function buildReleaseApks(version, variants) {
-  // #119：按变体解析 assemble/rename task
-  const gradleTasks = variants.flatMap((flavor) => {
-    const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-    return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
-  });
-
-  const buildSteps = [
-    ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
-    ["构建 Web 产物", "pnpm", ["run", "build"]],
-    // #250：OTA web bundle 三件套（打包 + 签名 + round-trip 自验，独立脚本 release-bundle.mjs）。
-    // 位置紧随「构建 Web 产物」：此后无任何步骤再触碰 dist/（cap:sync 是 copy 不 move）。
-    // 正常发布与 -o 重建两条路径共用本函数，本步自动生效；失败落在 step 3 的自动回滚窗口内。
-    // PICTELIO_RELEASE_SKIP_OTA=1 时整步省略（step 1 已打 warn）；
-    // minApkVersion 由脚本内读 PICTELIO_OTA_MIN_APK 决定（新增桥方法需提升时设置）。
-    ...(otaSkipped
-      ? []
-      : [["打包并签名 web bundle", "node", ["scripts/release-bundle.mjs", "--version", version]]]),
-    // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
-    // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
-    // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
-    // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
-    [
-      "构建 Lynx bundle",
-      "pnpm",
-      ["--dir", "../app-lynx", "run", "build"],
-      { env: { ...process.env, NODE_ENV: "production" } },
-    ],
-    ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
-    ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
-    [
-      "编译 Release APK",
-      "./gradlew",
-      gradleTasks,
-      {
-        cwd: resolvePath(rootDir, "android"),
-        env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
-      },
-    ],
-  ];
+  const buildSteps = releaseBuildSteps({ version, variants, otaSkipped });
   await runBuildSteps(buildSteps);
   const apkPaths = apkPathsFor(version, variants);
   const missing = [];
@@ -692,7 +657,7 @@ async function buildReleaseApks(version, variants) {
 }
 
 // #255：web-only 构建路径——只跑 credentials 同步 + web 构建 + release-bundle.mjs，
-// 跳过 gradle assemble / Lynx / cap:sync（不产 APK，分钟级热修通道）。
+// 跳过 gradle assemble / Lynx bundle（不产 APK，分钟级热修通道）。
 // 三件套是唯一产物，失败同样落在 step 3 的自动回滚窗口内。
 async function buildWebOnlyRelease(version) {
   const buildSteps = [
@@ -957,7 +922,7 @@ async function main() {
 
   await step(3, isWebOnly ? "构建 Web 产物并打包签名" : "构建 APK", async () => {
     if (isWebOnly) {
-      // #255：web-only 只构建 web 产物并打包签名（跳过 gradle assemble / Lynx / cap:sync）
+      // #255：web-only 只构建 web 产物并打包签名（跳过 gradle assemble / Lynx bundle）
       await buildWebOnlyRelease(newVersion);
       return;
     }

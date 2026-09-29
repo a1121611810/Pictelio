@@ -16,15 +16,25 @@ import ora from "ora";
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
 
-// #119：三 flavor 变体（full / webview / lynx），默认全量
-export const DEFAULT_VARIANTS = ["full", "webview", "lynx"];
+// #119：原为三 flavor 变体（full / webview / lynx），默认全量。
+// #610 单引擎化后 `flavorDimensions` 与全部 `productFlavors` 已删除，gradle variant 名
+// 退化为纯 buildType，故「变体」现在唯一取值 `release`。旧值 full / webview / lynx
+// 对应的 assemble{Full,Webview,Lynx}Release task 已不存在，保留会让 gradle 直接报
+// "Task not found"。推导见 lib/release-build-steps.mjs 的 RELEASE_BUILD_TYPES 注释。
+export const DEFAULT_VARIANTS = ["release"];
 export const APK_DIR = "android/app/build/outputs/apk";
 
+// 产物路径与 android/app/build.gradle 的 rename task 规则严格一致（build.gradle:118）：
+//   def apkDirStr = ".../outputs/apk/${bt}"
+//   def destApk   = new File("${apkDirStr}/pictelio-${versionName}-${bt}.apk")
+// 即 apk/{buildType}/pictelio-{versionName}-{buildType}.apk。
+// #610 前是 apk/{flavor}/release/pictelio-{version}-{flavor}.apk，多一层 flavor 目录。
+// versionName 由 step 2「更新版本号」先行写回 build.gradle，故此处传 version 即可对齐。
 export function apkPathsFor(version, variants) {
-  return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
+  return variants.map((bt) => `${APK_DIR}/${bt}/pictelio-${version}-${bt}.apk`);
 }
 
-// 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认全量
+// 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认单引擎 release
 export function resolveVariants() {
   const cliVariantsArg = args.find((a) => a.startsWith("--variants="))?.slice("--variants=".length);
   const hasCliVariants = cliVariantsArg !== undefined;
