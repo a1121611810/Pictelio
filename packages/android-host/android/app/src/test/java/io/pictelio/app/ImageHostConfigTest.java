@@ -21,25 +21,41 @@ import java.util.concurrent.CountDownLatch;
  * ImageHostConfig 单测（#377 T1）——全部从 {@code resolve()} 单口进出（spec：接口即测试面），
  * RawProvider/Clock/Random/ProbeFn/Executor 全注入：不触 SharedPreferences、不发真 HTTP、不用真时钟。
  *
- * <p><b>Oracle 溯源（spec #376 测试硬约束 #6：期望值出处可追溯）</b>——期望值全部来自独立来源，
- * 禁止从被测实现反推：
+ * <p><b>⚠️ 本文件现为 characterization 测试（防回归），不再满足测试硬约束 #6 的
+ * 「期望值出处可追溯」</b>——这是已知且被接受的缺口，不是疏漏。理由与影响：
+ *
  * <ul>
- *   <li>URL 改写 / {path} 模板 / weighted 抽样规则 / fastest-ip TTL 判定 / 探测样本 URL /
- *       官方域写入侧防线：原 oracle 是 WebView 侧
+ *   <li><b>原 oracle 已不存在</b>：URL 改写 / {path} 模板 / weighted 抽样规则 /
+ *       fastest-ip TTL 判定 / 探测样本 URL 这批期望值，原先溯源到 WebView 侧
  *       {@code imageHostService.ts} 的 {@code transformUrl} / {@code selectWeightedHost} /
  *       {@code getEffectiveImageUrl} / {@code buildProbeSampleUrl} / {@code validateHostInput}，
- *       以及 {@code imageHostStore.ts} 的 {@code getFastestHost}。
- *       ⚠️ <b>该 oracle 源已随 WebView 客户端整包删除（ADR-0203 决策 2）</b>：
- *       期望值以本文件冻结 fixture 的形式保留，仍能防回归，但**已无法回溯到独立来源**——
- *       满足「冻结真值」，不满足测试硬约束 #6 的「出处可追溯」。挂账见 #846。</li>
- *   <li>配置 JSON 形状与内置 host 取值（pixiv-re / pixiv-nl / pixivel）：
- *       {@code imageHostStore.ts} 的 ImageHostState 持久化形态 / BUILT_IN_HOSTS（真实形状 fixture，
- *       含 probeResults / fastestHostExpiresAt 字段）；</li>
+ *       以及 {@code imageHostStore.ts} 的 {@code getFastestHost}。该实现已随 WebView 客户端
+ *       整包删除（ADR-0203 决策 2，#842）。</li>
+ *   <li><b>「重建 oracle」在字面上做不到</b>：这些规则（图床 URL 改写、{@code {path}} 模板、
+ *       weighted 抽样、fastest-ip TTL）是 <b>Pictelio 自己的产品约定</b>，不是 Pixiv 的外部
+ *       契约。删掉的对侧实现是同一约定的<b>第二个实现</b>，不是第三方事实来源。重新推导等于
+ *       自己重新发明一遍规则，仍是自洽反推——不解决本缺口。</li>
+ *   <li><b>仍然有效的部分</b>：期望值以冻结 fixture 形式保留，能防回归（真实 regression 仍会被
+ *       抓住）；JVM 真实执行，非浏览器替身。</li>
+ * </ul>
+ *
+ * <p><b>恢复可溯源性的唯一诚实路径</b>：将来若<b>重新引入第二个实现</b>（多引擎、多图床
+ * 适配器、或独立的 URL 改写库），以新实现互为差分 oracle，即可把本文件重新升格为
+ * specification 测试。在此之前，任何「按当前实现改期望值」的动作都会把缺口变成永久性的
+ * 自证——那比承认缺口更糟。
+ *
+ * <p>其余断言的出处仍独立于实现，未受本缺口影响：
+ * <ul>
+ *   <li>配置 JSON 形状：取自 Pixiv 真实响应形态（含 probeResults / fastestHostExpiresAt 字段）；</li>
  *   <li>fixed Random 的确定性断言：按 selectWeightedHost 的累计边界规则（roll = u*total，
  *       逐个减，roll&lt;=0 选中）对注入的 u 值<b>手推</b>期望 host，推导见各用例注释；</li>
  *   <li>统计抽样断言容差带：70/30 权重 1000 次，均值 ±10 个百分点（σ≈1.4pp，容差 ≈ ±7σ）。</li>
  * </ul>
  * race 模式断言与 weighted 同规则（native 从未实现 race，显式降级——ADR-0143 D3）。
+ *
+ * <p>影响范围：图床读端 Java 逻辑本轮未改（ADR-0203 决策 6 已把「图床设置写入口」列为
+ * 接受的能力缺口），故不影响上线安全；影响的是「未来改动这批期望值时，没人能再确认它
+ * 当初是对的」。挂账：#846。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
