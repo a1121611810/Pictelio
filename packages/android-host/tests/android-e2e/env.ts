@@ -44,7 +44,7 @@ export function apkRelativePath(flavor: E2eFlavor): string {
  * E2E 目标 flavor。`ANDROID_E2E_FLAVOR` 显式指定，缺省 `single`（main 单引擎）。
  *
  * **刻意不做「按产物存在性自动探测」**：`outputs/apk/` 下会残留其它分支的陈旧
- * flavor 目录——实测在 main 上跑完 `pnpm build:android` 后，`full/`、`lynx/`、
+ * flavor 目录——实测在 main 上跑完 `pnpm build:android-host` 后，`full/`、`lynx/`、
  * `webview/` 里仍躺着过渡分支 6.2.1 的包。自动探测会把单引擎 main 误判成
  * `full`，进而指向一个本次构建根本没产出的 APK。要跑过渡分支须显式
  * `ANDROID_E2E_FLAVOR=full`。

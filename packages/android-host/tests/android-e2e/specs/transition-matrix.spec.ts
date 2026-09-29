@@ -5,7 +5,7 @@
  * **不进每-PR CI（#539 裁决）；发版前必跑 + 大 PR 手动触发。**
  * 运行前置 = Appium（pnpm appium:setup）+ AVD(pictelio_ui) + 代理（ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897，
  * 等价 `adb shell settings put global http_proxy 10.0.2.2:7897`，setup.ts 统一下发/teardown 清除）
- * + 登录态（PIXIV_REFRESH_TOKEN，经 `prefs.loginViaDevIntent()` 注入）+ **`BENCH_NAV=1 pnpm build:android`**
+ * + 登录态（PIXIV_REFRESH_TOKEN，经 `prefs.loginViaDevIntent()` 注入）+ **`BENCH_NAV=1 pnpm build:android-host`**
  * （benchNav 深链钩子整链注入，单独注入 build:app-lynx 会被覆盖——#542 实测坑；beforeAll 用 bundle grep 快速失败）。
  *
  * ── 单引擎化后本门从 4 行降为 3 行（#610 处置）────────────────────────────
@@ -374,7 +374,7 @@ function assertDeepLinkHookPresent(): void {
     if (r.stdout.trim() === "0") {
       throw new Error(
         `[transition-matrix] APK 内 lynx bundle 无深链钩子 ${hook}——请先 ` +
-          "`BENCH_NAV=1 pnpm build:android`（整链注入；单独注入 build:app-lynx 会被覆盖，#542 实测坑）",
+          "`BENCH_NAV=1 pnpm build:android-host`（整链注入；单独注入 build:app-lynx 会被覆盖，#542 实测坑）",
       );
     }
   }

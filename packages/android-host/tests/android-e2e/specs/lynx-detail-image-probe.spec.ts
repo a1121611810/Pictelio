@@ -28,8 +28,8 @@
  *     b) 截图海报区色彩方差显著（unique colors > 200）→ 图片加载成功
  *     两者皆无 → 重试一次启动再验；仍无 = 环境未复现，spec 红以暴露环境问题
  *
- * 前置：`BENCH_NAV=1 pnpm build:android`（整链注入，见 README benchNav 节——
- * build:android 内部重跑 lynx build，单独注入会被覆盖）；设备全局代理按需
+ * 前置：`BENCH_NAV=1 pnpm build:android-host`（整链注入，见 README benchNav 节——
+ * build:android-host 内部重跑 lynx build，单独注入会被覆盖）；设备全局代理按需
  * （ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897，DNS 污染环境必备）；PIXIV_REFRESH_TOKEN。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -79,8 +79,8 @@ function assertDeepLinkHookPresent(): void {
   const r = runCapture("grep", ["-a", "-c", "pictelioBenchNavIllustDetail", bundle]);
   if (r.stdout.trim() === "0") {
     throw new Error(
-      "[lynx-detail-image-probe] APK 内 lynx bundle 无详情页深链钩子——请先 `BENCH_NAV=1 pnpm build:android` " +
-        "（整链注入；build:android 内部重跑 lynx build，单独注入 build:app-lynx 会被覆盖，#542 实测坑）",
+      "[lynx-detail-image-probe] APK 内 lynx bundle 无详情页深链钩子——请先 `BENCH_NAV=1 pnpm build:android-host` " +
+        "（整链注入；build:android-host 内部重跑 lynx build，单独注入 build:app-lynx 会被覆盖，#542 实测坑）",
     );
   }
 }

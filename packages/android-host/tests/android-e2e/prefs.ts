@@ -398,7 +398,7 @@ export function assertDebugApkInstalled(serial: string): void {
   if (r.code !== 0) {
     throw new Error(
       `[android-e2e] ${APP_PACKAGE} 无法 run-as（code ${r.code}）。` +
-        `S1 契约测试需要 debug APK（run-as 访问私有目录）。请用 pnpm build:android 安装 debug 包。`,
+        `S1 契约测试需要 debug APK（run-as 访问私有目录）。请用 pnpm build:android-host 安装 debug 包。`,
     );
   }
 }

@@ -36,6 +36,6 @@ export async function assertReleaseBranchNotDiverged({
   throw new Error(
     `远端 ${branch} 包含本地没有的提交（常见于 OpenWiki CI 定时合并 docs 更新）。\n` +
       `  请先执行: git fetch origin && git rebase origin/${branch}\n` +
-      "  若存在上次失败残留的本地 tag，rebase 后需删除重打；然后重跑 pnpm release",
+      "  若存在上次失败残留的本地 tag，rebase 后需删除重打；然后重跑 pnpm release:android-host",
   );
 }
