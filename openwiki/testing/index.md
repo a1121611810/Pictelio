@@ -1,3 +1,3 @@
 # Files
 
-- [Testing Strategy](overview.md) - Two testing tiers — unit tests (Vitest) and AI agent-driven browser E2E tests (agent-browser). Component tests and Playwright E2E have been migrated to agent-browser per ADR-0034/ADR-0035.
+- [Testing Strategy](overview.md) - Two testing tiers after the single-engine consolidation — unit tests (app-lynx + android-host Vitest/JVM) and Android emulator E2E (Appium + WebdriverIO). The agent-browser and Playwright/component suites were removed with the WebView client in ADR-0203.

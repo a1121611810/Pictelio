@@ -1,11 +1,13 @@
 ---
 type: Concept
 title: Architecture Overview
-description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime, plus a parallel vue-lynx MVP client. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
-tags: [architecture, pictelio, solidjs, capacitor, monorepo]
+description: High-level architecture of Pictelio — a single Lynx (vue-lynx) client packaged into an APK by the @pictelio/android-host build host. Covers monorepo layout, Lynx boot sequence, routing, build tooling, and design system.
+tags: [architecture, pictelio, lynx, vue-lynx, monorepo]
 ---
 
 # Architecture Overview
+
+> **Single-engine (ADR-0203/0204, 2026-09-29):** the SolidJS + Capacitor WebView client (`pictelio-app` / `packages/app`) was **deleted** and the Android host moved to `packages/android-host`. Pictelio is now a single Lynx engine. Sections below that still describe the removed SolidJS/Capacitor stack (boot sequence, Fluent/UnoCSS design system) are **historical** and pending rewrite — see the quickstart backlog.
 
 ## Monorepo Layout
 
@@ -13,51 +15,52 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 
 | Package | Location | Purpose |
 |---------|----------|---------|
-| `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
+| `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx client (Vue 3.5 on ReactLynx runtime) — the only application client |
+| `@pictelio/android-host` | `/packages/android-host/` | Android build host — Gradle project, Java native modules, release scripts, android-e2e + JVM tests |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
-| `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
-| `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `isBelowMin` / `checkForUpdate`) consumed by both clients (ADR-0089), extended with OTA `minWebVersion`/`webBundle` dual-coordinate fields (ADR-0122) |
+| `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `isBelowMin` / `checkForUpdate`) consumed by the client (ADR-0089); APK update check survives, OTA web-bundle API removed (ADR-0202/0204) |
 | `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (animated illust) shared package |
 | `@pictelio/ranking-core` | `/packages/ranking-core/` | Ranking shared pure logic — 7 rank modes, `mode`→API mode mapping, cache keys, date handling (ADR-0158) |
 | `@pictelio/search-core` | `/packages/search-core/` | Search advanced-filter shared pure logic — period/bookmark-band/ratio/resolution/AI-override state + request building + URL codec |
 | `@pictelio/net-diagnostics` | `/packages/net-diagnostics/` | Network self-check pure logic — check plan, per-probe judgment/attribution, report formatting (consumed by `/network-check`) |
 | `@pictelio/novel-export` | `/packages/novel-export/` | Novel export shared pure logic — 9-format whitelist/MIME/ext, Pixiv HTML extraction, block parsing, export payload building (ADR-0154) |
 
-Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
+Root `package.json` delegates commands via `vp run --filter` (vite-plus). The client itself builds with **rspeedy** (`@lynx-js/rspeedy`); the root `vp` CLI wraps oxlint, oxfmt, and vitest.
 
-**Mobile targets:**
-- **Android** — Custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota, plus v5.0.0's GallerySaver/WebDav download-executor surface) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).
-- **iOS** — Initially introduced in v3.18.0, iOS platform support and files (`/packages/app/ios/`) were **removed in v3.19.1** — the project is now **Android-only**.
+**Mobile target:**
+- **Android** — single-engine Lynx client built into an APK by `@pictelio/android-host`. Java native modules (Pixiv API, auth, image loading, translation, download/export, WebDAV, net-diagnostics) live under `/packages/android-host/android/app/src/main/java/io/pictelio/app/`. See [Android Native & Build](/openwiki/integrations/android-native.md).
+- **iOS** — Removed in v3.19.1; the project is **Android-only**.
 
 ## Boot Sequence
 
-The application boots in `packages/app/src/main.tsx`:
+The client boots in `packages/app-lynx/src/index.ts`:
 
-1. **CSS loading** — Imports layer CSS: `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`
-2. **Fluent Web Components** — Registers individual Fluent components (badge, button, dialog, etc.) and syncs theme via `MutationObserver` on `<html>.dark`
-3. **Preference initialization** — `initializeStartupPreferences()` reads stored preferences before rendering
-4. **Solid root render** — `render(() => <App />, root)` — renders **before** auth to show skeleton/UI immediately
-5. **Auth initialization (non-blocking)** — `void initializeAuth()` called after render, does not block the first paint. `RootLayout.onMount` waits for auth result before navigating to `/home` or `/login`.
+1. **Vue app creation** — `createApp(App)` from `vue-lynx`.
+2. **Side-effect wiring** — `downloadExecutor` and `downloadSharer` register on module load.
+3. **Tailwind CSS** — imported from `styles/tailwind.css` (must be a standalone CSS entry; inline `@tailwind` in a `.vue` `<style>` block is not processed by the rsbuild CSS chain).
+4. **Pinia** — `app.use(pinia)` (singleton seam, ADR-0139).
+5. **Vue Query** — `app.use(VueQueryPlugin, { queryClient })` (ADR-0141).
+6. **vue-router** — `app.use(router)` (ADR-0138).
+7. **Mount** — `app.mount()`.
 
 ```mermaid
 sequenceDiagram
-    participant M as main.tsx
-    participant S as startup.ts
-    participant R as App.tsx
-    participant RL as RootLayout
-    participant A as authStore
+    participant I as index.ts
+    participant A as App.vue
+    participant P as pinia (stores/pinia.ts)
+    participant Q as queryClient (api/queryClient.ts)
+    participant R as router (router.ts)
 
-    M->>M: Load CSS layers (reset, tokens, base, uno)
-    M->>M: Register Fluent web components
-    M->>S: initializeStartupPreferences()
-    M->>R: render App (skeleton first)
-    Note over R: QueryClientProvider + Router
-    M->>A: void initializeAuth() (non-blocking)
-    Note over RL: onMount fires
-    RL->>A: await initializeAuth() result
-    A-->>RL: token ready or null
-    RL->>R: navigate("/home") or navigate("/login")
+    I->>I: import downloadExecutor/downloadSharer (side-effect wiring)
+    I->>I: import styles/tailwind.css
+    I->>I: createApp(App)
+    I->>P: app.use(pinia)
+    I->>Q: app.use(VueQueryPlugin, { queryClient })
+    I->>R: app.use(router)
+    I->>A: app.mount()
 ```
+
+> The former SolidJS boot sequence (`packages/app/src/main.tsx`, Fluent web components, `initializeStartupPreferences`) was removed with the WebView client (ADR-0203).
 
 ## Application Shell
 

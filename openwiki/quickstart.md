@@ -1,16 +1,18 @@
 ---
 type: Quickstart
 title: Pictelio — OpenWiki Quickstart
-description: Entrypoint for the Pictelio repository documentation. Pictelio is a third-party Pixiv illustration browser with two rendering clients — a SolidJS SPA (Capacitor Android) and a vue-lynx MVP (ReactLynx runtime).
-tags: [pictelio, pixiv, solidjs, capacitor, android, vue-lynx]
+description: Entrypoint for the Pictelio repository documentation. Pictelio is a third-party Pixiv illustration browser with a single Lynx (vue-lynx) client, packaged into an APK by the @pictelio/android-host build host.
+tags: [pictelio, pixiv, lynx, vue-lynx, android, monorepo]
 ---
 
 # Pictelio Documentation
 
-**Pictelio** (repo name `pixivizer`) is a third-party [Pixiv](https://www.pixiv.net) illustration browser with two rendering clients:
+**Pictelio** (repo name `pixivizer`) is a third-party [Pixiv](https://www.pixiv.net) illustration browser with a single [Lynx](https://lynxjs.org/) client:
 
-- **[`pictelio-app`](/packages/app/)** — SolidJS SPA, packaged as a native Android app via [Capacitor](https://capacitorjs.com/) (primary client)
-- **[`pictelio-app-lynx`](/packages/app-lynx/)** — vue-lynx MVP on the [ReactLynx](https://lynxjs.org/) runtime (parallel client, pre-alpha)
+- **[`pictelio-app-lynx`](/packages/app-lynx/)** — vue-lynx client (Vue 3.5 on the ReactLynx runtime) — the only application client
+- **[`@pictelio/android-host`](/packages/android-host/)** — Android build host (Gradle project, release scripts, native E2E, JVM unit tests) that packages the Lynx bundle into an APK
+
+The former SolidJS + Capacitor WebView client (`pictelio-app` / `packages/app`) was **deleted** in [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md) (single-engine consolidation, 2026-09-29); root commands were re-pointed to the Lynx client in [ADR-0204](/docs/adr/ADR-0204-root-command-naming.md). Client switching and the OTA web-bundle channel were retired alongside it (ADR-0203 decision 7, [ADR-0202](/docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md)).
 
 This wiki helps humans and agents understand the architecture, workflows, integrations, and test strategy.
 
@@ -18,40 +20,40 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 | Attribute | Value |
 |-----------|-------|
-| App version | 5.5.0 (`pictelio-app`) |
-| Framework | SolidJS 2.0 (RC) — migrated from 1.9 in ADR-0144; rc.9 after ADR-0184 |
-| Language | TypeScript 7.0 (strict) — `typescript-compiler-api` alias to TS 6 for the i18n hardcode gate (ADR-0184) |
-| Bundler | Rolldown (production) via vite-plus; Vite dev server |
-| Styling | UnoCSS 66.10 + Microsoft Fluent Design System 2 + A2 cardization (Win11 correction, ADR-0074) |
-| Routing | @solidjs/router 2.0.0-next.27 |
-| Data Fetching | @tanstack/solid-query 6.0.0-rc.3 |
-| Local DB | Local `localStorage` collection (`historyStore.ts`) — replaced `@tanstack/solid-db` in ADR-0144 |
-| i18n | `@solid-primitives/i18n` (zh-CN source + en), ADR-0157 |
-| Mobile Runtime | Capacitor 8.5.2 (Android target) |
+| App version | 6.3.0 (`pictelio-app-lynx`) |
+| Framework | vue-lynx (Vue 3.5.40 + `vue-lynx` 0.5.1) on the ReactLynx runtime |
+| Language | TypeScript 7.0 (strict); `check` runs `vue-tsc --noEmit -p src/tsconfig.json` (ADR-0144) |
+| Bundler | rspeedy (`@lynx-js/rspeedy`) for `dev`/`build`/`preview` |
+| Styling | Tailwind CSS via `@lynx-js/tailwind-preset` + Fluent semantic color palette (ADR-0046); spacing=`vw`, fontSize=`rpx` |
+| Routing | vue-router 5.3.1 (`createMemoryHistory`) |
+| Data Fetching | @tanstack/vue-query 5.103 (ADR-0141) |
+| State | Pinia 4.0 setup stores (`stores/pinia.ts` seam, ADR-0139/0140) |
+| Persistence | IndexedDB via web-core (`tokenStorage.ts` for refresh_token; `idbKV`) |
+| Mobile Runtime | Lynx single engine, packaged by `@pictelio/android-host` (Gradle + Java native modules) |
 | Package Manager | pnpm 11.9 |
-| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP), `@pictelio/update-check`, `@pictelio/ugoira`, `@pictelio/ranking-core`, `@pictelio/search-core`, `@pictelio/net-diagnostics`, `@pictelio/novel-export` |
+| Monorepo Packages | `pictelio-app-lynx` (client), `@pictelio/android-host` (build host), `pictelio-website` (Astro landing page, GitHub Pages), `@pictelio/update-check`, `@pictelio/ugoira`, `@pictelio/ranking-core`, `@pictelio/search-core`, `@pictelio/net-diagnostics`, `@pictelio/novel-export` |
 
 ## Documentation Map
 
 ### Architecture
 
-- **[Architecture Overview](/openwiki/architecture/overview.md)** — Monorepo layout, build tooling, Fluent Design, CSS architecture, SolidJS + TanStack ecosystem, boot sequence, and [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client) (vue-lynx, Tailwind, vue-router, Pinia state, TanStack Vue Query data layer)
-- **[API Layer & Authentication](/openwiki/architecture/api-layer.md)** — Pixiv API client, dual-mode transport (Web fetch vs CapacitorHttp), OAuth flows, token storage, 401 retry with Promise queue, GET deduplication
-- **[Image Loading Pipeline](/openwiki/architecture/image-pipeline.md)** — Three-layer cache (LRU keys → browser cache → Android disk), image host selection (race/weighted/fastest-ip/single), WebView proxy interception, Web Worker measurement
+- **[Architecture Overview](/openwiki/architecture/overview.md)** — Monorepo layout, rspeedy build tooling, Lynx boot sequence, and the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client) (vue-lynx, Tailwind, vue-router, Pinia state, TanStack Vue Query data layer)
+- **[API Layer & Authentication](/openwiki/architecture/api-layer.md)** — Pixiv API client, Lynx-native transport (`PictelioApi`/`PictelioAuth` modules) with access_token held in the Java heap, OAuth flows, token storage, 401 retry
+- **[Image Loading Pipeline](/openwiki/architecture/image-pipeline.md)** — Cache layers, image host selection (race/weighted/fastest-ip/single), and the shared `PixivImageLoader` serving the Lynx client
 
 ### Domains & Workflows
 
-- **[Feed & Browsing](/openwiki/domain/feed-and-browsing.md)** — C-shell home page (`SideNavShell` + single-column L5 layout) backed by six feed stores, unified `FeedList` with pull-to-refresh + adaptive tags, secondary virtualized feeds, search (incl. advanced filters), ranking, bookmarks (incl. tag panel), related-works injection, browsing history, R18 + AI filtering (SolidJS) / overlay masking (app-lynx, account-scoped settings)
-- **[Novel Reader](/openwiki/domain/novel-reader.md)** — Novel detail with virtualized text layout, in-text search with highlighting, reading progress, series sheet, novel feed with three layout modes, Pretext library integration, AI translation (BYOK DeepSeek, chunked pipeline + LRU cache + R18 grading), multi-format export (9 formats via `@pictelio/novel-export`)
-- **[Download, Save & Backup](/openwiki/integrations/android-native.md#download-save--backup-v500)** — Image save-to-album (ADR-0145), download queue/manager (ADR-0146) with ugoira multi-format export, WebDAV backup (ADR-0156), and network self-check — shared Java deep modules + thin dual bridges, surfaced by the `/downloads` and `/network-check` routes
+- **[Feed & Browsing](/openwiki/domain/feed-and-browsing.md)** — Recommended carousel + list feeds, unified `createMixFeed` pagination, search (incl. advanced filters), ranking, bookmarks (incl. tag panel), related-works injection, R18/AI overlay masking (account-scoped settings)
+- **[Novel Reader](/openwiki/domain/novel-reader.md)** — Novel detail with virtualized text layout, reading progress, series sheet, novel intro page, AI translation (BYOK LLM, chunked streaming pipeline + chapter cache + R18 grading), multi-format export (9 formats via `@pictelio/novel-export`)
+- **[Download, Save & Backup](/openwiki/integrations/android-native.md#download-save--backup-v500)** — Image save-to-album (ADR-0145), download queue/manager (ADR-0146) with ugoira multi-format export, WebDAV backup (ADR-0156), and network self-check — shared Java deep modules + Lynx native bridge, surfaced by the `/downloads` and `/network-check` routes
 
 ### Integrations
 
-- **[Android Native & Build](/openwiki/integrations/android-native.md)** — Native Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota), Android Keystore token encryption, WebView config, Gradle build pipeline, release signing, version sync, OTA web-bundle update
+- **[Android Native & Build](/openwiki/integrations/android-native.md)** — Lynx Native Modules (PictelioApi, PictelioAuth, PictelioImageService, etc.), Android Keystore token encryption, single-engine Gradle build, release signing, version sync
 
 ### Testing & Operations
 
-- **[Testing Strategy](/openwiki/testing/overview.md)** — Two test tiers (unit + agent-browser E2E), Playwright/browser-component migration completed (ADR-0034, ADR-0035), file naming conventions, test helpers, CI workflows
+- **[Testing Strategy](/openwiki/testing/overview.md)** — Unit tests (app-lynx + android-host Vitest) and Android emulator E2E (Appium + WebdriverIO); agent-browser and Playwright/browser-component suites removed with the WebView client (ADR-0034/0035, ADR-0203)
 
 ## Development Quick Start
 
@@ -61,14 +63,14 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 # Install dependencies
 pnpm install
 
-# Start Vite dev server (port 5173)
+# Start the Lynx client dev server (rspeedy)
 pnpm dev
 
-# Android debug build (full pipeline)
-pnpm build:android
+# Android debug build (full pipeline: lynx bundle → Gradle assembleDebug)
+pnpm build:android-host
 
 # One-command Android dev with hot reload
-pnpm dev:android
+pnpm dev:android-host
 ```
 
 > **Proxy note:** Web dev uses Vite proxy for Pixiv API. The app reads `https_proxy` / `HTTP_PROXY` env vars, defaulting to `http://127.0.0.1:10808`. Set before `pnpm dev`.
@@ -243,44 +245,47 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0182 | branded types for API IDs — `unique symbol`-branded `IllustId`/`NovelId`/`UserId`/`SeriesId`/`ChapterId` reject cross-type ID mix-ups at compile time; see [ADR-0182](/docs/adr/ADR-0182-branded-types-for-api-ids.md) |
 | 0183 | lynx novel intro-page toggle — device-level `novel_intro_first` setting (default on) lets high-frequency readers skip the `/novel/:id/intro` page and jump straight to the body; a single `openNovel()` seam in `src/utils/novelNavigation.ts` replaces six inline intro navigations, route layer unchanged; see [ADR-0183](/docs/adr/ADR-0183-lynx-novel-intro-toggle.md) |
 | 0184 | workspace dependency upgrade execution (2026-09) — ADR-0080's "evaluate only" batch is now executed: solidjs rc.6→rc.9 (`@solidjs/router` next.21→next.27, `@solidjs/vite-plugin` next.39→next.44), TypeScript → 7.0.2 (with a TS6 `typescript-compiler-api` alias for the i18n gate), vitest → 5.0.1 (app held at 4.1.10 by vite-plus), vue-router 4.6.4→5.3.1, Capacitor 8.5.2, UnoCSS 66.10, Vite 8.3; agent-browser / tailwind 4 / lynx toolchain held with explicit triggers; see [ADR-0184](/docs/adr/ADR-0184-dependency-upgrade-execution-2026-09.md) and [glossary](/docs/adr/glossary-dependency-upgrade.md) |
+| 0185–0200 | lynx feature batch (v5.5.0 → v6.2.0) — vite-plus 1.0-rc toolchain + regression campaign (0185/0186), tag mute (0187), notification center (0188), novel intro action row (0189), `<M3SegmentedButton>` (0190), watch-later (0191), download naming template (0192), mypixiv list (0193), common components (0194), pre-push fmt gate (0195), source tracing (0196), tag neighbors (0197), bili theme (0198), rate-limit backoff (0199), `Accept-Language` header (0200); see the individual ADRs under `/docs/adr/` |
+| 0201 | single-engine facade consolidation — removes the remaining webview/Lynx dual-client facade so the codebase speaks one engine; see [ADR-0201](/docs/adr/ADR-0201-single-engine-facade-consolidation.md) and [glossary](/docs/adr/glossary-single-engine-facade.md) |
+| 0202 | OTA web bundle channel retirement — the web-bundle update path is retired; only APK update-check (`checkForUpdate`) remains; see [ADR-0202](/docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md) |
+| 0203 | WebView client source removal (2026-09-29) — `packages/app` (SolidJS + Capacitor + tests) is deleted; the Android host moves to `packages/android-host`; OAuth credentials + product version move to `packages/app-lynx`; client switching is removed (decision 7); see [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md) |
+| 0204 | root command naming (2026-09-29) — bare `dev`/`build`/`check`/`test`/`preview` now delegate to `pictelio-app-lynx`; host actions use an explicit `:android-host` suffix; deleted-webview commands removed; see [ADR-0204](/docs/adr/ADR-0204-root-command-naming.md) |
 
 ## Key Source Files
 
 | Purpose | Path |
 |---------|------|
-| App entry | `/packages/app/src/main.tsx` |
-| Router definition | `/packages/app/src/router.tsx` |
-| Root layout | `/packages/app/src/routes/__root.tsx` |
-| Pixiv API client | `/packages/app/src/api/client.ts` |
-| Auth store | `/packages/app/src/stores/authStore.ts` |
-| Token persistence (secure storage) | `/packages/app/src/utils/secureStorage.ts` |
-| Native Pixiv API bridge | `/packages/app/src/native/PixivApi.ts` |
-| Feed virtualizer | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
-| Feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
-| Recommended feed store | `/packages/app/src/stores/recommendedStore.ts` |
-| Follow feed store | `/packages/app/src/stores/followStore.ts` |
-| Feed helpers (dedup, pagination) | `/packages/app/src/stores/shared/feedHelpers.ts` |
-| Novel recommended store | `/packages/app/src/stores/novelRecommendedStore.ts` |
-| Novel follow store | `/packages/app/src/stores/novelFollowStore.ts` |
-| Novel bookmark store | `/packages/app/src/stores/novelBookmarkStore.ts` |
-| Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
+| App entry (lynx) | `/packages/app-lynx/src/index.ts` |
+| Root component | `/packages/app-lynx/src/App.vue` |
+| Router definition | `/packages/app-lynx/src/router.ts` |
+| Pixiv API client | `/packages/app-lynx/src/api/client.ts` |
+| Auth store | `/packages/app-lynx/src/stores/authStore.ts` |
+| Token persistence | `/packages/app-lynx/src/utils/tokenStorage.ts` (IndexedDB) |
+| Settings store | `/packages/app-lynx/src/stores/settingsStore.ts` |
+| Query keys / client | `/packages/app-lynx/src/api/queryKeys.ts` + `queryClient.ts` |
+| Pinia seam | `/packages/app-lynx/src/stores/pinia.ts` |
+| Android Gradle project | `/packages/android-host/android/` |
+| Java native modules | `/packages/android-host/android/app/src/main/java/io/pictelio/app/` |
+| Android E2E tests | `/packages/android-host/tests/android-e2e/` |
+| Release script | `/packages/android-host/scripts/release.mjs` |
 
 ## Available Scripts
 
-All commands are run from the monorepo root:
+All commands are run from the monorepo root (ADR-0204: bare names → `pictelio-app-lynx`; host actions use an explicit `:android-host` suffix):
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm dev` | Start Vite dev server |
-| `pnpm build` | TypeScript check + Vite build |
-| `pnpm test` | Vitest unit tests |
-| `pnpm test:agent-browser` | AI-driven agent-browser E2E tests |
-| `pnpm lint` | oxlint code check |
-| `pnpm fmt` | oxfmt code formatting |
-| `pnpm build:android` | Full Android debug build chain |
-| `pnpm build:android:release` | Signed release APK |
-| `pnpm dev:android` | One-command Android dev with hot reload |
-| `pnpm release` | Full release pipeline to GitHub Releases |
+| `pnpm dev` | Start the Lynx client dev server (rspeedy) |
+| `pnpm build` | Build the Lynx client (`rspeedy build`) |
+| `pnpm test` | app-lynx Vitest unit tests |
+| `pnpm test:android-host` | android-host Vitest unit tests |
+| `pnpm test:android-host:unit` | android-host JVM/Gradle unit tests |
+| `pnpm test:android-host:e2e` | Android emulator E2E (Appium + WebdriverIO) |
+| `pnpm check:all` / `pnpm lint:all` | Type-check / lint all packages |
+| `pnpm build:android-host` | Full Android debug build chain (lynx bundle → Gradle assembleDebug) |
+| `pnpm build:android-host:release` | Signed release APK |
+| `pnpm dev:android-host` | One-command Android dev with hot reload |
+| `pnpm release:android-host` | Full release pipeline to GitHub Releases |
 | `pnpm openwiki:update` | Regenerate OpenWiki documentation from source |
 
 ## Tooling & Commit Standards
@@ -300,7 +305,9 @@ A **CodeGraph MCP server** is registered in [`.mcp.json`](/.mcp.json) (`codegrap
 
 ## Repo Evolution (Recent History)
 
-The repository has been actively refactored through **v5.5.0**. Key themes in recent commits:
+The repository has been actively refactored through **v5.5.0**, then underwent the **single-engine consolidation** (v6.3.0). Key themes in recent commits:
+
+- **Single-engine consolidation (ADR-0201 → ADR-0204, 2026-09-29, v6.3.0):** The WebView/SolidJS/Capacitor client was fully removed. ADR-0201 consolidated the dual-client facade; ADR-0202 retired the OTA web-bundle channel; ADR-0203 deleted `packages/app` (295 SolidJS `src/` files, 220 unit + 16 agent-browser tests) and moved the Android host to `packages/android-host` (22,559 Java lines + 37 android-e2e files + release scripts preserved), relocating OAuth credentials and the product version into `packages/app-lynx` and deleting the client-switch capability (decision 7); ADR-0204 re-pointed bare root commands (`dev`/`build`/`check`/`test`/`preview`) at `pictelio-app-lynx` and named host actions `:android-host`. Result: a single Lynx engine (`pictelio-app-lynx` 6.3.0) + a build host (`@pictelio/android-host`).
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
 - **Feed store split + legacy cleanup:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) have been split into dedicated per-tab stores using the same factory. `recommendedStore.ts` and `followStore.ts` (with `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts`) now power the home page feed panels directly via `IllustFeedPanel`/`NovelFeedPanel` — the standalone `RecommendedFeed`/`FollowFeed` components and `NovelRecommendedFeed`/`NovelFollowFeed` route panels were later **deleted** in the ADR-0083 dead-code cleanup. Both legacy monolithic stores and their tests have been **deleted** (commit `b30366f`). Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
@@ -368,8 +375,13 @@ The repository has been actively refactored through **v5.5.0**. Key themes in re
 
 ## Backlog
 
-The following areas are either already well-documented in existing docs or too narrow for a dedicated wiki page:
+The following areas are either already well-documented in existing docs or too narrow for a dedicated wiki page. **Note (ADR-0203/0204):** several deep wiki pages were written before the single-engine consolidation and still describe the removed WebView/Capacitor client. Their top-level framing was corrected in this run, but the deep WebView-specific sections are stale and await a focused rewrite:
 
+- **`integrations/android-native.md` deep sections** — Still documents the removed three-flavor Gradle architecture (`full`/`webview`/`lynx`) and the six Capacitor plugins (`src/webview/`). After ADR-0203 there is a single flavor (`single`) and only Lynx native modules under `/packages/android-host/android/`. Rewrite the plugin/flavor sections against the current Java sources.
+- **`architecture/overview.md` boot sequence & SolidJS sections** — The `packages/app/src/main.tsx` boot sequence and SolidJS/Fluent/UnoCSS detail describe the deleted client. The lynx boot path is `/packages/app-lynx/src/index.ts` → `App.vue`.
+- **`testing/overview.md` agent-browser suite** — The entire agent-browser tier (section 2) was deleted with `packages/app/tests/` in ADR-0203 (ADR-0204 removed `test:agent-browser`). Document only the surviving tiers: app-lynx unit, android-host unit/JVM, and android-e2e.
+- **`architecture/api-layer.md` + `image-pipeline.md`** — Still describe the removed `PixivApiPlugin` (Capacitor) gateway, WebView proxy interception, and Web Worker measurement. The Lynx equivalents are `PictelioApi`/`PictelioAuth` native modules and `PixivImageLoader`.
+- **`domain/*` webview-specific detail** — `feed-and-browsing.md` and `novel-reader.md` interleave SolidJS (SideNavShell/`FeedList`) and app-lynx behavior; the SolidJS halves are obsolete.
 - **Cross-platform migration research** — Nine new feasibility reports in `docs/research/` evaluating replacing the Capacitor WebView client: `lynx-migration-feasibility.md` (entrypoint) plus `lynx-pure-engine-analysis.md`, `vue-lynx-deep-dive.md`, `vue-lynx-production-readiness.md`, `vue-lynx-masonry-feasibility.md`, `vue-lynx-benchmark-ifr.md` (IFR benchmark analysis, 32-device runs, IFR rejected for app-lynx), `taro-migration-feasibility.md`, `tauri-migration-feasibility.md`, and `uniapp-x-migration-feasibility.md`. Research only — no code changes or framework decision yet; revisit when a migration is actually scheduled.
 - **Competitive & client-divergence research (2026-09-26)** — Two new research docs: [`competitor-features-comparison.md`](/docs/research/competitor-features-comparison.md) positions Pictelio against ~11 Pixiv third-party clients (Pixiv-Shaft, PixEz, PiPixiv, Pixiv-SwiftUI, PixHelper/pivlite, Pixeval, the Legado book source, official Pixiv, etc.) as an "enthusiast heavy client + AI-translation specialty" track, cataloguing gaps (novel bookshelf/offline, AI comic translation/super-resolution, reverse-image search, multi-account, tablet two-pane, direct CN connection, iOS, MCP/AI-agent); [`webview-vs-lynx-comparison.md`](/docs/research/webview-vs-lynx-comparison.md) is the webview-depth-flagship vs lynx-native-flagship capability matrix (shared Java backend; separate AI-translation, i18n, and design-system tracks). Research only — no code changes; revisit when gap-closing or client convergence is scheduled.
 - **Image loading pipeline deep-dive** — 40KB+ doc at `/docs/image-loading-pipeline.md` covers timing, diagrams, and optimization matrix. The [wiki page](/openwiki/architecture/image-pipeline.md) links there.
