@@ -21,7 +21,7 @@ import path from "node:path";
  * （ADR-0064 教训，注释同步于 proguard-rules.pro）。
  */
 
-// ── 路径（相对本测试文件：packages/app/tests/unit/android/） ──
+// ── 路径（相对本测试文件：packages/android-host/tests/unit/android/） ──
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const proguardFile = path.resolve(testDir, "../../../android/app/proguard-rules.pro");
 // 原 build.gradle 依赖面读取（buildGradleFile / buildGradle）随 work-runtime 断言

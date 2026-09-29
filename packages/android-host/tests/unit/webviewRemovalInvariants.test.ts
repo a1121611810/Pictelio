@@ -2,7 +2,7 @@
  * 仓库不变量契约：WebView 客户端「删干净了吗」——本轮唯一总闸（spec 核心缝 / ADR-0203）
  *
  * ## 判据来源（oracle 溯源，禁自洽反推）
- * - 七组不变量清单：`docs/specs/webview-client-removal.md` §Testing Decisions「核心缝：单一仓库不变量契约测试」
+ * - 不变量清单（已扩至 9 组，见文件末尾「不变量 ↔ 决策」表）：`docs/specs/webview-client-removal.md` §Testing Decisions「核心缝：单一仓库不变量契约测试」
  * - 术语与「存量格式契约」定义：`docs/adr/glossary-webview-client-removal.md`
  *   （§三「必须分清的三类 capacitor 字样」、§风险与易错点 1）
  * - 宿主包新身份与复核命令：`docs/adr/ADR-0203-webview-client-source-removal.md` §决策 2 + §复核判据
@@ -41,10 +41,23 @@
  * 是存量用户数据格式（ADR-0050），必须一字不改。正确形态恒为
  * 「依赖声明 = 0」**且**「存量格式契约命中 ≥ 1」——本文件的不变量 2 + 4 就是这一对。
  *
- * ## 当前状态（2026-09-29，T01 交付时）
- * 刻意为**红**：宿主迁移与客户端删除尚未执行，7 组不变量全部未满足
- * （实测 `7 failed | 8 passed`，红的 7 条全部是不变量断言本身）。
- * 红的必须是**不变量**而非语法错 / import 错 / 路径写错造成的假红。
+ * ## 当前状态（2026-09-29，T13 交付后）
+ * **全绿**：9 组不变量全部满足（`pnpm --filter @pictelio/android-host test` 实测通过）。
+ * 本段曾记录「T01 交付时刻意为红（7 failed | 8 passed）」的快照——那是**写门禁阶段**的
+ * 中间态（先立红再实现），现已失效。保留此行只为提醒：这份文件的绿是**实现的结果**，
+ * 不是它一开始就是绿的；是否真在守，由下方 13 条反事实注入当场证明。
+ *
+ * | 不变量 | 守什么 | 对应反事实注入 |
+ * | --- | --- | --- |
+ * | 1 | `packages/app` 目录不存在 | 对照 1 |
+ * | 2 | Capacitor 依赖声明清零 | 对照 2（配对不变量 4） |
+ * | 3 | 宿主资产齐全 | 对照 3 |
+ * | 4 | 存量格式契约仍在 | 对照 4 |
+ * | 5 | app-lynx 不跨包读已删目录 | 对照 5 |
+ * | 6 | 根命令表指向唯一客户端 | 对照 6 |
+ * | 7 | 门面措辞收敛 | 对照 7 |
+ * | 8 | 客户端切换能力已下线（决策 7） | 对照 8a / 8b / 8c / 8d |
+ * | 9 | gradle 入口自带生成物前置（决策 8） | 对照 9a / 9b |
  */
 import {
   existsSync,
@@ -57,7 +70,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
@@ -203,7 +216,11 @@ const HOST_ASSETS = [
 const CLIENT_SWITCH_STORE_REL = "src/stores/clientSwitchStore.ts";
 
 /** clientSwitch 在 app-lynx 里的标识符形态：store 名、UI 引用、切换专用文案。 */
-const CLIENT_SWITCH_REF_RE = /clientSwitch|selectedClient|pickClient|supportsClientSwitch/;
+// ⚠️ 必须覆盖**原生桥方法名**形态：code-review 抓到 Java 实现删了、TS 类型声明
+// （`rspeedy-env.d.ts` 的 `NativeModules.PictelioApp`）还留着。strict 下那种残留
+// 会让 vue-tsc 放行、运行时静默失败——比留代码更难发现。
+const CLIENT_SWITCH_REF_RE =
+  /(?:set|get)ClientKind(?:s)?|clientSwitch|selectedClient|pickClient|supportsClientSwitch/;
 
 /**
  * Java 侧切换专用方法（`PictelioAppModule` 内）。
@@ -249,6 +266,21 @@ const CREDENTIALS_SYNC = "sync:credentials";
 
 /** 配对正面锚点：宿主包里跑 gradlew 的脚本下界（防「全删就算修好」）。 */
 const GRADLE_ENTRY_MIN = 3;
+
+/**
+ * `.mjs` 侧的同样判据（code-review 修 blocking 后新增）。
+ * 缺口原委：ADR-0203 §决策 8 承诺「**凡**执行 gradlew 的宿主脚本都必须接 sync:credentials」，
+ * 但防线只扫 package.json 的 scripts 字面量，而 `dev:android` / `release` 的值是
+ * `node scripts/xxx.mjs`（无 gradlew 字面量）→ 真正跑 gradlew 的两条路径完全在防线外。
+ * 实测两条路径的手工接线都是对的（`dev-android.mjs` 与 `release-build-steps.mjs`），
+ * 但「手工且正确」不等于「被钉住」：删掉那一行仍全绿，干净检出即复现决策 8 记录的故障。
+ */
+const MJS_GRADLE_MIN = 3;
+
+/** 剥掉 JS 行注释与块注释——否则注释里提一句 `sync-credentials` 就能骗过「前置」判据。 */
+function stripJsComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+}
 
 interface Layout {
   repoRoot: string;
@@ -325,6 +357,13 @@ function deletedPkgRefsInText(text: string): string[] {
 
 type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type Verdict = Record<InvariantId, string[]>;
+
+/**
+ * 全部不变量编号（单一事实源）。
+ * 加第 10 条时只改这里；「N 组」文案由 `ALL_INVARIANTS.length` 派生，不再各处各写一份计数
+ * ——计数散落正是本文件头曾与实现漂移的成因。
+ */
+const ALL_INVARIANTS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[];
 
 /** 逐条求值八组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
 function evaluateInvariants(l: Layout): Verdict {
@@ -497,8 +536,10 @@ function evaluateInvariants(l: Layout): Verdict {
   if (clientFiles.length === 0) {
     verdict[8].push("[检测式不可信] 未扫描到客户端源集任何文本文件，残留检测空转");
   }
+  // 剥注释后再扫：`.d.ts` 里的方法声明是**代码**（要抓），而「这些方法已删除」这类
+  // 说明性注释不是（不该抓）。不剥注释会自指撞自己的断言——本仓已有先例。
   for (const f of clientFiles) {
-    const lines = readFileSync(f, "utf8").split("\n");
+    const lines = stripJsComments(readFileSync(f, "utf8")).split("\n");
     lines.forEach((line, i) => {
       if (CLIENT_SWITCH_REF_RE.test(line)) {
         verdict[8].push(`${rel(f)}:${i + 1}: ${line.trim()}`);
@@ -573,6 +614,52 @@ function evaluateInvariants(l: Layout): Verdict {
             `gradle 配置依赖 gitignored 的 OAuthConfig，干净检出会编译失败（主工作区因残留生成物而绿）`,
         );
       }
+    }
+  }
+
+  // `.mjs` 侧：真正跑 gradlew 的两条路径在 package.json 字面量之外
+  // （`dev:android` = `node scripts/dev-android.mjs`、`release` = `node scripts/release.mjs`）。
+  // 这里断的是**顺序**而不只是存在：sync 必须早于 gradlew，否则「先生成的删了、照样编不过」。
+  const scriptsDir = join(l.hostDir, "scripts");
+  const mjsFiles = [...walkFiles(scriptsDir, (f) => f.endsWith(".mjs"))];
+  const mjsGradle = mjsFiles.filter((f) =>
+    GRADLE_ENTRY_RE.test(stripJsComments(readFileSync(f, "utf8"))),
+  );
+  if (mjsGradle.length < MJS_GRADLE_MIN) {
+    verdict[9].push(
+      `[配对正面锚点失效] scripts/ 下只扫到 ${mjsGradle.length} 个跑 gradlew 的 .mjs < ${MJS_GRADLE_MIN}`,
+    );
+  }
+  /** 每个 .mjs 的「同步早于 gradlew」结果，供委托链解析复用。 */
+  const syncBeforeGradle = new Map<string, boolean>();
+  for (const f of mjsGradle) {
+    const stripped = stripJsComments(readFileSync(f, "utf8"));
+    const gradleAt = stripped.search(GRADLE_ENTRY_RE);
+    // 两种接线写法都算：npm 脚本名（"sync:credentials"）与直调脚本（sync-credentials.mjs）
+    const syncAt = [stripped.indexOf(CREDENTIALS_SYNC), stripped.indexOf("sync-credentials.mjs")]
+      .filter((i) => i >= 0)
+      .sort((a, b) => a - b)[0];
+    const ok = syncAt !== undefined && syncAt <= gradleAt;
+    syncBeforeGradle.set(f, ok);
+    if (syncAt !== undefined && syncAt > gradleAt) {
+      verdict[9].push(
+        `${rel(f)} 的凭证同步出现在 gradlew 调用**之后**（offset ${syncAt} > ${gradleAt}）——` +
+          `顺序错则生成物缺失，等同未接`,
+      );
+    }
+  }
+  // 委托形态：`release.mjs` 只按 `cmd === "./gradlew"` 消费步骤数组，
+  // 真正的前置在被它 import 的步骤定义模块里。判据沿链解析一层——
+  // **不解析就会误报**（把正确的委托判成缺陷）；解析了但被委托方不合规，仍要报。
+  for (const f of mjsGradle) {
+    if (syncBeforeGradle.get(f)) continue;
+    const stripped = stripJsComments(readFileSync(f, "utf8"));
+    const delegates = mjsGradle.filter((g) => g !== f && stripped.includes(basename(g)));
+    const delegatedOk = delegates.length > 0 && delegates.every((g) => syncBeforeGradle.get(g));
+    if (!delegatedOk) {
+      verdict[9].push(
+        `${rel(f)} 执行 gradlew 但全篇未接凭证同步（注释里的提及不算，须为实际调用）`,
+      );
     }
   }
 
@@ -729,6 +816,23 @@ function writeCompliantFixture(root: string): void {
     ].join("\n"),
   );
   writeFixtureFile(root, "packages/android-host/scripts/release.mjs", "export const steps = [];\n");
+  // 不变量 9 的 `.mjs` 侧载体：合规态 = 凭证同步先于 gradlew 调用。
+  // 刻意覆盖两种接线写法（npm 脚本名 / 直调脚本），证明判据认的是调用形态而非某一种字面量。
+  writeFixtureFile(
+    root,
+    "packages/android-host/scripts/mjsGradleA.mjs",
+    'await run("pnpm", ["run", "sync:credentials"]);\nawait run("./gradlew", ["assembleDebug"]);\n',
+  );
+  writeFixtureFile(
+    root,
+    "packages/android-host/scripts/mjsGradleB.mjs",
+    'await run("node", ["scripts/sync-credentials.mjs"]);\nawait run("./gradlew", ["assembleRelease"]);\n',
+  );
+  writeFixtureFile(
+    root,
+    "packages/android-host/scripts/lib/mjsGradleC.mjs",
+    'steps = [["同步", "pnpm", ["run", "sync:credentials"]], ["./gradlew", "assembleRelease"]];\n',
+  );
   writeFixtureFile(
     root,
     "packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts",
@@ -788,7 +892,7 @@ function evaluateFixture(mutate: (root: string) => void): Verdict {
 
 /** 合规树必须九组全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
 function expectOnly(target: Verdict, id: InvariantId, minHits: number): void {
-  for (const key of [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[]) {
+  for (const key of ALL_INVARIANTS) {
     if (key === id) {
       expect(
         target[key].length,
@@ -807,7 +911,7 @@ afterAll(() => {
 describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明九组不是恒绿假防线）", () => {
   it("基线：合规仓库树九组全绿", () => {
     const v = evaluateFixture(() => {});
-    for (const key of [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[]) {
+    for (const key of ALL_INVARIANTS) {
       expect(v[key], `合规树的不变量 ${key} 不该红：${v[key].join("；")}`).toEqual([]);
     }
   });

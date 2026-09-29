@@ -33,7 +33,7 @@ import okhttp3.Response;
  *       入参 null 或非 http(s) 开头 → <b>原样返回 officialUrl</b>；</li>
  *   <li>改写仅替换 host：officialUrl 的 path+query 逐字节保留，protocol/port 取镜像 baseUrl 的；
  *       baseUrl 含 {@code {path}} 模板时替换为 officialUrl 的 path 去掉前导 {@code /}
- *       （语义对齐 JS {@code transformUrl}，oracle 见 {@code packages/app/src/services/imageHostService.ts}）；</li>
+ *       （语义对齐 WebView 侧 {@code transformUrl}；该实现随 WebView 客户端删除，契约现以本类接口契约与 ADR-0143 为准）；</li>
  *   <li><b>缓存键恒官方 URL</b>（ADR-0143 D2 源无关命中不变量）：调用方必须用
  *       <b>officialUrl 入参</b>（而非本方法返回值）计算缓存键——下载源跟随图床，缓存键不跟随，
  *       切源/开关图床/换镜像均不使已缓存条目失效；</li>

@@ -85,9 +85,10 @@ declare global {
       removeItem(key: string, callback: (err: string | null) => void): void
     }
     PictelioApp: {
-      setClientKind(kind: string, callback: (err: string | null) => void): void
-      getClientKind(callback: (kind: string | null, err: string | null) => void): void
-      restart(callback: (err: string | null) => void): void
+      // ADR-0203 决策 7：setClientKind / getClientKind / restart 已随 WebView 客户端删除
+      // 从 PictelioAppModule 移除，故此处不再声明。⚠️ 别把它们加回来——
+      // strict 下加回只会让 vue-tsc 放行一个**运行时必然静默失败**的调用
+      // （Java 对端已无该 @LynxMethod），这正是决策 7「判定纪律」要防的镜像版本。
       /** 关闭 Lynx 宿主 Activity；lynx NativeModule 约定 Callback 必传（模拟器实测） */
       exitApp(callback: (err: string | null) => void): void
       /** 检查更新：用系统浏览器强制打开 release 页（独立 task，无法返回 app 内） */

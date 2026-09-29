@@ -10,12 +10,13 @@ import {
 } from "../../../scripts/lib/release-build-steps.mjs";
 import { DEFAULT_VARIANTS, apkPathsFor, APK_DIR } from "../../../scripts/lib/release-utils.mjs";
 
-// 定位锚点：本文件在 packages/app/tests/unit/scripts/ 下，回退 3 层 = packages/app
+// 定位锚点：本文件在 packages/android-host/tests/unit/scripts/ 下，回退 3 层 = packages/android-host
+// （ADR-0203 决策 2 宿主迁移；注释曾写已删的 packages/app，定位逻辑本身从未改）
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const readApp = (rel: string) => readFileSync(resolve(appDir, rel), "utf-8");
 
-/** 从 packages/app/package.json 读 scripts（真实来源，不硬编码期望值） */
+/** 从宿主包 package.json 读 scripts（真实来源，不硬编码期望值） */
 function appScripts(): Record<string, string> {
   return JSON.parse(readApp("package.json")).scripts ?? {};
 }
@@ -185,6 +186,17 @@ describe("releaseBuildSteps：步骤表内每个 pnpm script 都必须真实存�
     expect(flat).not.toContain("cap:sync");
     // 阳性对照：检测式能命中其它仍然存在的 script 名
     expect(flat).toContain("sync:credentials");
+  });
+
+  it("顺序：凭证同步必须在 gradlew 编译**之前**（不是「出现过就算」）", () => {
+    // 只断言存在过是不够的：把 sync 步骤调到 gradlew 之后，`toContain` 照样绿，
+    // 而生成物会缺失 → 干净检出复现 ADR-0203 决策 8 记录的同一故障。
+    const flat = steps.map((s) => JSON.stringify(s));
+    const syncAt = flat.findIndex((s) => s.includes("sync:credentials"));
+    const gradleAt = flat.findIndex((s) => s.includes("gradlew"));
+    expect(syncAt).toBeGreaterThanOrEqual(0);
+    expect(gradleAt).toBeGreaterThanOrEqual(0);
+    expect(syncAt).toBeLessThan(gradleAt);
   });
 });
 

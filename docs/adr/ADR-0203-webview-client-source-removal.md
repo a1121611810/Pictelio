@@ -199,11 +199,20 @@ grep -c "public void setClientKind\|public void getClientKind\|public void getCl
   packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java     # 原生切换方法已删（应为 0）
 ```
 
-**机器防线**：以上 8 条判据全部由单一总闸
+**机器防线**：以上判据**除第 6 条的计数**外全部由单一总闸
 `packages/android-host/tests/unit/webviewRemovalInvariants.test.ts` 覆盖
-（`pnpm --filter @pictelio/android-host test`），并带 4 组阳性对照
+（`pnpm --filter @pictelio/android-host test`），共 9 组不变量 × 13 条阳性对照
 证明它们不是恒绿假防线——其中不变量 8 的配对正面锚点专门防
 「把 `PictelioAppModule` 整份删掉也算修好」这种糊弄式过关。
+
+**判据 6（宿主资产计数）目前只有人工核对**：`HOST_ASSETS` 的目录型资产只断言 `minFiles: 1`，
+删掉九成 Java 文件仍会全绿。「没丢东西」这一事实由 T12 逐件实测担保
+（Java 94/94、`git diff -M --name-status -- "*.java"` = 94 R / 0 D），
+但**尚无机器下界**——不要误以为总闸已经守着它。
+
+**不变量 9 的扫描域有两个**（code-review 修 blocking 后扩）：`package.json` 脚本字面量，
+以及 `scripts/**/*.mjs` 正文。后者判的是**顺序**（同步早于 gradlew）而非存在，
+并沿委托链解析一层（`release.mjs` 只消费步骤数组，真正接线在 `release-build-steps.mjs`）。
 
 ## 参考
 

@@ -25,11 +25,13 @@ import java.util.concurrent.CountDownLatch;
  * 禁止从被测实现反推：
  * <ul>
  *   <li>URL 改写 / {path} 模板 / weighted 抽样规则 / fastest-ip TTL 判定 / 探测样本 URL /
- *       官方域写入侧防线：JS 源码
- *       {@code packages/app/src/services/imageHostService.ts} 的
- *       {@code transformUrl} / {@code selectWeightedHost} / {@code getEffectiveImageUrl} /
- *       {@code buildProbeSampleUrl} / {@code validateHostInput}，
- *       以及 {@code packages/app/src/stores/imageHostStore.ts} 的 {@code getFastestHost}；</li>
+ *       官方域写入侧防线：原 oracle 是 WebView 侧
+ *       {@code imageHostService.ts} 的 {@code transformUrl} / {@code selectWeightedHost} /
+ *       {@code getEffectiveImageUrl} / {@code buildProbeSampleUrl} / {@code validateHostInput}，
+ *       以及 {@code imageHostStore.ts} 的 {@code getFastestHost}。
+ *       ⚠️ <b>该 oracle 源已随 WebView 客户端整包删除（ADR-0203 决策 2）</b>：
+ *       期望值以本文件冻结 fixture 的形式保留，仍能防回归，但**已无法回溯到独立来源**——
+ *       满足「冻结真值」，不满足测试硬约束 #6 的「出处可追溯」。挂账见 #846。</li>
  *   <li>配置 JSON 形状与内置 host 取值（pixiv-re / pixiv-nl / pixivel）：
  *       {@code imageHostStore.ts} 的 ImageHostState 持久化形态 / BUILT_IN_HOSTS（真实形状 fixture，
  *       含 probeResults / fastestHostExpiresAt 字段）；</li>

@@ -21,7 +21,7 @@ import {
   defaultRunFmtCheck,
 } from "../../../../../scripts/check-push-refs.mjs";
 
-// 仓库根（仅「真实调用」用例使用）：本文件位于 packages/app/tests/unit/scripts/
+// 仓库根（仅「真实调用」用例使用）：本文件位于 packages/android-host/tests/unit/scripts/
 const REPO_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 // oxfmt 对「传入路径全被 ignore 规则排除」的真实文案（stderr），取自实测输出
 const FMT_SKIP_STDERR =

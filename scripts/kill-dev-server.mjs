@@ -14,7 +14,6 @@
  * - 跨平台：macOS/Unix 用 lsof + ps，Windows 用 netstat + taskkill。
  *
  * 用法：
- *   node scripts/kill-dev-server.mjs app                # 查看占用 app 端口(5173)的进程
  *   node scripts/kill-dev-server.mjs app --force        # 终止进程
  *   node scripts/kill-dev-server.mjs all --force        # 终止全部 dev 端口
  *   node scripts/kill-dev-server.mjs --port 4321        # 指定端口（不校验项目白名单）
@@ -30,7 +29,6 @@ import process from "node:process";
 
 /** 包名到开发服务器端口的映射（数组表示该包可能占用的多个端口） */
 const PROJECT_PORTS = {
-  app: [5173],
   "app-lynx": [3000, 3001], // rspeedy 在 3000 被占时自动切到 3001
   website: [4321],
 };

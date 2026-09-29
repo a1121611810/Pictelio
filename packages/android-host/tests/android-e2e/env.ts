@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** packages/app 包根目录（本文件位于 packages/app/tests/android-e2e/ 下） */
+/** 宿主包根目录（本文件位于 packages/android-host/tests/android-e2e/ 下） */
 export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 /** monorepo 根目录 */
 export const REPO_ROOT = resolve(APP_ROOT, "..", "..");

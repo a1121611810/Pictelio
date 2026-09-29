@@ -7,7 +7,8 @@ import { defineConfig } from "vite-plus";
  * 单进程覆盖全部 workspace 包（此前 lint:all / fmt:all 需按包 fan-out，且 6 个
  * 纯逻辑包与 app-lynx 的 lint/fmt 一直是空占位）。规则集自
  * packages/app/vite.config.ts 的 lint/fmt 块上移，语义不变；app 内同名块已删除，
- * 防止双源漂移。app 的 dev/build 配置仍在 packages/app/vite.config.ts。
+ * 防止双源漂移。app 的 dev/build 配置已随 WebView 客户端整包删除（ADR-0203 决策 2），
+ * 唯一客户端 app-lynx 的 dev/build 走根 package.json 的裸名命令。
  */
 export default defineConfig({
   lint: {
