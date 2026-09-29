@@ -56,7 +56,7 @@ describe("R8 keep 规则（Room 反射实例化面，ADR-0124）", () => {
   // 原「work-runtime 依赖声明与 keep 规则同在（webview + full 两个 flavor）」断言
   // 已随 #610 手术移除：手术把 `webviewImplementation "androidx.work:work-runtime"`
   // **整条删除**（不是改成通用 implementation），因为 work-runtime 是 OTA 慢通道
-  // （proguard-rules.pro 注释：ADR-0122）��而 OTA 随 webview flavor 下线。
+  // （proguard-rules.pro 注释：ADR-0122），而 OTA 随 webview flavor 下线。
   // ⚠️ 该断言的存废实质归属 #804（更新通道处置）——若 OTA 以 Lynx 形态重建，
   // 依赖与本断言须一并加回，否则 R8 会再次剥离 WorkDatabase_Impl 的无参构造器
   // （ADR-0124 记录的 Release 启动闪退）。
