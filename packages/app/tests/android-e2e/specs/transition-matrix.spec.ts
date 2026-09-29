@@ -70,6 +70,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createCanvas, loadImage } from "canvas";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { runReleaseGate, type OutcomeRow } from "../support/releaseGate";
 import {
   adbPath,
   APP_PACKAGE,
@@ -760,13 +761,12 @@ describe.skipIf(SKIPPED)(
     }, 900_000);
 
     afterAll(async () => {
-      await ctx?.teardown().catch(() => {});
-      try {
-        if (!serial) return;
-        forceStopApp(serial);
-      } catch {
-        // 收尾失败不阻断
-      }
+      // 收尾（teardown / forceStop）与外层门的**执行时序**由 `runReleaseGate` 统一承担：
+      // 它保证「收尾出错 / serial 尚未赋值」只影响收尾本身，**判定永远执行**。
+      // ⚠️ 曾在此处写 `if (!serial) return;` —— 因 `serial` 初值 `""` 且 beforeAll 前三步
+      // 失败时它还没被赋值，那句 early return 会让外层门整段不执行（不判红、不 warn）。
+      // 见 `tests/android-e2e/support/releaseGate.ts` 的说明与对应单测。
+      //
       // ── 外层门：只堵「既没判定也没声明」这条回潮路径（#819 二次订正）────────
       //
       // ⚠️ 首版（求和 `r1Injected + r3BookmarkPairs > 0`）**太弱**：R1 单独不可判定时，
@@ -785,33 +785,24 @@ describe.skipIf(SKIPPED)(
       //
       // 反事实检验（务必保留）：把 R1 断言③ / R3 收藏行对的 skip 分支改回 `return`，
       // `skipped` 与 `judged` 双 0 ⇒ 本断言立刻转红——回潮路径被堵死。
-      const rows: ReadonlyArray<readonly [string, { judged: number; skipped: number }]> = [
+      // 该检验现有**两个入口**：本行的设备级（贵，要模拟器）与
+      // `tests/android-e2e/unit/releaseGate.test.ts` 的纯函数级（秒级，随 CI 跑）。
+      // 日常改判定语义请走后者；前者留给发版前首跑。
+      const rows: OutcomeRow[] = [
         ["R1 断言③「相关作品」段注入", coreOutcome.r1],
         ["R3「收藏行」两两不同", coreOutcome.r3],
       ];
-      const silent = rows.filter(([, o]) => o.judged === 0 && o.skipped === 0).map(([n]) => n);
-      expect(
-        silent,
-        `发版门内容断言既未判定、也未声明不可判定：${silent.join(" + ")}。` +
-          `两种成因，**报错文案不替你猜是哪种**（务必按序自查）：` +
-          `① 该行被写回 return —— 不可判定分支直接返回，vitest 记 passed 且日志宣称已验证，` +
-          `实际什么都没验到（「什么都没验到」≠「通过」）；` +
-          `② 该行所属 test 本轮**根本没跑** —— 台账停在 0/0，但与 ① 的成因和修法完全不同。` +
-          `修法：① 改用 t.skip() 显式声明不可判定并写明原因；② 跑全量（不带 -t）、` +
-          `并先看 vitest 结果的 passed/skipped 计数与 beforeAll 报错，再谈代码回潮。` +
-          `本轮台账：${rows.map(([n, o]) => `${n} judged=${o.judged}/skipped=${o.skipped}`).join("；")}。` +
-          `取证：test-results/android-e2e/transition-matrix/ 下各 r1-*/r3-* 帧 + logcat。`,
-      ).toEqual([]);
-
-      const unverified = rows.filter(([, o]) => o.judged === 0).map(([n]) => n);
-      if (unverified.length > 0) {
-        console.warn(
-          `[transition-matrix] ⚠️ 本轮发版门**未验证**：${unverified.join(" + ")}` +
-            `（内容形态导致采样窗取不到被测对象，已显式 skip 并记为 skipped 而非 passed）。` +
-            `该 test 在 vitest 结果里显示为 skipped；不判红是刻意取舍——` +
-            `按「内容形态不可判定」判红只会得到随机红的发版门。留证与挂账见 #819。`,
-        );
-      }
+      await runReleaseGate({
+        teardown: async () => {
+          await ctx?.teardown();
+        },
+        forceStop: forceStopApp,
+        serial,
+        rows,
+        warn: (message) => console.warn(message),
+        // 判红：expect 抛错即失败，与改造前 `expect(silent, msg).toEqual([])` 等价
+        fail: (silent, message) => expect(silent, message).toEqual([]),
+      });
     });
 
     it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡注入「相关作品」段 + 滚动不回顶", async (t) => {
