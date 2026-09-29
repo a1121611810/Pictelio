@@ -121,6 +121,9 @@ describe("发版门外层三态门 · 判红文案", () => {
     expect(msg).toMatch(/logcat 不落盘|只落帧/);
     // 命令带 serial 参数，不能写成 /adb logcat/（那匹配不上 `adb -s <serial> logcat -d`）
     expect(msg).toMatch(/adb[^\n`]*logcat/);
+    // 环形 buffer 会滚：实测 main ring 2 MiB、可读仅 200 KiB，而 Lynx 有 ~60fps 逐帧日志。
+    // 只说「现取」而不说「可能已滚」，等于把读者引向一个可能扑空的目录。
+    expect(msg).toMatch(/滚|已被挤|可能已丢/);
   });
 
   it("两行都双 0 时，缺口的**全部**行名都进消息", () => {

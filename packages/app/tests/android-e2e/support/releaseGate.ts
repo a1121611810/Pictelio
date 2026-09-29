@@ -78,7 +78,8 @@ export function buildGateFailureMessage(
     `本轮台账：${ledger}。` +
     `取证：test-results/android-e2e/transition-matrix/ 下有各 r1-*/r3-* 帧；` +
     `⚠️ 该目录**只落帧、logcat 不落盘**（spec 全程只在内存里轮询 logcat），` +
-    `logcat 需现取 \`adb -s <serial> logcat -d\`。`
+    `logcat 需现取 \`adb -s <serial> logcat -d\`，但**环形 buffer 会滚**（main ring 2 MiB、` +
+    `实测可读常只剩 200 KiB 量级，而 Lynx 有 ~60fps 逐帧日志），判红后要尽快取，否则可能已被挤掉。`
   );
 }
 
