@@ -28,7 +28,18 @@ vi.mock("@/api/queryClient", () => ({
   },
 }));
 
-/** ensureInfiniteQueryData 实收 options 的最小形状：只留用例要断言的字段 */
+/**
+ * ensureInfiniteQueryData 实收 options 的最小形状：只留用例要断言的字段。
+ *
+ * ⚠️ **别改成 `Parameters<QueryClient["ensureInfiniteQueryData"]>[0]`**（review 已提过一次，
+ * 成本**不为零**）：TanStack 的真实 `QueryFunctionContext`
+ * （`@tanstack/query-core` 的 `QueryFunctionContext`：`client` / `queryKey` /
+ * `signal: AbortSignal` / `meta` 四项**必填**）会让用例为了通过类型检查而**伪造一个
+ * 完整 context** 才能调 `queryFn`。而生产侧的 queryFn 正是按
+ * `({ pageParam, signal }) => …` 这个**最小解构形状**写的（`createTQFeedStore.ts`），
+ * 用真实类型反而会诱使我们把断言从「按生产形状调用」改成「按库的形状补齐」——
+ * 那是在迎合类型系统，不是在验证契约。此处的窄类型是**承重**的，不是省事。
+ */
 export type EnsureOptions = {
   queryKey: readonly unknown[];
   queryFn?: (ctx: { pageParam: unknown; signal?: AbortSignal | undefined }) => Promise<unknown>;
