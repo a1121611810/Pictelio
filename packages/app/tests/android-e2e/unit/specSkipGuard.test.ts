@@ -51,10 +51,34 @@ const sources = specFiles.map((f) => ({
   lines: readFileSync(path.join(SPEC_DIR, f), "utf8").split("\n"),
 }));
 
-/** 门控常量：全大写标识符（`SKIPPED` / `HAS_TOKEN` / `ENABLED` …）。 */
-const GATE_NAME = "[A-Z][A-Z0-9_]*";
+/**
+ * 门控条件的**可接受面**（#819 第 13 轮 Spec 轴实测补齐覆盖面）。
+ *
+ * 初版只认「裸全大写标识符」，实测三种写法溜过：
+ *   `if (ctx.SKIPPED) return;` / `if (skipped) return;` /
+ *   `if (!process.env.PIXIV_REFRESH_TOKEN) return;`
+ * 第三种正是本仓 `settings-sync-contract.spec.ts` 的现役门控读法——源码把 env 折叠成
+ * 全大写常量才被抓到；一旦有人直接写 env 形式，同一个洞回来。
+ *
+ * 现接受**两类结构上可判定**的门控：① 全大写标识符（含成员表达式 `ctx.SKIPPED`）；
+ * ② `process.env.*`。
+ *
+ * ⚠️ **已知且刻意接受的漏面**：`if (skipped) return;`（小写局部变量）**抓不到**。
+ * 放宽到「任意标识符」会误伤正当的数据性早退——实测 `lynx-detail-image-probe:210` 的
+ * 「首跑即取证成功就收工」被当场拦下。环境信号与测试自有数据在静态上无法区分，
+ * 故此处取「宁可漏不可误伤」，并把该边界写进本注释（而非假装覆盖到了）。
+ * 补上它需要人工判断每个候选的来源，暂不自动化。
+ *
+ * ⚠️ **误伤面**：合法的数据性早退若以全大写常量命名（如 `if (ITEMS.length === 0)`）
+ * 仍会被拦下。处置见文件头「什么形态会误伤 / 怎么豁免」——**放宽判据是错的选择**。
+ */
+// 接收者链可为空（`SKIPPED`）、可小写（`ctx.SKIPPED`），但**末段必须全大写**
+// —— 末段大写才是「这是个门控常量」的信号（实测 `ctx.SKIPPED` 曾因接收者小写而漏网）。
+const GATE_NAME = "(?:[\\w$]+\\.)*[A-Z][A-Z0-9_]*";
 /** `if (…门控…) return;` 或 `if (…门控…) {` 的守卫头。 */
-const GUARD_HEAD = new RegExp(`^if\\s*\\(\\s*!?\\s*${GATE_NAME}\\b.*\\)\\s*(\\{|return;?$)`);
+const GUARD_HEAD = new RegExp(
+  `^if\\s*\\(\\s*!?\\s*(?:process\\.env\\.)?${GATE_NAME}\\b.*\\)\\s*(\\{|return;?$)`,
+);
 
 /**
  * 在 `it(` / `test(` 的**整个回调体**内找「门控早退」。
@@ -149,6 +173,10 @@ describe("android-e2e 跳过形态契约（it 体内 return = 冒充通过）", 
   });
 
   it("带设备门控的 spec 必须走 describe.skipIf（清单可枚举）", () => {
+    // ⚠️ 末段全大写 + describe.skipIf 的交叉核对：只认常量名 `SKIPPED` 是不够的
+    // （`settings-sync-contract` 用 `HAS_TOKEN`，它用 `t.skip()` 而非 describe.skipIf，
+    // 形态正确，故不进这条核对）。前提「本仓门控常量统一叫 SKIPPED」**已不成立**，
+    // 故这里按「声明了任意全大写门控常量」来枚举，而不是按名字。
     // 交叉核对：本仓的设备门控常量统一叫 SKIPPED。声明了它却没走 describe.skipIf 的文件，
     // 几乎必然是用 it 体内 return 实现了跳过（上一条已拦）；这条从另一侧锁枚举口径，
     // 防止将来新增一个用别的常量名跳过、两条都溜过去的 spec。

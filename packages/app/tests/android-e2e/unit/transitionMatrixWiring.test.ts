@@ -186,6 +186,73 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     expect(evalExpected(frames(2), 1), "2 帧 ⇒ 1 对").toBe(1);
   });
 
+  it("⚠️ 每个台账写入必须是 it 体的**顶层**语句（被条件吞掉 ⇒ 门 fail-open 且全绿）", () => {
+    // #819 第 13 轮 Spec 轴阻塞项：前三条断言钉的是**取值**（唯一性 / 初值 / RHS 求值），
+    // 唯独没钉**可达性**。实测把 R3 那行改成
+    //   `if (judgedPairs > 99) coreOutcome.r3.expected = (…);`
+    // （恒假 ⇒ 生产永不写）⇒ **112/112 全绿**，而 `judged < expected` 退化成 `judged < 0`
+    // 恒假 ⇒ 第 11 轮那个「1/3 覆盖静默」的洞**原样回归**。守卫方向是 **fail-open**。
+    //
+    // 这与 `releaseGate.ts` 里「让门被 early return 吞掉在结构上不可 reintroduce」同源：
+    // 记账写入点同样可以结构上被吞掉，此前无任何防线。
+    //
+    // 判据（两条都要，缺一即可绕过）：
+    //   ① 该行去掉缩进后**必须以 `coreOutcome.` 开头** —— 挡 `if (x) coreOutcome.…` 同行；
+    //   ② 缩进必须**等于其所属 `it` 体**的基线缩进 —— 挡 `if (x) {` + 换行形态。
+    //
+    // ⚠️ **只约束 `judged` / `expected`，`skipped` 不受约束**：后两者的语义是
+    // 「本行出了判定」，一旦嵌进条件就意味着「有时不记」⇒ 台账可能停在初值；
+    // 而 `skipped` 的语义恰恰是「本轮声明了不可判定」，它**必须**写在 skip 分支里
+    // （挪到体顶层反而是 bug：无条件记 skipped 会让每次运行都报成未验证）。
+    const lines = specSrc.split("\n");
+    const indentOf = (l: string): number => l.match(/^ */)?.[0].length ?? 0;
+    const TOP_LEVEL_FIELDS = new Set(["judged", "expected"]);
+    // ⚠️ 筛选正则**故意不加行首锚**：加了 `^` 就等于把「`if (x) coreOutcome…` 同行」这种
+    // 旁路**排除在集合之外**，规则 ① 根本没机会判它 —— 实测正是这样全绿的。
+    // 收集要「行内任意位置」，收口才交给「必须以 coreOutcome. 开头」那条。
+    const WRITES =
+      /(?<![\w.$])coreOutcome\.r[13]\.(judged|skipped|expected)\s*(?:\+=|--|\+\+|(?<![=!<>])=(?!=))/;
+    const writes = lines.map((l, i) => ({ l, i })).filter(({ l }) => WRITES.test(l.trim()));
+    expect(
+      writes.length,
+      "台账写入点应至少 5 处（R1 skipped/judged + R3 skipped×2/judged/expected）",
+    ).toBeGreaterThanOrEqual(5);
+
+    for (const { l, i } of writes) {
+      const field = /coreOutcome\.r[13]\.(judged|skipped|expected)/.exec(l.trim())?.[1] ?? "";
+      if (!TOP_LEVEL_FIELDS.has(field)) continue;
+      const trimmed = l.trim();
+      // ① 顶层：以 coreOutcome. 开头（不是 if / && / ?: 的尾巴）
+      expect(
+        trimmed.startsWith("coreOutcome."),
+        `第 ${i + 1} 行 ${field} 写入被包在表达式里（可达性未证）：${trimmed.slice(0, 60)}`,
+      ).toBe(true);
+      // ② 缩进 = 所属 it 体的**语句基线**（不是 it 行自身的缩进——它比函数体少一级）
+      const ownerIdx = lines
+        .slice(0, i)
+        .map((x, k) => ({ x, k }))
+        .findLast(({ x }) => /^\s*(?:it|test)(?:\.\w+)?\(/.test(x))?.k;
+      expect(ownerIdx, `第 ${i + 1} 行 ${field} 写入找不到所属 it(/test(`).toBeDefined();
+      const ownerIndent = indentOf(lines[ownerIdx as number] ?? "");
+      // ⚠️ 别用 `Array#takeWhile`：本仓 lib 目标里没有它（实测 `is not a function`）
+      const bodyLines: string[] = [];
+      for (let k = (ownerIdx as number) + 1; k < lines.length; k++) {
+        const x = lines[k] ?? "";
+        if (x.trim() === "") continue;
+        if (indentOf(x) <= ownerIndent) break;
+        bodyLines.push(x);
+      }
+      const bodyIndents = bodyLines.map(indentOf);
+      const base = bodyIndents.length > 0 ? Math.min(...bodyIndents) : ownerIndent;
+      const col = /^\s*/.exec(l)?.[0].length ?? 0;
+      expect(
+        col,
+        `第 ${i + 1} 行 ${field} 写入缩进 ${col} ≠ 所属 it 体基线 ${base}，` +
+          `说明它嵌在 if / for / try 里（可达性未证）`,
+      ).toBe(base);
+    }
+  });
+
   it("spec 文件仍在，契约测试没读到空串", () => {
     expect(specSrc.length).toBeGreaterThan(1000);
     expect(hook.length).toBeGreaterThan(200);
