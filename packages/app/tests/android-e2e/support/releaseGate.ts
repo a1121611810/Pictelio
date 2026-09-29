@@ -14,16 +14,27 @@
  * | `judged > 0` | 正常判红（断言不通过时） |
  * | `judged = 0, skipped > 0` | **不判红**，但 warn 高亮「本轮未验证」 |
  * | `judged = 0, skipped = 0` | **判红** |
+ * | `0 < judged < expected`（一行内**部分**子判定未覆盖） | **不判红**，但 warn 高亮「本轮未验证」 |
  *
  * ⚠️ 「求和 > 0」太弱（R3 判过就能替 R1 背书）、「逐行 AND」太强（把内容形态导致的
  * 合法 skip 报成产品回归 ⇒ 随机红的发版门）。逐行分类 + 三态是唯一同时满足
  * 「不放过 `return` 回潮」与「不因内容形态随机红」的形态。
  */
 
-/** 一行内容断言的判定台账：`judged` = 真判过几次；`skipped` = 显式声明不可判定几次。 */
+/**
+ * 一行内容断言的判定台账：`judged` = 真判过几次；`skipped` = 显式声明不可判定几次。
+ *
+ * ⚠️ `expected` 是**覆盖率**维度（#819 第 11 轮 review 补）：一行内容断言内部可能
+ * 含**多次**子判定（如 R3「三帧两两不同」= 3 对），只记 `judged === 0` 会让
+ * 「1 对判过 + 2 对采样窗无内容」这种**部分验证**既不判红也不 warn ⇒ 门完全静默，
+ * 而该行对外承诺的是「两两不同」（3 对）。补 `expected` 后，部分覆盖落进 `unverified`
+ * （warn「本轮未验证」），**不判红**——与三态表同源：内容形态导致的覆盖不足不是产品回归。
+ */
 export interface OutcomeCounts {
   judged: number;
   skipped: number;
+  /** 本行应给出的判定总数（子判定个数）。`undefined` = 不做覆盖率判定（单次判定行）。 */
+  expected?: number;
 }
 
 /** 台账行：`[可读名, 计数]`。可读名进判红文案，读者据此定位到具体断言。 */
@@ -42,11 +53,18 @@ export interface GateClassification {
  *
  * 纯函数、无 IO、不依赖 vitest —— 可在 `tests/android-e2e/unit/` 里被
  * `pnpm test` → `test:all` → CI 直接跑到（不碰 adb / 模拟器）。
+ *
+ * ⚠️ 「未验证」的判据是 `judged === 0` **或覆盖率不足**（`judged < expected`）：
+ * 只看 `judged === 0` 会漏掉「一行含多次子判定、只判过一部分」——那种情况既不判红
+ * 也不 warn，门静默，而行名对外承诺的是全量。⚠️ 但覆盖率不足**只 warn 不判红**：
+ * 判红它就是随机红的发版门（内容形态决定覆盖率），与三态表同源纪律。
  */
 export function classifyOutcomeRows(rows: readonly OutcomeRow[]): GateClassification {
   return {
     silent: rows.filter(([, o]) => o.judged === 0 && o.skipped === 0).map(([name]) => name),
-    unverified: rows.filter(([, o]) => o.judged === 0).map(([name]) => name),
+    unverified: rows
+      .filter(([, o]) => o.judged === 0 || (o.expected !== undefined && o.judged < o.expected))
+      .map(([name]) => name),
   };
 }
 
@@ -96,7 +114,8 @@ export function buildUnverifiedWarning(classification: GateClassification): stri
   if (unverified.length === 0) return undefined;
   return (
     `[transition-matrix] ⚠️ 本轮发版门**未验证**：${unverified.join(" + ")}` +
-    `（内容形态导致采样窗取不到被测对象，已显式 skip 并记为 skipped 而非 passed）。` +
+    `（内容形态导致采样窗取不到被测对象，或一行内部分子判定未覆盖，已显式 skip /` +
+    `覆盖率不足并记为 skipped 而非 passed）。` +
     `该 test 在 vitest 结果里显示为 skipped；不判红是刻意取舍——` +
     `按「内容形态不可判定」判红只会得到随机红的发版门。留证与挂账见 #819。`
   );

@@ -16,9 +16,18 @@
  * 下面的真值表**逐格抄自 spec**：`docs/specs/qa-defense-lines.md` 的
  * 「内容断言的「不可判定」口径（三态记账）」表（`judged>0` / `judged=0,skipped>0` /
  * `judged=0,skipped=0` 三行 → 各自的「外层门」列），而非跑一遍
- * `classifyOutcomeRows` 把输出当快照。改动 spec 而不改本测试（或反之）都会立刻红。
+ * `classifyOutcomeRows` 把输出当快照。
+ *
+ * ⚠️ 「抄」本身**不构成机器防线**——本文件早前那句「改动 spec 而不改本测试都会立刻红」
+ * 是假的（它只在注释里提到那份 .md，从不读它；实测 `grep -rln qa-defense-lines
+ * tests/ src/` 的命中全是注释文本）。故补了「spec 一致性」组的 doc-parity 断言：
+ * 真去读那份 .md、抽出三态表的三格判定词，再与 `classifyOutcomeRows` 的**实际行为**
+ * 对照——改 spec 而不改实现（或反之）现在真的会红。
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildGateFailureMessage,
   buildUnverifiedWarning,
@@ -27,10 +36,18 @@ import {
   type OutcomeRow,
 } from "../support/releaseGate";
 
-/** 台账行：[可读名, 计数]。名字取自 spec 里两行内容断言的原文。 */
-const row = (label: string, judged: number, skipped: number): OutcomeRow => [
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+/** 仓根 = unit → android-e2e → tests → app → packages → 仓根，共 5 级。 */
+const SPEC_MD_PATH = path.resolve(testDir, "../../../../../docs/specs/qa-defense-lines.md");
+const specMd = readFileSync(SPEC_MD_PATH, "utf8");
+
+/**
+ * 台账行：[可读名, 计数]。名字取自 spec 里两行内容断言的原文。
+ * 第 4 参 `expected` = 本行应有的子判定总数（覆盖率维度，缺省不做覆盖率判定）。
+ */
+const row = (label: string, judged: number, skipped: number, expected?: number): OutcomeRow => [
   label,
-  { judged, skipped },
+  expected === undefined ? { judged, skipped } : { judged, skipped, expected },
 ];
 
 describe("发版门外层三态门 · 台账分类", () => {
@@ -70,6 +87,34 @@ describe("发版门外层三态门 · 台账分类", () => {
     const r = classifyOutcomeRows([row("R1", 0, 0), row("R3", 3, 0)]);
     expect(r.silent).toEqual(["R1"]);
     expect(r.unverified).toEqual(["R1"]);
+  });
+
+  it("⚠️ 覆盖率不足（0 < judged < expected）必须落进未验证，而**不是**静默", () => {
+    // #819 第 11 轮 review 的阻塞项：R3「三帧两两不同」= 3 对，采样窗可能只让
+    // 1 对可判定、另 2 对被 `continue` 吞掉且**不写台账**。只看 `judged === 0` 时
+    // 这种「1/3 覆盖」既不判红也不 warn ⇒ 门完全静默，而行名承诺的是「两两不同」。
+    const r = classifyOutcomeRows([row("R3", 1, 0, 3)]);
+    expect(r.silent, "部分覆盖不判红（内容形态决定覆盖率，判红即随机红）").toEqual([]);
+    expect(r.unverified, "部分覆盖必须算未验证并 warn").toEqual(["R3"]);
+  });
+
+  it("覆盖率足额（judged >= expected）不算未验证", () => {
+    expect(classifyOutcomeRows([row("R3", 3, 0, 3)]).unverified).toEqual([]);
+    // 判过量超过 expected 也算足额（防御：台账累加口径变了不至于误 warn）
+    expect(classifyOutcomeRows([row("R3", 4, 0, 3)]).unverified).toEqual([]);
+  });
+
+  it("expected 缺省 = 不做覆盖率判定（单次判定行的旧行为不变）", () => {
+    // R1 断言③ 是单次判定；不给 expected 时 judged=1 不该被 warn
+    expect(classifyOutcomeRows([row("R1", 1, 0)]).unverified).toEqual([]);
+  });
+
+  it("双 0 且带 expected 时仍**判红**（test 没跑那条路径不被覆盖率逻辑吞掉）", () => {
+    // 关键：R3 test 本轮没跑时 expected 仍是初值 0，判据 `judged < expected`
+    // 为假 ⇒ 落回 `judged === 0 && skipped === 0` 判红，不会被新逻辑放过。
+    const r = classifyOutcomeRows([row("R3", 0, 0, 0)]);
+    expect(r.silent, "双 0 必须判红").toEqual(["R3"]);
+    expect(r.unverified).toEqual(["R3"]);
   });
 
   it("两行都双 0 时全量报出，不做「报一行就够」的折叠", () => {
@@ -218,7 +263,7 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
 
   it("⚠️ fail 收到的必须是**分类出的那份** silent 名单，而不是空名单/别的名单", async () => {
     // 实测过的洞：把 runReleaseGate 里的 `deps.fail(classification.silent, …)`
-    // 改成 `deps.fail([], …)`，**全部 25 例照样绿** —— 因为调用方绑的是
+    // 改成 `deps.fail([], …)`，**当时全部 25 例照样绿** —— 因为调用方绑的是
     // `expect(silent, msg).toEqual([])`，空数组对空数组恒过 ⇒ 门永不判红。
     // 接线契约（读 spec 源码）抓不到这一条：退化发生在 **runReleaseGate 内部**。
     // 故这里是**行为**断言：fail 的第一个参数必须与 classifyOutcomeRows 的 silent 同值，
@@ -243,7 +288,8 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
   it("⚠️ 门必须排在收尾**之后**（台账要能触发门，否则断言退化成假绿）", async () => {
     // 本条专治一个实测过的假绿：用**全判定过**的台账去断顺序时，events 里根本不会出现
     // fail/warn，`toEqual` 只比较了 teardown 与 forceStop 两个事件 ⇒ 把整段门挪到收尾
-    // **之前**也照样 17 例全绿，而生产后果是 appium 未停 / 全局代理未清除 / app 未
+    // **之前**也照样 17 例全绿（用例数随防线增补已变多，该数字只作当时记录），
+    // 而生产后果是 appium 未停 / 全局代理未清除 / app 未
     // force-stop（收尾根本没跑）。故这里的台账必须**能触发门**。
     const { events, deps } = makeDeps("emulator-5554", [row("R1", 0, 0), row("R3", 2, 0)]);
     await runReleaseGate(deps);
@@ -332,5 +378,99 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     const failMsg = events.find((e) => e.startsWith("fail")) ?? "";
     expect(failMsg).toMatch(/①/);
     expect(failMsg).toMatch(/②/);
+  });
+});
+
+/**
+ * spec 一致性（doc-parity）：三态表的**判定词**与 `classifyOutcomeRows` 的实际行为对照。
+ *
+ * ## 为什么需要它（ADR-0097：翻转必须配机器防线）
+ *
+ * 三态表是这道门对外的**唯一语义契约**（`qa-defense-lines.md` §3.T2「不可判定口径」）。
+ * 本文件早前的真值表是**人工抄**进去的，抄错不会有任何东西变红——实测该文件从头到尾
+ * 只在**注释**里提到那份 .md，从不读它（`grep -rln qa-defense-lines tests/ src/`
+ * 的命中全是注释文本）⇒ 「改 spec 而不改本测试」曾经是零成本静默漂移。
+ * 本组把那张表读出来、把每格映射成一个可执行的判定（判红 / 不判红+warn），
+ * 再与纯函数的**实际输出**对照。
+ *
+ * ⚠️ 抽取器**必须断言抽到了 3 格**（ArchUnit `failOnEmptyShould` 教训）：表格改格式时
+ * 静默抽到 0 格，会让全称断言恒真——那正是本组要防的假绿。
+ */
+describe("发版门外层三态门 · spec 一致性（三态表 ↔ 实现行为）", () => {
+  /** 抽出三态表的数据行（blockquote 内的 `| … |` 行，跳过表头与分隔行）。 */
+  function threeStateRows(md: string): { ledger: string; gate: string }[] {
+    return (
+      md
+        .split("\n")
+        .map((l) => l.replace(/^\s*>\s?/, ""))
+        // ⚠️ 锚点必须**紧跟首个竖线的反引号**（`| \`judged…`），不能用 `/^\|.*judged/`：
+        // 后者会把任何「表格行里含 judged 一词」的行也算进来——本次 review 往 R1 行
+        // 补了一句「`judged` 只说明…」的挂账说明，抽取器就多收了 1 行、与 4 格断言冲突。
+        // 这与「接线契约的切片终点会静默漂移」同族：抽取范围必须由**结构**界定，不能由词面命中界定。
+        .filter((l) => /^\|\s*`/.test(l))
+        .map((l) => {
+          const cells = l
+            .split("|")
+            .slice(1, -1)
+            .map((c) => c.trim());
+          return { ledger: cells[0] ?? "", gate: cells[2] ?? "" };
+        })
+    );
+  }
+  const specRows = threeStateRows(specMd);
+
+  it("必须从 qa-defense-lines.md 抽到三态表的全部 4 格（抽到 0 格会让本组全称断言恒真）", () => {
+    expect(specRows.length, "三态表数据行数").toBe(4);
+    expect(specMd.length, "spec 文件没读到空串").toBeGreaterThan(1000);
+    for (const { ledger, gate } of specRows) {
+      expect(ledger, "台账列必须非空").not.toBe("");
+      expect(gate, "外层门列必须非空").not.toBe("");
+    }
+  });
+
+  it("第 2 格「显式声明不可判定」：spec 说不判红 + warn，实现也必须不判红且给 warn", () => {
+    const specRow = specRows.find((r) => /skipped\s*>\s*0/.test(r.ledger));
+    expect(specRow, "必须抽到「judged = 0, skipped > 0」那一格").toBeDefined();
+    // 判定词只认「**不判红**」——它与「判红」共用「判红」二字，必须按是否被否定区分
+    expect(specRow!.gate, "spec 该格必须声明不判红").toMatch(/不判红/);
+
+    const r = classifyOutcomeRows([row("R1", 0, 1)]);
+    expect(r.silent, "实现必须不判红").toEqual([]);
+    expect(buildUnverifiedWarning(r), "实现必须给出 warn").toBeDefined();
+  });
+
+  it("第 3 格「既没判定也没声明」：spec 说判红，实现也必须进 silent 名单", () => {
+    const specRow = specRows.find(
+      (r) => /judged\s*=\s*0/.test(r.ledger) && /skipped\s*=\s*0/.test(r.ledger),
+    );
+    expect(specRow, "必须抽到「judged = 0, skipped = 0」那一格").toBeDefined();
+    // ⚠️ 该格含成因说明，若只写「不判红」就是自相矛盾
+    expect(specRow!.gate, "spec 该格必须判红").toMatch(/(?<!不)判红/);
+    expect(specRow!.gate, "spec 该格不得声明不判红").not.toMatch(/不判红/);
+
+    expect(classifyOutcomeRows([row("R1", 0, 0)]).silent, "实现必须判红").toEqual(["R1"]);
+  });
+
+  it("第 4 格「覆盖率不足」（0 < judged < expected）：spec 说不判红 + warn，实现也必须只 warn", () => {
+    const specRow = specRows.find((r) => /judged\s*<\s*expected/u.test(r.ledger));
+    expect(specRow, "必须抽到「0 < judged < expected」那一格").toBeDefined();
+    expect(specRow!.gate, "spec 该格必须声明不判红").toMatch(/不判红/);
+    // ⚠️ 覆盖率不足**不得**升级为判红：那会因内容形态随机红（与三态表同源纪律）
+    expect(specRow!.gate, "spec 该格不得声明判红").not.toMatch(/(?<!不)判红/u);
+
+    const r = classifyOutcomeRows([row("R3", 1, 0, 3)]);
+    expect(r.silent, "部分覆盖不得判红").toEqual([]);
+    expect(r.unverified, "部分覆盖必须算未验证").toEqual(["R3"]);
+  });
+
+  it("第 1 格「真跑了并给出判定」：spec 说不因台账判红，实现也不得凭空判红", () => {
+    const specRow = specRows.find((r) => /judged\s*>\s*0/.test(r.ledger));
+    expect(specRow, "必须抽到「judged > 0」那一格").toBeDefined();
+    // 该格的判红来自**断言不通过**，不是台账 ⇒ 台账层不得产生 silent
+    expect(specRow!.gate, "spec 该格的外层门列必须指向断言结果而非台账").toMatch(/断言不通过/);
+
+    const r = classifyOutcomeRows([row("R1", 1, 0)]);
+    expect(r.silent, "判过就不该判红").toEqual([]);
+    expect(r.unverified, "判过就不该算未验证").toEqual([]);
   });
 });

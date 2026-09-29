@@ -139,9 +139,16 @@ afterAll(() => {
   }
 });
 
-describe("lynx 详情页图片失败取证（#543 Part2）", () => {
+// ⚠️ #819 收口：原先这里写 `if (SKIPPED) return;`（在 `it` 体内）——vitest 会把
+// 跳过的用例记 **passed**，而 `Tests … | N skipped` 计数**贡献 0** ⇒ 该 spec 在
+// 非 pictelio_ui 设备上「冒充通过」，而发版门的人工核对项（核 skipped 计数）
+// 对它**结构性失明**。这正是 `qa-defense-lines.md` 第三类口径要堵的形态。
+// 现改为与另 3 个 spec 同型的 `describe.skipIf`，跳过即如实记 skipped。
+// ⚠️ 文件级 `beforeAll` / `afterAll` 的 `if (SKIPPED) return;` **保留**：它们挂在
+// 文件 suite 上，不在 `describe.skipIf` 的覆盖范围内（是否执行取决于 vitest 是否
+// 把文件 suite 一并提升为 skip），留着是防御性的，不构成冒充。
+describe.skipIf(SKIPPED)("lynx 详情页图片失败取证（#543 Part2）", () => {
   it("深链进详情页，抓取图片链路失败/成功证据并落盘", async () => {
-    if (SKIPPED) return;
     const serial = ctx.serial;
     mkdirSync(EVIDENCE_DIR, { recursive: true });
 

@@ -43,7 +43,7 @@
 
 | 行 | 表面 | 动作序列 | 内容断言（禁存在性） |
 |----|------|----------|---------------------|
-| R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | **锚点卡下方区域帧差 > `INJECT_TH`(800)**（帧对比代理：对应 `relatedRowFor` 渲染物，**但不区分变化来源**——该区域任何内容变化都满足，理由见 §3.T2 下方「不可判定」口径）；滚动位置不回顶（对比返回前后帧） |
+| R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | **锚点卡下方区域帧差 > `INJECT_TH`(800)**（帧对比代理：对应 `relatedRowFor` 渲染物，**但不区分变化来源**——该区域任何内容变化都满足，理由见 §3.T2 下方「不可判定」口径）；滚动位置不回顶（对比返回前后帧）｜⚠️ **弱代理**：`judged` 只说明「该区域变了」，不说明「是注入段变的」——判绿 ≠ ADR-0162 已验。#816 验收里「单列与双列两种形态下都能正确定」与「双列形态窗计算单测」两项已按 #819 §1 的方式**显式放弃挂账**（实测双列形态下 214/446 ≪ `INJECT_TH`，恒走 `t.skip`；窗计算单测从未补） |
 | R2 | lynx SearchSheet | 搜多结果词→滚到底→等第二页 | 断言翻页后行数增加且无「加载更多失败」横幅；再切「小说」scope→列表无插画行 |
 | R3 | lynx 推荐轮播 | 滑动 ≥2 张 | 每张卡收藏数两两不同（对比帧文本）；卡内容随 index 变化 |
 
@@ -60,6 +60,7 @@
 > | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
 > | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
 > | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时。**这两类 `afterAll` 仍会执行**（vitest `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮。**`-t` 过滤不在此列**——但要分清：`-t` **只滤掉本 test** 时属第 ② 类（门抓得到，本 spec 有 3 个 test，可复现）；`-t` 把 suite 内**全部** test 都滤光时才属下方第三类（门直接消失）。⚠️ 注意「`afterAll` 被调用」**不等于**「`afterAll` 里的门被执行」——本项曾经是假的（`afterAll` 开头有 `if (!serial) return;`，而 `serial` 在 `beforeAll` 前三步失败时仍是 `""`），已改为 `runReleaseGate` 无条件判定，并有单测钉住该时序 |
+> | `0 < judged < expected` | 一行内**部分**子判定未覆盖（覆盖率不足） | **不判红**，但 `console.warn` 高亮「本轮未验证」。**这是第 4 格**（#819 第 11 轮 review 补）：一行内容断言可能含**多次**子判定——R3「三帧两两不同」= 3 对，而采样窗可能只让其中 1 对可判定、另 2 对因「窗内无实质内容」被 `continue` 吞掉（那两对**不写台账**）。只按 `judged === 0` 判定时，「1/3 覆盖」既不判红也不 warn ⇒ **门完全静默**，而行名对外承诺的是「两两不同」（3 对）。实现侧是台账的 `expected` 字段 + `classifyOutcomeRows` 的 `unverified` 判据 `judged === 0 \|\| judged < expected`。⚠️ 仍**不判红**：覆盖率由内容形态决定，按它判红就是随机红的发版门 |
 >
 > ⚠️ **第三类：不产生双 0，而是让门整个消失**——成因是 `suite.mode` 被置为 `skip`：
 > - `describe.skipIf(SKIPPED)` 为真（**非 `pictelio_ui` 设备即属此类**）；
@@ -76,7 +77,7 @@
 >
 > **门覆盖面已收窄，勿再按 4 行理解**：单引擎下不存在第二个渲染面，**本门不再有「双引擎基线对照」**。
 
-实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；**R1 的注入段断言用「锚点卡下方区域帧对比」代理**（`belowAnchorRegion` 上的像素差 > `INJECT_TH`）——lynx 无文本读取通道（见下方口径），**不用**页面文本「相关作品」定位；且该代理只证明「该区域内容变化」，不区分变化来源，行文按代理口径表述。
+实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；**R1 的注入段断言用「锚点卡下方区域帧对比」代理**（`belowAnchorRegion` 上的像素差 > `INJECT_TH`）——lynx 无文本读取通道（口径见**上方**「内容断言的「不可判定」口径（三态记账）」段；无文本通道的根因是单引擎下**没有承载 WebView 的 Activity**、Appium 永远等不到 `WEBVIEW` context，见**上方** R4 删除说明），**不用**页面文本「相关作品」定位；且该代理只证明「该区域内容变化」，不区分变化来源，行文按代理口径表述。
 
 ### T3 宿主矩阵测试（app-lynx 单测，P1）
 

@@ -6,7 +6,10 @@
 > `LynxActivity`（`build.gradle` 已无 `productFlavors`）。因此本文的：
 > - **R4「webview 引擎基线对照」**与所有「切到 webview 引擎（`/client-switch`）」步骤**不可执行**；
 > - 所有 `am start -n io.pictelio.app/.MainActivity` 深链指向**已不存在的 Activity**；
-> - 前置条件「full 包即可」同样失效。
+> - 前置条件「full 包即可」同样失效；
+> - 正文 R1 里「卡**内部**存在「相关作品」展开段」这类**文本/形态**判据**不可作为验收依据**：
+>   单引擎下 lynx 无文本读取通道，该行已改用「锚点卡下方区域帧差 > `INJECT_TH`」代理，
+>   口径见 `docs/specs/qa-defense-lines.md` §3.T2。
 >
 > 替代发版门：`docs/android-e2e-gate.md`（历史存档）+ `docs/specs/qa-defense-lines.md`
 > §3.T2（矩阵**现为 3 行**：R1/R2/R3 全部 Lynx）。该清单待 #805 重新定义。

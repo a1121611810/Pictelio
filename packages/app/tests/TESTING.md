@@ -12,11 +12,11 @@
 
 ### 文件命名
 
-| 前缀        | 存放目录               | 说明                                                    |
-| ----------- | ---------------------- | ------------------------------------------------------- |
-| `*.test.ts` | `tests/unit/`          | 纯逻辑测试，`vitest.config.ts` 匹配                     |
-| `*.test.ts` | `tests/android-e2e/unit/` | android-e2e **契约工具的纯函数单测**（不碰 adb / 模拟器，issue #523）。#818 起已并入 `vitest.config.ts` 的 include，故随 `pnpm test` → `test:all` → CI 执行；⚠️ 它同时被 `test:android:e2e` 收进去——**若这批测试在跑 e2e 时处于红态，那一轮 e2e 的结论即失真**（红的是 unit 用例、不是设备行为），故跑长时 e2e 前先把代码推到终态 |
-| `*.test.ts` | `tests/agent-browser/` | AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配 |
+|  前缀           |  存放目录                       |  说明                                                                                                                                                                                                                                          |
+| ------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|  `*.test.ts`  |  `tests/unit/`              |  纯逻辑测试，`vitest.config.ts` 匹配                                                                                                                                                                                                                 |
+|  `*.test.ts`  |  `tests/android-e2e/unit/`  |  android-e2e **契约工具的纯函数单测**（不碰 adb / 模拟器，issue #523）。#818 起已并入 `vitest.config.ts` 的 include，故随 `pnpm test` → `test:all` → CI 执行；⚠️ 它同时被 `test:android:e2e` 收进去——**若这批测试在跑 e2e 时处于红态，那一轮 e2e 的结论即失真**（红的是 unit 用例、不是设备行为），故跑长时 e2e 前先把代码推到终态  |
+|  `*.test.ts`  |  `tests/agent-browser/`     |  AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配                                                                                                                                                                                            |
 
 ### E2E 测试模式
 

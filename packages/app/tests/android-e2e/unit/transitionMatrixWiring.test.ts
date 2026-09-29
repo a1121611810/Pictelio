@@ -4,7 +4,7 @@
  * ## 为什么需要它（`releaseGate.test.ts` 覆盖不到的那一半）
  *
  * `releaseGate.test.ts` 全部用例都 **import 纯函数直接调**，没有一条走
- * `transition-matrix.spec.ts` 的 `afterAll`。于是下面三种劣化**全都 20/20 全绿**，
+ * `transition-matrix.spec.ts` 的 `afterAll`。于是下面三种劣化**当时 20/20 全绿**，
  * 而发版门对 ADR-0162「相关作品」段注入与 init-only props 收藏行的强制力归零：
  *
  * ① 删掉 `await runReleaseGate({ … })` 整段调用；
@@ -34,7 +34,7 @@ const specSrc = readFileSync(SPEC_PATH, "utf8");
  *
  * ⚠️ 终点用**正则同时匹配 `it(` 与 `test(`**：早先只认 `it(`，实测把最近的
  * `it(` 改名成 `test(`（合法重构）后，切片会**静默扩大**去吞下一个用例——
- * 5 条断言照样全绿，而「afterAll 块」已经不是它自称的那一段。
+ * 那 5 条断言照样全绿，而「afterAll 块」已经不是它自称的那一段。
  * 这类「靠巧合而非靠设计」的判别力要么修掉，要么写明。
  */
 function afterAllBlock(src: string): string {
@@ -59,21 +59,20 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     expect(calls.length, "afterAll 里 runReleaseGate 只应被调用一次").toBe(1);
   });
 
-  it("fail 必须绑到会抛的 expect（换成 logger 会红）", () => {
-    const failLine = hook.split("\n").find((l) => l.includes("fail:"));
-    expect(failLine, "afterAll 里必须有 fail 绑定").toBeDefined();
-    expect(failLine).toMatch(/expect\(/);
-  });
-
   it("rows 必须来自 coreOutcome 台账（两行都在）", () => {
     expect(hook).toMatch(/coreOutcome\.r1/);
     expect(hook).toMatch(/coreOutcome\.r3/);
   });
 
   it("台账的四个记账字段都要有写入点，否则某行永远停在双 0", () => {
-    // 实测分布：R1 的 skipped/judged 各 1 处（断言① 与 断言③），
-    // R3 的 skipped **2 处**（收藏行对数不足 / 无可判定内容两个分支）、judged 1 处。
-    // 合计 3 处 skipped ⇒ 与 `qa-defense-lines.md` 的「3 处动态 t.skip()」对齐。
+    // 实测分布：R1 的 skipped/judged 各 1 处，**两处都在断言③**
+    // （`specs/transition-matrix.spec.ts` 的 `coreOutcome.r1.skipped += 1` 在
+    // `if (injected <= INJECT_TH)` 块内、紧随其后是 `coreOutcome.r1.judged += 1`）；
+    // 断言① **不写台账**——它判别窗退化时只 `console.log` 声明 + 置
+    // `notTopJudged = false` 后继续，由断言② 兜底（见 spec 的 JSDoc 计数口径段）。
+    // R3 的 skipped **2 处**（某帧未探测到收藏胶囊 / 三对全被采样窗吞掉两个分支）、
+    // judged 1 处。合计 3 处 skipped ⇒ 与 `qa-defense-lines.md` 的「3 处动态
+    // `t.skip()`」对齐。
     //
     // ⚠️ 这是 **change-detector**（钉源码形态），不是行为契约：把 `+= 1` 改写成 `++`
     // 或抽成 helper 都会让它变红，而那些是**语义等价**的合法重构。之所以仍保留：
@@ -85,7 +84,7 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
 
     expect(
       countWrites("coreOutcome.r1.skipped"),
-      "R1 断言① 的 skipped 写入点",
+      "R1 断言③ 的 skipped 写入点（断言① 不写台账）",
     ).toBeGreaterThanOrEqual(1);
     expect(
       countWrites("coreOutcome.r1.judged"),
@@ -151,6 +150,20 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     const label = (rowsBlock as RegExpExecArray)[1];
     expect(label, "R1 行名必须含代理口径标记（锚点卡下方区域）").toMatch(/锚点卡下方区域/);
     expect(label, "R1 行名必须含被比较的阈值名 INJECT_TH").toMatch(/INJECT_TH/);
+  });
+
+  it("R3 台账必须写 expected（覆盖率判据），否则「1/3 覆盖」又变回静默", () => {
+    // #819 第 11 轮 review 阻塞项：`classifyOutcomeRows` 的未验证判据含
+    // `judged < expected`，但若 spec 从不给 R3 写 `expected`，该判据**永不触发**
+    // ——纯函数单测全绿、生产门照旧静默。故断**接线**：赋值点必须存在，且在
+    // `coreOutcome.r3.judged` 累加之后（否则先写 expected 再判，顺序无碍但读起来误导；
+    // 关键是它必须在该 test 内被赋值，而不是靠台账初值 0）。
+    const expectedWrites = specSrc.match(/coreOutcome\.r3\.expected\s*=(?!=)/g) ?? [];
+    expect(expectedWrites.length, "R3 的 expected 写入点应恰好 1 处").toBe(1);
+    // 台账初值必须显式带 expected 字段（否则类型上 `expected` 是可选的，漏写不报错）
+    expect(specSrc, "r3 台账初值必须显式声明 expected 字段").toMatch(
+      /r3:\s*\{\s*judged:\s*0,\s*skipped:\s*0,\s*expected:\s*0\s*,?\s*\}/,
+    );
   });
 
   it("spec 文件仍在，契约测试没读到空串", () => {

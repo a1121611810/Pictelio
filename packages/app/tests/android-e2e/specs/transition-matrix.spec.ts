@@ -744,8 +744,12 @@ describe.skipIf(SKIPPED)(
      *     其 `console.log` 是**抛错前的诊断日志**，不是「声明不可判定」。
      */
     const coreOutcome = {
+      // R1 断言③ 是**单次**判定（不给 expected ⇒ 不做覆盖率判定）
       r1: { judged: 0, skipped: 0 },
-      r3: { judged: 0, skipped: 0 },
+      // R3 收藏行是**三对两两不同** = 3 次子判定，故带 expected：
+      // 采样窗可能只让部分对可判定，另几对被 `continue` 吞掉且**不写台账**。
+      // 缺 expected 时「1/3 覆盖」既不判红也不 warn ⇒ 门完全静默（#819 第 11 轮 review）。
+      r3: { judged: 0, skipped: 0, expected: 0 },
     };
 
     beforeAll(async () => {
@@ -935,14 +939,25 @@ describe.skipIf(SKIPPED)(
         // 「相关作品」段注入回归彻底失效，且下方「✓ R1 通过」日志会宣称验证了
         // 实际未验证的事。改为 `t.skip()`：报 skipped 而非 passed，诚实。
         // 同时记 skipped（区别于「既没判定也没声明」），供 afterAll 外层门区分二者。
+        //
+        // ⚠️ skip 文案里的成因**必须按本轮 logcat 分支**，不能无条件断言
+        // 「数据已到位」：#819 第 11 轮 review 实测，本轮 logcat 根本没有
+        // 「注入完成」行（logcat 是 2 MiB 环形 buffer，Lynx 逐帧日志会把它挤掉），
+        // 而 skip 消息仍在陈述那条因果——**在唯一告诉人「本轮未验证」的消息里塞一个
+        // 本轮没验的诊断**，与门级「并列两类成因」是同一个错。
+        const injectedLog = /注入完成/u.test(logcatTailByPid());
         coreOutcome.r1.skipped += 1;
         t.skip(
           `R1 断言③不可判定：锚点卡下方区域帧差 ${injected} ≤ ${INJECT_TH}。` +
             `采样窗 y ${below.y0}..${below.y1}、采样点 ${belowSamples}；` +
             `锚点上方保持率 ${preservedRatio.toFixed(4)}，返回帧与 s1 差异 ${notTop}` +
             `${notTopJudged ? "（断言①亦不可判定）" : ""}。` +
-            `锚点卡不在视口内或该内容形态不产生卡内展开段——**不判为「渲染缝回归」**` +
-            `（consumeAnchor 日志显示「注入完成 items=N」时数据已到位，差异低是采样对象不可见）`,
+            `两种候选成因，**不替读者猜是哪种**：① 锚点卡不在视口内；` +
+            `② 该内容形态不产生卡内展开段。` +
+            (injectedLog
+              ? `本轮 logcat 检出「注入完成」⇒ 数据已到位，差异低是采样对象不可见。`
+              : `本轮 logcat **未**检出「注入完成」⇒ 成因本轮未取证（环形 buffer 会滚，` +
+                `2 MiB、Lynx ~60fps 逐帧日志）；**不要据此改产品**。`),
         );
       }
       coreOutcome.r1.judged += 1;
@@ -1163,6 +1178,9 @@ describe.skipIf(SKIPPED)(
         );
       }
       coreOutcome.r3.judged += judgedPairs;
+      // 记本轮应有几次子判定（帧数组合对），供外层门做覆盖率判定：
+      // 「1/3 覆盖」必须落进 warn（未验证），否则门静默而日志只报「跳过 N 对」。
+      coreOutcome.r3.expected = (frames.length * (frames.length - 1)) / 2;
       console.log(
         `[transition-matrix] ✓ R3 通过：换卡 ×2 + 收藏行三帧两两不同` +
           `（实质判定 ${judgedPairs} 对 / 跳过 ${skippedPairs} 对，证据 r3-card*.png）`,
