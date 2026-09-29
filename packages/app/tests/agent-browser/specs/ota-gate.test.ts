@@ -9,8 +9,8 @@
  *   ④ floor 达标 + 无更新 → 无过渡面
  *
  * 机制级四场景（好包生效/坏签拒/崩 10s 回滚/门槛阻断的真实下载-验签-切换链路）
- * 依赖原生桥，agent-browser（浏览器）不可达 → 由 packages/app/scripts/bench-ota.sh
- * 设备回归脚本覆盖（#256 验收的另一张网）。
+ * 依赖原生桥，agent-browser（浏览器）不可达；ADR-0202 下线 OTA 发布通道后，
+ * 配套的设备回归脚本 bench-ota.sh 与三件套管线一并删除，本套 JS 层面用例保留。
  *
  * 依赖：无登录凭证需求（门槛面渲染于登录前）。mock 注入不跨 reload——通过
  * __pictelioOtaDev 钩子在 mock 注入后重跑检查（绕开启动时序竞态）。

@@ -1,9 +1,5 @@
 {
   "version": "6.3.0",
   "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.3.0",
-  "changelog": "# Pictelio 更新日志\n\n## ⚡ 体验优化：统一使用 Lynx 引擎\n\n- **Lynx 引擎**：成为 App 的唯一渲染客户端，之前的 WebView 引擎已下线；之前手动选择过 WebView 的用户将直接进入 Lynx，不再可切换",
-  "webBundle": {
-    "version": "6.3.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v6.3.0/pictelio-6.3.0"
-  }
+  "changelog": "# Pictelio 更新日志\n\n## ⚡ 体验优化：统一使用 Lynx 引擎\n\n- **Lynx 引擎**：成为 App 的唯一渲染客户端，之前的 WebView 引擎已下线；之前手动选择过 WebView 的用户将直接进入 Lynx，不再可切换"
 }

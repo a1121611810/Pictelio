@@ -43,29 +43,20 @@ export function gradleTasksFor(variants) {
  *
  * 顺序有依赖，不可随意调换：
  *   1) sync:credentials 先把 OAuth 配置写进 Java 源码
- *   2) 构建 Web 产物 —— OTA web bundle 三件套紧随其后打包，因为此后无步骤再触碰 dist/
+ *   2) 构建 Web 产物
  *   3) 构建 Lynx bundle（NODE_ENV=production 硬兜底，防 dev 凭证内联进生产包）
  *      再同步进 android/app/src/main/assets/main.lynx.bundle，否则 APK 无 bundle → 白屏
  *   4) 最后 gradle assemble + rename
  *
  * @param {object} input
- * @param {string} input.version 目标版本（写入 web bundle 三件套文件名）
  * @param {string[]} input.variants 构建变体（= buildType），来自 resolveVariants()
- * @param {boolean} input.otaSkipped PICTELIO_RELEASE_SKIP_OTA=1 时省略 web bundle 步骤
  * @returns {Array<[string, string, string[], object?]>} [label, cmd, args, opts]
  */
-export function releaseBuildSteps({ version, variants, otaSkipped }) {
+export function releaseBuildSteps({ variants }) {
   const androidDir = resolvePath(rootDir, "android");
   return [
     ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
     ["构建 Web 产物", "pnpm", ["run", "build"]],
-    // #250：OTA web bundle 三件套（打包 + 签名 + round-trip 自验，独立脚本 release-bundle.mjs）。
-    // 位置紧随「构建 Web 产物」：此后无任何步骤再触碰 dist/。
-    // 正常发布与 -o 重建两条路径共用本函数，本步自动生效；失败落在 step 3 的自动回滚窗口内。
-    // minApkVersion 由脚本内读 PICTELIO_OTA_MIN_APK 决定（新增桥方法需提升时设置）。
-    ...(otaSkipped
-      ? []
-      : [["打包并签名 web bundle", "node", ["scripts/release-bundle.mjs", "--version", version]]]),
     // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
     // 否则 APK 无 main.lynx.bundle，LynxActivity 加载失败 → 白屏。
     // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth

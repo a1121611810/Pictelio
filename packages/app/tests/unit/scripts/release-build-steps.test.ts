@@ -72,20 +72,38 @@ describe("gradleTasksFor：必须产出 build.gradle 真实注册的 task", () =
 });
 
 describe("releaseBuildSteps：步骤表内每个 pnpm script 都必须真实存在", () => {
-  const steps = releaseBuildSteps({ version: "9.9.9", variants: ["release"], otaSkipped: false });
+  const steps = releaseBuildSteps({ variants: ["release"] });
 
   it("抽到步骤表（扫描范围下界，防正则失效导致后续断言恒真）", () => {
     expect(steps.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("otaSkipped=true 时省略 web bundle 步骤，false 时包含（双路径）", () => {
-    const skipped = releaseBuildSteps({
-      version: "9.9.9",
-      variants: ["release"],
-      otaSkipped: true,
-    });
-    expect(skipped.some(([label]) => label.includes("web bundle"))).toBe(false);
-    expect(steps.some(([label]) => label.includes("web bundle"))).toBe(true);
+  // ADR-0202：OTA web bundle 发布通道已下线（release-bundle.mjs 及其三件套管线一并删除）。
+  // 本守卫锁死「步骤表不得再出现任何 web bundle 打包步骤」——否则 step 3 会调用已删脚本硬失败，
+  // 或某天有人重新引入一条无人消费的 OTA 产物路径。期望值溯源：ADR-0202 的删除清单。
+  //
+  // 检测式按「语义」而非按具体文件名匹配：只查 "web bundle" 字面量时，改名复活
+  // （如 ["打包签名三件套", "node", ["scripts/ota-pack.mjs"]]）会整条漏过。
+  it("步骤表不含任何 web bundle / OTA 打包步骤（通道已下线，ADR-0202）", () => {
+    const isOtaStep = ([label, , args]: [string, string, string[]]) =>
+      /web[\s_-]?bundle|ota|三件套|release-bundle/iu.test(label) ||
+      args.some((a) => /release-bundle|ota-|三件套/iu.test(String(a)));
+
+    // 阳性对照：检测式本身必须能命中已知目标，否则下面那条断言是恒绿假防线
+    expect(
+      [
+        ["打包并签名 web bundle", "node", ["scripts/release-bundle.mjs"]],
+        ["打包签名三件套", "node", ["scripts/ota-pack.mjs"]],
+      ].filter(isOtaStep),
+    ).toHaveLength(2);
+
+    expect(steps.filter(isOtaStep)).toEqual([]);
+    // 兜底：命令面也不得再有 node 调用的 OTA 脚本
+    expect(
+      steps.filter(
+        ([, cmd, args]) => cmd === "node" && args.some((a) => String(a).includes("bundle")),
+      ),
+    ).toEqual([]);
   });
 
   it("步骤表里引用的每个 pnpm run <script> 在对应 package.json 中都存在", () => {
