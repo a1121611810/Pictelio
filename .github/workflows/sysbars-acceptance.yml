@@ -54,9 +54,10 @@ jobs:
       - name: Sync lynx bundle to android assets
         run: node packages/app-lynx/scripts/sync-android-assets.mjs
 
-      - name: Build full debug APK
+      # 沙盒 #610：flavor 维度下线，单 variant。旧 assembleFullDebug 任务已不存在。
+      - name: Build debug APK
         working-directory: packages/app/android
-        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullDebug --no-daemon
+        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug --no-daemon
 
       - name: Install emulator image
         run: |
@@ -104,7 +105,7 @@ jobs:
           echo "boot timeout"; tail -20 /tmp/emulator.log; exit 1
 
       - name: Acceptance matrix (assertive)
-        working-directory: packages/app/android/app/build/outputs/apk/full/debug
+        working-directory: packages/app/android/app/build/outputs/apk/debug
         run: |
           set -euo pipefail
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
@@ -115,9 +116,30 @@ jobs:
           pull_shot() { adb exec-out screencap -p > "/tmp/$1"; }
 
           adb wait-for-device
-          adb install -r -d app-full-debug.apk | tee -a "$LOG"
-          adb shell am start -n $PKG/.MainActivity | tee -a "$LOG"
-          sleep 20
+          # APK 名不写死：沙盒 #610 后产物可能已过 rename 任务改名（pictelio-{ver}-debug.apk），
+          # 写死文件名等于给本脚本埋一个「构建改名规则一改就腐」的雷。
+          APK=$(ls -1 ./*.apk 2>/dev/null | head -1)
+          [ -n "$APK" ] || { say "PREFLIGHT FAIL: apk/debug 下找不到 APK（构建未产出？脚本可能已过期）"; exit 1; }
+          say "apk: $APK"
+          adb install -r -d "$APK" | tee -a "$LOG"
+
+          # 启动目标运行时解析，不硬编码类名。沙盒 #610 删除了 MainActivity、
+          # LAUNCHER 改由 build.gradle 的 manifestPlaceholders 注入；硬编码类名会
+          # 在下次改 Activity 名时再次腐掉，而失败表现会被误读为产品回归。
+          LAUNCHER=$(adb shell cmd package resolve-activity --brief \
+            -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PKG" \
+            2>/dev/null | tr -d '\r' | grep -E "^${PKG}/" | head -1)
+          case "$LAUNCHER" in
+            */*) say "launcher: $LAUNCHER" ;;
+            *) say "PREFLIGHT FAIL: 未能从已安装包解析 LAUNCHER activity（得到 '$LAUNCHER'）——本脚本可能已过期，先查它而不是查产品"; exit 1 ;;
+          esac
+          adb shell am start -n "$LAUNCHER" | tee -a "$LOG"
+          # 启动后必须真有本进程的活动窗口；否则 A1 的「LynxView != 全屏」会被
+          # 读成布局回归，而真实原因可能只是这里没起来。
+          sleep 3
+          adb shell "dumpsys activity activities | grep -q $PKG" \
+            || { say "PREFLIGHT FAIL: am start 后无 $PKG 活动窗口（LAUNCHER=$LAUNCHER，脚本可能已过期）"; exit 1; }
+          sleep 17
 
           say "=== A1/A2: e2e 基底 ==="
           DISPLAY_SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+')
@@ -135,7 +157,7 @@ jobs:
           say "=== A3: 全屏冷启动（settings_fullscreen_mode=true）==="
           # run-as 内写 /tmp 在 API 36 模拟器 Permission denied——临时文件放应用私有 shared_prefs
           adb shell "run-as $PKG sh -c 'sed \"s|</map>|    <string name=\\\"settings_fullscreen_mode\\\">true</string>\\n</map>|\" shared_prefs/CapacitorStorage.xml > shared_prefs/.c.tmp && cat shared_prefs/.c.tmp > shared_prefs/CapacitorStorage.xml && rm shared_prefs/.c.tmp'"
-          adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
+          adb shell "am force-stop $PKG; am start -n $LAUNCHER" >/dev/null
           sleep 15
           HIDDEN=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=false" || true)
           [ "$HIDDEN" -ge 2 ] || { say "A3 FAIL: 全屏冷启动后系统栏未隐藏（visible=false 计数=$HIDDEN，每源双行）"; exit 1; }
@@ -155,7 +177,7 @@ jobs:
 
           say "=== A5: 关闭恢复 ==="
           adb shell "run-as $PKG sh -c 'sed \"s|<string name=\\\"settings_fullscreen_mode\\\">true</string>|<string name=\\\"settings_fullscreen_mode\\\">false</string>|\" shared_prefs/CapacitorStorage.xml > shared_prefs/.c.tmp && cat shared_prefs/.c.tmp > shared_prefs/CapacitorStorage.xml && rm shared_prefs/.c.tmp'"
-          adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
+          adb shell "am force-stop $PKG; am start -n $LAUNCHER" >/dev/null
           sleep 15
           BACK=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=true" || true)
           [ "$BACK" -ge 2 ] || { say "A5 FAIL: 恢复后系统栏未显示（visible=true 计数=$BACK，每源双行）"; exit 1; }
