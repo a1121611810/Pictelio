@@ -41,9 +41,13 @@ packages/app/
 # ADR-0203 决策 3：凭证事实源迁到 app-lynx；发布文案的 AI 配置随发布脚本迁到宿主包
 packages/android-host/.env
 packages/app-lynx/.env
+# ADR-0203/T04：E2E 随包迁到宿主包，但上面那条 ignore 仍指着已删的 packages/app，
+# 于是 49MB 帧产物变成未跟踪噪声并挡住 fmt:check。改为通配 + 保留旧条目（存档用）。
+packages/*/test-results/
 packages/app/test-results/
 # android-e2e 快照目录以 process.cwd() 定位，从仓库根误跑时会在根目录生成
 /test-results/
+packages/*/test/e2e/screenshots/
 packages/app/test/e2e/screenshots/
 
 # ADR-0202：OTA web bundle 三件套通道已下线，ota/ 不再产出任何产物。
