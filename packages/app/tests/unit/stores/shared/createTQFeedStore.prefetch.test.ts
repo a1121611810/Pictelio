@@ -14,14 +14,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QueryClient } from "@tanstack/solid-query";
-
-const qc = vi.hoisted(() => ({ client: undefined as QueryClient | undefined }));
-
-vi.mock("@/api/queryClient", () => ({
-  get queryClient() {
-    return qc.client!;
-  },
-}));
+import { queryClientRef as qc, type EnsureOptions } from "./sharedQueryClientMock";
 
 import { createTQFeedStore, type TQFeedStoreResult } from "@/stores/shared/createTQFeedStore";
 
@@ -131,9 +124,10 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     expect(staleTimes.every((t) => t === Number.POSITIVE_INFINITY)).toBe(true);
   });
 
-  // #811 机器防线的**直接**层：本文件是 13 个 store 的共同底座，断言钉在这里，
-  // 比任何单个 store 的传递性覆盖更靠内。缺它 ⇒ 底座哪天把 queryFn 删回去，
+  // #811 机器防线的**直接**层：本文件是所有走 createTQFeedStore 的 store 的共同底座，
+  // 断言钉在这里，比任何单个 store 的传递性覆盖更靠内。缺它 ⇒ 底座哪天把 queryFn 删回去，
   // 只能靠「某个 store 的某条用例碰巧也炸」来发现。
+  // （刻意不写 store 计数：数字随 store 增删漂移，本注释此前正是栽在这上面。）
   it("ensureLoaded 传给 ensureInfiniteQueryData 的 options 自带可用 queryFn（#811 回归）", async () => {
     const store = makeStore();
     const spy = vi.spyOn(qc.client!, "ensureInfiniteQueryData");
@@ -142,20 +136,18 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     // 每次调用的 options 都必须带 queryFn：只传 queryKey 时，QueryCache.build()
     // 会用它新建一个无 queryFn 的 query 并抛 `Missing queryFn`（未装配场景）。
     for (const call of spy.mock.calls) {
-      const options = call[0] as {
-        queryFn?: (ctx: {
-          pageParam: unknown;
-          signal?: AbortSignal | undefined;
-        }) => Promise<unknown>;
-      };
+      const options = call[0] as EnsureOptions;
       expect(typeof options.queryFn, "ensureLoaded 必须补传 queryFn（#811）").toBe("function");
     }
-    // 再钉一层「存在即可用」：实调一次并断言取到数。换成空壳 / rejecting 的假
-    // queryFn，会在这一行转红——只验 `typeof === "function"` 挡不住这种。
-    const first = spy.mock.calls[0]![0] as {
-      queryFn: (ctx: { pageParam: unknown; signal?: AbortSignal | undefined }) => Promise<unknown>;
-    };
-    await expect(first.queryFn({ pageParam: undefined, signal: undefined })).resolves.toBeDefined();
+    // 再钉一层「存在即可用」：实调一次并断言取到**具体数据**。`resolves.toBeDefined()`
+    // 挡不住返回 `{}` / `[]` / `0` 的空壳 queryFn，只验 `typeof === "function"` 也一样。
+    // calls[0] 的来源：makeStore() 的 t1 是 merge(all) + subTabs ["a","b"]，activeKeys
+    // 按 subTabs 顺序产出 ⇒ 首个是 t1_a，其 queryFn 返回 id=1 那条（见本文件 makeStore）。
+    const first = spy.mock.calls[0]![0] as EnsureOptions;
+    await expect(first.queryFn!({ pageParam: undefined, signal: undefined })).resolves.toEqual({
+      items: [{ id: 1, create_date: "2026-01-01" }],
+      next_url: null,
+    });
   });
 
   it("失败传播与缓存清理：预取 reject 向上传播（调度器 warn 不成死代码），error entry 被清除让首访回到干净骨架路径", async () => {

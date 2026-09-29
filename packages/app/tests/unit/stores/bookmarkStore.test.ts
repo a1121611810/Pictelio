@@ -55,14 +55,9 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
 // createTQFeedStore 只经 `queryClient.ensureInfiniteQueryData` 触达缓存，因此必须给它一个
 // **真** client 才能 spy 到 ensureLoaded 真正传下去的 options（@tanstack/solid-query 整体
 // mock 只替换 useInfiniteQuery，QueryClient 类仍是 actual 展开出来的真类）。
-// 注入方式沿用同目录 createTQFeedStore.prefetch.test.ts 的既有惯用法（vi.hoisted + getter）。
-const qc = vi.hoisted(() => ({ client: undefined as QueryClient | undefined }));
-
-vi.mock("@/api/queryClient", () => ({
-  get queryClient() {
-    return qc.client!;
-  },
-}));
+// 注入方式取自邻近目录 tests/unit/stores/shared/ 的共享 fixture sharedQueryClientMock.ts
+// （getter 惰性读一个可变导出对象；prefetch.test.ts 用的是同一份，跨目录 import 已实测生效）。
+import { queryClientRef as qc, type EnsureOptions } from "./shared/sharedQueryClientMock";
 
 // Mock api/illust (only loadBookmarks is needed now; loadNext is internal to TQ)
 const mockLoadBookmarks = vi.fn();
@@ -104,12 +99,6 @@ function makeIllust(id: number): PixivIllust {
     meta_single_page: {},
   } as PixivIllust;
 }
-
-/** ensureInfiniteQueryData 实收 options 的最小形状：只留本用例要断言的两个字段 */
-type EnsureOptions = {
-  queryKey: readonly unknown[];
-  queryFn?: (ctx: { pageParam: unknown; signal?: AbortSignal | undefined }) => Promise<unknown>;
-};
 
 async function loadStore() {
   // 每个用例一份**全新空缓存** client：#811 的复现条件正是「该 query 从未被上面的
@@ -282,7 +271,9 @@ describe("bookmarkStore", () => {
       // 上一条只是「没抛这个错」：把实现换成「总是抛别的错」照样绿。真正的契约是
       // 「ensureInfiniteQueryData 收到的 options 自带一个可用的 queryFn」——
       // #811 的修复点正是 createTQFeedStore.ts:519 补传 queryFn。
-      expect(spy).toHaveBeenCalledTimes(1);
+      // 不断言调用**次数**（本契约不关心）：ensureLoaded 未来合法地多调一次
+      // （merge 模式扩子查询）时本用例仍绿，pin 的是下面这条 options 的内容。
+      expect(spy).toHaveBeenCalled();
       const options = spy.mock.calls[0]![0] as EnsureOptions;
       // queryKey 形状对齐 bookmarkStore.ts:31 的 ["bookmarks", userId, restrict]
       expect(options.queryKey).toEqual(["bookmarks", 1, "public"]);
