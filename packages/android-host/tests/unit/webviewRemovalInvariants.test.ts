@@ -45,7 +45,7 @@
  * **全绿**：10 组不变量全部满足（`pnpm --filter @pictelio/android-host test` 实测通过）。
  * 本段曾记录「T01 交付时刻意为红（7 failed | 8 passed）」的快照——那是**写门禁阶段**的
  * 中间态（先立红再实现），现已失效。保留此行只为提醒：这份文件的绿是**实现的结果**，
- * 不是它一开始就是绿的；是否真在守，由下方 17 条反事实注入当场证明。
+ * 不是它一开始就是绿的；是否真在守，由下方 19 条反事实注入当场证明。
  * 另有 2 条「扫描覆盖」断言，钉住扫描根/排除清单本身不失效。
  *
  * | 不变量 | 守什么 | 对应反事实注入 |
@@ -59,7 +59,7 @@
  * | 7 | 门面措辞收敛 | 对照 7 |
  * | 8 | 客户端切换能力已下线（决策 7） | 对照 8a / 8b / 8c / 8d |
  * | 9 | gradle 入口自带生成物前置（决策 8） | 对照 9a / 9b |
- * | 10 | pnpm 调用点在其**解析目标包**里存在（决策 2 改名须同步调用点） | 对照 10a / 10b / 10c / 10d |
+ * | 10 | pnpm 调用点在其**解析目标包**里存在；字符串里的命令名同样受查 | 对照 10a / 10b / 10c / 10d / 10e / 10f |
  */
 import {
   existsSync,
@@ -290,7 +290,12 @@ function stripJsComments(src: string): string {
 }
 
 /**
- * 根命令调用点完备性（不变量 10；ADR-0204 §决策 2「改名必须同步调用点」）。
+ * 根命令调用点完备性（不变量 10）。
+ *
+ * ⚠️ oracle 引文更正：ADR-0204 **没有**「改名必须同步调用点」这句话（复查时误将本判据
+ * 的自我描述写成了引文）。可溯源的源头是 §决策 2「宿主包的命令一律显式命名，不占用裸名」
+ * 与 §后果「根命令表里每一条都指向真实存在的包与脚本」；本条把那条后果从根命令表扩到
+ * **源码里的调用点**——扩大的那一步由本文件的反事实对照证明，不假称 ADR 已写。
  *
  * 背景：本轮**两次**栽在同一形态上——
  * ① T07 把根 `build:android` 改名为 `build:android-host`（ADR-0204），
@@ -315,12 +320,30 @@ function stripJsComments(src: string): string {
  * 2. 文件里出现 `cwd: REPO_ROOT` ⇒ 目标 = 仓库根；
  * 3. 其余 ⇒ 目标 = 文件所属包（pnpm 以 `--filter` 起包内脚本时 cwd 即该包目录）。
  *
- * 两条**已知局限**，方向都是「响的」而非「静默的」：
- * - cwd 识别按**文件**粒度且只认 `cwd: REPO_ROOT` 这一种写法。同一个文件里若出现
- *   「一部分步骤带自定义 cwd、另一部分不带」，会被判成所属包 ⇒ 可能误报（红），不会漏报。
- * - 不解析 `pnpm run ${x}` 这类字符串拼接（静态不可知），也不解析 shell 字符串形态
- *   （如根 package.json 里的 `vp run --filter X build`）。本仓所有 pnpm 调用点均为
- *   数组字面量（已实测，见下方扫描覆盖断言）。
+ * ## 第二道检查：字符串形态的 pnpm 引用（code-review 抓到 B1 后补）
+ *
+ * 数组字面量那条判据对**字符串**完全失明，而本轮真缺陷就长在字符串里：
+ * `transition-matrix.spec.ts` / `lynx-detail-image-probe.spec.ts` / `prefs.ts`
+ * 三处**活的 `throw new Error()` 消息**仍在教人跑已随 ADR-0204 改名的 `pnpm build:android`
+ * （根上已无此脚本）。它们**就在本判据声明的扫描根里**，却一条都没被抓到。
+ * 复审实测：把那处调用改成 `"run build:android".split(" ")`（运行时行为完全等价），
+ * 30 条测试**全绿** ⇒ 数组判据在此处是 fail-open。
+ *
+ * 故补一条**不依赖形态**的检查：源码里出现的**每一个** `pnpm <name>`，`<name>` 必须是
+ * 真实存在的脚本（根 ∪ 宿主 ∪ 客户端）或已知非脚本动词。它认的是「这个名字活着吗」，
+ * 不是「它出现在哪种语法位置」，因此字符串 / 模板串 / 散文 / 错误消息一网打尽。
+ *
+ * 之所以不查 `.md`：本仓大量文档是**刻意保留的决策史**（docs/adr、docs/specs、
+ * docs/research），以及 ADR-0185 声明「字节原状」的冻结目录；把「历史 vs 存活」
+ * 这道判断题编成正则白名单只会变成误报源，且白名单自身会漂。文档面改为人工核查。
+ *
+ * ## 剩余局限（如实记录，不要美化）
+ * - cwd 识别按**文件**粒度且只认 `cwd: REPO_ROOT` 一种写法 ⇒ 误报方向（红），不漏报。
+ * - 数组字面量判据不认变量 / 模板串 / 单引号 / 展开（`["run", name]`、`['run','x']`）。
+ *   这是 **fail-open**（上一轮的注释把它写成「响的」，是错的）。
+ *   第二道检查兜住了其中的**死命令**，但**解析不出目标包**这件事它也不管
+ *   （`pnpm run <变量>` 到底查哪张表，仍然静态不可知）。
+ * - `.md` 全文不在扫描面内（理由见上）。
  */
 
 /** `["run", "<name>"]` —— 目标包 = 显式 cwd（若指向仓库根），否则文件所属包。 */
@@ -349,6 +372,74 @@ const INV10_EXCLUDED_ROOTS = ["packages/android-host/tests/unit"] as const;
 
 /** 配对正面锚点：扫到的 pnpm 数组调用点下界（防「零调用点」让全称断言静默恒真）。 */
 const INV10_CALLSITE_MIN = 2;
+
+/**
+ * 第二道检查的形态无关正则：源码里出现的**每一个** `pnpm <name>`。
+ * 只认「`pnpm` + 一个标识符」的最简形态，**不看**它后面是数组、字符串、模板串还是散文。
+ */
+const PNPM_MENTION_RE = /\bpnpm\s+([a-zA-Z][\w:.-]*)/g;
+
+/**
+ * 非脚本的 pnpm 动词 / 本地二进制：它们不在任何 package.json 的 scripts 里，
+ * 查表必然「不存在」⇒ 误报。逐个列出而非通配，避免把真死命令一起放过去。
+ */
+const PNPM_NON_SCRIPT = new Set([
+  "install",
+  "i",
+  "add",
+  "remove",
+  "dlx",
+  "exec",
+  "run",
+  "store",
+  "workspace",
+  "vitest",
+  "config",
+  "why",
+  "outdated",
+  "--filter",
+  "--dir",
+  "-w",
+  "-C",
+]);
+
+/** 配对正面锚点：扫到的 pnpm 提及数下界（防「一条都没扫到」让全称断言静默恒真）。 */
+const INV10_MENTION_MIN = 1;
+
+/**
+ * 字符串字面量区间（双引号 / 单引号 / 模板串，按最外层配对抓）。
+ * 只用来区分「代码里 spawn 的参数」与「写给人看的操作指令」——
+ * 后者按**仓库根**解析，因为人是在仓库根敲 pnpm 命令的。
+ */
+const QUOTED_SPAN_RE = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+
+/**
+ * ADR-0204 §决策 2 的命令族：宿主动作在**根**一律带 `:android-host` 后缀。
+ * 字符串里提到本族名字时按**根**命令表判定（人是在仓库根敲 pnpm 的）。
+ * `\b` 放在 `android` 之后，使 `build:android` 与 `build:android-host` **都**命中本族——
+ * 前者正是要抓的缺陷形态，后者是合规形态，两者都必须能在根查到才算通过。
+ */
+const ADR0204_HOST_CMD_RE = /^(?:build|dev|release|test):android\b/;
+
+/**
+ * ADR-0204 §决策 3 明列的**已退役根命令**（+ 决策 2 从根改名的两个旧名）。
+ * 逐条抄自 ADR，不自造：字符串里提到它们 ⇒ 根上必然 `Missing script` ⇒ 判红。
+ * 这张表与「孤儿检测工具」的退役名单同源同病（会漂），故**只覆盖 ADR 决策 3 点名的那些**，
+ * 并且**任何新增项必须回 ADR 补写**——不变量本身不做「全仓不得出现旧名」这种宽口径断言。
+ */
+const ADR0204_RETIRED_ROOT_CMDS = new Set([
+  "release",
+  "release:transition",
+  "dev:app",
+  "build:app",
+  "check:app",
+  "preview:app",
+  "test:app",
+  "test:app:all",
+  "test:watch",
+  "test:agent-browser",
+  "kill:app",
+]);
 
 interface PkgNode {
   /** 包目录（绝对路径） */
@@ -777,19 +868,73 @@ function evaluateInvariants(l: Layout): Verdict {
   // `sync:credentials`（只在宿主包、继承宿主 cwd）。两个方向都有真实反例。
   const pkgs = loadWorkspacePackages(l, rel);
   const rootPkg = pkgs.find((p) => p.dir === l.repoRoot);
+  // 第二道检查用的「名字还活着吗」：这里**取并集是对的**——它问的不是「运行时查哪张表」
+  // （那个问题由形态判据按目标包精确回答），而是「这个名字在本仓任何地方存不存在过」。
+  // 两个问法不要混：并集在这里是保守方向（只把彻底不存在的名字判红）。
+  const allKnownScripts = new Set<string>();
+  for (const p of pkgs) for (const s of p.scripts) allKnownScripts.add(s);
   if (!rootPkg) verdict[10].push("[检测式不可信] 未找到根 package.json，调用点检测式空转");
   if (pkgs.filter((p) => p.scripts.size > 0).length === 0) {
     verdict[10].push("[检测式不可信] 未解析到任何非空 scripts 表，调用点检测式空转");
   }
   let callSiteCount = 0;
+  let mentionCount = 0;
   for (const scanRel of INV10_SCAN_ROOTS) {
     for (const f of walkFiles(join(l.repoRoot, ...scanRel.split("/")), (x) => {
-      const e = x.endsWith(".ts") || x.endsWith(".mjs");
-      return e;
+      // `.sh` 也在内：code-review 查到 `tests/android-e2e/tools/*.sh` 是活的 pnpm 调用点，
+      // 原先只有 .ts/.mjs 是个**未记录**的洞。
+      return x.endsWith(".ts") || x.endsWith(".mjs") || x.endsWith(".sh");
     })) {
       const stripped = stripJsComments(readFileSync(f, "utf8"));
       const owning = nearestPackage(pkgs, dirname(f));
       const cwdIsRoot = PNPM_CWD_ROOT_RE.test(stripped);
+
+      // ── 第二道检查：形态无关的「这个 pnpm 名字还活着吗」 ──
+      // 判据只问名字是否真实存在，因此字符串 / 模板串 / 错误消息里的死命令一网打尽。
+      // 已按形态查过表的**同一段文本**要跳过，否则重复计数——按字符区间判定。
+      const arrayFormRanges: Array<[number, number]> = [];
+      for (const m of stripped.matchAll(PNPM_DIR_RUN_RE)) {
+        if (m.index !== undefined) arrayFormRanges.push([m.index, m.index + m[0].length]);
+      }
+      for (const m of stripped.matchAll(PNPM_RUN_ARRAY_RE)) {
+        if (m.index !== undefined) arrayFormRanges.push([m.index, m.index + m[0].length]);
+      }
+      // 字符串字面量区间：区别对待「代码里 spawn 的参数」与「写给人看的操作指令」。
+      const stringRanges: Array<[number, number]> = [];
+      for (const m of stripped.matchAll(QUOTED_SPAN_RE)) {
+        if (m.index !== undefined) stringRanges.push([m.index, m.index + m[0].length]);
+      }
+      for (const m of stripped.matchAll(PNPM_MENTION_RE)) {
+        const name = m[1];
+        const at = m.index;
+        if (name === undefined || at === undefined || PNPM_NON_SCRIPT.has(name)) continue;
+        if (arrayFormRanges.some(([s, e]) => at >= s && at < e)) continue;
+        mentionCount++;
+        // 判定表的选择有讲究，不能一刀切：
+        //
+        // · ADR-0204 §决策 2 的**命令族**（`build:android` / `dev:android` /
+        //   `release:android` / `test:android` …）在根一律带 `:android-host` 后缀。
+        //   字符串里提到它们 = 写给人在仓库根敲 ⇒ 必须能在**根**命令表查到。
+        //   这是**前瞻性判据**（守命名约定），不需要维护「已退役名单」那种会漂的表。
+        //   它同时抓住 B1（`build:android` 只活在宿主包）和本轮新查出的
+        //   `release-preflight.mjs` 的「重跑 pnpm release」（根上已改名）。
+        //
+        // · 其余名字取并集：像 `pnpm appium:setup` 这种**只在包内**存在的命令，
+        //   消息里会明说「在 packages/android-host 下执行」，按根判是误报。
+        const inString = stringRanges.some(([s, e]) => at >= s && at < e);
+        const isHostFamily = ADR0204_HOST_CMD_RE.test(name) || ADR0204_RETIRED_ROOT_CMDS.has(name);
+        const table = inString && isHostFamily ? rootPkg?.scripts : allKnownScripts;
+        if (table && !table.has(name)) {
+          verdict[10].push(
+            `${rel(f)} 提到 \`pnpm ${name}\`（` +
+              `${inString ? "字符串内的操作指令" : "非字符串提及"}${
+                inString ? (isHostFamily ? "，属 ADR-0204 命令族 ⇒ 按仓库根解析" : "") : ""
+              }），` +
+              `但${inString && isHostFamily ? "根 package.json" : "根 / 宿主 / 客户端任何一个 package.json"}里无此脚本` +
+              `（ADR-0204 改名只改了根命令表，字符串形态的引用不会进 diff，靠人读是读不出来的）`,
+          );
+        }
+      }
 
       // 形态 1：`["--dir", "<rel>", "run", "<name>"]`，目标包由 <rel> 决定
       for (const m of stripped.matchAll(PNPM_DIR_RUN_RE)) {
@@ -834,6 +979,12 @@ function evaluateInvariants(l: Layout): Verdict {
   if (callSiteCount < INV10_CALLSITE_MIN) {
     verdict[10].push(
       `[配对正面锚点失效] 只扫到 ${callSiteCount} 处 pnpm 数组调用 < ${INV10_CALLSITE_MIN}，调用点检测式可能已失明`,
+    );
+  }
+  // 第二道检查的配对正面锚点：一条提及都没扫到 ⇒ 「零死命令」是恒真的空断言
+  if (mentionCount < INV10_MENTION_MIN) {
+    verdict[10].push(
+      `[配对正面锚点失效] 形态无关检查只扫到 ${mentionCount} 处 pnpm 提及 < ${INV10_MENTION_MIN}，该检查可能已失明`,
     );
   }
   return verdict;
@@ -894,7 +1045,7 @@ describe("不变量 9：gradle 入口自带生成物前置（ADR-0203 §决策 8
     assertSatisfied(9));
 });
 
-describe("不变量 10：pnpm 调用点完备性（ADR-0204 §决策 2「改名必须同步调用点」）", () => {
+describe("不变量 10：pnpm 调用点完备性（ADR-0204 §决策 2 命令族命名 + §决策 3 退役名单）", () => {
   it("每个 pnpm 数组调用在其**解析目标包**的 package.json 里都存在，且调用点数不低于下界（配对正面锚点）", () =>
     assertSatisfied(10));
 });
@@ -1096,6 +1247,8 @@ function writeCompliantFixture(root: string): void {
       'import { REPO_ROOT } from "./env";',
       'const buildArgs = ["run", "build:android-host"];',
       'spawn("pnpm", buildArgs, { cwd: REPO_ROOT });',
+      // 字符串形态的第二道检查载体：合法名 ⇒ 基线绿；对照 10e 把它换成死名。
+      'export const hint = "编译超时时可先手动跑 pnpm build:android-host 再用 ANDROID_E2E_SKIP_BUILD=1 跳过";',
       "",
     ].join("\n"),
   );
@@ -1491,6 +1644,43 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
           'steps = [["同步", "node", ["../../scripts/sync-credentials.mjs"]], ["./gradlew", "assembleRelease"]];\n',
         );
       }),
+      10,
+      1,
+    );
+  });
+
+  // 10e 形态无关检查的反事实：把**字符串里**的命令名换成宿主包内旧名。
+  // 这一条是 B1 的原样复现——复审实证：只靠数组判据时，把调用改成字符串形态后 30 条测试全绿。
+  it("对照 10e：错误消息字符串里引用宿主包内旧名 → 不变量 10 转红（形态无关检查在断）", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const abs = join(r, "packages/android-host/tests/android-e2e/build-install.ts");
+        writeFileSync(
+          abs,
+          readFileSync(abs, "utf8").replace(
+            "编译超时时可先手动跑 pnpm build:android-host",
+            "编译超时时可先手动跑 pnpm build:android",
+          ),
+          "utf8",
+        );
+      }),
+      10,
+      1,
+    );
+  });
+
+  // 10f 退役命令族的反事实：ADR-0204 决策 3 点名的名字出现在字符串里 ⇒ 根上必然 Missing script。
+  // 这条的来源是本轮新查出的第 4 处活死命令（`release-preflight.mjs` 的「重跑 pnpm release」），
+  // 与 10e 互为两条不同的抓法：10e 抓「改名了但名字还活在别处」，10f 抓「名字已彻底退役」。
+  it("对照 10f：字符串里提到 ADR-0204 决策 3 已退役的根命令 → 不变量 10 转红", () => {
+    expectOnly(
+      evaluateFixture((r) =>
+        writeFixtureFile(
+          r,
+          "packages/android-host/scripts/preflight.mjs",
+          'export const hint = "分叉了请先 rebase，然后重跑 pnpm release";\n',
+        ),
+      ),
       10,
       1,
     );
