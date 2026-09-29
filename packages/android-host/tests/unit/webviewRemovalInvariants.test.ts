@@ -15,7 +15,7 @@
  * ## 阳性对照（强制项，不是加分项）
  * 本仓此前多条防线在「改动前就已经绿」，是恒真的假防线（spec 核心缝「阳性对照是强制项」）。
  * 唯一能识破的办法是反事实。本文件底部 describe「检测式阳性对照」把反事实**常驻**成测试：
- * 在 `os.tmpdir()` 造一棵合规仓库树（应七条全绿），再逐条塞回违规（应各自转红），
+ * 在 `os.tmpdir()` 造一棵合规仓库树（应九组全绿），再逐条塞回违规（应各自转红），
  * 跑的就是上面那**同一个** `evaluateInvariants`，所以后人重构扫描逻辑也逃不掉。
  *
  * 2026-09-29 首次执行（`pnpm --filter @pictelio/android-host test`）结果，7 / 7 全部转红：
@@ -231,6 +231,25 @@ const CLIENT_SWITCH_POSITIVE_ANCHORS = [
   { method: "exportDiagLog", minHits: 1, owner: "通用：诊断日志导出" },
 ] as const;
 
+/**
+ * 生成物依赖的前置接线（不变量 9；ADR-0203 §决策 8「Gradle 入口必须自带生成物」）。
+ *
+ * 背景：T12 的「全新 clone 可复现性」验证当场抓到——`pnpm test:android-host:unit`
+ * 在干净检出上**编译失败**（388 个「找不到符号」），而主工作区全绿。原因：
+ * gradle 配置依赖 gitignored 的生成物 `io.pictelio.app.config`（OAuthConfig.java，
+ * 由 `sync:credentials` 从 `packages/app-lynx/credentials.json5` 生成），
+ * 而 CI 在 gradle 步骤前**显式**跑了该脚本，本地便捷命令却没有。
+ * ⇒ 「本地绿 / 干净环境红」的接线遗漏，且错误信息完全指不到真因。
+ *
+ * 判据取自 CI 既有约定（`.github/workflows/ci.yml` 的 gradle 步骤前置）：
+ * 凡执行 `gradlew` 的脚本，都必须自带 `sync:credentials`。
+ */
+const GRADLE_ENTRY_RE = /gradlew/;
+const CREDENTIALS_SYNC = "sync:credentials";
+
+/** 配对正面锚点：宿主包里跑 gradlew 的脚本下界（防「全删就算修好」）。 */
+const GRADLE_ENTRY_MIN = 3;
+
 interface Layout {
   repoRoot: string;
   packagesDir: string;
@@ -304,7 +323,7 @@ function deletedPkgRefsInText(text: string): string[] {
   return hits;
 }
 
-type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type Verdict = Record<InvariantId, string[]>;
 
 /** 逐条求值八组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
@@ -319,6 +338,7 @@ function evaluateInvariants(l: Layout): Verdict {
     6: [] as string[],
     7: [] as string[],
     8: [] as string[],
+    9: [] as string[],
   };
 
   // 不变量 1 —— packages/app 目录不存在（ADR-0203 决策 2 + 复核判据 `test ! -d packages/app`）
@@ -524,6 +544,38 @@ function evaluateInvariants(l: Layout): Verdict {
     }
   }
 
+  // 不变量 9 —— 跑 gradlew 的脚本必须自带生成物前置（ADR-0203 §决策 8）
+  // 判据来源是 CI 既有约定，不是拍脑袋：CI 在 gradle 步骤前显式跑 sync:credentials。
+  const hostManifestPath = join(l.hostDir, "package.json");
+  if (!existsSync(hostManifestPath)) {
+    verdict[9].push("[检测式不可信] 宿主 package.json 不存在，无从校验 gradle 入口接线");
+  } else {
+    let hostScripts: Record<string, string> = {};
+    try {
+      hostScripts =
+        (JSON.parse(readFileSync(hostManifestPath, "utf8")) as { scripts?: Record<string, string> })
+          .scripts ?? {};
+    } catch (err) {
+      console.warn(`[webviewRemovalInvariants] 宿主 package.json 解析失败：${String(err)}`);
+    }
+    const gradleEntries = Object.entries(hostScripts).filter(([, v]) => GRADLE_ENTRY_RE.test(v));
+    // 配对正面锚点：扫描集本身不能为空，否则「零个 gradle 脚本」会让全称断言静默恒真
+    if (gradleEntries.length < GRADLE_ENTRY_MIN) {
+      verdict[9].push(
+        `[配对正面锚点失效] 宿主包只扫到 ${gradleEntries.length} 个 gradle 入口 < ${GRADLE_ENTRY_MIN}——` +
+          `入口几乎全没，比「某个入口漏了前置」更严重`,
+      );
+    }
+    for (const [name, cmd] of gradleEntries) {
+      if (!cmd.includes(CREDENTIALS_SYNC)) {
+        verdict[9].push(
+          `脚本 ${name} 执行 gradlew 却未接 ${CREDENTIALS_SYNC}：` +
+            `gradle 配置依赖 gitignored 的 OAuthConfig，干净检出会编译失败（主工作区因残留生成物而绿）`,
+        );
+      }
+    }
+  }
+
   return verdict;
 }
 
@@ -577,6 +629,11 @@ describe("不变量 8：客户端切换能力已随 WebView 下线（ADR-0203 §
     assertSatisfied(8));
 });
 
+describe("不变量 9：gradle 入口自带生成物前置（ADR-0203 §决策 8；CI 既有约定）", () => {
+  it("宿主包每个执行 gradlew 的脚本都接了 sync:credentials，且 gradle 入口数不低于下界（配对正面锚点）", () =>
+    assertSatisfied(9));
+});
+
 // ── 阳性对照：真实临时目录 + 同一批扫描函数 ──────────────────────────────────
 // 目的：证明上面八条**不是恒绿假防线**。做法是造一棵合规仓库树（应全绿），
 // 再逐条塞回违规（应各自转红），跑的就是上面那个 evaluateInvariants。
@@ -592,7 +649,7 @@ function removeFixtureFile(root: string, relPath: string): void {
   rmSync(join(root, ...relPath.split("/")), { force: true, recursive: true });
 }
 
-/** 造一棵「删除已完成」的合规仓库树：满足全部八条不变量。 */
+/** 造一棵「删除已完成」的合规仓库树：满足全部九组不变量。 */
 function writeCompliantFixture(root: string): void {
   writeFixtureFile(
     root,
@@ -680,7 +737,15 @@ function writeCompliantFixture(root: string): void {
   writeFixtureFile(
     root,
     "packages/android-host/package.json",
-    JSON.stringify({ name: "@pictelio/android-host" }),
+    JSON.stringify({
+      name: "@pictelio/android-host",
+      scripts: Object.fromEntries(
+        Array.from({ length: GRADLE_ENTRY_MIN }, (_, i) => [
+          `gradleTask${i}`,
+          `npm run ${CREDENTIALS_SYNC} && ./gradlew task${i}`,
+        ]),
+      ),
+    }),
   );
   writeFixtureFile(root, "packages/android-host/tsconfig.json", "{}\n");
   writeFixtureFile(root, "packages/android-host/vitest.config.ts", "export default {};\n");
@@ -721,9 +786,9 @@ function evaluateFixture(mutate: (root: string) => void): Verdict {
   }
 }
 
-/** 合规树必须八条全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
+/** 合规树必须九组全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
 function expectOnly(target: Verdict, id: InvariantId, minHits: number): void {
-  for (const key of [1, 2, 3, 4, 5, 6, 7, 8] as InvariantId[]) {
+  for (const key of [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[]) {
     if (key === id) {
       expect(
         target[key].length,
@@ -739,10 +804,10 @@ afterAll(() => {
   for (const root of TMP_ROOTS) rmSync(root, { recursive: true, force: true });
 });
 
-describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明八条不是恒绿假防线）", () => {
-  it("基线：合规仓库树八条全绿", () => {
+describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明九组不是恒绿假防线）", () => {
+  it("基线：合规仓库树九组全绿", () => {
     const v = evaluateFixture(() => {});
-    for (const key of [1, 2, 3, 4, 5, 6, 7, 8] as InvariantId[]) {
+    for (const key of [1, 2, 3, 4, 5, 6, 7, 8, 9] as InvariantId[]) {
       expect(v[key], `合规树的不变量 ${key} 不该红：${v[key].join("；")}`).toEqual([]);
     }
   });
@@ -915,6 +980,38 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
 
   // 8d 误删通用方法：证明「配对正面锚点」真的在断——这是本条不变量的防糊弄半边。
   // 若删掉这条，正面锚点就只剩装饰：把 PictelioAppModule 整份删光也能让 8a/8b/8c 全绿。
+  // 9a 把某个 gradle 入口的 sync:credentials 前置摘掉：证明这条在断真实接线
+  it("对照 9a：摘掉某 gradle 入口的 sync:credentials 前置 → 不变量 9 转红", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const abs = join(r, "packages/android-host/package.json");
+        const parsed = JSON.parse(readFileSync(abs, "utf8")) as {
+          scripts: Record<string, string>;
+        };
+        parsed.scripts.gradleTask0 = "./gradlew gradleTask0";
+        writeFileSync(abs, JSON.stringify(parsed), "utf8");
+      }),
+      9,
+      1,
+    );
+  });
+
+  // 9b 把 gradle 入口删到下界以下：证明配对正面锚点在断（不是「零入口恒绿」）
+  it("对照 9b：gradle 入口删到下界以下 → 不变量 9 转红（配对正面锚点在断）", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const abs = join(r, "packages/android-host/package.json");
+        const parsed = JSON.parse(readFileSync(abs, "utf8")) as {
+          scripts: Record<string, string>;
+        };
+        parsed.scripts = { onlyOne: `npm run ${CREDENTIALS_SYNC} && ./gradlew onlyOne` };
+        writeFileSync(abs, JSON.stringify(parsed), "utf8");
+      }),
+      9,
+      1,
+    );
+  });
+
   it("对照 8d：误删通用原生方法 exitApp → 不变量 8 转红（配对正面锚点在断）", () => {
     expectOnly(
       evaluateFixture((r) => {

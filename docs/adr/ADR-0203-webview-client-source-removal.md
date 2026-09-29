@@ -127,6 +127,33 @@ Capacitor 插件**，运行时本就不可用。Lynx 侧对全部其余能力均
 一个**拨动无反应**的开关（设置键无消费方）——比隐藏更糟。
 「不可达 + 无消费方 + 前提已被删除」三者同时成立才构成删除授权。
 
+### 决策 8：Gradle 入口必须自带生成物前置
+
+T12 的「全新 clone 可复现性」验证当场抓到一个**本地绿 / 干净环境红**的接线遗漏：
+`pnpm test:android-host:unit` 在全新检出上编译失败（388 个「找不到符号」），
+而主工作区全绿。
+
+根因：gradle 配置依赖 gitignored 的生成物 `io.pictelio.app.config`（`OAuthConfig.java`，
+由 `sync:credentials` 从 `packages/app-lynx/credentials.json5` 生成）。
+CI 在 gradle 步骤前**显式**跑了该脚本（`.github/workflows/ci.yml` 步骤「Generate
+credentials config」，注释里本就写明「gradle 配置依赖 gitignored 生成物」），
+而迁移后的本地便捷命令**没有**。主工作区之所以绿，只是因为先跑过
+`build:android-host:release`，残留了生成物——典型的假绿。
+
+修法：让便捷命令与 CI 约定一致——
+
+```
+test:android:unit = npm run sync:credentials && cd android && ./gradlew testDebugUnitTest
+```
+
+配套新增**不变量 9**：凡执行 `gradlew` 的宿主脚本都必须接 `sync:credentials`，
+且 gradle 入口数不低于下界（配对正面锚点，防「入口几乎全没」这种更严重的情况
+被当成「全称断言通过」）。该条已在真实仓库做过反事实：把脚本改回缺陷形态后立即转红。
+
+**为什么值得单列一条不变量**：这与前 8 条不同——前 8 条守的是「删干净了没有」，
+本条守的是「**干净环境能不能自己长出来**」。二者都会表现为「某天全绿突然变红」，
+但归因完全相反。前者查残留，后者查前置。
+
 ## 存量格式契约（不可动）
 
 删除源码后，`capacitor` 字样**不应**从仓库清零。以下字面量必须原样保留：
