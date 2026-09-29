@@ -274,7 +274,8 @@ const enPages = {
   // ⚠️ ADR-0203 decision 7 removed the only renderer (Me page effective-state row) — it sat
   // inside the client-switch group whose v-if is always false in a single-engine package.
   // Copy and engineState.ts are now consumer-less retained items, and "switched to WebView"
-  // wording can never be true again. Tracked in #846.
+  // wording can never be true again. Traceability gap explicitly acknowledged in #846
+  // (downgraded to characterization rather than papered over).
   "engineFallback.reason.preferred": "Running on your preferred engine",
   "engineFallback.reason.lynx_unavailable": "Lynx isn’t available on this device; WebView is in use",
   "engineFallback.reason.lynx_known_bad": "Lynx failed before on this version; WebView is in use",

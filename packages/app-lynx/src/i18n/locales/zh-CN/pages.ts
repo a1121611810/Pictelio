@@ -276,7 +276,8 @@ const zhPages = {
   //     码集 = EngineRoute.Reason 全 10 码 + unknown 兜底。
   //     ⚠️ ADR-0203 决策 7 删除了唯一的渲染方（Me 页生效双态行）——它挂在客户端切换
   //     组的 v-if 内，单引擎包恒不渲染。文案与 engineState.ts 一并成为无消费方保留项，
-  //     且「已改用 WebView」类表述在 WebView 客户端删除后永不可能为真。挂账见 #846。
+  //     且「已改用 WebView」类表述在 WebView 客户端删除后永不可能为真。
+  //     该溯源缺口已由 #846 显式认领（降级为 characterization，不掩盖）。
   "engineFallback.reason.preferred": "按首选引擎运行",
   "engineFallback.reason.lynx_unavailable": "Lynx 引擎在本机不可用，已改用 WebView",
   "engineFallback.reason.lynx_known_bad": "Lynx 在本版本曾运行失败，已改用 WebView",

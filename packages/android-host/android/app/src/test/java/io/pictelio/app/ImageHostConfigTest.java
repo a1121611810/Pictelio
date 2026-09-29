@@ -55,7 +55,7 @@ import java.util.concurrent.CountDownLatch;
  *
  * <p>影响范围：图床读端 Java 逻辑本轮未改（ADR-0203 决策 6 已把「图床设置写入口」列为
  * 接受的能力缺口），故不影响上线安全；影响的是「未来改动这批期望值时，没人能再确认它
- * 当初是对的」。挂账：#846。
+ * 当初是对的」。该缺口已由 #846 认领并显式降级，不作掩盖。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)

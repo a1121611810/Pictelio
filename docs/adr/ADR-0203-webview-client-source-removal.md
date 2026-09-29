@@ -121,9 +121,9 @@ Capacitor 插件**，运行时本就不可用。Lynx 侧对全部其余能力均
 
 **数据层不在删除范围**：`engineState.ts`（ADR-0153 契约，有独立键集测试）与
 `settingsStore.autoFallbackEngine` 字段属独立决策的能力面，删它们是另一件事，
-本 ADR 不授权。它们因此变成无调用方的保留项，遗留债务挂账见
-[#846](https://github.com/a1121611810/Pictelio/issues/846)（oracle 溯源断链）
-与 [#847](https://github.com/a1121611810/Pictelio/issues/847)（`differential/` 目录名）。
+本 ADR 不授权。它们因此成为无调用方的保留项，附带的溯源缺口与目录名失实
+已分别由 #846（oracle 溯源断链，已显式降级为 characterization）与
+#847（`differential/` → `contract/`）处理完毕。
 
 > 首版此处写的是「已如实记入遗留债务」而**仓库中查无该记录**——code-review 判为空头承诺。
 > 文档里写「已挂账」不构成挂账，**issue 号才是**。
