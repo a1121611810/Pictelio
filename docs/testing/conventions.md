@@ -16,7 +16,7 @@
 | 层级         | 配置                             | 命令                      | 用途                                                             | 速度 |
 | ------------ | -------------------------------- | ------------------------- | ---------------------------------------------------------------- | ---- |
 | **单元测试** | `vitest.config.ts`               | `pnpm test`               | 纯逻辑：store、utils、API 参数验证（唯一客户端）                 | 快   |
-| **仓库不变量** | `packages/android-host/vitest.config.ts` | `pnpm test:android-host` | WebView 客户端是否已彻底删除的权威判据（10 组不变量 + 17 条阳性对照 + 2 条扫描覆盖断言） | 快 |
+| **仓库不变量** | `packages/android-host/vitest.config.ts` | `pnpm test:android-host` | WebView 客户端是否已彻底删除的权威判据（10 组不变量 + 19 条阳性对照 + 2 条扫描覆盖断言） | 快 |
 | **E2E 测试** | `vitest.agent-browser.config.ts` | ~~`pnpm test:agent-browser`~~ | ~~AI 驱动 E2E~~ **已随客户端删除**                   | —    |
 | **全量**     | —                                | `pnpm test:all`           | 所有包单测并行                                                    | —    |
 
