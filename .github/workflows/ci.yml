@@ -17,6 +17,10 @@ jobs:
   check:
     name: Type check & lint
     runs-on: ubuntu-latest
+    env:
+      # 根脚本默认并发 2（见 package.json：--concurrency-limit ${RUN_CONCURRENCY:-2}）。
+      # 那个默认值是给内存受限的本地机器定的，CI runner 内存充裕，显式放开以保持速度。
+      RUN_CONCURRENCY: "9"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -42,6 +46,10 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
+    env:
+      # 根脚本默认并发 2（见 package.json：--concurrency-limit ${RUN_CONCURRENCY:-2}）。
+      # 那个默认值是给内存受限的本地机器定的，CI runner 内存充裕，显式放开以保持速度。
+      RUN_CONCURRENCY: "9"
     steps:
       - name: Checkout
         uses: actions/checkout@v5

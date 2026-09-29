@@ -137,13 +137,13 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 
 ## 命令
 
-项目根目录执行，pnpm workspace 委托（裸名指向见 ADR-0204，取代 ADR-0059 的委托部分；权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；五条裸命令（`dev` / `build` / `check` / `test` / `preview`）→ `pictelio-app-lynx`；**宿主包动作一律显式命名**，不占用裸名（`pnpm <命令>:android-host`）；`<命令>:<包名>` → 对应包；`:all` → 并行全部：
+项目根目录执行，pnpm workspace 委托（裸名指向见 ADR-0204，取代 ADR-0059 的委托部分；权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；五条裸命令（`dev` / `build` / `check` / `test` / `preview`）→ `pictelio-app-lynx`；**宿主包动作一律显式命名**，不占用裸名（`pnpm <命令>:android-host`）；`<命令>:<包名>` → 对应包；`:all` → **有界并发**（`--concurrency-limit 4`）跑完全部包：
 
 | 命令 | 说明 |
 | --- | --- |
 | `pnpm dev` / `build` / `check` / `test` | 唯一客户端 app-lynx：开发服务器 / 构建 / vue-tsc / Vitest |
 | `pnpm lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
-| `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 并行全部 |
+| `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 有界并发跑完全部包 |
 | `pnpm dev:android-host` / `build:android-host(:release)` | 宿主：安装调试包 / Debug 或签名 Release APK（需密码环境变量） |
 | `pnpm test:android-host` / `:unit` / `:e2e` | 宿主单测 / JVM(Robolectric) 单测 / 模拟器 E2E（手动按需） |
 | `pnpm release:android-host` / `deploy(:dry)` | 交互式发布 / 落地页预览 |
