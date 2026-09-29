@@ -734,7 +734,7 @@ describe.skipIf(SKIPPED)(
      * test 记为 **skipped**（不是 passed），信息不丢失、也不冒充通过。
      *
      * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
-     * R1 断言③「相关作品」段注入、R3「收藏行」两两不同。这四行之外的断言形态各不相同，
+     * R1 断言③「锚点卡下方区域」帧差、R3「收藏行」两两不同。这四行之外的断言形态各不相同，
      * 都不是「显式 skip」，故一律不进本台账：
      *   · R1 断言①：判别窗无判别力时 `console.log` 声明不可判定 + 置 `notTopJudged = false`
      *     后**继续**（不判红，由断言② 兜底）；
@@ -795,7 +795,11 @@ describe.skipIf(SKIPPED)(
       // `tests/android-e2e/unit/releaseGate.test.ts` 的纯函数级（秒级，随 CI 跑）。
       // 日常改判定语义请走后者；前者留给发版前首跑。
       const rows: OutcomeRow[] = [
-        ["R1 断言③「相关作品」段注入", coreOutcome.r1],
+        // ⚠️ 行名按**代理口径**表述，不写成「相关作品段注入」：该断言判的是
+        // 「锚点卡下方区域帧差 > INJECT_TH」，不区分变化来源（qa-defense-lines §3.T2
+        // 「帧对比代理」）。判红时读者只见这行名，写成渲染物名会把他引向错误的
+        // 产品改动——#814→#816 连续三轮正是这个坑。
+        ["R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）", coreOutcome.r1],
         ["R3「收藏行」两两不同", coreOutcome.r3],
       ];
       await runReleaseGate({
@@ -811,7 +815,7 @@ describe.skipIf(SKIPPED)(
       });
     });
 
-    it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡注入「相关作品」段 + 滚动不回顶", async (t) => {
+    it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡下方区域出现帧差（代理「相关作品」段注入）+ 滚动不回顶", async (t) => {
       // 深链到 /illusts（benchNav illust），等列表内容渲染完成
       await launchBenchNav("illust");
       await waitForContentLoaded("r1-illusts", REGION_TOPREF, 25);
@@ -933,7 +937,7 @@ describe.skipIf(SKIPPED)(
         // 同时记 skipped（区别于「既没判定也没声明」），供 afterAll 外层门区分二者。
         coreOutcome.r1.skipped += 1;
         t.skip(
-          `R1 断言③不可判定：注入段差异 ${injected} ≤ ${INJECT_TH}。` +
+          `R1 断言③不可判定：锚点卡下方区域帧差 ${injected} ≤ ${INJECT_TH}。` +
             `采样窗 y ${below.y0}..${below.y1}、采样点 ${belowSamples}；` +
             `锚点上方保持率 ${preservedRatio.toFixed(4)}，返回帧与 s1 差异 ${notTop}` +
             `${notTopJudged ? "（断言①亦不可判定）" : ""}。` +
@@ -945,7 +949,8 @@ describe.skipIf(SKIPPED)(
       console.log(
         `[transition-matrix] ✓ R1 通过：` +
           `${notTopJudged ? `未回顶（与 s1 差异 ${notTop} ≤ ${NOT_TOP_TH}）` : "断言①不可判定（未回顶未判）"}` +
-          ` + 滚动保持 + 相关作品段注入（差异 ${injected} > ${INJECT_TH}，证据 r1-*.png）`,
+          ` + 滚动保持 + 锚点卡下方区域帧差 ${injected} > ${INJECT_TH}` +
+          `（代理「相关作品」段注入，不区分变化来源；证据 r1-*.png）`,
       );
     }, 300_000);
 

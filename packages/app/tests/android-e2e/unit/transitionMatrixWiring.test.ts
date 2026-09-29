@@ -96,6 +96,63 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     expect(countWrites("coreOutcome.r3.skipped"), "R3 的 skipped 写入点").toBe(2);
   });
 
+  // ── 以下三条针对「countWrites 只数字符串出现次数」留下的三个洞 ──────────────
+  // 计数型断言看不到**形态**与**可达性**：把 `t.skip(` 换成 `return`（记账留着）
+  // 计数不变；把记账挪到 `t.skip()` 之后计数也不变，但运行时不可达。
+  it("每处 skipped 记账旁必须紧跟 t.skip( —— return 回潮（保留记账）不得放行", () => {
+    // 这正是 #819 开票要堵的洞。实测把三处 `t.skip(` 全改 `return`（**保留**记账）时，
+    // 只数写入次数的断言**全部照样绿** —— 而生产里 vitest 会记 passed 而非 skipped，
+    // 即「冒充通过」。故这里断的是**形态**：记账与 t.skip 必须成对相邻。
+    const lines = specSrc.split("\n");
+    const sites = lines
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => /coreOutcome\.r[13]\.skipped\s*\+=/.test(l));
+    expect(sites.length, "skipped 记账点应与 3 处 t.skip 一一对应").toBe(3);
+
+    for (const { i } of sites) {
+      // 允许记账与 t.skip 之间夹注释行，不允许夹可执行语句
+      const next = lines.slice(i + 1).find((l) => !/^\s*(\/\/|\*)/.test(l) && l.trim() !== "");
+      expect(next, `第 ${i + 1} 行记账之后必须有可执行语句`).toBeDefined();
+      expect(
+        next,
+        `第 ${i + 1} 行记账之后必须紧跟 t.skip(，实际是：${String(next).trim()}`,
+      ).toMatch(/^\s*t\.skip\(/);
+    }
+  });
+
+  it("fail 必须绑在「对 silent 断言为空数组」的 expect 上 —— 恒真/自反/空名单都要拦", () => {
+    // 只验「有 expect(」不够：以下三种退化都含 expect 却恒过，实测 25/25 全绿——
+    //   expect(silent.length).toBeGreaterThanOrEqual(0)   // 恒真
+    //   expect(String(message)).toEqual(String(message)) // 自反
+    //   deps.fail([], …)                                  // 空名单
+    // 三者后果完全相同：**门永不判红**。故断到「对 silent 参数断言它等于空数组」这一层。
+    const failLine = hook.split("\n").find((l) => l.includes("fail:"));
+    expect(failLine, "afterAll 里必须有 fail 绑定").toBeDefined();
+    expect(failLine).toMatch(/expect\(\s*silent\s*,\s*message\s*\)\s*\.toEqual\(\s*\[\s*\]\s*\)/);
+  });
+
+  it("afterAll 里不得有 try/catch —— 门包进 try 会把判红抛错吞掉", () => {
+    // 实测把整段门包进 `try { … } catch {}` 时 25/25 全绿：生产 `fail` 抛错被吞，
+    // 门整个消失且无任何结论。收尾的容错已下沉进 runReleaseGate，hook 里不该再有 try。
+    expect(hook).not.toMatch(/^\s*try\s*\{/m);
+    expect(hook).not.toMatch(/^\s*\}\s*catch/m);
+  });
+
+  it("R1 台账行名必须写代理口径（带被比较的阈值），不能只写渲染物名", () => {
+    // 判红时读者**只见行名**（台账对象不出现在 vitest 输出里）。行名若写成
+    // 「相关作品段注入」，等于宣称「已验证该渲染物」——而断言判的是
+    // 「锚点卡下方区域帧差 > INJECT_TH」，**不区分变化来源**（qa-defense-lines §3.T2）。
+    // overclaim 的行名会把读者引向错的产品改动：#814→#816 连续三轮正是这个坑。
+    //
+    // 判据取「行名里必须出现被比较的阈值名」而非逐字钉死整串：换措辞仍绿，
+    // 但一旦退回「只报渲染物、不报比较量」就红。
+    const rowsBlock = /\[\s*"([^"]+)"\s*,\s*coreOutcome\.r1\s*\]/.exec(hook);
+    expect(rowsBlock, "afterAll 里必须有 R1 台账行").not.toBeNull();
+    const label = (rowsBlock as RegExpExecArray)[1];
+    expect(label, "R1 行名必须含代理口径标记（锚点卡下方区域）").toMatch(/锚点卡下方区域/);
+    expect(label, "R1 行名必须含被比较的阈值名 INJECT_TH").toMatch(/INJECT_TH/);
+  });
+
   it("spec 文件仍在，契约测试没读到空串", () => {
     expect(specSrc.length).toBeGreaterThan(1000);
     expect(hook.length).toBeGreaterThan(200);
