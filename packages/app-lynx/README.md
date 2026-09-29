@@ -67,5 +67,7 @@ src/
 
 ## 凭证
 
-`lynx.config.ts` 从 `../app/credentials.json5` 读取（**单一事实源**，与现有 app 同源）。
+`lynx.config.ts` 从**本包内**的 `credentials.json5` 读取（**单一事实源**）。
+ADR-0203 决策 3：凭证与产品版本号原挂在宿主包，构建期跨包 fail-closed 读取；
+随 WebView 客户端整包删除，事实源归位到唯一客户端，跨包读取随之解除。
 `__CREDENTIALS__` 仅在 `__DEV__` 分支引用，生产构建整块消除。

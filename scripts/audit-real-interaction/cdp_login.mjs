@@ -10,7 +10,7 @@ const PKG = "io.pictelio.app";
 const CDP_PORT = 9333;
 
 const adb = (...a) => execFileSync("adb", ["-s", DEV, ...a], { encoding: "utf8" }).trim();
-const envFile = readFileSync(resolve(import.meta.dirname, "../../packages/app/.env"), "utf8");
+const envFile = readFileSync(resolve(import.meta.dirname, "../../packages/app-lynx/.env"), "utf8");
 const token = envFile.match(/^PIXIV_REFRESH_TOKEN=(.+)$/m)?.[1]?.trim();
 if (!token) throw new Error(".env 缺 PIXIV_REFRESH_TOKEN");
 

@@ -1069,7 +1069,7 @@ function compareMarkdown(base, cur) {
  *  流程：tap 聚焦 textarea(360,960) → input text token → ESC 收起键盘 → tap 登录(360,1093)。 */
 async function loginViaAdbInput(cdpRef) {
   log("登录：adb input text 真实键入 refresh_token…");
-  const token = readFileSync(resolve(SCRIPT_DIR, "../../packages/app/.env"), "utf8")
+  const token = readFileSync(resolve(SCRIPT_DIR, "../../packages/app-lynx/.env"), "utf8")
     .match(/^PIXIV_REFRESH_TOKEN=(.+)$/m)?.[1]?.trim();
   if (!token) throw new Error(".env 缺 PIXIV_REFRESH_TOKEN，无法自动重登");
   await adbAsync(["shell", "input", "tap", "360", "960"]);
