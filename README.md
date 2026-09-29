@@ -30,13 +30,11 @@
       <td align="center"><strong>Feed</strong></td>
       <td align="center"><strong>Detail</strong></td>
       <td align="center"><strong>Novel</strong></td>
-      <td align="center"><strong>Translate</strong></td>
     </tr>
     <tr>
       <td><img src="packages/website/public/screenshots/01_feed.png" width="180" alt="Feed"></td>
       <td><img src="packages/website/public/screenshots/02_detail.png" width="180" alt="Detail"></td>
       <td><img src="packages/website/public/screenshots/03_novel.png" width="180" alt="Novel"></td>
-      <td><img src="packages/website/public/screenshots/04_translate.png" width="180" alt="Translate"></td>
     </tr>
     <tr>
       <td align="center"><strong>Settings</strong></td>
