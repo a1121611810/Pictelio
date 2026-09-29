@@ -735,7 +735,9 @@ describe.skipIf(SKIPPED)(
      *
      * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
      * R1 断言③「相关作品」段注入、R3「收藏行」两两不同。R1 断言①② 与 R2 三条
-     * 是无条件的 `expect`，不可判定时走 `t.skip()`/正常判定，不进本台账。
+     * 是无条件的 `expect`，**不可判定时走 `console.log` 显式声明**（不判红、不进本台账）——
+     * 注意 R2 的 `it` 回调签名是 `async () => {}`、**没有 `t` 形参**，用不了 `t.skip()`；
+     * R1 虽有 `t`，但断言①② 走的是 `console.log` + 标记位，只有断言③ 用 `t.skip()`。
      */
     const coreOutcome = {
       r1: { judged: 0, skipped: 0 },

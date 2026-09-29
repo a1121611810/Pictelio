@@ -76,7 +76,9 @@ export function buildGateFailureMessage(
     `修法：① 改用 t.skip() 显式声明不可判定并写明原因；② 跑全量（不带 -t）、` +
     `并先看 vitest 结果的 passed/skipped 计数与 beforeAll 报错，再谈代码回潮。` +
     `本轮台账：${ledger}。` +
-    `取证：test-results/android-e2e/transition-matrix/ 下各 r1-*/r3-* 帧 + logcat。`
+    `取证：test-results/android-e2e/transition-matrix/ 下有各 r1-*/r3-* 帧；` +
+    `⚠️ 该目录**只落帧、logcat 不落盘**（spec 全程只在内存里轮询 logcat），` +
+    `logcat 需现取 \`adb -s <serial> logcat -d\`。`
   );
 }
 

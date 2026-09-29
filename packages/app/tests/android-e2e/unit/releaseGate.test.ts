@@ -113,8 +113,14 @@ describe("发版门外层三态门 · 判红文案", () => {
     expect(msg).toMatch(/judged=2\/skipped=0/);
   });
 
-  it("点名取证目录（判红后要去哪里翻帧与 logcat）", () => {
+  it("取证指引必须说清「目录里只有帧、logcat 要现取」，不得承诺盘上有 logcat", () => {
+    // 实测（code-review Spec 轴 S-4）：spec 只把帧 writeFileSync 进 EVIDENCE_DIR，
+    // logcat 全程只在内存里轮询、**从不落盘** ⇒ 文案承诺「各 r1-*/r3-* 帧 + logcat」
+    // 会让判红的人去那个目录翻一个不存在的文件。
     expect(msg).toMatch(/test-results\/android-e2e\/transition-matrix/);
+    expect(msg).toMatch(/logcat 不落盘|只落帧/);
+    // 命令带 serial 参数，不能写成 /adb logcat/（那匹配不上 `adb -s <serial> logcat -d`）
+    expect(msg).toMatch(/adb[^\n`]*logcat/);
   });
 
   it("两行都双 0 时，缺口的**全部**行名都进消息", () => {
@@ -196,7 +202,9 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
   it("正常路径：收尾完成后门静默（不判红、不 warn）", async () => {
     const { events, deps } = makeDeps("emulator-5554", [row("R1", 1, 0), row("R3", 2, 0)]);
     await runReleaseGate(deps);
-    expect(events).toEqual(["teardown", "forceStop:emulator-5554"]);
+    // 不断言 events 的完整集合：合法地新增一个收尾动作就会让 `toEqual` 误伤。
+    // 这里要表达的是「门没开口」，故只断言门的两类事件都没出现。
+    expect(events.some((e) => e.startsWith("fail:") || e.startsWith("warn:"))).toBe(false);
   });
 
   it("⚠️ 门必须排在收尾**之后**（台账要能触发门，否则断言退化成假绿）", async () => {
@@ -206,9 +214,14 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     // force-stop（收尾根本没跑）。故这里的台账必须**能触发门**。
     const { events, deps } = makeDeps("emulator-5554", [row("R1", 0, 0), row("R3", 2, 0)]);
     await runReleaseGate(deps);
-    expect(events[0]).toBe("teardown");
-    expect(events[1]).toBe("forceStop:emulator-5554");
-    expect(events[2]).toMatch(/^fail:/);
+    // 用**相对序**而非绝对下标：合法地新增一个收尾动作不应让本条转红，
+    // 但「门排到收尾之前」必须转红。
+    const teardownAt = events.indexOf("teardown");
+    const forceStopAt = events.indexOf("forceStop:emulator-5554");
+    const failAt = events.findIndex((e) => e.startsWith("fail:"));
+    expect(teardownAt).toBeGreaterThanOrEqual(0);
+    expect(forceStopAt).toBeGreaterThan(teardownAt);
+    expect(failAt).toBeGreaterThan(forceStopAt);
   });
 
   it("⚠️ 判红本身也排在收尾之后（fail 抛错时收尾仍已完成）", async () => {
@@ -229,7 +242,8 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
         },
       }),
     ).rejects.toThrow("判红");
-    expect(events).toEqual(["teardown", "forceStop:emulator-5554"]);
+    expect(events.indexOf("teardown")).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf("forceStop:emulator-5554")).toBeGreaterThan(events.indexOf("teardown"));
   });
 
   it("显式 skip 的行 ⇒ 不判红，只 warn「本轮未验证」", async () => {
@@ -239,6 +253,8 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     expect(events.filter((e) => e.startsWith("warn"))).toHaveLength(1);
   });
 
+  // 顺序约定的出处：docs/specs/qa-defense-lines.md 三态口径段的「**顺序约定**：判红先于 warn」
+  // （三态表本身只规定各自判不判红，不规定先后——故这条不是抄表，是抄那段顺序约定）
   it("判红抛错（生产里 expect 会抛）⇒ warn 不执行 —— 判红优先于 warn", async () => {
     // 上面所有用例的 `fail` 替身只记录不抛，所以「fail 抛了会怎样」一直没被钉住。
     // 生产形态 `fail = (silent, msg) => expect(silent, msg).toEqual([])` **会抛**，
