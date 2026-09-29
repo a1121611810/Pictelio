@@ -61,13 +61,13 @@ export function classifyOutcomeRows(rows: readonly OutcomeRow[]): GateClassifica
  */
 export function buildGateFailureMessage(
   rows: readonly OutcomeRow[],
-  silent: readonly string[],
+  classification: GateClassification,
 ): string {
   const ledger = rows
     .map(([name, o]) => `${name} judged=${o.judged}/skipped=${o.skipped}`)
     .join("；");
   return (
-    `发版门内容断言既未判定、也未声明不可判定：${silent.join(" + ")}。` +
+    `发版门内容断言既未判定、也未声明不可判定：${classification.silent.join(" + ")}。` +
     `两种成因，**报错文案不替你猜是哪种**（务必按序自查）：` +
     `① 该行被写回 return —— 不可判定分支直接返回，vitest 记 passed 且日志宣称已验证，` +
     `实际什么都没验到（「什么都没验到」≠「通过」）；` +
@@ -81,11 +81,15 @@ export function buildGateFailureMessage(
 }
 
 /**
- * 「本轮未验证」warn：`judged === 0` 的行（含显式 skip）点名报出。
+ * 「本轮未验证」warn：`judged === 0` 的行点名报出。
  * 全都判定过时返回 `undefined` —— 调用方据此不打印，避免无内容时刷屏。
+ *
+ * ⚠️ 参数吃的是**已算好的分类**，不是 rows：让文案自己再推导一次，会留下
+ * 「分类与文案各说各话」的缝（判红时消息里点的行名与实际判红名单不一致），
+ * 也让同一份台账被 filter 两遍。
  */
-export function buildUnverifiedWarning(rows: readonly OutcomeRow[]): string | undefined {
-  const unverified = classifyOutcomeRows(rows).unverified;
+export function buildUnverifiedWarning(classification: GateClassification): string | undefined {
+  const { unverified } = classification;
   if (unverified.length === 0) return undefined;
   return (
     `[transition-matrix] ⚠️ 本轮发版门**未验证**：${unverified.join(" + ")}` +
@@ -95,7 +99,13 @@ export function buildUnverifiedWarning(rows: readonly OutcomeRow[]): string | un
   );
 }
 
-/** `runReleaseGate` 的依赖注入——全部为回调，故本模块不 import vitest，可纯函数单测。 */
+/**
+ * `runReleaseGate` 的依赖注入。**不含 vitest**，故本模块可被纯函数单测直接调用
+ * （`tests/android-e2e/unit/releaseGate.test.ts`，随 `pnpm test` → CI 执行）。
+ *
+ * 6 个字段：4 个是调用方注入的**回调**（teardown / forceStop / warn / fail），
+ * 2 个是**数据**（serial / rows）——不是「全部为回调」。
+ */
 export interface ReleaseGateDeps {
   /** 设备/会话收尾。抛错被吞（收尾失败不阻断判定）。 */
   teardown: () => Promise<unknown>;
@@ -133,10 +143,13 @@ export async function runReleaseGate(deps: ReleaseGateDeps): Promise<void> {
   } catch {
     // 收尾失败不阻断判定
   }
-  const { silent } = classifyOutcomeRows(deps.rows);
-  if (silent.length > 0) {
-    deps.fail(silent, buildGateFailureMessage(deps.rows, silent));
+  // 只分类一次，两处文案共用同一份结果（避免「判红名单」与「消息里点的行名」分叉）
+  const classification = classifyOutcomeRows(deps.rows);
+  if (classification.silent.length > 0) {
+    deps.fail(classification.silent, buildGateFailureMessage(deps.rows, classification));
   }
-  const warning = buildUnverifiedWarning(deps.rows);
+  // ⚠️ fail 在生产里会抛（expect），抛了就不会走到这里 —— 判红优先于 warn。
+  // 这条顺序在生产与测试替身里**不一致**（替身只记录不抛），已单独用一条用例钉住。
+  const warning = buildUnverifiedWarning(classification);
   if (warning !== undefined) deps.warn(warning);
 }

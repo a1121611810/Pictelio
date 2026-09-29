@@ -52,7 +52,10 @@ describe("发版门外层三态门 · 台账分类", () => {
     // 依据：qa-defense-lines 三态表第 3 行「**判红**」
     const r = classifyOutcomeRows([row("R1 断言③「相关作品」段注入", 0, 0)]);
     expect(r.silent).toEqual(["R1 断言③「相关作品」段注入"]);
-    // 双 0 同时也是「本轮没判定过」，故 warn 名单仍含它
+    // ⚠️ 这条**不是**抄自三态表第 3 行（那里只写「判红」），而是由 warn 的筛选条件
+    // `judged === 0` 推出：双 0 必然满足 judged === 0 ⇒ 也进 warn 名单。
+    // 生产里这条**观察不到**——`fail` 先抛，warn 根本走不到；单测替身不抛才看得见。
+    // 顺序本身另有一条用例钉住（见「收尾与执行顺序」组）。
     expect(r.unverified).toEqual(["R1 断言③「相关作品」段注入"]);
   });
 
@@ -81,7 +84,7 @@ describe("发版门外层三态门 · 判红文案", () => {
     row("R1 断言③「相关作品」段注入", 0, 0),
     row("R3「收藏行」两两不同", 2, 0),
   ];
-  const msg = buildGateFailureMessage(rows, ["R1 断言③「相关作品」段注入"]);
+  const msg = buildGateFailureMessage(rows, classifyOutcomeRows(rows));
 
   it("必须并列列出**两类**成因（① 被写回 return / ② 该 test 本轮没跑），不单因归错", () => {
     expect(msg).toMatch(/①/);
@@ -115,7 +118,8 @@ describe("发版门外层三态门 · 判红文案", () => {
   });
 
   it("两行都双 0 时，缺口的**全部**行名都进消息", () => {
-    const m = buildGateFailureMessage([row("R1", 0, 0), row("R3", 0, 0)], ["R1", "R3"]);
+    const bothZero: OutcomeRow[] = [row("R1", 0, 0), row("R3", 0, 0)];
+    const m = buildGateFailureMessage(bothZero, classifyOutcomeRows(bothZero));
     expect(m).toMatch(/R1/);
     expect(m).toMatch(/R3/);
   });
@@ -123,11 +127,12 @@ describe("发版门外层三态门 · 判红文案", () => {
 
 describe("发版门外层三态门 · 未验证 warn 文案", () => {
   it("本轮全部判定过 ⇒ 不产生 warn（返回 undefined）", () => {
-    expect(buildUnverifiedWarning([row("R1", 1, 0), row("R3", 2, 0)])).toBeUndefined();
+    const allJudged = [row("R1", 1, 0), row("R3", 2, 0)];
+    expect(buildUnverifiedWarning(classifyOutcomeRows(allJudged))).toBeUndefined();
   });
 
   it("显式 skip 的行 ⇒ warn 点名该行并说明「不判红是刻意取舍」", () => {
-    const w = buildUnverifiedWarning([row("R1", 1, 0), row("R3", 0, 1)]);
+    const w = buildUnverifiedWarning(classifyOutcomeRows([row("R1", 1, 0), row("R3", 0, 1)]));
     expect(w).toBeDefined();
     expect(w).toMatch(/R3/);
     expect(w).toMatch(/未验证/);
@@ -160,7 +165,7 @@ describe("发版门外层三态门 · 未验证 warn 文案", () => {
  * 函数体的结构性质，不依赖调用方写对顺序。
  */
 describe("发版门外层三态门 · 收尾与执行顺序", () => {
-  /** 记录门与收尾的实际发生顺序，便于断言「门没有��收尾吞掉」。 */
+  /** 记录门与收尾的实际发生顺序，便于断言「门没有被收尾吞掉」。 */
   const makeDeps = (serial: string, rows: OutcomeRow[]) => {
     const events: string[] = [];
     return {
@@ -188,9 +193,42 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     expect(events.filter((e) => e.startsWith("forceStop"))).toHaveLength(0);
   });
 
-  it("正常路径：先收尾再判门，顺序稳定", async () => {
+  it("正常路径：收尾完成后门静默（不判红、不 warn）", async () => {
     const { events, deps } = makeDeps("emulator-5554", [row("R1", 1, 0), row("R3", 2, 0)]);
     await runReleaseGate(deps);
+    expect(events).toEqual(["teardown", "forceStop:emulator-5554"]);
+  });
+
+  it("⚠️ 门必须排在收尾**之后**（台账要能触发门，否则断言退化成假绿）", async () => {
+    // 本条专治一个实测过的假绿：用**全判定过**的台账去断顺序时，events 里根本不会出现
+    // fail/warn，`toEqual` 只比较了 teardown 与 forceStop 两个事件 ⇒ 把整段门挪到收尾
+    // **之前**也照样 17 例全绿，而生产后果是 appium 未停 / 全局代理未清除 / app 未
+    // force-stop（收尾根本没跑）。故这里的台账必须**能触发门**。
+    const { events, deps } = makeDeps("emulator-5554", [row("R1", 0, 0), row("R3", 2, 0)]);
+    await runReleaseGate(deps);
+    expect(events[0]).toBe("teardown");
+    expect(events[1]).toBe("forceStop:emulator-5554");
+    expect(events[2]).toMatch(/^fail:/);
+  });
+
+  it("⚠️ 判红本身也排在收尾之后（fail 抛错时收尾仍已完成）", async () => {
+    // 生产里 fail 会抛，抛了就不会走到 warn。此处钉的是「抛之前收尾已经做完」——
+    // 否则读者会在收尾都没做完时就看到判红，去追一个尚未稳定的现场。
+    const events: string[] = [];
+    await expect(
+      runReleaseGate({
+        teardown: async () => {
+          events.push("teardown");
+        },
+        forceStop: (s) => events.push(`forceStop:${s}`),
+        serial: "emulator-5554",
+        rows: [row("R1", 0, 0)],
+        warn: () => events.push("warn"),
+        fail: () => {
+          throw new Error("判红");
+        },
+      }),
+    ).rejects.toThrow("判红");
     expect(events).toEqual(["teardown", "forceStop:emulator-5554"]);
   });
 
@@ -199,6 +237,26 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
     await runReleaseGate(deps);
     expect(events.filter((e) => e.startsWith("fail"))).toHaveLength(0);
     expect(events.filter((e) => e.startsWith("warn"))).toHaveLength(1);
+  });
+
+  it("判红抛错（生产里 expect 会抛）⇒ warn 不执行 —— 判红优先于 warn", async () => {
+    // 上面所有用例的 `fail` 替身只记录不抛，所以「fail 抛了会怎样」一直没被钉住。
+    // 生产形态 `fail = (silent, msg) => expect(silent, msg).toEqual([])` **会抛**，
+    // 抛了就不会走到 warn —— 顺序反了读者会先看到「本轮未验证」再看到判红，更误导。
+    const events: string[] = [];
+    await expect(
+      runReleaseGate({
+        teardown: async () => {},
+        forceStop: () => {},
+        serial: "emulator-5554",
+        rows: [row("R1", 0, 0)],
+        warn: () => events.push("warn"),
+        fail: () => {
+          throw new Error("判红");
+        },
+      }),
+    ).rejects.toThrow("判红");
+    expect(events).not.toContain("warn");
   });
 
   it("收尾（teardown / forceStop）抛错**不阻断**外层门", async () => {

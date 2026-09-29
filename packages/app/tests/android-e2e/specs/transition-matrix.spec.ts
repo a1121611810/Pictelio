@@ -710,7 +710,7 @@ describe.skipIf(SKIPPED)(
      * （ADR-0162）与「收藏行两两不同」（init-only props）这两条**内容断言**丧失强制力，
      * 且 `:xxx` 的「✓ R1/R3 通过」日志会宣称验证了实际未验证的事。
      *
-     * 现在两处都改用 `ctx.skip()`（报 skipped 而非 passed），这里再补一道**外层**，
+     * 现在三处都改用 `t.skip()`（报 skipped 而非 passed），这里再补一道**外层**，
      * 堵住「有人把 skip 又改回 return」这条回潮路径。
      *
      * ⚠️ **为什么是三态而不是布尔**（二次订正的实测依据）：
@@ -735,7 +735,7 @@ describe.skipIf(SKIPPED)(
      *
      * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
      * R1 断言③「相关作品」段注入、R3「收藏行」两两不同。R1 断言①② 与 R2 三条
-     * 是无条件的 `expect`，不可判定时走 `ctx.skip()`/正常判定，不进本台账。
+     * 是无条件的 `expect`，不可判定时走 `t.skip()`/正常判定，不进本台账。
      */
     const coreOutcome = {
       r1: { judged: 0, skipped: 0 },
@@ -923,7 +923,7 @@ describe.skipIf(SKIPPED)(
       if (injected <= INJECT_TH) {
         // ⚠️ #819：此处曾是 `return` —— vitest 记 **passed**，发版门对 ADR-0162
         // 「相关作品」段注入回归彻底失效，且下方「✓ R1 通过」日志会宣称验证了
-        // 实际未验证的事。改为 `ctx.skip()`：报 skipped 而非 passed，诚实。
+        // 实际未验证的事。改为 `t.skip()`：报 skipped 而非 passed，诚实。
         // 同时记 skipped（区别于「既没判定也没声明」），供 afterAll 外层门区分二者。
         coreOutcome.r1.skipped += 1;
         t.skip(
@@ -1108,7 +1108,7 @@ describe.skipIf(SKIPPED)(
       const undetected = rowSpans.map((s, i) => (s ? null : `card${i}`)).filter(Boolean);
       if (undetected.length > 0) {
         // ⚠️ #819：此处曾是 `return` —— vitest 记 **passed**，init-only props
-        // （收藏数冻结在首卡）这条 C 类缺陷的帧证据防线形同虚设。改 ctx.skip()。
+        // （收藏数冻结在首卡）这条 C 类缺陷的帧证据防线形同虚设。改 t.skip()。
         // 记账必须在 t.skip() **之前**：`t.skip()` 是 throw（vitest
         // run.C5UmxDPh.js:3362 抛 PendingError 中止执行），放在其后不可达 ⇒
         // 台账双 0 会被外层门误报成「return 回潮」并判红。

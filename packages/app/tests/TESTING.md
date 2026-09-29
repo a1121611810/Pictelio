@@ -15,6 +15,7 @@
 | 前缀        | 存放目录               | 说明                                                    |
 | ----------- | ---------------------- | ------------------------------------------------------- |
 | `*.test.ts` | `tests/unit/`          | 纯逻辑测试，`vitest.config.ts` 匹配                     |
+| `*.test.ts` | `tests/android-e2e/unit/` | android-e2e **契约工具的纯函数单测**（不碰 adb / 模拟器，issue #523）。#818 起已并入 `vitest.config.ts` 的 include，故随 `pnpm test` → `test:all` → CI 执行；⚠️ 它同时被 `test:android:e2e` 收进去——**正在 TDD 中途（红）的这批测试会让那一轮 e2e 结论失真**，跑长时 e2e 前先把代码推到终态 |
 | `*.test.ts` | `tests/agent-browser/` | AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配 |
 
 ### E2E 测试模式
