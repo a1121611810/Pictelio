@@ -16,10 +16,22 @@
  *
  * ## 判据
  *
- * 扫全部 `specs/*.spec.ts`：**`it(` / `test(` 体前若干行内不得出现 `if (SKIPPED) return`**。
+ * 扫全部 `specs/*.spec.ts`：**`it(` / `test(` 的**整个回调体**内（按缩进界定）不得出现
+ * 「**门控常量 + 早退**」（`if (X) return;` 或 `if (X) { … return; }`，X 为全大写常量）。
  * 只扫 `it` 体、不扫 `beforeAll` / `afterAll`——那两处挂在**文件 suite** 上、不在
  * `describe.skipIf` 的覆盖范围内，是**正当**的防御性写法（`lynx-detail-image-probe:123/134`
  * 就保留着）。
+ *
+ * ## 覆盖面缺口（review 第 13 轮要求记录）
+ *
+ * 只扫 `tests/android-e2e/specs/*.spec.ts`（10 个），**不扫** `tests/agent-browser/specs/**`
+ * （12 个，pre-push 门禁）——「冒充通过」是同一类形态。现状无命中（唯一近似的
+ * `bookmark-tags.test.ts:160` 的 `if (!open) return;` 在 helper 里、不在 `it` 体）。
+ * 要扩就扩，别假装已经覆盖。
+ *
+ * ⚠️ **什么形态会误伤 / 怎么豁免**（review 第 13 轮要求记录）：任何「全大写常量 + 早退」都会
+ * 被命中，包括合法的 `if (ITEMS.length === 0) return;`。届时**不要放宽判据**（会放回冒充
+ * 通过），而应把该常量改名成非全大写（它是**数据**不是**门控**）或改用 `t.skip()`。
  *
  * ⚠️ 抽取器必须**断言扫到了文件**（ArchUnit `failOnEmptyShould` 教训）：文件清单为空时
  * 全称断言会静默恒真——那正是本组要防的假绿。
@@ -73,14 +85,25 @@ function skipReturnInTestBody(lines: string[]): { line: number; text: string }[]
       // 体的结束：非空行且缩进不再更深
       if (t !== "" && indentOf(raw) <= base) break;
       if (!GUARD_HEAD.test(t)) continue;
-      // 带块的形态要往后看几行，确认块内确有 early return
-      const tail = t.endsWith("{")
-        ? lines
-            .slice(j + 1, j + 6)
-            .map((x) => x.trim())
-            .join(" ")
-        : t;
-      if (/\breturn;/.test(tail)) {
+      if (t.endsWith("{")) {
+        // ⚠️ 块形态必须按**缩进配平**取全文，**不能**用 `slice(j+1, j+N)` 那种常数窗口：
+        // 实测 `if (!HAS_TOKEN) {` + 5 行注释 + `return;` 全部照绿（注释占满窗口、
+        // 看不见 return）。上一轮修的是「体首 8 行」这个常数窗口，却在块形态上留了
+        // 另一个——同一个洞的两个入口。
+        const bodyIndent = indentOf(raw);
+        let depth = 1;
+        const buf: string[] = [];
+        for (let k = j + 1; k < lines.length; k++) {
+          const l2 = lines[k] ?? "";
+          depth += (l2.match(/\{/g) ?? []).length - (l2.match(/\}/g) ?? []).length;
+          buf.push(l2);
+          if (depth <= 0 && indentOf(l2) < bodyIndent) break;
+        }
+        if (/\breturn;/.test(buf.join(" "))) {
+          hits.push({ line: j + 1, text: t });
+          break;
+        }
+      } else if (/\breturn;/.test(t)) {
         hits.push({ line: j + 1, text: t });
         break;
       }

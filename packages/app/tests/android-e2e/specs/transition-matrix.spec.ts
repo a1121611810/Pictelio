@@ -725,8 +725,10 @@ describe.skipIf(SKIPPED)(
      *   judged  = 断言真跑了并给出通过/不通过的判定；
      *   skipped = 断言显式 `t.skip()` 声明「本形态不可判定」并带原因；
      *   两者皆 0 = **既没判定也没声明** ⇒ 判红。⚠️ 但这**不唯一**指向 `return`：
-     *   见下方外层门 `expect` 消息里并列的两类成因（① 被写回 return / ② 该 test
-     *   本轮没跑）——那条消息才是判红时读者唯一能看到的诊断物。
+     *   见 `support/releaseGate.ts` 的 `buildGateFailureMessage`——它并列三类成因
+     *   （① 被写回 return / ② 该 test
+     *   本轮没跑 / ③ 该行自己的断言真失败）——那条消息才是判红时读者唯一能看到的
+     *   诊断物。⚠️ 这里**不编号复述**那三类：复述即漂移源，本轮已经漂过一次。
      *   ⚠️ 更细一层的「`-t` 把 suite 内全部 test 滤掉 ⇒ 门整个消失」**不属此类**
      *   （那时 afterAll 都不执行，台账对象不存在），已记在
      *   `docs/specs/qa-defense-lines.md` 的「不可判定」口径**第三类**。
@@ -788,7 +790,7 @@ describe.skipIf(SKIPPED)(
       //   该条件**主要**指向「直接 return、既不判定也不 skip」，正是首版要堵的洞；
       //   但**不是唯一成因**——「该 test 本轮没跑」同样停在双 0（beforeAll 失败 /
       //   前面断言抛错 / 超时；`-t` 只滤掉本 test 时也属此列）。故报错文案并列
-      //   两类成因，不替读者猜。
+      //   报错文案并列多类成因，不替读者猜（清单与措辞见 buildGateFailureMessage）。
       //   ⚠️ 与上方 JSDoc 的「第三类」分界：`-t` 把 suite 内**全部** test 滤光时
       //   门整个消失、根本进不到这里（那不是双 0，是无台账）。
       //   显式 skip 的行不判红，但 warn 高亮「本轮未验证」，且 vitest 已记 skipped。
@@ -944,23 +946,29 @@ describe.skipIf(SKIPPED)(
         // 「数据已到位」：#819 第 11 轮 review 实测，本轮 logcat 根本没有
         // 「注入完成」行（logcat 是 2 MiB 环形 buffer，Lynx 逐帧日志会把它挤掉），
         // 而 skip 消息仍在陈述那条因果——**在唯一告诉人「本轮未验证」的消息里塞一个
-        // 本轮没验的诊断**，与门级「并列两类成因」是同一个错。
+        // 本轮没验的诊断**，与门级「并列多类成因」是同一个错。
         //
         // ⚠️ 取证调用**必须容错**（#819 第 12 轮 review）：`logcatTailByPid` 底层
         // `runCapture` 在 spawnSync 出错时**抛**，`TIMEOUTS.adb = 30s`。若让异常逃出
         // `it`，本例记 **failed**（不是 skipped）⇒ 台账停在双 0 ⇒ 外层门**再判红一次**，
         // 而判红文案 ① 写的是「该行被写回 return」——把读者引向错误的修法
-        // （正是 `releaseGate.ts` 判红文案要并列两类成因所防的那件事）。
-        // 故：抛错按「未取证」走（第三态）并 warn；**保持在记账之前**，
+        // （正是 `releaseGate.ts` 判红文案并列多类成因所防的那件事）。
+        // 故：抛错**必须单列第三态**并 warn；**保持在记账之前**，
         // 否则会撞接线契约「记账下一条可执行语句必须是 t.skip(」的不变式。
-        let injectedLog: boolean;
+        //
+        // ⚠️ 上一轮只做到「不抛」，却把第三态并回了第二态：catch 里置 `false` 后
+        // 落进「未检出」分支——而抛错路径上 logcat **根本没读成功**，「未检出」是假陈述。
+        // skip 消息是 vitest 持久化、判红时读者**唯一能回看**的那条（warn 谁也不会回头看），
+        // 所以三态必须在消息里分开说。
+        let injectedLog: boolean | undefined;
+        let logcatErr = "";
         try {
           injectedLog = /注入完成/u.test(logcatTailByPid());
         } catch (err) {
-          injectedLog = false;
+          logcatErr = String(err).slice(0, 120);
           console.warn(
-            `[transition-matrix] ⚠️ 取证失败：读 app logcat 抛错（${String(err).slice(0, 120)}）` +
-              `⇒ 本轮「注入完成」**未知**（非「未注入」），skip 消息按未取证分支表述`,
+            `[transition-matrix] ⚠️ 取证失败：读 app logcat 抛错（${logcatErr}）` +
+              `⇒ 本轮「注入完成」**未知**（既非已检出也非未检出），skip 消息按「读取失败」分支表述`,
           );
         }
         coreOutcome.r1.skipped += 1;
@@ -971,11 +979,14 @@ describe.skipIf(SKIPPED)(
             `${notTopJudged ? "（断言①亦不可判定）" : ""}。` +
             `两种候选成因，**不替读者猜是哪种**：① 锚点卡不在视口内；` +
             `② 该内容形态不产生卡内展开段。` +
-            (injectedLog
-              ? `本轮 logcat 检出「注入完成」——**这只说明数据已到位**；` +
-                `**不据此断定差异低的原因**（候选成因 ②「无卡内展开段」与该日志同样兼容）。`
-              : `本轮 logcat **未**检出「注入完成」⇒ 成因本轮未取证（环形 buffer 会滚，` +
-                `2 MiB、Lynx ~60fps 逐帧日志）；**不要据此改产品**。`),
+            (injectedLog === undefined
+              ? `本轮 logcat **读取失败**（${logcatErr}）⇒「注入完成」状态**未知**` +
+                `（既非已检出也非未检出）；成因本轮未取证，**不要据此改产品**。`
+              : injectedLog
+                ? `本轮 logcat 检出「注入完成」——**这只说明数据已到位**；` +
+                  `**不据此断定差异低的原因**（候选成因 ②「无卡内展开段」与该日志同样兼容）。`
+                : `本轮 logcat **未**检出「注入完成」⇒ 成因本轮未取证（环形 buffer 会滚，` +
+                  `2 MiB、Lynx ~60fps 逐帧日志）；**不要据此改产品**。`),
         );
       }
       coreOutcome.r1.judged += 1;

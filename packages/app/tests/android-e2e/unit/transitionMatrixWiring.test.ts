@@ -164,9 +164,20 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     //
     // 求值时把 `judgedPairs` 喂 1（与 3 帧的组合对数 3 不同）——若 RHS 引用了
     // 已达成对数，两个变异都取到 1 ⇒ 红。
+    // ⚠️ 正则取的是**全文件首个匹配** ⇒ 必须在 R1 的 `it` 体内先插一次赋值即可旁路
+    // （实测 `expected = [1,3,6][frames.length - 2]` 放前面 → 全绿）。所以除求值外
+    // 还要钉**唯一性**与**初值**，三者缺一都能被绕过（review 第 13 轮实测）。
+    const writes = specSrc.match(/coreOutcome\.r3\.expected\s*=/g) ?? [];
+    expect(writes.length, "R3 的 expected 写入点应恰好 1 处").toBe(1);
+    expect(specSrc, "r3 台账初值必须显式声明 expected 字段").toMatch(
+      /r3:\s*\{\s*judged:\s*0,\s*skipped:\s*0,\s*expected:\s*0\s*,?\s*\}/,
+    );
+
     const rhs = /coreOutcome\.r3\.expected\s*=\s*([^;]+);/.exec(specSrc)?.[1];
     expect(rhs, "必须能抽出 R3 expected 的赋值表达式").toBeDefined();
-    // eslint-disable-next-line no-new-func -- 仓库自有源码里的纯算术表达式；非可信输入场景
+    // 下面是本仓唯一一处 `new Function`：输入是仓内源码里的纯算术表达式、只在 vitest
+    // 进程里求值、无 IO、不持有外部引用。⚠️ 求值对**语义等价**的改写敏感——例如把
+    // `frames.length` 改成 `frames[0].length` 会红。那是「钉公式」的合理代价。
     const evalExpected = new Function("frames", "judgedPairs", `return ${rhs as string}`);
     const frames = (n: number) => ({ length: n }) as unknown as unknown[];
 

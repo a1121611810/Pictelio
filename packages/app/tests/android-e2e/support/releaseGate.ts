@@ -36,7 +36,7 @@ export interface OutcomeCounts {
   /**
    * 本行应给出的判定总数（子判定个数）。`undefined` = 不做覆盖率判定（单次判定行）。
    *
-   * ⚠️ **不变量**（review 第 12 轮实测枚举 8 种组合后记录）：必须是**有限正整数**。
+   * ⚠️ **不变量**：必须是**有限正整数**（据 review 判断，穷举推导见下）。
    * 两种越界形态当前**生产不可达**（赋值点与 `judged` 累加相邻、无 `await`，
    * `frames.length` 恒 3），但若将来成立会**恒静默**：`NaN` 满足 `judged < NaN` 为
    * false；`expected = 0` 配 `judged > 0` 也不触发 `judged === 0`。接线契约
@@ -94,7 +94,7 @@ export function buildGateFailureMessage(
     .join("；");
   return (
     `发版门内容断言既未判定、也未声明不可判定：${classification.silent.join(" + ")}。` +
-    `两种成因，**报错文案不替你猜是哪种**（务必按序自查）：` +
+    `三类成因，**报错文案不替你猜是哪种**（务必按序自查）：` +
     `① 该行被写回 return —— 不可判定分支直接返回，vitest 记 passed 且日志宣称已验证，` +
     `实际什么都没验到（「什么都没验到」≠「通过」）；` +
     `② 该行所属 test 本轮**根本没跑** —— 台账停在 0/0，但与 ① 的成因和修法完全不同` +
