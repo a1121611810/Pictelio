@@ -275,7 +275,7 @@ function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: 
 }
 
 /** 收藏行探测扫描域（scrim 底部带；右界 = `CONTENT_RIGHT` 1080 横跨全屏宽、
- *  收藏胶囊实测横跨 x 0..1078；上界 = 内容区底界 2016，避开系统栏） */
+ *  收藏胶囊实测横跨 x 0..1078；上界 = `CONTENT_BOTTOM` 避开系统栏） */
 const REGION_BOOKMARK_SCAN: Region = { x0: 0, y0: 1700, x1: CONTENT_RIGHT, y1: CONTENT_BOTTOM };
 
 // 放射 FAB 落点：**推导所得，非魔数**（#816 R2 真因教训）。
@@ -723,8 +723,9 @@ describe.skipIf(SKIPPED)(
      * 故按**三态**记账：
      *   judged  = 断言真跑了并给出通过/不通过的判定；
      *   skipped = 断言显式 `t.skip()` 声明「本形态不可判定」并带原因；
-     *   两者皆 0 = **既没判定也没声明** ⇒ 判红。⚠️ 但这**不唯一**指向 `return`
-     *   （见外层门处的成因清单）——写「只可能」会被四种同样产生双 0 的情形打脸。
+     *   两者皆 0 = **既没判定也没声明** ⇒ 判红。⚠️ 但这**不唯一**指向 `return`：
+     *   见下方外层门 `expect` 消息里并列的四项成因清单（该消息才是判红时读者唯一
+     *   能看到的诊断物，注释在这里写「只可能」会被那四种情形打脸）。
      * skipped 的情形不判红，但会 `console.warn` 高亮「本轮未验证」，且 vitest 已把该
      * test 记为 **skipped**（不是 passed），信息不丢失、也不冒充通过。
      *
@@ -785,10 +786,13 @@ describe.skipIf(SKIPPED)(
       const silent = rows.filter(([, o]) => o.judged === 0 && o.skipped === 0).map(([n]) => n);
       expect(
         silent,
-        `发版门内容断言既未判定也未声明不可判定：${silent.join(" + ")}。` +
-          `这是「不可判定分支被写回 return」的形态——vitest 会记 passed 且日志宣称已验证，` +
-          `而实际什么都没验到（「什么都没验到」≠「通过」）。` +
-          `修法：用 t.skip() 显式声明不可判定并写明原因。` +
+        `发版门内容断言既未判定、也未声明不可判定：${silent.join(" + ")}。` +
+          `两种成因，**报错文案不替你猜是哪种**（务必按序自查）：` +
+          `① 该行被写回 return —— 不可判定分支直接返回，vitest 记 passed 且日志宣称已验证，` +
+          `实际什么都没验到（「什么都没验到」≠「通过」）；` +
+          `② 该行所属 test 本轮**根本没跑** —— 台账停在 0/0，但与 ① 的成因和修法完全不同。` +
+          `修法：① 改用 t.skip() 显式声明不可判定并写明原因；② 跑全量（不带 -t）、` +
+          `并先看 vitest 结果的 passed/skipped 计数与 beforeAll 报错，再谈代码回潮。` +
           `本轮台账：${rows.map(([n, o]) => `${n} judged=${o.judged}/skipped=${o.skipped}`).join("；")}。` +
           `取证：test-results/android-e2e/transition-matrix/ 下各 r1-*/r3-* 帧 + logcat。`,
       ).toEqual([]);
