@@ -12,7 +12,7 @@ specs/*.spec.ts                      # vitest 用例（冒烟 smoke.spec.ts）
        ├─ appium.ts                  # Appium server 启动/复用/健康检查、uiautomator2 driver 预检
        ├─ avd.ts                     # AVD 检测、启动（-no-window）、boot 等待、WebView 版本探测
        ├─ chromedriver.ts            # 预置匹配设备 WebView 的 chromedriver（代理下载）
-       ├─ build-install.ts           # pnpm build:android → adb install
+       ├─ build-install.ts           # pnpm build:android-host → adb install
        └─ driver.ts                  # WebdriverIO standalone 封装：session、context 切换、失败证据收集
 env.ts                               # SDK 路径定位、子进程工具、超时档位、显式等待 waitFor
 ```
@@ -33,13 +33,15 @@ pnpm appium:setup           # 等价于 appium driver install uiautomator2（装
 - Android SDK：默认取 `~/Library/Android/sdk`，或设置 `ANDROID_HOME` / `ANDROID_SDK_ROOT`。
 - 固定 AVD（ADR-0061，不新建/删除）：`pictelio_ui`（android-34，WebView ≥ 85，首选）、`pictelio_low`（android-28，WebView 过老仅验证升级提示页）。
 - 代理：chromedriver 下载走 `chromedriver.storage.googleapis.com`，本机直连大文件会超时，必须能访问代理（默认读 `https_proxy` / `http_proxy` env）。
-- debug 签名环境无需额外配置；APK 由 `pnpm build:android` 编译。
+- debug 签名环境无需额外配置；APK 由 `pnpm build:android-host` 编译。
 
 ## 运行
 
 ```bash
-cd packages/android-host
-pnpm test:android:e2e
+# 仓库根目录（ADR-0204：宿主动作一律 :android-host 显式命名，不占用裸名）
+pnpm test:android-host:e2e
+# 跑单个 spec
+pnpm test:android-host:e2e -- specs/smoke.spec.ts
 ```
 
 默认自动选择第一个可用 AVD（pictelio_ui 优先）。冒烟测试会完整走通：
@@ -53,23 +55,23 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择                                                                                                                                                                    |
 | `ANDROID_E2E_HTTP_PROXY`   | 可选；设为宿主代理（如 `10.0.2.2:7897`）时为模拟器设全局 HTTP 代理（`settings put global http_proxy`），用于宿主网络直连 pixiv 受限（DNS 污染）的环境；teardown 会清除（`settings delete`）。默认不设、零影响 |
-| `ANDROID_E2E_BUILD_MODE`   | 设为 `e2e` 时改跑 `pnpm build:android:e2e`（保留 E2E 钩子），默认普通构建，见「构建模式」                                                                                                                     |
-| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代）                                                                                                                                                       |
+| `ANDROID_E2E_FLAVOR`       | 本分支只支持 `single`（缺省）。build.gradle 已无 productFlavors，显式设成 `full`/`webview` 会**立刻抛错**并指向正确指令（env.ts 收口，不静默 skip）                                              |
+| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android-host`，直接使用既有 APK（快速迭代）                                                                                                                                                 |
 | `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                                                                                                                                                                        |
 | `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）                                                                                                                                                        |
 
-### 构建模式（ANDROID_E2E_BUILD_MODE）
+### E2E 钩子：靠 `BENCH_NAV=1` 注入，没有独立的「构建模式」
 
-`build-install.ts` 的 `buildDebugApk()` 默认跑 `pnpm build:android`（普通构建，web 产物**不含**
-`window.pictelioE2e` E2E 钩子）；设置 `ANDROID_E2E_BUILD_MODE=e2e` 时改跑
-`pnpm build:android:e2e`（web 构建带 `--mode e2e`，define `__E2E__=true` 保留钩子）。
+`build-install.ts` 的 `buildDebugApk()` 只有**一条**路径：跑 `pnpm build:android-host`。
 
-- **依赖 `window.pictelioE2e` 钩子的用例**：单引擎化后**已无此类用例**。原先依赖该钩子的
-  `switch-client-oneway` / `switch-client-roundtrip` / `switch-client-roundtrip-3x` 已随
-  webview 客户端一起删除（被测对象不存在）。若将来新增依赖该钩子的用例，记得用
-  `ANDROID_E2E_BUILD_MODE=e2e` 编译，否则会红在「E2E 钩子应存在」类断言上。
-- 快速迭代：`ANDROID_E2E_SKIP_BUILD=1` 跳过编译直接复用既有 APK。构建模式随产物本身固化，
-  **切换 BUILD_MODE 后必须重新编译**，SKIP_BUILD 复用的旧产物不会因此改变模式。
+- **不存在 `build:android:e2e` 这个脚本**，`ANDROID_E2E_BUILD_MODE` 在代码里也已 0 命中。
+  这条分支随 WebView 客户端删除后已无存在依据，历史上它一旦置位就必然 `Missing script`。
+  由 ADR-0203 决策 7 删除的 `switch-client-*` 系列正是依赖旧 E2E 钩子的那批用例。
+- 现在唯一需要钩子的通道是 **benchNav 深链**，注入方式是**编译期环境变量**：
+  `BENCH_NAV=1 pnpm build:android-host`（见末节「benchNav 深链」）。
+  不注入则 `__BENCH_NAV__=false`，整块钩子被 tree-shake 掉。
+- 快速迭代：`ANDROID_E2E_SKIP_BUILD=1` 跳过编译直接复用既有 APK。钩子随产物本身固化，
+  **加了 / 去掉 `BENCH_NAV=1` 后必须重新编译**，SKIP_BUILD 复用的旧产物不会因此改变。
 
 ### AVD 选择（ANDROID_E2E_AVD）
 
@@ -171,9 +173,9 @@ PictelioWebDavModule → 真实服务器」，断言服务器落盘快照的 `en
   `docs/verification/app-lynx-translation-emulator.md`、ADR-0170「交付通道实测」）。
   因此上一条的「字符串不可用」应读作：**未验证前不要假定字符串载荷可用**；新用途请自备
   JS 侧到达探针（`console.warn` 落 logcat，见下条）再下结论。
-- **构建链必须全程 `BENCH_NAV=1`**：`pnpm build:android` 内部会**重跑 lynx bundle 构建**
+- **构建链必须全程 `BENCH_NAV=1`**：`pnpm build:android-host` 内部会**重跑 lynx bundle 构建**
   （不带该 env 即注入 `__BENCH_NAV__=false`，整块钩子被 tree-shake）——只对
   `build:app-lynx` 单独注入会被随后的整链构建覆盖回无钩子版本（#542 实测坑）。
-  正确姿势：`BENCH_NAV=1 pnpm build:android`；出货构建不注入，天然零钩子。
+  正确姿势：`BENCH_NAV=1 pnpm build:android-host`；出货构建不注入，天然零钩子。
 - **console 探针**：lynx JS 的 console.warn/log 落 logcat（tag `lynx`，`lynx_console.cc`），
   可作为无 UI 信号的事件到达/分支判定探针。

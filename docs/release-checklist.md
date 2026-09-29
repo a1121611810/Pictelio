@@ -56,7 +56,7 @@
 | 格式化             | `pnpm fmt`                                          | ✅ 通过（134 文件，863 ms）                                  |
 | 类型检查与代码检查 | `pnpm check` / `pnpm check:android-host`             | ✅ 通过（格式化 + lint 均无问题）                            |
 | 单元测试           | `pnpm test`                                         | ✅ 通过（客户端 + 宿主包）                                   |
-| 仓库不变量总闸     | `pnpm test:android-host`                            | ✅ 7 组不变量全绿（WebView 客户端已删除的权威判据）           |
+| 仓库不变量总闸     | `pnpm test:android-host`                            | ✅ 10 组不变量全绿（WebView 客户端已删除的权威判据）           |
 | 生产构建           | `pnpm build`                                        | ✅ 成功生成客户端产物                                        |
 | Android Debug 构建 | `pnpm build:android-host`                           | ✅ 产出可安装 APK                                            |
 
