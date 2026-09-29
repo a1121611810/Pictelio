@@ -43,7 +43,7 @@
 
 | 行 | 表面 | 动作序列 | 内容断言（禁存在性） |
 |----|------|----------|---------------------|
-| R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | 返回后锚点卡内存在「相关作品」段（`relatedRowFor` 渲染物）；滚动位置不回顶（对比返回前后截图/首屏元素一致） |
+| R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | **锚点卡下方区域帧差 > `INJECT_TH`(800)**（帧对比代理：对应 `relatedRowFor` 渲染物，**但不区分变化来源**——该区域任何内容变化都满足，理由见 §3.T2 下方「不可判定」口径）；滚动位置不回顶（对比返回前后帧） |
 | R2 | lynx SearchSheet | 搜多结果词→滚到底→等第二页 | 断言翻页后行数增加且无「加载更多失败」横幅；再切「小说」scope→列表无插画行 |
 | R3 | lynx 推荐轮播 | 滑动 ≥2 张 | 每张卡收藏数两两不同（对比帧文本）；卡内容随 index 变化 |
 
@@ -59,7 +59,9 @@
 > |------|------|--------|
 > | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
 > | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
-> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。**成因不唯一**：① 不可判定分支被写回 `return`（要堵的洞）；② 该用例本轮**根本没执行**（`-t` 过滤 / `describe.skipIf` / `beforeAll` 失败 / 前面断言抛错 / 超时）。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮 |
+> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时 / `-t` 过滤。**这些情形 `afterAll` 仍会执行**（vitest 源码 `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮 |
+>
+> ⚠️ **第三类：不产生双 0，而是让门整个消失**——`describe.skipIf(SKIPPED)` 为真时 vitest 直接把 suite 标为 skip 并结束（`run.C5UmxDPh.js:4023-4025` 的 `suite.mode === "skip"` 分支**不含 `afterAll`**），台账对象根本不存在 ⇒ **不判红、结果里也不留痕迹**。在非 `pictelio_ui` 设备上跑发版门就属于这一类。已挂 #819 第 7 项（待办：`docs/release-checklist.md` 加一条「跑完核对 `Tests … | N skipped` 计数与该行 console 输出，确认发版门真的跑了」）。
 >
 > 「求和」太弱（R3 判过就能替 R1 背书）；「逐行 AND」太强（把内容形态导致的不可判定报成产品回归，得到随机红的发版门）。三态是唯一同时满足「不放过 `return` 回潮」与「不因内容形态随机红」的形态。**反事实检验**：把 skip 分支改回 `return`，实测该行立刻转红，且同轮 R3 判过 3 对也遮不住（证明是逐行而非求和）。
 >

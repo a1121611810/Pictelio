@@ -297,7 +297,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - **框架**：Vitest 4.1（`vp test`）+ `happy-dom`（SolidJS server 姿态问题，ADR-0144）
 - **位置**：`tests/unit/**`（按源目录）、`tests/agent-browser/specs/**`、`src/**/*.test.ts`；编写约定详版 = `packages/app/tests/TESTING.md`（本节为摘要）
-- **E2E 编排**：agent-browser 6 spec 本地门禁（pre-push 静态锚点）；android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/app/tests/android-e2e/specs/`
+- **E2E 编排**：agent-browser 12 spec 本地门禁（pre-push 静态锚点）；android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/app/tests/android-e2e/specs/`
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
 
 ### 门禁边界（#539 拍板，2026-09-15）
