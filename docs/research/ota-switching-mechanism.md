@@ -1,5 +1,18 @@
 # OTA 运行时指向机制选型：下载后的 bundle 目录如何让 WebView 加载
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文描述的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
+> 三件套上传 GitHub Release）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：本文的整套运行时指向机制（`setServerBasePath` 原子切换、
+> `notifyAppReady` 回滚、`versions/<id>/index.html` 布局）**没有执行方**——WebView 客户端已下线，
+> Lynx 侧对 OTA 零消费；而 `packages/app/src/**` 的 OTA **消费层代码**与 `@pictelio/update-check`
+> 的 web bundle API **一行未删、原样留存**，与本文描述存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 评估日期：2026-08-29。回答 issue #241（Map: #240，前置结论见 `docs/research/mpa-remote-githubpages-feasibility.md` §D——本地 webDir + web bundle OTA 路线，远程 URL 壳已否决）。
 > 第一手来源实抓：`@capgo/capacitor-updater` 8.51.15 Android 源码逐行实读（CapacitorUpdaterPlugin.java 5860 行 / CapgoUpdater.java 3395 行 / BundleInfo / DownloadService 等直接自 GitHub `Cap-go/capacitor-updater` main 下载）；Capacitor 8.5.0 Android 源码实读（Bridge.java / WebViewLocalServer.java / WebView.java 插件 / CapConfig.java / UriMatcher.java，tag `8.5.0`）；npm registry metadata；capacitorjs.com/docs/config；ionic-team/capacitor issues #1228 / #4598；GitHub API 仓库/发布数据；本仓 `packages/app/android/.../MainActivity.java` 代码实读。
 > 注：`docs/research/nuxt-service-worker-prototype.md`（app-nuxt 原型报告）在仓内实际不存在（未被提交，`packages/app-nuxt` 整体无 git 跟踪记录），本文对 v3 拦截实验的引用只能转述 mpa 报告的二手结论；仓内**已提交、生产在跑**的拦截先例是主 app MainActivity 的 `/pixiv-img/` 代理（本文 §B 直接实读该源码）。

@@ -1,5 +1,17 @@
 # OTA web bundle 更新实施规格
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文描述的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
+> 三件套上传 GitHub Release）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：`packages/app/src/**` 的 OTA **消费层代码**（`otaService.ts` /
+> `native/Ota.ts` / `GateOverlay.tsx` 等）与 `@pictelio/update-check` 的 web bundle API
+> **一行未删、原样留存**，与本文描述的「web 修复可不经 APK 重装」存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 对应 issue [#246](https://github.com/a1121611810/Pictelio/issues/246)（Wayfinder 地图 [#240](https://github.com/a1121611810/Pictelio/issues/240) 唯一 open task）。
 > 依据：`docs/research/` 五份调研（mpa-remote-githubpages-feasibility / ota-switching-mechanism / ota-ed25519-android / ota-minwebversion-gate / ota-release-integration，均为第一手源码/文档实抓）+ #245 原型四场景实测（分支 `prototype/ota-sandbox`，四坑修复已验证）。
 > 关键裁决：**切换机制自研硬化**（见 ADR-0122）；其余决策为 2026-08-30 grill 会话与用户逐条确认（全屏过渡面 / 快慢双通道 / 开关+门槛豁免 / web-only 发布模式）。

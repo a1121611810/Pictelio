@@ -1,5 +1,17 @@
 # Pictelio SPA→MPA 拆分 + GitHub Pages 远程壳可行性调研
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文 §D 结论所导向的 **OTA web bundle 发布通道**（构建 web 产物 →
+> Ed25519 签名 → 三件套上传 GitHub Release）**已整体下线**，「若立项则先 spike 自研 OTA 最小闭环」
+> 的行动项**不再可执行**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：`packages/app/src/**` 的 OTA **消费层代码**与 `@pictelio/update-check`
+> 的 web bundle API **一行未删、原样留存**，与本文描述存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 评估日期：2026-08-29。第一手来源实抓：capacitorjs.com 官方文档（config / security guides）、github/docs 仓库 raw 文档（Pages limits / HTTPS）、Google Play 政策页、GitHub API（capacitor#4080 讨论、#2373 issue、npm registry）、本项目 GitHub Pages 站点响应头实测、作者网络环境 DNS/直连探测；本地壳实测数据复用 `docs/research/nuxt-service-worker-prototype.md`（下称「原型报告」）。
 > 用户提案原文：「目前 app 项目是 SPA，我打算拆成多页面（MPA）；另外打算页面上云，不放本地了，放在 GitHub（Pages），壳（Capacitor）直接访问链接（远程 URL）。」
 > 前置阅读：`docs/research/nuxt-ssr-android-paths.md`（下称「SSR 路径报告」——远程 origin 桥接不可靠的既有论证，本文 §C 复核并扩充）。

@@ -1,5 +1,18 @@
 # web bundle OTA 的 Android 侧 Ed25519 验签选型与密钥流程（minSdk 28）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文描述的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
+> 三件套上传 GitHub Release）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：Android 侧验签类（`OtaSignatureVerifier` 等）**早已不在仓库**
+> （`find packages/app/android/app/src -iname "*Ota*" -o -iname "*Signature*"` 实测 0 行），
+> 本文的密钥流程与签名选型**已无执行方**；而 `packages/app/src/**` 的 OTA **消费层代码**
+> 与 `@pictelio/update-check` 的 web bundle API **一行未删、原样留存**，与本文描述存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 调研日期：2026-08-30。对应 issue #242（Wayfinder 地图 #240 的调研子任务）。Node 侧签名已定用 `node:crypto` 内置 Ed25519（本题不再展开），本题只解三件事：Android 侧验签工具链选型、公钥内置方式与私钥保管流程、签名对象（zip 直签 vs 摘要签）。
 >
 > 一句话结论：**`java.security` 的 Ed25519 虽在 AOSP javadoc 里标注 "API 33+"，但实测 Android 15 仍抛 `NoSuchAlgorithmException`（Conscrypt 2025-01 才提交实现），minSdk 28 下必须捆绑验签库；推荐 BouncyCastle 的 lightweight API（`bcprov-jdk18on` 1.85.2，只调 `Ed25519Signer`，全程不注册 JCA provider，从根上避开 Android 内置裁剪版 BC 的冲突坑），jar 原始 10.28 MB 但 R8 后 dex 增量仅数十 KB 量级，Android 侧核心验签代码约 50-70 行；公钥用 BuildConfig 字段内置 base64 raw 32 字节（仓库已有 `CLIENT_KINDS` 的 `buildConfigField` 先例）；签名对象推荐「域分隔前缀 + SHA-256(zip) 摘要」的 hash-then-sign（两侧均可流式、内存 O(1)，且 SHA-256 兼作下载完整性快检），不做 RFC 8032 的 Ed25519ph。**

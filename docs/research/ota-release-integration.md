@@ -1,5 +1,17 @@
 # release 流程与 web bundle 产物/签名的整合点（issue #244 调研）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文记录的 **OTA web bundle 发布通道**整合点（`release.mjs` 的
+> 打包/签名/上传挂载、`release-bundle.mjs`、OTA 私钥、Ed25519 三件套）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：`release.mjs` 已无 OTA 挂载步骤，本文的 step 1/2/3/6 插入点
+> **不再存在**；而 `packages/app/src/**` 的 OTA **消费层代码**与 `@pictelio/update-check`
+> 的 web bundle API **一行未删、原样留存**，与本文描述存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 调研日期：2026-08-29。对应 issue #244（Wayfinder 地图 #240 的调研子任务）。前置结论：签名方案见 `docs/research/ota-ed25519-android.md`（域分隔前缀 + SHA-256(zip) 摘要签 / manifest JSON，Node 侧 `node:crypto` Ed25519），切换机制见 `docs/research/ota-switching-mechanism.md`（capgo 手动模式 / `versions/<id>/index.html` 布局）。**本文全部结论来自本仓源码逐行实读（文件 + 行号在来源节），无外部依赖。**
 >
 > 一句话结论：**插入点 = `release.mjs` 的 step 3（`buildReleaseApks()` 的 `buildSteps` 追加「打包 + 签名 web bundle」一步，正常发布与覆盖发布重建两条路径自动共用）+ step 6（`uploadReleaseAssets({ paths })` 追加 bundle 三件套资产，复用既有逐包重试/上传面板/失败隔离）；版本方案 = bundle 版本与 `package.json` / APK `versionName` 同源同值（tag/versionCode/version.json 一套状态零新增），兼容约束用 manifest 的 `minApkVersion` 字段（进签名覆盖范围）+ App 端下载前守卫 + CI 桥接口一致性契约测试三层表述；签名只放本地（现有 CI 无任何签名/发布步骤，与 APK 签名同一信任模型），CI 只做不持密钥的验证类工作（Ed25519 官方向量测试、桥契约测试、可选 zip 结构 smoke）。**

@@ -1,5 +1,18 @@
 # minWebVersion 强制门槛：数据源选型、检查时机与触发 UX
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文描述的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
+> 三件套上传 GitHub Release）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **与当前状态的偏差**：`version.json` 的 `minWebVersion` / `webBundle` 字段**不再被发布脚本写入**；
+> 但 `packages/app/src/**` 的 OTA **消费层代码**与 `@pictelio/update-check` 的 web bundle API
+> （`isBelowMin` / `parseMinWebVersion` / `parseWebBundle`）**一行未删、原样留存**，
+> 故这些解析现为**恒空读**（判「未低于门槛」），与本文描述存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 评估日期：2026-08-29。回答 issue #243（Map: #240）。前置结论：`docs/research/mpa-remote-githubpages-feasibility.md` §D（本地 webDir + OTA bundle 正路，远程壳否决）、`docs/research/ota-switching-mechanism.md`（#241：capgo 手动模式 + hostFiles 原子切换 + notifyAppReady 回滚）、`docs/research/ota-ed25519-android.md`（#242：bcprov 验签）。
 > 第一手来源实抓：本仓代码实读（`packages/update-check/src/index.ts`、`packages/app/src/routes/__root.tsx`、`packages/app/src/stores/settingsStore.ts`、`packages/app/src/components/StartupUpdateDialog.tsx`、`packages/app-lynx/src/stores/updateStore.ts`、`packages/app/scripts/release.mjs`、`.github/workflows/deploy.yml`、`packages/website/src/pages/index.astro` / `layouts/BaseLayout.astro`）；ADR-0089；本站 raw.githubusercontent / GitHub Pages 响应头 curl 实测；docs.github.com 限流页、Expo Updates 官方文档、`microsoft/react-native-code-push` 文档（gh API 实抓）。
 

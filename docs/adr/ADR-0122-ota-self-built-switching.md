@@ -1,5 +1,19 @@
 # ADR-0122: OTA web bundle 切换机制自研而非引入 @capgo/capacitor-updater
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> **Lynx 单引擎**客户端；本文的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
+> 三件套上传 GitHub Release）**已整体下线**。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> ⚠️ **本 ADR 被 [`ADR-0202`](./ADR-0202-ota-web-bundle-channel-retirement.md) 部分取代**：
+> 其**发布侧通道**部分失效，**消费侧设计记录**（自研 vs capgo 的选型依据、四个生产坑的修复语义、
+> Ed25519 验签与密钥保管的信任模型）仍作历史资料保留。
+> ⚠️ **与当前状态的偏差**：`packages/app/src/**` 的 OTA **消费层代码**与 `@pictelio/update-check`
+> 的 web bundle API **一行未删、原样留存**，与本文描述的「已可热更新」存在偏差。
+> 当前 OTA 通道事实见 [`ADR-0202`](./ADR-0202-ota-web-bundle-channel-retirement.md)；
+> 单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+
 web bundle 的运行时切换只需 Capacitor 官方原语（`setServerBasePath` / `setServerAssetPath`，官方 issue #1228 背书的唯一正道），#245 原型已用约 350 行自研 OtaPlugin 在设备上跑通四场景（好包下次启动生效 / 坏签名拒装 / 启动崩溃 10s 回滚 / 门槛阻断）。生产必修的四个坑（本地服务器响应缺 `Cache-Control`、notifyReady 需版本握手防陈旧文档误报、切换与 WebView 首导航竞态、回滚清 pending + 幂等重装）中三个的修复语义位于自有代码——capgo 没有对应机制（其 `notifyAppReady` 无版本参数），引入意味着 fork 打补丁（MPL-2.0 文件级 copyleft 义务）并废弃已验证的证据链。故裁决（#246，2026-08-30）：**自研硬化**。
 
 ## Considered Options
