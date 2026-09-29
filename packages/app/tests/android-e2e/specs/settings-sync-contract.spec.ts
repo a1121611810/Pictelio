@@ -83,7 +83,7 @@ describe("T5 设置迁移契约（ADR-0103）", () => {
     await ctx?.teardown();
   });
 
-  it("预置老键（模拟升级前设备）→ dev hook 登录 → 迁移播种到账号键 + 真实契约键断言", async () => {
+  it("预置老键（模拟升级前设备）→ dev hook 登录 → 迁移播种到账号键 + 真实契约键断言", async (t) => {
     // 先停 app：SharedPreferences 实例有内存缓存，运行中经 adb 写文件不可见——
     // 必须在 app 停止时播种，重启后 fresh 实例才会读到种子文件（ADR-0103 迁移前提）
     forceStopApp(serial);
@@ -97,8 +97,17 @@ describe("T5 设置迁移契约（ADR-0103）", () => {
     await waitForActivity(serial, LYNX_ACTIVITY, 30_000);
 
     if (!HAS_TOKEN) {
-      console.warn("[T5] 跳过登录段（缺 PIXIV_REFRESH_TOKEN）——无 uid 则迁移不会触发");
-      return;
+      // ⚠️ #819 第 12 轮 review：此处曾是 `return` —— vitest 记 **passed**、对
+      // `Tests … | N skipped` 计数贡献 **0**，即「冒充通过」：而本行之后正是本 spec
+      // **唯一的真实 oracle**（迁移播种到账号键 + 契约键断言）。缺 token 时它被静默
+      // 跳过、结果却显示通过——发版门的人工核对项（核 skipped 计数）对此结构性失明。
+      // 改 `t.skip()`：报 skipped 而非 passed。老注释写「跳过登录段」也不准——
+      // `return` 掉的是**整个用例**。
+      t.skip(
+        "[T5] 不可判定：缺 PIXIV_REFRESH_TOKEN，dev hook 登录与迁移播种断言无法执行。" +
+          "本用例不记 passed（那会宣称验证了实际未验证的事）；" +
+          "无 token 时请配 PIXIV_REFRESH_TOKEN 后复跑",
+      );
     }
     // 登录：dev intent hook（webview 登录页注入已随 #610 删除）
     await loginViaDevIntent(serial);

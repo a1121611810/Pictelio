@@ -945,7 +945,24 @@ describe.skipIf(SKIPPED)(
         // 「注入完成」行（logcat 是 2 MiB 环形 buffer，Lynx 逐帧日志会把它挤掉），
         // 而 skip 消息仍在陈述那条因果——**在唯一告诉人「本轮未验证」的消息里塞一个
         // 本轮没验的诊断**，与门级「并列两类成因」是同一个错。
-        const injectedLog = /注入完成/u.test(logcatTailByPid());
+        //
+        // ⚠️ 取证调用**必须容错**（#819 第 12 轮 review）：`logcatTailByPid` 底层
+        // `runCapture` 在 spawnSync 出错时**抛**，`TIMEOUTS.adb = 30s`。若让异常逃出
+        // `it`，本例记 **failed**（不是 skipped）⇒ 台账停在双 0 ⇒ 外层门**再判红一次**，
+        // 而判红文案 ① 写的是「该行被写回 return」——把读者引向错误的修法
+        // （正是 `releaseGate.ts` 判红文案要并列两类成因所防的那件事）。
+        // 故：抛错按「未取证」走（第三态）并 warn；**保持在记账之前**，
+        // 否则会撞接线契约「记账下一条可执行语句必须是 t.skip(」的不变式。
+        let injectedLog: boolean;
+        try {
+          injectedLog = /注入完成/u.test(logcatTailByPid());
+        } catch (err) {
+          injectedLog = false;
+          console.warn(
+            `[transition-matrix] ⚠️ 取证失败：读 app logcat 抛错（${String(err).slice(0, 120)}）` +
+              `⇒ 本轮「注入完成」**未知**（非「未注入」），skip 消息按未取证分支表述`,
+          );
+        }
         coreOutcome.r1.skipped += 1;
         t.skip(
           `R1 断言③不可判定：锚点卡下方区域帧差 ${injected} ≤ ${INJECT_TH}。` +
@@ -955,7 +972,8 @@ describe.skipIf(SKIPPED)(
             `两种候选成因，**不替读者猜是哪种**：① 锚点卡不在视口内；` +
             `② 该内容形态不产生卡内展开段。` +
             (injectedLog
-              ? `本轮 logcat 检出「注入完成」⇒ 数据已到位，差异低是采样对象不可见。`
+              ? `本轮 logcat 检出「注入完成」——**这只说明数据已到位**；` +
+                `**不据此断定差异低的原因**（候选成因 ②「无卡内展开段」与该日志同样兼容）。`
               : `本轮 logcat **未**检出「注入完成」⇒ 成因本轮未取证（环形 buffer 会滚，` +
                 `2 MiB、Lynx ~60fps 逐帧日志）；**不要据此改产品**。`),
         );

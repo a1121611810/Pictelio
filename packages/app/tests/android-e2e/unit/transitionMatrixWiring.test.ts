@@ -152,18 +152,27 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     expect(label, "R1 行名必须含被比较的阈值名 INJECT_TH").toMatch(/INJECT_TH/);
   });
 
-  it("R3 台账必须写 expected（覆盖率判据），否则「1/3 覆盖」又变回静默", () => {
+  it("R3 台账的 expected 必须按**帧数组合对数**算，不是按已判对数或写死常量", () => {
     // #819 第 11 轮 review 阻塞项：`classifyOutcomeRows` 的未验证判据含
     // `judged < expected`，但若 spec 从不给 R3 写 `expected`，该判据**永不触发**
-    // ——纯函数单测全绿、生产门照旧静默。故断**接线**：赋值点必须存在，且在
-    // `coreOutcome.r3.judged` 累加之后（否则先写 expected 再判，顺序无碍但读起来误导；
-    // 关键是它必须在该 test 内被赋值，而不是靠台账初值 0）。
-    const expectedWrites = specSrc.match(/coreOutcome\.r3\.expected\s*=(?!=)/g) ?? [];
-    expect(expectedWrites.length, "R3 的 expected 写入点应恰好 1 处").toBe(1);
-    // 台账初值必须显式带 expected 字段（否则类型上 `expected` 是可选的，漏写不报错）
-    expect(specSrc, "r3 台账初值必须显式声明 expected 字段").toMatch(
-      /r3:\s*\{\s*judged:\s*0,\s*skipped:\s*0,\s*expected:\s*0\s*,?\s*\}/,
-    );
+    // ——纯函数单测全绿、生产门照旧静默。
+    //
+    // ⚠️ 只断「赋值点存在」**不够**（第 12 轮实测）：把 RHS 改成 `1` 或
+    // `judgedPairs` 时接线断言全绿，而 `judged < expected` 变成恒假/重言式 ⇒
+    // 「1/3 覆盖静默」那个洞原样回来。**存在性恰好是语义退化最容易伪装的形态。**
+    // 故这里**求值** RHS 而不是钉字面量：对格式化/重命名免疫，且两种变异都红。
+    //
+    // 求值时把 `judgedPairs` 喂 1（与 3 帧的组合对数 3 不同）——若 RHS 引用了
+    // 已达成对数，两个变异都取到 1 ⇒ 红。
+    const rhs = /coreOutcome\.r3\.expected\s*=\s*([^;]+);/.exec(specSrc)?.[1];
+    expect(rhs, "必须能抽出 R3 expected 的赋值表达式").toBeDefined();
+    // eslint-disable-next-line no-new-func -- 仓库自有源码里的纯算术表达式；非可信输入场景
+    const evalExpected = new Function("frames", "judgedPairs", `return ${rhs as string}`);
+    const frames = (n: number) => ({ length: n }) as unknown as unknown[];
+
+    expect(evalExpected(frames(3), 1), "3 帧 ⇒ 3 对子判定").toBe(3);
+    expect(evalExpected(frames(4), 1), "4 帧 ⇒ 6 对子判定（证明是组合数而非常量）").toBe(6);
+    expect(evalExpected(frames(2), 1), "2 帧 ⇒ 1 对").toBe(1);
   });
 
   it("spec 文件仍在，契约测试没读到空串", () => {

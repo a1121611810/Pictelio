@@ -14,15 +14,16 @@
  * ## 为什么期望值不是从实现反推（测试硬约束 #4 / #6 oracle 溯源）
  *
  * 下面的真值表**逐格抄自 spec**：`docs/specs/qa-defense-lines.md` 的
- * 「内容断言的「不可判定」口径（三态记账）」表（`judged>0` / `judged=0,skipped>0` /
- * `judged=0,skipped=0` 三行 → 各自的「外层门」列），而非跑一遍
- * `classifyOutcomeRows` 把输出当快照。
+ * 「内容断言的「不可判定」口径」表（**四行** → 各自的「外层门」列），而非跑一遍
+ * `classifyOutcomeRows` 把输出当快照：
+ *   ① `judged > 0`                ② `judged = 0, skipped > 0`
+ *   ③ `judged = 0, skipped = 0`   ④ `0 < judged < expected`（覆盖率不足，第 11 轮补）
  *
  * ⚠️ 「抄」本身**不构成机器防线**——本文件早前那句「改动 spec 而不改本测试都会立刻红」
- * 是假的（它只在注释里提到那份 .md，从不读它；实测 `grep -rln qa-defense-lines
- * tests/ src/` 的命中全是注释文本）。故补了「spec 一致性」组的 doc-parity 断言：
- * 真去读那份 .md、抽出三态表的三格判定词，再与 `classifyOutcomeRows` 的**实际行为**
- * 对照——改 spec 而不改实现（或反之）现在真的会红。
+ * 是假的：它当时只在注释里提到那份 .md，从不读它（故那句 grep 当时全是注释文本命中；
+ * ⚠️ 自本组加入后该证据已失效，改 spec 的读点现在**真的存在**——就是下面那个
+ * `readFileSync`）。故补了「spec 一致性」组的 doc-parity 断言：真去读那份 .md、
+ * 抽出四格的判定词，再与 `classifyOutcomeRows` 的**实际行为**对照。
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -40,6 +41,9 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 /** 仓根 = unit → android-e2e → tests → app → packages → 仓根，共 5 级。 */
 const SPEC_MD_PATH = path.resolve(testDir, "../../../../../docs/specs/qa-defense-lines.md");
 const specMd = readFileSync(SPEC_MD_PATH, "utf8");
+/** 实现侧的同款表（`releaseGate.ts` 头注释）——两份表可各自漂移，必须同源核对。 */
+const GATE_SRC_PATH = path.resolve(testDir, "../support/releaseGate.ts");
+const gateSrc = readFileSync(GATE_SRC_PATH, "utf8");
 
 /**
  * 台账行：[可读名, 计数]。名字取自 spec 里两行内容断言的原文。
@@ -137,11 +141,18 @@ describe("发版门外层三态门 · 判红文案", () => {
   ];
   const msg = buildGateFailureMessage(rows, classifyOutcomeRows(rows));
 
-  it("必须并列列出**两类**成因（① 被写回 return / ② 该 test 本轮没跑），不单因归错", () => {
+  it("必须并列列出**三类**成因（① return 回潮 / ② test 没跑 / ③ 本行自己的 expect 真失败）", () => {
     expect(msg).toMatch(/①/);
     expect(msg).toMatch(/②/);
+    expect(msg).toMatch(/③/);
     expect(msg).toMatch(/return/);
     expect(msg).toMatch(/没跑|根本没跑/);
+    // ③ 是 #819 第 12 轮 review 补的：台账写入点在所有 expect 之后 ⇒ 本行断言真失败
+    // 同样留下双 0，而 ② 的措辞（「前面断言抛错」）会把你引去查 beforeAll。诊断指向错
+    // 与「单因归错」同型，故必须单独点名。
+    expect(msg, "必须点名第三类成因：本行自己的内容断言真失败").toMatch(
+      /该行自己的内容断言真失败/u,
+    );
   });
 
   it("第 ② 类的**成因子句**自带子因（含 -t 只滤掉本 test），不得只藏在修法里", () => {
@@ -398,31 +409,44 @@ describe("发版门外层三态门 · 收尾与执行顺序", () => {
  */
 describe("发版门外层三态门 · spec 一致性（三态表 ↔ 实现行为）", () => {
   /** 抽出三态表的数据行（blockquote 内的 `| … |` 行，跳过表头与分隔行）。 */
-  function threeStateRows(md: string): { ledger: string; gate: string }[] {
-    return (
-      md
-        .split("\n")
-        .map((l) => l.replace(/^\s*>\s?/, ""))
-        // ⚠️ 锚点必须**紧跟首个竖线的反引号**（`| \`judged…`），不能用 `/^\|.*judged/`：
-        // 后者会把任何「表格行里含 judged 一词」的行也算进来——本次 review 往 R1 行
-        // 补了一句「`judged` 只说明…」的挂账说明，抽取器就多收了 1 行、与 4 格断言冲突。
-        // 这与「接线契约的切片终点会静默漂移」同族：抽取范围必须由**结构**界定，不能由词面命中界定。
-        .filter((l) => /^\|\s*`/.test(l))
-        .map((l) => {
-          const cells = l
-            .split("|")
-            .slice(1, -1)
-            .map((c) => c.trim());
-          return { ledger: cells[0] ?? "", gate: cells[2] ?? "" };
-        })
-    );
+  /**
+   * 抽出三态表的数据行（blockquote 内、每格 3 列的行）。
+   *
+   * ⚠️ **两个独立的抽取边界都要由结构界定**，缺一即假绿：
+   *
+   * ① **行的边界**：锚点必须**紧跟首个竖线的反引号**（`| \`judged…`），不能用
+   *    `/^\|.*judged/`——后者会把任何「表格行里含 judged 一词」的行也算进来（review 往
+   *    R1 行补了句含 `judged` 的挂账说明，就多收了 1 行）。锚点 `^\|\s*\`` 修好了这层。
+   * ② **格的边界**：**不能直接 `split("|")`**。第 4 格正文里写了 markdown 转义竖线
+   *    `\|\|`（判据 `judged === 0 \|\| judged < expected`），naive split 会把该行切成
+   *    **5 格**、`cells[2]` 在 322 字符处**截断**——尾部那句真正的规范承诺
+   *    （「⚠️ 仍**不判红**：覆盖率由内容形态决定…」）**从不进入任何断言**。
+   *    实测把那句改成「一律判红」或「仍判红」，doc-parity **全绿**。
+   *    修法：split 前先把 `\|` 换成哨兵、split 后还原；并断言 `cells.length === 3`
+   *    （那才是能抓住这个洞的下界断言）。
+   */
+  function threeStateRows(md: string): { ledger: string; gate: string; cells: number }[] {
+    const SENTINEL = " ";
+    return md
+      .split("\n")
+      .map((l) => l.replace(/^\s*>\s?/, ""))
+      .filter((l) => /^\|\s*`/.test(l))
+      .map((l) => {
+        const raw = l.replace(/\\\|/g, SENTINEL).split("|").slice(1, -1);
+        const cells = raw.map((c) => c.trim().replaceAll(SENTINEL, "|"));
+        return { ledger: cells[0] ?? "", gate: cells[2] ?? "", cells: raw.length };
+      });
   }
   const specRows = threeStateRows(specMd);
 
   it("必须从 qa-defense-lines.md 抽到三态表的全部 4 格（抽到 0 格会让本组全称断言恒真）", () => {
     expect(specRows.length, "三态表数据行数").toBe(4);
     expect(specMd.length, "spec 文件没读到空串").toBeGreaterThan(1000);
-    for (const { ledger, gate } of specRows) {
+    for (const { ledger, gate, cells } of specRows) {
+      // ⚠️ 每行必须**恰 3 格**：这是「格的边界没界定」的唯一下界断言。第 4 格正文含
+      // 转义竖线 `\|\|`，naive split 会让它变 5 格、尾部承诺被静默截断（review 实测：
+      // 把尾部改成「一律判红」时全部测试照绿）。少这行断言，那类假绿就永久藏着。
+      expect(cells, `「${ledger}」那行必须是 3 格（转义竖线须还原）`).toBe(3);
       expect(ledger, "台账列必须非空").not.toBe("");
       expect(gate, "外层门列必须非空").not.toBe("");
     }
@@ -433,6 +457,15 @@ describe("发版门外层三态门 · spec 一致性（三态表 ↔ 实现行�
     expect(specRow, "必须抽到「judged = 0, skipped > 0」那一格").toBeDefined();
     // 判定词只认「**不判红**」——它与「判红」共用「判红」二字，必须按是否被否定区分
     expect(specRow!.gate, "spec 该格必须声明不判红").toMatch(/不判红/);
+    // ⚠️ 「不判红」半边之外还要钉「**要 warn**」半边：#819 第 12 轮实测把 spec 该格
+    // 改成「不判红，且**不 warn**（静默放过）」时 doc-parity 全绿——warn 承诺是硬编码在
+    // 测试里查实现的，不是从 spec 读的，spec 可以悄悄把它删掉。
+    // ⚠️ 断的是**承诺的具体措辞**而非裸的 `/warn/`：反事实实测把该格改成
+    // 「**不 warn**（静默放过）」时，`/warn|未验证/` 照样命中 ⇒ 假绿。中文否定句天然
+    // 包含被否定的关键词（与「不判红 vs 判红」同族；那处用 `(?<!不)判红` 处理，此处否定词
+    // 与被否词之间还隔了空格、lookbehind 抓不到，故改断正向措辞）。
+    // 措辞与实现、checklist 共用「本轮未验证」一词，改一处要同步另两处。
+    expect(specRow!.gate, "spec 该格必须同时承诺 warn「本轮未验证」").toMatch(/本轮未验证/u);
 
     const r = classifyOutcomeRows([row("R1", 0, 1)]);
     expect(r.silent, "实现必须不判红").toEqual([]);
@@ -451,10 +484,23 @@ describe("发版门外层三态门 · spec 一致性（三态表 ↔ 实现行�
     expect(classifyOutcomeRows([row("R1", 0, 0)]).silent, "实现必须判红").toEqual(["R1"]);
   });
 
+  it("实现侧头注释的表必须与 spec 同格数、且含第 4 格（两份表可各自漂移）", () => {
+    // 之前只有 spec 那张表被机器核对，实现注释里手抄的那张谁都不读 —— 三份真值表
+    // （spec md / releaseGate.ts 注释 / 本测试断言）可以各说各话。
+    const table = /\* \| 台账 \| 外层门 \|([\s\S]*?)\n \*\n/.exec(gateSrc)?.[1] ?? "";
+    const rows = table.split("\n").filter((l) => l.startsWith(" * | `"));
+    expect(rows.length, "实现注释表的数据行数（须与 spec 的 4 格一致）").toBe(4);
+    expect(table, "实现注释表必须提到覆盖率维度 expected").toMatch(/expected/);
+    expect(gateSrc, "实现侧分类函数必须真的读 expected（否则注释与行为脱节）").toMatch(
+      /o\.expected !== undefined && o\.judged < o\.expected/u,
+    );
+  });
+
   it("第 4 格「覆盖率不足」（0 < judged < expected）：spec 说不判红 + warn，实现也必须只 warn", () => {
     const specRow = specRows.find((r) => /judged\s*<\s*expected/u.test(r.ledger));
     expect(specRow, "必须抽到「0 < judged < expected」那一格").toBeDefined();
     expect(specRow!.gate, "spec 该格必须声明不判红").toMatch(/不判红/);
+    expect(specRow!.gate, "spec 该格必须同时承诺 warn「本轮未验证」").toMatch(/本轮未验证/u);
     // ⚠️ 覆盖率不足**不得**升级为判红：那会因内容形态随机红（与三态表同源纪律）
     expect(specRow!.gate, "spec 该格不得声明判红").not.toMatch(/(?<!不)判红/u);
 

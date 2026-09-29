@@ -33,7 +33,15 @@
 export interface OutcomeCounts {
   judged: number;
   skipped: number;
-  /** 本行应给出的判定总数（子判定个数）。`undefined` = 不做覆盖率判定（单次判定行）。 */
+  /**
+   * 本行应给出的判定总数（子判定个数）。`undefined` = 不做覆盖率判定（单次判定行）。
+   *
+   * ⚠️ **不变量**（review 第 12 轮实测枚举 8 种组合后记录）：必须是**有限正整数**。
+   * 两种越界形态当前**生产不可达**（赋值点与 `judged` 累加相邻、无 `await`，
+   * `frames.length` 恒 3），但若将来成立会**恒静默**：`NaN` 满足 `judged < NaN` 为
+   * false；`expected = 0` 配 `judged > 0` 也不触发 `judged === 0`。接线契约
+   * `transitionMatrixWiring.test.ts` 已按「求值 RHS」钉住公式，故此处不再加运行时守卫。
+   */
   expected?: number;
 }
 
@@ -44,7 +52,7 @@ export type OutcomeRow = readonly [label: string, counts: OutcomeCounts];
 export interface GateClassification {
   /** 既没判定也没声明的行名 —— **非空即判红**。 */
   silent: string[];
-  /** 本轮没有判定过的行名（含显式 skip）—— 非空即 warn「本轮未验证」。 */
+  /** 本轮**未完整验证**的行名（非空即 warn）。含两类：`judged === 0`，以及覆盖率不足。 */
   unverified: string[];
 }
 
@@ -72,10 +80,10 @@ export function classifyOutcomeRows(rows: readonly OutcomeRow[]): GateClassifica
  * 判红消息：`judged === 0 && skipped === 0` 时它是读者**唯一**能看到的诊断物
  * （台账对象不出现在 vitest 输出里）。
  *
- * ⚠️ **必须并列两类成因，不替读者猜是哪种**。单因归错（「只可能是 return 回潮」）
+ * ⚠️ **必须并列三类成因，不替读者猜是哪种**。单因归错（「只可能是 return 回潮」）
  * 会把「该 test 本轮没跑」这条同样停在双 0 的路径导向错误的修法——
  * 本仓实测过：文案写单因时，读者会去改根本没错的 skip 分支。
- * 防线见 `unit/releaseGate.test.ts`「判红文案」组。
+ * 防线见 `unit/releaseGate.test.ts`「判红文案」组（三类各有一条断言）。
  */
 export function buildGateFailureMessage(
   rows: readonly OutcomeRow[],
@@ -91,8 +99,12 @@ export function buildGateFailureMessage(
     `实际什么都没验到（「什么都没验到」≠「通过」）；` +
     `② 该行所属 test 本轮**根本没跑** —— 台账停在 0/0，但与 ① 的成因和修法完全不同` +
     `（子因：-t 只滤掉本 test / beforeAll 失败 / 前面断言抛错 / 超时）。` +
+    `③ **该行自己的内容断言真失败** —— 台账写入点在所有 expect **之后**，故这一行自己的` +
+    `expect 抛错同样留下 0/0。它**不是**「前面断言抛错」（② 的措辞会把你引去查 beforeAll，` +
+    `而真因在本行）。判红本身是对的，错的是诊断指向——先看是哪一行的哪条 expect 红了。` +
     `修法：① 改用 t.skip() 显式声明不可判定并写明原因；② 跑全量（不带 -t）、` +
-    `并先看 vitest 结果的 passed/skipped 计数与 beforeAll 报错，再谈代码回潮。` +
+    `并先看 vitest 结果的 passed/skipped 计数与 beforeAll 报错；③ 修那条 expect 指向的产品缺陷，` +
+    `再谈代码回潮。` +
     `本轮台账：${ledger}。` +
     `取证：test-results/android-e2e/transition-matrix/ 下有各 r1-*/r3-* 帧；` +
     `⚠️ 该目录**只落帧、logcat 不落盘**（spec 全程只在内存里轮询 logcat），` +
@@ -114,10 +126,11 @@ export function buildUnverifiedWarning(classification: GateClassification): stri
   if (unverified.length === 0) return undefined;
   return (
     `[transition-matrix] ⚠️ 本轮发版门**未验证**：${unverified.join(" + ")}` +
-    `（内容形态导致采样窗取不到被测对象，或一行内部分子判定未覆盖，已显式 skip /` +
-    `覆盖率不足并记为 skipped 而非 passed）。` +
-    `该 test 在 vitest 结果里显示为 skipped；不判红是刻意取舍——` +
-    `按「内容形态不可判定」判红只会得到随机红的发版门。留证与挂账见 #819。`
+    `（两种成因：① 该行被显式 \`t.skip()\` 声明不可判定（vitest 记 skipped）；` +
+    `② 该行含多次子判定、本轮**只覆盖了一部分**（test 跑完并通过，skipped 计数对它贡献 0）。` +
+    `⚠️ 两者的共同点是「**没验全 ≠ 通过**」：读 vitest 结果时不能只看 skipped 计数——` +
+    `成因 ② 在那个计数器上是 0。不判红是刻意取舍：按「内容形态不可判定」判红只会得到` +
+    `随机红的发版门。留证与挂账见 #819。`
   );
 }
 
