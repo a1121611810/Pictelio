@@ -308,6 +308,13 @@ Grill 澄清 → to-spec → to-tickets → implement
 ### 门禁边界（#539 拍板，2026-09-15）
 
 - **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
+- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须保持关闭**：`vp` 默认
+  `run.cache = { scripts: false, tasks: true }`，即 package.json 的 script 默认**不缓存**。
+  给 `check:all` 加 `--cache` 后，7 个 `tsc` 任务实测 100% 命中（省 ~5s）；`test:all` 不加，
+  8 个 vitest 任务实测恒为 `cache disabled`。**这是刻意的**：测试门禁一旦缓存命中，
+  意味着**测试根本没跑、只重放日志**——绿灯是假的，正是本仓反复在消灭的那类假绿。
+  改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`：`run.tasks` 不能与
+  package.json 同名 script 共存（会报错），故无法用配置做「只缓存 check」，只能靠命令行作用域。
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
 ### 测试硬约束（违反视为架构违规；详版见 `docs/testing/conventions.md`，编号一一对应）
