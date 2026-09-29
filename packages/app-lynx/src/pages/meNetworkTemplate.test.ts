@@ -51,13 +51,13 @@ describe('Me 页网络区块（ADR-0199 D4 / #779）', () => {
     expect(Object.keys(NETWORK_ZH).sort()).toEqual(Object.keys(NETWORK_EN).sort())
   })
 
-  it('网络组标题与 hint 渲染（卡片结构镜像客户端组）', () => {
+  it('网络组标题与 hint 渲染（卡片结构沿用 Me 页通用分组卡）', () => {
     expect(meVue).toContain("t('me.network.title')")
     expect(meVue).toContain("t('me.network.hint')")
     expect(meVue).toContain('ME_A11Y_LABELS.networkGroupTitle')
   })
 
-  it('开关行存在：backoff + backoffDesc + M3Switch 绑定 + @tap 切换（镜像 autoFallbackEngine 行）', () => {
+  it('开关行存在：backoff + backoffDesc + M3Switch 绑定 + @tap 切换（按 M3 开关行范式）', () => {
     expect(meVue).toContain("t('me.network.backoff')")
     expect(meVue).toContain("t('me.network.backoffDesc')")
     expect(meVue).toContain(':checked="rateLimitBackoffEnabled"')

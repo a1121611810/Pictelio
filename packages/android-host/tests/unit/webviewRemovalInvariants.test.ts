@@ -188,17 +188,22 @@ const HOST_ASSETS = [
   {
     rel: "android/app/src/lynx/java/io/pictelio/app",
     kind: "dir",
-    minFiles: 1,
+    // 下界实测 19（2026-09-29）。原值 1 形同无断言：删掉九成 Java 文件仍全绿，
+    // 而 ADR-0203 §复核判据 6 承诺的是「逐件没丢东西」。留约 15% 余量容忍正常增删。
+    minFiles: 16,
     ext: ".java",
     label: "Lynx 原生模块源集",
   },
-  { rel: "scripts", kind: "dir", minFiles: 1, ext: ".mjs", label: "发布脚本目录" },
+  // 下界实测 17 → 取 14
+  { rel: "scripts", kind: "dir", minFiles: 14, ext: ".mjs", label: "发布脚本目录" },
   { rel: "scripts/release.mjs", kind: "file", label: "发布入口脚本" },
-  { rel: "tests/android-e2e", kind: "dir", minFiles: 1, ext: ".ts", label: "原生 E2E 目录" },
+  // 下界实测 31 → 取 26
+  { rel: "tests/android-e2e", kind: "dir", minFiles: 26, ext: ".ts", label: "原生 E2E 目录" },
   {
     rel: "android/app/src/test/java/io/pictelio/app",
     kind: "dir",
-    minFiles: 1,
+    // 下界实测 41 → 取 34
+    minFiles: 34,
     ext: ".java",
     label: "JVM/Robolectric 单测源集",
   },
@@ -636,9 +641,11 @@ function evaluateInvariants(l: Layout): Verdict {
     const stripped = stripJsComments(readFileSync(f, "utf8"));
     const gradleAt = stripped.search(GRADLE_ENTRY_RE);
     // 两种接线写法都算：npm 脚本名（"sync:credentials"）与直调脚本（sync-credentials.mjs）
-    const syncAt = [stripped.indexOf(CREDENTIALS_SYNC), stripped.indexOf("sync-credentials.mjs")]
-      .filter((i) => i >= 0)
-      .sort((a, b) => a - b)[0];
+    const syncCandidates = [
+      stripped.indexOf(CREDENTIALS_SYNC),
+      stripped.indexOf("sync-credentials.mjs"),
+    ].filter((i) => i >= 0);
+    const syncAt = syncCandidates.length > 0 ? Math.min(...syncCandidates) : undefined;
     const ok = syncAt !== undefined && syncAt <= gradleAt;
     syncBeforeGradle.set(f, ok);
     if (syncAt !== undefined && syncAt > gradleAt) {
@@ -770,14 +777,22 @@ function writeCompliantFixture(root: string): void {
     ),
   );
 
-  // 宿主包：逐件齐全的最小树
+  // 宿主包：逐件齐全的最小树。
+  // 目录型资产要写满 minFiles 个文件——下界是真实约束（ADR-0203 §复核判据 6），
+  // fixture 只放 1 个会让「基线全绿」本身变成假绿。
   for (const asset of HOST_ASSETS) {
     if (asset.kind === "file") {
       writeFixtureFile(root, `packages/android-host/${asset.rel}`, "// fixture\n");
     } else {
-      // 目录型资产必须真的带一个对应扩展名的文件，否则 minFiles 检查会判「空目录」
       const ext = "ext" in asset ? asset.ext : "";
-      writeFixtureFile(root, `packages/android-host/${asset.rel}/Fixture${ext}`, "// fixture\n");
+      const n = "minFiles" in asset ? asset.minFiles : 1;
+      for (let i = 0; i < n; i++) {
+        writeFixtureFile(
+          root,
+          `packages/android-host/${asset.rel}/Fixture${i}${ext}`,
+          "// fixture\n",
+        );
+      }
     }
   }
   writeFixtureFile(

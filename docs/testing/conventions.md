@@ -120,7 +120,8 @@ expect(pressed).toBe("true");
 设置页等受登录守卫保护（`src/routes/__root.tsx` 启动导航强制 `/home`）的路径：
 
 - 需要 `PIXIV_REFRESH_TOKEN` 环境变量（`~/.zshrc` 已配置；CI 需配置 secret），无 token 时测试自动跳过（`describe.skipIf`）
-- **env 文件兜底**：agent-browser 与 android-e2e 均通过 globalSetup 自动读取 `packages/app/.env`（`tests/ai-shared/globalSetup.ts` 的 `loadEnvFile()` / `tests/android-e2e/globalSetup.ts`）注入 `process.env`——`process.env` 已有值时不覆盖（bash export 优先，`.env` 兜底）。两个 `.env`（app 与 app-lynx）均被 `.gitignore` 忽略
+- **env 文件兜底**：android-e2e 通过 globalSetup 自动读取 `packages/app-lynx/.env`（`packages/android-host/tests/android-e2e/globalSetup.ts`）注入 `process.env`——`process.env` 已有值时不覆盖（bash export 优先，`.env` 兜底）。该 `.env` 被 `.gitignore` 忽略。
+  ⚠️ agent-browser 套件已随 WebView 客户端删除（ADR-0203 决策 2），其 `tests/ai-shared/globalSetup.ts` 不复存在；E2E 契约单测迁到 `packages/android-host/tests/android-e2e/unit/`
 - 直接 `navigate` 子路由会被启动导航覆盖，必须走 UI 路径（如 `/home` 顶部用户名 → `/me` → "设置"行 → `/settings`）
 
 ## 本文档的删除影响登记

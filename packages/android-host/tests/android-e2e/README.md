@@ -1,7 +1,8 @@
 # Android 模拟器 E2E（Appium + WebdriverIO）
 
 > issue #104 交付的基建层。父 spec：`docs/specs/android-emulator-e2e-gate.md`；ADR：`docs/adr/ADR-0061-android-emulator-e2e-gate.md`。
-> 本目录只包含基建 + 冒烟测试；「切换渲染引擎」完整链路用例在后续 ticket（#105 起）追加到 `specs/`。
+> 本目录含 10 个 spec。「切换渲染引擎」链路用例已随 WebView 客户端删除（ADR-0203 决策 7）——
+> 客户端切换与引擎回退两组能力均已下线，测试矩阵不再覆盖跨引擎切换。
 
 ## 架构
 
