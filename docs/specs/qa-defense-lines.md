@@ -59,7 +59,7 @@
 > |------|------|--------|
 > | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
 > | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
-> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时。**这三类 `afterAll` 仍会执行**（vitest `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮。**`-t` 过滤不在此列**——见下方第三类 |
+> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时。**这两类 `afterAll` 仍会执行**（vitest `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮。**`-t` 过滤不在此列**——但要分清：`-t` **只滤掉本 test** 时属第 ② 类（门抓得到，本 spec 有 3 个 test，可复现）；`-t` 把 suite 内**全部** test 都滤光时才属下方第三类（门直接消失） |
 >
 > ⚠️ **第三类：不产生双 0，而是让门整个消失**——成因是 `suite.mode` 被置为 `skip`：
 > - `describe.skipIf(SKIPPED)` 为真（**非 `pictelio_ui` 设备即属此类**）；
