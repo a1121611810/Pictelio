@@ -129,6 +129,10 @@ const TEXT_EXT = new Set([
   ".cjs",
   ".mts",
   ".cts",
+  // ⚠️ `.vue` 必须在内：唯一客户端的页面是 Vue SFC，clientSwitch 的 UI 引用
+  // （Me.vue 里 20 处）全在 `.vue` 里。漏掉它会让不变量 8 的引用扫描对最脏的那个文件失明——
+  // 这是对照 8b 当场抓出来的（漏扫时注入的 `.vue` 引用零命中、断言转红）。
+  ".vue",
   ".json",
   ".json5",
   ".sh",
@@ -185,6 +189,46 @@ const HOST_ASSETS = [
     ext: ".java",
     label: "JVM/Robolectric 单测源集",
   },
+] as const;
+
+/**
+ * 客户端切换能力的残留面（不变量 8；ADR-0203 §决策 7「WebView 下线后单态收敛」）。
+ *
+ * 背景：WebView 客户端是「webview ↔ lynx 双客户端切换」的唯一切换对象。它被删除后，
+ * 整个 clientSwitch 能力失去存在依据——运行时虽已被 `CLIENT_KINDS={"lynx"}` 门控为
+ * 不可达（`supportsClientSwitch` 返回 false，整张切换卡片不渲染），但源码、Java 原生
+ * 方法与 UI 文案会继续留在树里并被打进 APK bundle（含失实文案 "SolidJS + Capacitor"）。
+ * 「不可达」不等于「已下线」——残留会误导 grep APK 的人，也会在日后被误当作可用功能。
+ */
+const CLIENT_SWITCH_STORE_REL = "src/stores/clientSwitchStore.ts";
+
+/** clientSwitch 在 app-lynx 里的标识符形态：store 名、UI 引用、切换专用文案。 */
+const CLIENT_SWITCH_REF_RE = /clientSwitch|selectedClient|pickClient|supportsClientSwitch/;
+
+/**
+ * Java 侧切换专用方法（`PictelioAppModule` 内）。
+ * ⚠️ 判据只认这 4 个**方法签名**；`PictelioAppModule` 其余 10 个 `@LynxMethod`
+ * 是通用能力（视口/退出/安全区/深色模式/分享/诊断…），有 9–11 处调用，**必须保留**。
+ */
+const CLIENT_SWITCH_JAVA_METHODS = [
+  "setClientKind",
+  "getClientKind",
+  "getClientKinds",
+  "restart",
+] as const;
+
+/**
+ * 配对正面锚点（不变量 8 的「防糊弄」半边）。
+ * 没有它，「把 PictelioAppModule 整份删掉」和「把 Me.vue 整页删掉」都会让
+ * 所有负面断言转绿——那是事故不是修好。数字取自删除前的实测值，留足下限余量。
+ */
+const CLIENT_SWITCH_POSITIVE_ANCHORS = [
+  { method: "getViewportSize", minHits: 1, owner: "通用：视口尺寸" },
+  { method: "exitApp", minHits: 1, owner: "通用：退出应用" },
+  { method: "getSafeAreaInsets", minHits: 1, owner: "通用：安全区内边距" },
+  { method: "applyDarkModePreference", minHits: 1, owner: "通用：深色模式同步" },
+  { method: "openUrl", minHits: 1, owner: "通用：外链打开" },
+  { method: "exportDiagLog", minHits: 1, owner: "通用：诊断日志导出" },
 ] as const;
 
 interface Layout {
@@ -260,10 +304,10 @@ function deletedPkgRefsInText(text: string): string[] {
   return hits;
 }
 
-type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type InvariantId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 type Verdict = Record<InvariantId, string[]>;
 
-/** 逐条求值七组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
+/** 逐条求值八组不变量；返回每个不变量的**违规清单**（空 = 满足）。 */
 function evaluateInvariants(l: Layout): Verdict {
   const rel = (p: string) => relative(l.repoRoot, p);
   const verdict = {
@@ -274,6 +318,7 @@ function evaluateInvariants(l: Layout): Verdict {
     5: [] as string[],
     6: [] as string[],
     7: [] as string[],
+    8: [] as string[],
   };
 
   // 不变量 1 —— packages/app 目录不存在（ADR-0203 决策 2 + 复核判据 `test ! -d packages/app`）
@@ -422,6 +467,63 @@ function evaluateInvariants(l: Layout): Verdict {
     }
   }
 
+  // 不变量 8 —— 客户端切换能力已随 WebView 客户端下线（ADR-0203 §决策 7「单态收敛」）
+  // 负面：store / UI 引用 / Java 切换方法 全部不在
+  const switchStore = join(l.clientDir, ...CLIENT_SWITCH_STORE_REL.split("/"));
+  if (existsSync(switchStore)) {
+    verdict[8].push(`客户端切换 store 仍存在：${rel(switchStore)}——WebView 已删除，切换无对象`);
+  }
+  // 检测式非空转锚点：证明确实扫到了客户端源集，而不是路径写错导致恒绿
+  if (clientFiles.length === 0) {
+    verdict[8].push("[检测式不可信] 未扫描到客户端源集任何文本文件，残留检测空转");
+  }
+  for (const f of clientFiles) {
+    const lines = readFileSync(f, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      if (CLIENT_SWITCH_REF_RE.test(line)) {
+        verdict[8].push(`${rel(f)}:${i + 1}: ${line.trim()}`);
+      }
+    });
+  }
+  // Java 侧：切换专用方法 + 配对正面锚点（同一个文件里做，才能防「整份删掉也算修好」）
+  const appModule = join(
+    l.hostDir,
+    "android",
+    "app",
+    "src",
+    "lynx",
+    "java",
+    "io",
+    "pictelio",
+    "app",
+    "PictelioAppModule.java",
+  );
+  if (!existsSync(appModule)) {
+    verdict[8].push(`[检测式不可信] ${rel(appModule)} 不存在，无从校验切换方法是否已下线`);
+  } else {
+    const moduleText = readFileSync(appModule, "utf8");
+    for (const method of CLIENT_SWITCH_JAVA_METHODS) {
+      // 只认方法签名（public void xxx(Callback)），不认 javadoc/散文里的提及——
+      // 否则「注释里解释为什么删了它」会把这条判红
+      const sig = new RegExp(`public\\s+void\\s+${method}\\s*\\(`);
+      if (sig.test(moduleText)) {
+        verdict[8].push(
+          `${rel(appModule)} 仍定义切换专用原生方法 ${method}(Callback)——WebView 已删除，切换无对象`,
+        );
+      }
+    }
+    for (const { method, minHits, owner } of CLIENT_SWITCH_POSITIVE_ANCHORS) {
+      const sig = new RegExp(`public\\s+void\\s+${method}\\s*\\(`);
+      const hits = moduleText.match(new RegExp(sig.source, "g"))?.length ?? 0;
+      if (hits < minHits) {
+        verdict[8].push(
+          `[配对正面锚点失效] ${rel(appModule)} 的通用原生方法 ${method} 命中 ${hits} < ${minHits}（${owner}）——` +
+            `切换方法该删、通用方法不该跟着没，一起没说明是事故不是下线`,
+        );
+      }
+    }
+  }
+
   return verdict;
 }
 
@@ -470,8 +572,13 @@ describe("不变量 7：门面措辞收敛（spec 核心缝 7 / 用户故事 13�
     assertSatisfied(7));
 });
 
+describe("不变量 8：客户端切换能力已随 WebView 下线（ADR-0203 §决策 7「单态收敛」）", () => {
+  it("clientSwitch store / UI 引用 / Java 切换专用方法均已清空，且通用原生方法仍在（配对正面锚点）", () =>
+    assertSatisfied(8));
+});
+
 // ── 阳性对照：真实临时目录 + 同一批扫描函数 ──────────────────────────────────
-// 目的：证明上面七条**不是恒绿假防线**。做法是造一棵合规仓库树（应全绿），
+// 目的：证明上面八条**不是恒绿假防线**。做法是造一棵合规仓库树（应全绿），
 // 再逐条塞回违规（应各自转红），跑的就是上面那个 evaluateInvariants。
 const TMP_ROOTS: string[] = [];
 
@@ -485,7 +592,7 @@ function removeFixtureFile(root: string, relPath: string): void {
   rmSync(join(root, ...relPath.split("/")), { force: true, recursive: true });
 }
 
-/** 造一棵「删除已完成」的合规仓库树：满足全部七条不变量。 */
+/** 造一棵「删除已完成」的合规仓库树：满足全部八条不变量。 */
 function writeCompliantFixture(root: string): void {
   writeFixtureFile(
     root,
@@ -549,6 +656,21 @@ function writeCompliantFixture(root: string): void {
     "packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java",
     'final class PictelioPrefsModule { static final String PREFS_NAME = "CapacitorStorage"; }\n',
   );
+  // 不变量 8 的正面锚点载体：合规态 = 只剩通用原生方法，切换专用方法一个都不在。
+  // 判定只认 `public void xxx(` 签名，故这里也只用签名形态造点。
+  writeFixtureFile(
+    root,
+    "packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java",
+    [
+      "package io.pictelio.app;",
+      "class PictelioAppModule {",
+      ...CLIENT_SWITCH_POSITIVE_ANCHORS.map(
+        (a) => `  public void ${a.method}(Callback callback) { callback.invoke(null, null); }`,
+      ),
+      "}",
+      "",
+    ].join("\n"),
+  );
   writeFixtureFile(root, "packages/android-host/scripts/release.mjs", "export const steps = [];\n");
   writeFixtureFile(
     root,
@@ -599,9 +721,9 @@ function evaluateFixture(mutate: (root: string) => void): Verdict {
   }
 }
 
-/** 合规树必须七条全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
+/** 合规树必须八条全绿——否则下面的「转红」证明不了任何东西（可能一开始就没在算）。 */
 function expectOnly(target: Verdict, id: InvariantId, minHits: number): void {
-  for (const key of [1, 2, 3, 4, 5, 6, 7] as InvariantId[]) {
+  for (const key of [1, 2, 3, 4, 5, 6, 7, 8] as InvariantId[]) {
     if (key === id) {
       expect(
         target[key].length,
@@ -617,10 +739,10 @@ afterAll(() => {
   for (const root of TMP_ROOTS) rmSync(root, { recursive: true, force: true });
 });
 
-describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明七条不是恒绿假防线）", () => {
-  it("基线：合规仓库树七条全绿", () => {
+describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明八条不是恒绿假防线）", () => {
+  it("基线：合规仓库树八条全绿", () => {
     const v = evaluateFixture(() => {});
-    for (const key of [1, 2, 3, 4, 5, 6, 7] as InvariantId[]) {
+    for (const key of [1, 2, 3, 4, 5, 6, 7, 8] as InvariantId[]) {
       expect(v[key], `合规树的不变量 ${key} 不该红：${v[key].join("；")}`).toEqual([]);
     }
   });
@@ -725,6 +847,91 @@ describe("检测式阳性对照（临时合规树 + 逐条塞回违规，证明�
         ),
       ),
       7,
+      1,
+    );
+  });
+
+  // ── 不变量 8 的三个注入 ──────────────────────────────────────────────────
+  // 8a 塞回 store 文件：证明「store 是否还在」这条不是恒绿
+  it("对照 8a：把 clientSwitchStore.ts 塞回去 → 不变量 8 转红", () => {
+    expectOnly(
+      evaluateFixture((r) =>
+        writeFixtureFile(
+          r,
+          `packages/app-lynx/${CLIENT_SWITCH_STORE_REL}`,
+          "export const useClientSwitchStore = () => ({});\n",
+        ),
+      ),
+      8,
+      1,
+    );
+  });
+
+  // 8b 塞回 UI 引用：证明「引用扫描」这条不是恒绿
+  // ⚠️ 注入的是**一个** clientSwitch 引用就要求 ≥1 命中，不要求 ≥2：
+  // 若这里写死 2，塞回单个引用反而会红，等于把「刚好一处残留」判成合格。
+  it("对照 8b：让客户端页面重新引用 clientSwitch → 不变量 8 转红", () => {
+    expectOnly(
+      evaluateFixture((r) =>
+        writeFixtureFile(
+          r,
+          "packages/app-lynx/src/pages/Me.vue",
+          [
+            "<template>",
+            '  <view v-if="supportsClientSwitch(clientSwitch.availableKinds)">',
+            "    <text>SolidJS + Capacitor</text>",
+            "  </view>",
+            "</template>",
+            "",
+          ].join("\n"),
+        ),
+      ),
+      8,
+      1,
+    );
+  });
+
+  // 8c 塞回 Java 切换方法：证明「原生方法签名」这条不是恒绿
+  it("对照 8c：把 setClientKind(Callback) 加回 PictelioAppModule → 不变量 8 转红", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const abs = join(
+          r,
+          "packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java",
+        );
+        writeFileSync(
+          abs,
+          `${readFileSync(abs, "utf8").replace(
+            "\n}",
+            "\n  public void setClientKind(String kind, Callback callback) {}\n}",
+          )}`,
+          "utf8",
+        );
+      }),
+      8,
+      1,
+    );
+  });
+
+  // 8d 误删通用方法：证明「配对正面锚点」真的在断——这是本条不变量的防糊弄半边。
+  // 若删掉这条，正面锚点就只剩装饰：把 PictelioAppModule 整份删光也能让 8a/8b/8c 全绿。
+  it("对照 8d：误删通用原生方法 exitApp → 不变量 8 转红（配对正面锚点在断）", () => {
+    expectOnly(
+      evaluateFixture((r) => {
+        const abs = join(
+          r,
+          "packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java",
+        );
+        writeFileSync(
+          abs,
+          readFileSync(abs, "utf8").replace(
+            /^\s*public void exitApp\(Callback callback\).*\n/m,
+            "",
+          ),
+          "utf8",
+        );
+      }),
+      8,
       1,
     );
   });

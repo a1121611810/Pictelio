@@ -6,7 +6,6 @@ import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
-import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore, type AiFilterMode } from '../stores/settingsStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useWatchLaterStore } from '../stores/watchLaterStore'
@@ -15,7 +14,6 @@ import type { UgoiraExtractMode } from '../api/ugoira'
 import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
-import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
@@ -57,50 +55,13 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
-const clientSwitch = useClientSwitchStore()
 // 通知角标（ADR-0188 D7 / #728）：Me 挂载静默刷新未读，行尾圆点数据源
 const notificationStore = useNotificationStore()
 // 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
 const watchLaterStore = useWatchLaterStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode, downloadByAuthorDir, rateLimitBackoffEnabled, rateLimitMaxRetries, rateLimitBaseDelayMs, rateLimitMaxDelayMs } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, fullscreenMode, downloadByAuthorDir, rateLimitBackoffEnabled, rateLimitMaxRetries, rateLimitBaseDelayMs, rateLimitMaxDelayMs } = storeToRefs(settings)
 
-const switching = ref(false)
 
-// ─── 引擎生效状态快照（ADR-0164 / #555）：客户端卡「本次生效」双态行数据源 ───
-// 读不到（键缺失/读取失败/畸形）→ null 不渲染（engineState 读取侧已 warn，禁静默）；
-// 仅降级生效（effective ≠ none 且 ≠ preferred）时渲染，正常与双失败（错误页兜底）都隐藏。
-const engineState = ref<EngineStateSnapshot | null>(null)
-const degradedEngineState = computed<EngineStateSnapshot & { effective: EngineKind } | null>(() => {
-  const s = engineState.value
-  if (s === null || s.effective === 'none' || s.effective === s.preferred) return null
-  return s as EngineStateSnapshot & { effective: EngineKind }
-})
-
-/** 引擎显示名（Lynx/WebView 为产品名，双语同形，不进 i18n 字典） */
-function engineDisplayName(kind: EngineKind): string {
-  return kind === 'lynx' ? 'Lynx' : 'WebView'
-}
-
-/** 双态行主文案（t 在 computed 内调用保持 locale 响应） */
-const effectiveStateText = computed(() => {
-  const s = degradedEngineState.value
-  if (s === null) return ''
-  return t('me.client.effectiveState', {
-    preferred: engineDisplayName(s.preferred),
-    effective: engineDisplayName(s.effective),
-  })
-})
-
-/** 双态行原因文案（reasonKey 映射：引擎状态快照降级原因码 → i18n） */
-const degradedReasonText = computed(() => {
-  const s = degradedEngineState.value
-  return s === null ? '' : t(REASON_I18N_KEYS[s.reason])
-})
-
-/** 自动回退开关（ADR-0164）：一键翻转，设备级 setter 自带持久化；与引擎切换互不影响，无需 switching 守卫 */
-function toggleAutoFallbackEngine() {
-  settings.setAutoFallbackEngine(!autoFallbackEngine.value)
-}
 
 /** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：一键翻转 + 原生即时切换（setter 内） */
 function toggleFullscreenMode() {
@@ -110,7 +71,7 @@ function toggleFullscreenMode() {
 // ─── 限流退避四参数（ADR-0199 D4 / #779）：网络组开关 + 三档位行（设备级 setter 自带落盘
 //     与组装注入 client 即时生效）；档位集合 = api/rateLimitBackoff.ts 单一事实源常量 ───
 
-/** 限流退避开关（镜像 toggleAutoFallbackEngine 范式）：一键翻转；关闭后 429 立即报错零重试 */
+/** 限流退避开关（一键翻转范式）：关闭后 429 立即报错零重试 */
 function toggleRateLimitBackoff() {
   settings.setRateLimitBackoffEnabled(!rateLimitBackoffEnabled.value)
 }
@@ -354,10 +315,6 @@ onActivated(() => {
 })
 onMounted(async () => {
   unreg = useGlobalFabStore().usePage('me', {})
-  // 引擎生效状态快照（fire-and-forget）：失败/无快照 → null 不渲染（读取侧 warn）
-  void readEngineState().then((s) => {
-    engineState.value = s
-  })
   await ensureAuth()
   refreshWebdavLastBackupLabel()
   if (settings.webdavEnabled) await loadWebdavCredentials()
@@ -410,13 +367,6 @@ function openNotifications() {
 /** 静音标签管理入口（ADR-0187 D5 / #732）：内容组行（AI 三态分段之后） */
 function openMuteTags() {
   void navigate('/mute-tags')
-}
-
-function pickClient(kind: ClientKind) {
-  if (clientSwitch.selectedClient === kind || switching.value) return
-  switching.value = true
-  clientSwitch.switchClient(kind)
-  // switchClient 内部触发重启（原生桥或 reload），此处仅兜底
 }
 
 // ADR-0051：R18/R18G 开关（对齐主项目 settingsStore，默认隐藏，持久化 IndexedDB）
@@ -646,83 +596,6 @@ function pickAppearanceMode(mode: DarkModeId) {
         </view>
       </GlassCard>
 
-      <!-- 客户端组（ADR-0062：仅 full 包同时含 webview+lynx 时渲染；独立包隐藏） -->
-      <view v-if="supportsClientSwitch(clientSwitch.availableKinds)" class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text
-          class="text-title-small font-medium text-surface-on"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.clientGroupTitle"
-          >{{ t('me.client.title') }}</text
-        >
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.client.hint') }}</text>
-        <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.switchToWebview"
-          @tap="pickClient('webview')"
-        >
-          <view class="flex flex-col">
-            <text
-              class="text-title-medium text-surface-on"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.webviewOptionTitle"
-              >{{ t('me.client.webview') }}</text
-            >
-            <text class="text-label-medium text-surface-on-variant mt-0.5">SolidJS + Capacitor</text>
-          </view>
-          <!-- M3 radio button：选中 primary 实心 + on-primary 圆点，未选 outline 空心 -->
-          <view
-            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="clientSwitch.selectedClient === 'webview' ? 'bg-primary' : 'border-2 border-outline'"
-          >
-            <view v-if="clientSwitch.selectedClient === 'webview'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
-          </view>
-        </view>
-        <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.switchToLynx"
-          @tap="pickClient('lynx')"
-        >
-          <view class="flex flex-col">
-            <text
-              class="text-title-medium text-surface-on"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.lynxOptionTitle"
-              >{{ t('me.client.lynx') }}</text
-            >
-            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.lynxHint') }}</text>
-          </view>
-          <view
-            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="clientSwitch.selectedClient === 'lynx' ? 'bg-primary' : 'border-2 border-outline'"
-          >
-            <view v-if="clientSwitch.selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
-          </view>
-        </view>
-        <!-- 自动回退 WebView 开关（ADR-0164 / #555）：设备级缺省开；M3 switch（照内容组 R18 行逐字范式） -->
-        <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.autoFallbackEngine"
-          @tap="toggleAutoFallbackEngine"
-        >
-          <view class="flex flex-col">
-            <text class="text-title-medium text-surface-on">{{ t('me.client.autoFallback') }}</text>
-            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.autoFallbackDesc') }}</text>
-          </view>
-          <M3Switch
-            :checked="autoFallbackEngine"
-          />
-        </view>
-        <!-- 生效双态行（ADR-0164）：仅降级生效时渲染（effective≠none 且≠preferred）；正常与双失败不显示 -->
-        <view v-if="degradedEngineState" class="pt-3">
-          <text class="text-label-medium text-surface-on-variant">{{ effectiveStateText }}</text>
-          <text class="text-label-medium text-surface-on-variant mt-1">{{ degradedReasonText }}</text>
-        </view>
-        <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
-      </view>
-
       <!-- 全屏模式组（#806）：从客户端组移出。它与引擎无关，是 Lynx 侧沉浸式功能
            （spec docs/specs/lynx-systembars.md D5：隐藏系统栏 + 边缘滑动唤出），
            不得随单引擎隐藏客户端组而一并消失。 -->
@@ -734,8 +607,8 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="toggleFullscreenMode"
         >
           <view class="flex flex-col">
-            <text class="text-title-medium text-surface-on">{{ t('me.client.fullscreenMode') }}</text>
-            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.fullscreenModeDesc') }}</text>
+            <text class="text-title-medium text-surface-on">{{ t('me.fullscreenMode') }}</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.fullscreenModeDesc') }}</text>
           </view>
           <M3Switch
             :checked="fullscreenMode"
@@ -752,7 +625,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           >{{ t('me.network.title') }}</text
         >
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.network.hint') }}</text>
-        <!-- 限流退避开关行（镜像 autoFallbackEngine 行逐字范式）：关闭后 429 立即报错零重试 -->
+        <!-- 限流退避开关行：关闭后 429 立即报错零重试 -->
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
           :accessibility-element="A11Y_ELEMENT_ENABLED"

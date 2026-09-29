@@ -1320,8 +1320,10 @@ describe('Me 页 accessibility 标注注册表（issue #103）', () => {
   })
 
   it('模板内 label/element 数量配对 + 迁移段 key 经 options 消费', () => {
-    // a. 模板内配对：段级 :accessibility-label 迁入 options 后，模板内 label 与 element 同降为 62，
-    //    两者数量必须相等，「每处 label 引用都伴随 element 开启」的模板内配对关系不破。
+    // a. 模板内配对：段级 :accessibility-label 迁入 options 后，模板内 label 与 element 数量必须相等，
+    //    「每处 label 引用都伴随 element 开启」的模板内配对关系不破。
+    //    计数是**相对断言**（两者相等），不写死绝对值——客户端切换组下线（ADR-0203 决策 7）
+    //    已把该数从 71 降到 65，写死数字只会让每次正当删减都要改测试。
     const labelCount = (meVueSource.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (meVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(elementCount)
@@ -1340,8 +1342,9 @@ describe('Me 页 accessibility 标注注册表（issue #103）', () => {
     //    「Me.vue 侧消费完整性 + 模板内配对」。
   })
 
-  it('「切回 WebView」入口与页面标题标注存在（模拟器 E2E 双向闭环锚点）', () => {
-    expect(ME_A11Y_LABELS.switchToWebview).toBe('切换客户端到WebView')
+  // 原「切回 WebView」锚点用例随客户端切换能力下线一并删除（ADR-0203 决策 7）：
+  // 该入口在 WebView 客户端删除后已无对象，钉住它等于要求保留一个不存在的功能。
+  it('页面标题标注存在（模拟器 E2E 双向闭环锚点）', () => {
     expect(ME_A11Y_LABELS.pageTitle).toBe('我的')
   })
 })
@@ -1639,106 +1642,6 @@ describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
     expect(refreshableListSource).toContain('createFabMenuState')
     expect(refreshableListSource).toContain('finally')
     expect(refreshableListSource).toContain('menu.endRefresh')
-  })
-})
-
-const { normalizeKinds, supportsClientSwitch, useClientSwitchStore } = await import('../src/stores/clientSwitchStore')
-
-describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包能力）', () => {
-
-  describe('normalizeKinds', () => {
-    it('full 包：["webview","lynx"] → 原样', () => {
-      expect(normalizeKinds(['webview', 'lynx'])).toEqual(['webview', 'lynx'])
-    })
-
-    it('独立包：["webview"] / ["lynx"] → 原样', () => {
-      expect(normalizeKinds(['webview'])).toEqual(['webview'])
-      expect(normalizeKinds(['lynx'])).toEqual(['lynx'])
-    })
-
-    it('含非法值 → 剔除', () => {
-      expect(normalizeKinds(['webview', 'bogus'])).toEqual(['webview'])
-    })
-
-    it('非数组 / 空数组 → null', () => {
-      expect(normalizeKinds(null)).toBeNull()
-      expect(normalizeKinds(undefined)).toBeNull()
-      expect(normalizeKinds([])).toBeNull()
-      expect(normalizeKinds('webview')).toBeNull()
-    })
-  })
-
-  describe('supportsClientSwitch', () => {
-    it('full 包（webview+lynx）→ true', () => {
-      expect(supportsClientSwitch(['webview', 'lynx'])).toBe(true)
-    })
-
-    it('webview-only → false', () => {
-      expect(supportsClientSwitch(['webview'])).toBe(false)
-    })
-
-    it('lynx-only → false', () => {
-      expect(supportsClientSwitch(['lynx'])).toBe(false)
-    })
-
-    it('null（未知）→ true（保守渲染）', () => {
-      expect(supportsClientSwitch(null)).toBe(true)
-    })
-  })
-
-  describe('initClientSetting（ADR-0062：原生能力查询填充 availableKinds）', () => {
-    afterEach(() => {
-      vi.unstubAllGlobals()
-      vi.resetModules()
-    })
-
-    it('full 包：getClientKinds 送达 JSON 文本 [webview,lynx] → availableKinds 填充', async () => {
-      vi.stubGlobal('NativeModules', {
-        PictelioApp: {
-          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["webview","lynx"]', null),
-          getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
-        },
-      })
-      setActivePinia(createPinia())
-      const mod = await import('../src/stores/clientSwitchStore')
-      const store = mod.useClientSwitchStore()
-      store.initClientSetting()
-      await new Promise((r) => setTimeout(r, 0))
-      expect(store.availableKinds).toEqual(['webview', 'lynx'])
-      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(true)
-    })
-
-    it('lynx-only 包：getClientKinds 送达 JSON 文本 [lynx] → availableKinds=[lynx]，切换不支持', async () => {
-      vi.stubGlobal('NativeModules', {
-        PictelioApp: {
-          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["lynx"]', null),
-          getClientKind: (cb: (kind: string, err: string | null) => void) => cb('lynx', null),
-        },
-      })
-      setActivePinia(createPinia())
-      const mod = await import('../src/stores/clientSwitchStore')
-      const store = mod.useClientSwitchStore()
-      store.initClientSetting()
-      await new Promise((r) => setTimeout(r, 0))
-      expect(store.availableKinds).toEqual(['lynx'])
-      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(false)
-    })
-
-    it('webview-only 包：getClientKinds 送达 JSON 文本 [webview] → 切换不支持', async () => {
-      vi.stubGlobal('NativeModules', {
-        PictelioApp: {
-          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["webview"]', null),
-          getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
-        },
-      })
-      setActivePinia(createPinia())
-      const mod = await import('../src/stores/clientSwitchStore')
-      const store = mod.useClientSwitchStore()
-      store.initClientSetting()
-      await new Promise((r) => setTimeout(r, 0))
-      expect(store.availableKinds).toEqual(['webview'])
-      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(false)
-    })
   })
 })
 

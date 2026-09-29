@@ -12,13 +12,8 @@
 export const ME_A11Y_LABELS = {
   // ── 页面标识（E2E 断言「Me 页完整渲染」的锚点文本） ──
   pageTitle: '我的',
-  clientGroupTitle: '客户端',
-  webviewOptionTitle: 'WebView（现有）',
-  lynxOptionTitle: 'Lynx（当前）',
   // ── 关键交互（@tap 容器：view 默认不进 accessibility 树，必须显式标注） ──
   // （M3 改造后 Me 为底部导航顶层页，无返回箭头；back 标注已移除）
-  switchToWebview: '切换客户端到WebView', // 「切回 WebView」入口
-  switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
   watchlist: '追更列表',
   // 稍后看入口（ADR-0191 D5 / #753 T4）：账户组行 + 行尾计数徽标（徽标为装饰性，
@@ -74,7 +69,6 @@ export const ME_A11Y_LABELS = {
   rankingEntryToggle: '排行榜入口开关',
   novelIntroFirstToggle: '小说先进介绍页开关',
   // 引擎自动回退开关（ADR-0164 / #555：Me 客户端卡 M3 switch 行）
-  autoFallbackEngine: '自动回退WebView开关',
   // 全屏模式开关（spec lynx-systembars D5：Me 客户端卡 M3 switch 行）
   fullscreenMode: '全屏模式开关',
   // 网络组（ADR-0199 D4 / #779 T2：Me 网络卡组标题 + 限流退避开关行 + 三个档位行容器）

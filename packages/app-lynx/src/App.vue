@@ -4,7 +4,6 @@ import { RouterView } from 'vue-router'
 import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
 import SearchSheet from './components/SearchSheet.vue'
-import { useClientSwitchStore } from './stores/clientSwitchStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -55,8 +54,6 @@ onMounted(() => {
 })
 
 onMounted(() => {
-  // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
-  useClientSwitchStore().initClientSetting()
   void engineFallback.check()
   void initRouter()
   // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本

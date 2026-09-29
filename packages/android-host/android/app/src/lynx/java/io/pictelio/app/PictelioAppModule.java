@@ -11,17 +11,11 @@ import com.lynx.jsbridge.LynxModule;
 import com.lynx.react.bridge.Callback;
 import com.lynx.tasm.behavior.LynxContext;
 
-
-import org.json.JSONArray;
-
 /**
- * client 切换重启 Native Module（#51）。
+ * 应用级 Native Module（视口 / 退出 / 深色模式 / 外链 / 诊断日志）。
  *
  * <p>JS 侧访问：{@code NativeModules.PictelioApp}。回调契约（第二参区分错误）：
  * <ul>
- *   <li>{@code setClientKind(kind, cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}</li>
- *   <li>{@code getClientKind(cb)}：成功 {@code cb(kind, null)}；失败 {@code cb(null, errMsg)}</li>
- *   <li>{@code restart(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}</li>
  *   <li>{@code exitApp(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}（ADR-0066）</li>
  *   <li>{@code setSystemBarsHidden(hidden, cb)}：成功 {@code cb()}；失败 {@code cb(errMsg)}</li>
  *   <li>{@code applyDarkModePreference(cb)}：成功 {@code cb()}；失败 {@code cb(errMsg)}
@@ -29,29 +23,10 @@ import org.json.JSONArray;
  *   <li>{@code exportDiagLog(text, cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}
  *       （T0-DIAG 临时通道：无可用分享应用时日志已写盘，回调可读提示而非失败）</li>
  * </ul>
- *
- * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"}（沙盒 #610：
- * 原别名 {@code EnginePrefs} 随引擎机制整体下线，改指向存活的单一所有者
- * {@link PictelioPrefsModule#PREFS_FILE}，取值逐字不变，存量用户配置零迁移）——
- * 与 {@code @capacitor/preferences} 默认 group 是同一文件。
  */
 public class PictelioAppModule extends LynxModule {
 
     private static final String TAG = "PictelioAppModule";
-
-    /** SharedPreferences 文件（@capacitor/preferences 默认 group，勿改；红线：存量用户配置所在文件） */
-    public static final String CLIENT_PREFS = PictelioPrefsModule.PREFS_FILE;
-    /**
-     * client 开关 key（app-lynx clientSwitchStore 同名）。
-     * 沙盒 #610：原所有者 EnginePrefs 随引擎机制下线，键名字面量在此就地保留——
-     * 存量 SharedPreferences 里已有该键，删之即丢用户选择。取值未变。
-     */
-    public static final String CLIENT_KEY = "pictelio_client_kind";
-    /**
-     * 失败记忆键（沙盒 #610 后已无写入方，仅在 setClientKind 中作为陈旧键清理）。
-     * 取值与原 EnginePrefs.KEY_FAILURE_MEMORY 逐字一致。
-     */
-    private static final String KEY_LYNX_FAILURE_MEMORY = "pictelio_engine_lynx_failure_version";
 
     /** httpGet 线程池（阻塞 IO 不占 Lynx 调用线程；同 PictelioApiModule 模式） */
     private static final java.util.concurrent.ExecutorService HTTP_EXECUTOR =
@@ -83,118 +58,6 @@ public class PictelioAppModule extends LynxModule {
 
     private Context appContext() {
         return ((LynxContext) mContext).getContext();
-    }
-
-    @LynxMethod
-    public void setClientKind(String kind, Callback callback) {
-        try {
-            appContext()
-                    .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(CLIENT_KEY, kind)
-                    .apply();
-            // 沙盒 #610：原 EnginePrefs.clearLynxFailure 内联为陈旧键清理。
-            // 该键（pictelio_engine_lynx_failure_version）属失败记忆机制，已随引擎
-            // 机制下线——不再有写入方，但存量 SharedPreferences 里可能残留，就地移除。
-            try {
-                appContext()
-                        .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
-                        .edit()
-                        .remove(KEY_LYNX_FAILURE_MEMORY)
-                        .apply();
-            } catch (Exception clearEx) {
-                Log.w(TAG, "陈旧失败记忆键清理失败", clearEx);
-            }
-            callback.invoke();
-        } catch (Exception e) {
-            Log.w(TAG, "setClientKind(" + kind + ") 失败", e);
-            callback.invoke(String.valueOf(e.getMessage()));
-        }
-    }
-
-    @LynxMethod
-    public void getClientKind(Callback callback) {
-        try {
-            // 缺省读 null（非 "webview"）：absent → containsKind 归一化 → CLIENT_KINDS[0]
-            //（= 本包缺省引擎，full 包翻转后为 lynx，ADR-0164 决策 1）。
-            String stored = appContext()
-                    .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
-                    .getString(CLIENT_KEY, null);
-            // ADR-0062：归一化——存储值不在当前包支持列表时回退到包默认引擎
-            // （如 full 包切到 lynx 后换装 lynx-only 包，残留 "webview" → 归一为 "lynx"）
-            String kind = containsKind(stored) ? stored : BuildConfig.CLIENT_KINDS[0];
-            callback.invoke(kind);
-        } catch (Exception e) {
-            Log.w(TAG, "getClientKind 失败", e);
-            callback.invoke(String.valueOf(e.getMessage()));
-        }
-    }
-
-    /**
-     * 返回当前包支持的 client 引擎列表（ADR-0062）。
-     * 单引擎包 → {@code ["lynx"]}。JS 侧据此决定是否渲染引擎切换入口。
-     *
-     * <p><b>#806</b>：必须以 <b>JSON 文本</b>形式送达。
-     * {@link Callback#invoke} 的签名是变参 {@code invoke(Object...)}：
-     * <ul>
-     *   <li>传 {@code String[]} → 数组被<b>摊平成位置参数</b>，JS 实收字符串；</li>
-     *   <li>传 {@link org.json.JSONArray} → 亦不会转成 JS 数组（实测 {@code typeof} 为
-     *       object、{@code Array.isArray} 为 false、{@code JSON.stringify} 得 null）。</li>
-     * </ul>
-     * 两种写法都让 JS 侧 {@code normalizeKinds} 拿不到数组 → {@code availableKinds=null}
-     * → {@code supportsClientSwitch(null)} 按「未知 = 视为支持」兜底返回 true
-     * → <b>单引擎包也渲染出引擎切换卡片</b>。该缺陷先于单引擎化存在（full 包上被
-     * 「正确答案恰好是显示」掩盖），在 {@code CLIENT_KINDS = {"lynx"}} 时才显形。
-     */
-    @LynxMethod
-    public void getClientKinds(Callback callback) {
-        try {
-            JSONArray kinds = new JSONArray();
-            for (String kind : BuildConfig.CLIENT_KINDS) {
-                kinds.put(kind);
-            }
-            callback.invoke(kinds.toString());
-        } catch (Exception e) {
-            Log.w(TAG, "getClientKinds 失败", e);
-            // #806：错误必须落**第二参**（与 TS 声明 (kinds, err) 同形，也与同族的
-            // getClientKind 一致）。此前走 `callback.invoke(错误串)` 单参，等于把错误
-            // 消息塞进 kinds 槽——JS 的 `if (!err)` 会判为成功并去解析它 → null
-            // → 门控退化，单引擎包重现客户端卡，且全程无告警。
-            callback.invoke(null, String.valueOf(e.getMessage()));
-        }
-    }
-
-    private static boolean containsKind(String kind) {
-        for (String k : BuildConfig.CLIENT_KINDS) {
-            if (k.equals(kind)) return true;
-        }
-        return false;
-    }
-
-    @LynxMethod
-    public void restart(Callback callback) {
-        try {
-            Context ctx = appContext();
-            // 通过 PackageManager 获取 LAUNCHER intent，避免硬编码 Activity 类
-            // （lynx flavor 无 MainActivity，full flavor LAUNCHER 是 MainActivity）
-            Intent intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
-            if (intent == null) {
-                callback.invoke("无法获取 LAUNCHER intent");
-                return;
-            }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            ctx.startActivity(intent);
-            callback.invoke();
-            // 不 killProcess（issue #120/#124）：Activity 级切换，进程保留——
-            // token 内存态 / OkHttp 连接池 / 图片磁盘缓存延续；旧 Activity（LynxActivity）
-            // 被 CLEAR_TASK 销毁后 LynxView.destroy() 释放资源。与 webview 侧
-            // ClientInfoPlugin.restart 语义对齐（双向行为一致）。
-            // 降级分支：若实测 LynxView.destroy() 释放不净，可恢复 300ms 延迟
-            // killProcess（lynx 官方模式）——仅开关一个 flag，架构不变。
-        } catch (Exception e) {
-            Log.w(TAG, "restart 失败", e);
-            callback.invoke(String.valueOf(e.getMessage()));
-        }
     }
 
     /**

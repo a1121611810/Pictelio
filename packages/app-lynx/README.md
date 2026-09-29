@@ -36,7 +36,7 @@ src/
 ├── router.ts           # 手写内存路由（组件表 + 导航）
 ├── routerCore.ts       # 路由匹配纯逻辑（可单测）
 ├── api/                # Pixiv API（types/client/auth/illust/novel/userAgent）
-├── stores/             # authStore（登录态）、settingsStore 等；clientSwitchStore 为 #819-3 挂账的遗留（读点无写入方）
+├── stores/             # authStore（登录态）、settingsStore 等（客户端切换 store 已随 WebView 下线删除，ADR-0203 决策 7）
 ├── pages/              # Login / Recommended / IllustDetail / NovelList / NovelDetail / Me
 ├── utils/              # fetchWrapper（worker fetch 适配）、imageUrl（代理 URL）、errors
 └── styles/tokens.css   # Fluent 2 令牌（Lynx CSS 子集）

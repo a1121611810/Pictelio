@@ -95,6 +95,38 @@ Capacitor 插件**，运行时本就不可用。Lynx 侧对全部其余能力均
 
 **实施期不得**把任何一项悄悄扩大为「顺便补上」——那是范围蔓延，不是本 ADR 的授权。
 
+### 决策 7：客户端切换能力随之下线（单态收敛）
+
+本 ADR 起草时未覆盖「webview ↔ lynx 客户端切换」功能——它在 T12 验证签名 APK 时
+才被发现：解开 APK 后 `assets/main.lynx.bundle` 仍含 `"SolidJS + Capacitor"` 字样。
+追查确认该功能完整残留在唯一客户端里（TS store + 2 个测试文件 + Me.vue 的 UI 区块
++ Java 侧 4 个 `@LynxMethod`），约 500 行。
+
+判定其「已下线」而非「可用」，三条实测依据：
+
+1. **运行时不可达**：`CLIENT_KINDS = {"lynx"}` ⇒ `supportsClientSwitch(["lynx"])`
+   返回 false ⇒ Me.vue 的整个客户端组 `v-if` 恒假。
+2. **无其他调用方**：Java 侧 `setClientKind` / `getClientKind` / `getClientKinds` /
+   `restart` 的唯一消费者就是被删的 store；宿主启动链路**不读** `pictelio_client_kind`，
+   故已安装用户设备上的残留值不会被任何人消费。
+3. **同宿的引擎回退组也是死代码**：ADR-0164 的「自动回退 WebView」开关与生效双态行
+   埋在同一个 `v-if` 里，同样从未渲染；且 `autoFallbackEngine` 设置键在原生侧
+   **零消费方**、`readEngineState()` 恒返回 null（原生无任何写入方），
+   `LynxActivity` 注释已明写「单引擎后不存在可降级到的 WebView」。
+
+因此决策：**整链删除**——store、两个测试文件、Me.vue 区块、6 个 a11y label、
+9 个 `me.client.*` i18n key（`fullscreenMode` 两个迁至 `me.fullscreen*`），
+以及 Java 侧 4 个方法 + 3 个常量（`CLIENT_PREFS` / `CLIENT_KEY` /
+`KEY_LYNX_FAILURE_MEMORY`）+ `containsKind`。
+
+**数据层不在删除范围**：`engineState.ts`（ADR-0153 契约，有独立键集测试）与
+`settingsStore.autoFallbackEngine` 字段属独立决策的能力面，删它们是另一件事，
+本 ADR 不授权。它们因此变成无调用方的保留项，已如实记入遗留债务。
+
+**判定纪律**：本条不是「看到残留就删」。若当时误判为可用而放出 UI，用户会拿到
+一个**拨动无反应**的开关（设置键无消费方）——比隐藏更糟。
+「不可达 + 无消费方 + 前提已被删除」三者同时成立才构成删除授权。
+
 ## 存量格式契约（不可动）
 
 删除源码后，`capacitor` 字样**不应**从仓库清零。以下字面量必须原样保留：
@@ -135,7 +167,16 @@ grep -rn "\.\./app/" packages/app-lynx/lynx.config.ts   # 跨包读取已解除�
 grep -rn "@capacitor/" --include=package.json packages/ # 依赖已清零（应无输出）
 grep -c "capacitor-storage_" packages/android-host/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java  # 存量契约仍在（应 ≥1）
 git ls-files packages/android-host | wc -l              # 宿主资产齐全
+grep -rn "clientSwitch\|supportsClientSwitch" packages/app-lynx/src packages/app-lynx/tests  # 切换能力已下线（应无输出）
+grep -c "public void setClientKind\|public void getClientKind\|public void getClientKinds\|public void restart" \
+  packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java     # 原生切换方法已删（应为 0）
 ```
+
+**机器防线**：以上 8 条判据全部由单一总闸
+`packages/android-host/tests/unit/webviewRemovalInvariants.test.ts` 覆盖
+（`pnpm --filter @pictelio/android-host test`），并带 4 组阳性对照
+证明它们不是恒绿假防线——其中不变量 8 的配对正面锚点专门防
+「把 `PictelioAppModule` 整份删掉也算修好」这种糊弄式过关。
 
 ## 参考
 
