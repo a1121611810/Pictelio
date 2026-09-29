@@ -162,7 +162,7 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 **何时用**：只改 web 层（UI/逻辑/内容适配）的热修——不构建 APK、不需要 keystore 密码，分钟级完成一次 OTA 发布；已装用户的 app 静默吸收（下次启动生效），无需重装 APK。含原生变更（Java/Kotlin、Capacitor 插件、桥方法、Lynx bundle）的发布一律走正常发布。
 
 - **命令**：`pnpm run release --web-only`（交互流程与正常发布一致：选 commit → 选版本 → 确认发布；版本建议 bump patch，符合热修语义）。
-- **流程差异**（相对正常发布）：step 1 只查 OTA 私钥（跳过 keystore 密码/文件检查）；step 3 只跑 credentials 同步 + web 构建 + `release-bundle.mjs`（跳过 gradle assemble / Lynx / cap:sync）；step 4/5 照常 commit + tag + push；step 6 `gh release create --prerelease`（GitHub "Latest" 徽章仍指向最后完整 APK 版本），**只上传三件套不传 APK**。
+- **流程差异**（相对正常发布）：step 1 只查 OTA 私钥（跳过 keystore 密码/文件检查）；step 3 只跑 credentials 同步 + web 构建 + `release-bundle.mjs`（跳过 gradle assemble / Lynx bundle）；step 4/5 照常 commit + tag + push；step 6 `gh release create --prerelease`（GitHub "Latest" 徽章仍指向最后完整 APK 版本），**只上传三件套不传 APK**。
 - **双坐标行为**：`version.json` 的 `version` 字段（APK 坐标，APK 弹窗比较对象）**保持上一已发布 APK 版本不动**（从旧 version.json 继承；旧文件缺失/解析失败 = 硬错误，禁止静默降级）；`webBundle.version`（bundle 坐标）前进到本次版本；`url` 仍指向本次新 tag 的 Release 页。`minWebVersion` 同正常发布（`--min-web=x.y.z` 覆写 / 缺省继承旧值）。下次正常发布时一次 commit 原子翻转全部坐标。
 - **与 `-o` 的边界**：`--web-only` 与 `-o` 互斥（脚本拒绝）——OTA 热修一律走 web-only bump patch；`PICTELIO_RELEASE_SKIP_OTA=1` 与 `--web-only` 也互斥（web-only 的唯一交付物就是三件套，跳过打包 = version.json 指向不存在的资产）。
 - **中途失败**：与正常发布共用自动回滚（step 2/3 失败回滚 package.json / build.gradle / changelog / version.json），可安全重跑。

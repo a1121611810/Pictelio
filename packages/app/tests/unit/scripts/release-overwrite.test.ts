@@ -18,15 +18,15 @@ const EXPECTED_ASSETS = [
 
 const fullLocalApks = [
   {
-    flavor: "full",
+    buildType: "full",
     path: "/abs/android/app/build/outputs/apk/full/release/pictelio-4.2.4-full.apk",
   },
   {
-    flavor: "webview",
+    buildType: "webview",
     path: "/abs/android/app/build/outputs/apk/webview/release/pictelio-4.2.4-webview.apk",
   },
   {
-    flavor: "lynx",
+    buildType: "lynx",
     path: "/abs/android/app/build/outputs/apk/lynx/release/pictelio-4.2.4-lynx.apk",
   },
 ];
@@ -98,13 +98,13 @@ describe("planOverwrite", () => {
   it("本地缺少某变体 APK → 列入 buildRequired，不进入上传清单", () => {
     const plan = makePlan({
       localApks: [
-        { flavor: "full", path: null },
+        { buildType: "full", path: null },
         {
-          flavor: "webview",
+          buildType: "webview",
           path: "/abs/android/app/build/outputs/apk/webview/release/pictelio-4.2.4-webview.apk",
         },
         {
-          flavor: "lynx",
+          buildType: "lynx",
           path: "/abs/android/app/build/outputs/apk/lynx/release/pictelio-4.2.4-lynx.apk",
         },
       ],
@@ -259,9 +259,9 @@ describe("executeOverwrite", () => {
     // 本地全部缺失：不构建也不上传（仅文案模式），但远端有资产时仍备份——此处让 upload 清单为空
     const plan = makePlan({
       localApks: [
-        { flavor: "full", path: null },
-        { flavor: "webview", path: null },
-        { flavor: "lynx", path: null },
+        { buildType: "full", path: null },
+        { buildType: "webview", path: null },
+        { buildType: "lynx", path: null },
       ],
     });
     expect(plan.assetsToUpload).toEqual([]);
@@ -297,5 +297,81 @@ describe("executeOverwrite", () => {
     const restoreInput = upload.mock.calls[1][0];
     expect(restoreInput.paths).toHaveLength(1);
     expect(restoreInput.paths[0].endsWith("pictelio-4.2.4-webview.apk")).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// #610 单引擎化后的默认分支（生产中唯一可达的那条路径）
+//
+// 上面的 15 例走的是 #610 前 v4.2.4 三 flavor 的真实历史快照，作为历史契约保留
+// （AGENTS.md 测试硬约束 #2：契约测试必须使用真实样例，不许因为「现在走不到了」
+// 就删）。但它们都**显式传了 variants**，planOverwrite 的默认值分支零覆盖——
+// 而 DEFAULT_VARIANTS 已从 ["full","webview","lynx"] 改为 ["release"]，
+// 按 AGENTS.md 测试硬约束 #4（字段/常量/默认值改动须查契约测试，缺失则补）必须补上。
+// ─────────────────────────────────────────────────────────────
+describe("planOverwrite — 默认 variants 分支（#610 单引擎，AGENTS.md 硬约束 #4）", () => {
+  // 真实样例：2026-09-29 实测 build.gradle rename task 产出
+  //   Renamed: app-release.apk -> pictelio-6.2.1-release.apk
+  const V = "6.2.1";
+  const localApks = [
+    {
+      buildType: "release",
+      path: `/abs/android/app/build/outputs/apk/release/pictelio-${V}-release.apk`,
+    },
+  ];
+  const remote = {
+    tag: `v${V}`,
+    release: { exists: true, draft: false, assets: [`pictelio-${V}-release.apk`] },
+  };
+
+  it("不传 variants 时按单引擎默认计算资产集合", () => {
+    const plan = planOverwrite({
+      version: V,
+      repo: REPO,
+      localApks,
+      remote,
+      notes: "test notes",
+    });
+    expect(plan.assetsMissing).toEqual([]);
+    expect(plan.assetsToReplace).toEqual([`pictelio-${V}-release.apk`]);
+    expect(plan.assetsToUpload).toEqual([
+      `/abs/android/app/build/outputs/apk/release/pictelio-${V}-release.apk`,
+    ]);
+    expect(plan.buildRequired).toEqual([]);
+    expect(plan.needsBackup).toBe(true);
+  });
+
+  it("本地缺产物时 buildRequired 指向单引擎产物名，不出现已下线 flavor", () => {
+    const plan = planOverwrite({
+      version: V,
+      repo: REPO,
+      localApks: [{ buildType: "release", path: null }],
+      remote,
+      notes: null,
+    });
+    expect(plan.assetsToUpload).toEqual([]);
+    expect(plan.buildRequired).toEqual(["release"]);
+    expect(plan.warnings.join(" ")).not.toMatch(/full|webview/u);
+  });
+
+  it("默认分支不会把远端遗留的旧 flavor 资产判为「多出来」之外的错类", () => {
+    // 远端还挂着 #610 前的旧资产时，它们属于 extraRemote（保留不动），不是本版本资产
+    const plan = planOverwrite({
+      version: V,
+      repo: REPO,
+      localApks,
+      remote: {
+        ...remote,
+        release: {
+          exists: true,
+          draft: false,
+          assets: [`pictelio-${V}-release.apk`, "pictelio-4.2.4-webview.apk"],
+        },
+      },
+      notes: null,
+    });
+    expect(plan.assetsMissing).toEqual([]);
+    expect(plan.assetsToReplace).toEqual([`pictelio-${V}-release.apk`]);
+    expect(plan.warnings.join(" ")).toMatch(/pictelio-4\.2\.4-webview\.apk/u);
   });
 });

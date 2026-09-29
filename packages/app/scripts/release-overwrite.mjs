@@ -63,9 +63,10 @@ export async function probeRemote({ tag, repo, run = runOutputAsync }) {
  *
  * @param {object} input
  * @param {string} input.version      package.json version，如 "4.2.4"
- * @param {string[]} [input.variants] 期望变体，默认全量三变体
- * @param {string} input.repo         GitHub 仓库，如 "a1121611810/pixivizer"
- * @param {{flavor: string, path: string|null}[]} input.localApks 本地 APK 探测结果（null=未构建）
+ * @param {string[]} [input.variants] 期望构建变体。#610 单引擎化后 gradle 的 flavor
+ *   维度已下线，「变体」实为 buildType，默认唯一值 "release"（不是 #610 前的三 flavor）。
+ * @param {string} input.repo         GitHub 仓库，如 "a1121611810/pictelier"
+ * @param {{buildType: string, path: string|null}[]} input.localApks 本地 APK 探测结果（null=未构建）
  * @param {{tag: string|null, release: {exists: boolean, draft: boolean, assets: string[]}|null}} input.remote 远端状态
  * @param {string|null} [input.notes] 新文案（null = 本次不更新文案）
  * @returns {{
@@ -111,11 +112,11 @@ export function planOverwrite({
   const assetsToReplace = expectedAssets.filter((a) => remoteAssets.includes(a));
   const extraRemote = remoteAssets.filter((a) => !expectedAssets.includes(a));
 
-  const pathByFlavor = new Map(localApks.map((x) => [x.flavor, x.path]));
+  const pathByBuildType = new Map(localApks.map((x) => [x.buildType, x.path]));
   const assetsToUpload = includeAssets
-    ? variants.filter((f) => pathByFlavor.get(f)).map((f) => pathByFlavor.get(f))
+    ? variants.filter((f) => pathByBuildType.get(f)).map((f) => pathByBuildType.get(f))
     : [];
-  const buildRequired = includeAssets ? variants.filter((f) => !pathByFlavor.get(f)) : [];
+  const buildRequired = includeAssets ? variants.filter((f) => !pathByBuildType.get(f)) : [];
 
   const needsBackup = includeAssets && assetsToReplace.length > 0;
 

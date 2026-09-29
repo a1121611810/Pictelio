@@ -422,7 +422,7 @@ async function runOverwriteFlow() {
     const localApks = [];
     for (let i = 0; i < variants.length; i++) {
       localApks.push({
-        flavor: variants[i],
+        buildType: variants[i],
         path: (await exists(apkPaths[i])) ? resolvePath(rootDir, apkPaths[i]) : null,
       });
     }
@@ -443,13 +443,15 @@ async function runOverwriteFlow() {
       const missing = localApks.filter((x) => !x.path);
       if (missing.length === 0) {
         console.log("\n本地已存在全部变体 APK：");
-        for (const x of localApks) console.log(`  ${x.flavor}: ${x.path}`);
+        for (const x of localApks) console.log(`  ${x.buildType}: ${x.path}`);
         const ans = ((await askQuestion("\n复用本地 APK (r) 还是重新构建 (b)？ [r]: ")) || "r")
           .trim()
           .toLowerCase();
         rebuild = ans === "b";
       } else {
-        console.log(`\n本地缺少变体 APK：${missing.map((x) => x.flavor).join(", ")}，将重新构建`);
+        console.log(
+          `\n本地缺少变体 APK：${missing.map((x) => x.buildType).join(", ")}，将重新构建`,
+        );
         rebuild = true;
       }
     }
@@ -475,7 +477,7 @@ async function runOverwriteFlow() {
       }
       for (let i = 0; i < variants.length; i++) {
         localApks[i] = {
-          flavor: variants[i],
+          buildType: variants[i],
           path: (await exists(apkPaths[i])) ? resolvePath(rootDir, apkPaths[i]) : null,
         };
       }

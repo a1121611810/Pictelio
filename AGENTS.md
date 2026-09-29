@@ -146,7 +146,7 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 并行全部 |
 | `pnpm dev:android` / `build:android(:release)` | 热重载 / Debug 或签名 Release APK（需密码环境变量） |
 | `pnpm test:agent-browser` / `test:android:e2e` | AI E2E（入门禁）/ 模拟器 E2E（手动按需） |
-| `pnpm release` / `cap:sync` / `deploy(:dry)` | 交互式发布 / Capacitor 同步 / 落地页预览 |
+| `pnpm release` / `deploy(:dry)` | 交互式发布 / 落地页预览 |
 
 ## Monorepo 结构
 

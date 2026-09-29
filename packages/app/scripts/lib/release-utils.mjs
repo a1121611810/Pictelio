@@ -16,12 +16,30 @@ import ora from "ora";
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
 
-// #119：原为三 flavor 变体（full / webview / lynx），默认全量。
-// #610 单引擎化后 `flavorDimensions` 与全部 `productFlavors` 已删除，gradle variant 名
-// 退化为纯 buildType，故「变体」现在唯一取值 `release`。旧值 full / webview / lynx
-// 对应的 assemble{Full,Webview,Lynx}Release task 已不存在，保留会让 gradle 直接报
-// "Task not found"。推导见 lib/release-build-steps.mjs 的 RELEASE_BUILD_TYPES 注释。
-export const DEFAULT_VARIANTS = ["release"];
+/**
+ * #610 单引擎化后唯一可发布的构建变体（= gradle buildType）。
+ *
+ * 原值是 `["full", "webview", "lynx"]`（gradle flavor）。#610 删除了 `flavorDimensions`
+ * 与全部 `productFlavors`，variant 名退化为**纯 buildType**，于是：
+ *   - assemble${Flavor}Release  →  assemble${BuildType}     （assembleRelease）
+ *   - rename${Flavor}ReleaseApk →  rename${BuildType}Apk    （renameReleaseApk）
+ *   - apk/${flavor}/release/…   →  apk/${buildType}/…        （apk/release/…）
+ *
+ * 取值与 android/app/build.gradle 的 `buildTypeList2 = ['debug', 'release']` 对齐；
+ * 发布只取 release（debug 包不签名、不进 Release 资产）。
+ *
+ * ⚠️ 本常量是**唯一事实源**：gradle task 拼法（release-build-steps.mjs）与 --variants
+ * 白名单（resolveVariants）都从它派生。早期版本在两处各写一份字面量、再用一条单测
+ * 断言「二者相等」——那是用测试去 policing 冗余，同义反复。
+ */
+export const RELEASE_BUILD_TYPES = ["release"];
+
+/**
+ * #119 时期名为 DEFAULT_VARIANTS（flavor 语义），#610 后其实承载 buildType。
+ * 保留旧名是为不破坏 CLI/环境变量 PICTELIO_RELEASE_VARIANTS 的既有语义。
+ * 从 RELEASE_BUILD_TYPES 派生，保证白名单与 task 拼法同源。
+ */
+export const DEFAULT_VARIANTS = [...RELEASE_BUILD_TYPES];
 export const APK_DIR = "android/app/build/outputs/apk";
 
 // 产物路径与 android/app/build.gradle 的 rename task 规则严格一致（build.gradle:118）：

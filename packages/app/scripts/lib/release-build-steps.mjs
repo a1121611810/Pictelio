@@ -13,23 +13,15 @@ import { resolve as resolvePath, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
 
+import { RELEASE_BUILD_TYPES } from "./release-utils.mjs";
+
 // 与 release-utils.mjs 同口径：lib/ 的上级上级 = packages/app
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/**
- * #610 单引擎化后唯一可发布的构建变体。
- *
- * 原 DEFAULT_VARIANTS 是 `["full", "webview", "lynx"]`（gradle flavor）。#610 删除了
- * `flavorDimensions` 与全部 `productFlavors`，gradle variant 名退化为**纯 buildType**，
- * 于是：
- *   - assemble${Flavor}Release  →  assemble${BuildType}     （assembleRelease）
- *   - rename${Flavor}ReleaseApk →  rename${BuildType}Apk    （renameReleaseApk）
- *   - apk/${flavor}/release/…   →  apk/${buildType}/…        （apk/release/…）
- *
- * 命名与 android/app/build.gradle 的 buildTypeList2 = ['debug', 'release'] 对齐；
- * 发布只取 release（debug 包不签名、不进 Release 资产）。
- */
-export const RELEASE_BUILD_TYPES = ["release"];
+// 变体集合的唯一事实源在 release-utils.mjs（RELEASE_BUILD_TYPES）；这里只 re-export，
+// 供「本模块的 task 拼法」与「release-utils 的 --variants 白名单」同源这一点可被直接引用。
+// 本模块的函数签名接受调用方传入的 variants，不自行决定取哪几个。
+export { RELEASE_BUILD_TYPES };
 
 /** buildType 段首字母大写（assembleRelease / renameReleaseApk） */
 function capSegment(bt) {
