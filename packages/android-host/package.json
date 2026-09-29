@@ -1,0 +1,15 @@
+{
+  "name": "@pictelio/android-host",
+  "version": "0.1.0",
+  "description": "Pictelio Android 构建宿主（Gradle 工程 / 发布脚本 / 原生 E2E / JVM 单测），不是客户端——客户端是 packages/app-lynx（ADR-0203）",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

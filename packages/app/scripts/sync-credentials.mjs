@@ -1,14 +1,18 @@
 // sync-credentials.mjs
 // 从 credentials.json5 读取配置，生成 Java 常量类 OAuthConfig.java。
 // 在 build:android / build:android:release 之前自动调用。
+//
+// ADR-0203 决策 3「事实源迁移」：凭证事实源已迁到唯一客户端包 pictelio-app-lynx，
+// 本脚本改为消费 ../app-lynx/credentials.json5（不再读本包内已迁走的副本）。
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import JSON5 from "json5";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const lynxPackageDir = resolve(rootDir, "..", "app-lynx");
 
-const credsPath = resolve(rootDir, "credentials.json5");
+const credsPath = resolve(lynxPackageDir, "credentials.json5");
 if (!existsSync(credsPath)) {
   console.error("[sync-credentials] ❌ 未找到 credentials.json5，请确认文件存在后重试");
   process.exit(1);

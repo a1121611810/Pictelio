@@ -10,16 +10,17 @@ import { pluginLivereload } from './rspeedy-plugin-livereload.ts'
 
 const _root = dirname(fileURLToPath(import.meta.url))
 
-// ─── 从 app 包读取单一事实源 credentials.json5 ────────────────────
-// 与 packages/app/vite.config.ts 同源，避免双份凭证漂移。
-const _credsPath = resolve(_root, '../app/credentials.json5')
+// ─── 读取单一事实源 credentials.json5（包内，不跨包） ────────────────────
+// ADR-0203 决策 3「事实源迁移」：WebView 客户端源码删除后，凭证归属唯一客户端
+// pictelio-app-lynx（同步 JS 注入与 Java 侧 OAuthConfig 生成）。
+const _credsPath = resolve(_root, 'credentials.json5')
 const credentials = JSON5.parse(readFileSync(_credsPath, 'utf-8'))
 
 // ─── 版本号注入（检查更新用，与 APK 版本单一事实源一致） ───
-// 版本号不自己维护：直接读 app 包（pictelio-app）的 version——
-// APK versionCode/versionName 由 scripts/sync-android-version.mjs 从 app 包同步，
-// lynx bundle 属于同一 APK，必须与 app 包版本比较（用 lynx 自身 0.1.0 会永远提示有更新）。
-const _appPkg = JSON.parse(readFileSync(resolve(_root, '../app/package.json'), 'utf-8')) as {
+// 版本号不自己维护：直接读本包（pictelio-app-lynx）package.json 的 version——
+// APK versionCode/versionName 由 scripts/sync-android-version.mjs 从本包同步，
+// lynx bundle 属于同一 APK，两者必然同源。
+const _appPkg = JSON.parse(readFileSync(resolve(_root, 'package.json'), 'utf-8')) as {
   version: string
 }
 const __APP_VERSION__ = JSON.stringify(_appPkg.version)

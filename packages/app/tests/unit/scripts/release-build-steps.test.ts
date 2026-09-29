@@ -74,8 +74,16 @@ describe("gradleTasksFor：必须产出 build.gradle 真实注册的 task", () =
 describe("releaseBuildSteps：步骤表内每个 pnpm script 都必须真实存在", () => {
   const steps = releaseBuildSteps({ variants: ["release"] });
 
-  it("抽到步骤表（扫描范围下界，防正则失效导致后续断言恒真）", () => {
-    expect(steps.length).toBeGreaterThanOrEqual(5);
+  it("步骤表恰有 4 步：OAuth 同步 → Lynx bundle 构建 → 同步进 assets → gradle", () => {
+    // 期望值溯源：release-build-steps.mjs 的步骤表在「构建 Web 产物」步删除后（ADR-0203 /
+    // spec 决策九）剩 4 步。写成**精确**值而非下界：复活任何一步（包括塞回 Web 产物构建）
+    // 都会在这里转红，不必只依赖后面的语义守卫。
+    expect(steps.map(([label]) => label)).toEqual([
+      "同步 OAuth 配置",
+      "构建 Lynx bundle",
+      "同步 Lynx bundle 到 Android assets",
+      "编译 Release APK",
+    ]);
   });
 
   // ADR-0202：OTA web bundle 发布通道已下线（release-bundle.mjs 及其三件套管线一并删除）。
@@ -104,6 +112,45 @@ describe("releaseBuildSteps：步骤表内每个 pnpm script 都必须真实存�
         ([, cmd, args]) => cmd === "node" && args.some((a) => String(a).includes("bundle")),
       ),
     ).toEqual([]);
+  });
+
+  // ADR-0203 / spec 决策九：WebView 客户端源码随包删除后，其构建产物在 APK 中没有落点，
+  // 「构建 Web 产物」步已从步骤表移除。
+  //
+  // 检测式按**语义**（白名单）而非按步骤标签字面量匹配——本仓有先例：
+  // 改名复活的步骤（「构建 Web 产物」→「打包 SPA 静态资源」）会让字面量断言整条漏过。
+  // 语义形态：宿主包内（无 --dir）执行的 pnpm 步骤只能是**发布链管道脚本**；
+  // 任何其它宿主包内 pnpm 步骤都意味着「又在构建被删的 WebView 客户端产物」。
+  it("步骤表不得包含任何宿主包内的 WebView 客户端产物构建步骤（客户端已删除）", () => {
+    /** 步骤在哪个包执行：无 --dir 即宿主包自身 */
+    const runsInHostPkg = (args: string[]) => args.indexOf("--dir") === -1;
+    /** 宿主包内的发布链管道脚本白名单（同步类，非产物构建） */
+    const HOST_PIPELINE_SCRIPTS = new Set(["sync:credentials", "sync:android-version"]);
+    const scriptNameOf = (args: string[]) => {
+      const i = args.indexOf("run");
+      return i === -1 ? "" : (args[i + 1] ?? "");
+    };
+    const isHostOnlyProductStep = (step: [string, string, string[]]) => {
+      const [, cmd, args] = step;
+      return (
+        cmd === "pnpm" && runsInHostPkg(args) && !HOST_PIPELINE_SCRIPTS.has(scriptNameOf(args))
+      );
+    };
+
+    // 阳性对照：检测式必须能命中原步骤与改名复活形态，否则下面那条断言是恒绿假防线
+    expect(
+      [
+        ["构建 Web 产物", "pnpm", ["run", "build"]], // 原形态（被删）
+        ["打包 SPA 静态资源", "pnpm", ["run", "build"]], // 改名复活
+        ["打包静态站点", "pnpm", ["run", "build:web"]], // 改名 + 改 script 名
+      ].filter(isHostOnlyProductStep),
+    ).toHaveLength(3);
+    // 反向：Lynx bundle 构建走 --dir，不属于宿主包内步骤，不得被误伤
+    expect(
+      isHostOnlyProductStep(["构建 Lynx bundle", "pnpm", ["--dir", "../app-lynx", "run", "build"]]),
+    ).toBe(false);
+
+    expect(steps.filter(isHostOnlyProductStep)).toEqual([]);
   });
 
   it("步骤表里引用的每个 pnpm run <script> 在对应 package.json 中都存在", () => {

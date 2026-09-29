@@ -3,15 +3,19 @@
 //   - error 字段（「检查失败」与「无更新」可区分）
 //   - fetchImpl 依赖注入（不 stub 全局 fetch）
 //   - 超时路径（fake timers + signal abort）
-//   - 双坐标扩展（minWebVersion / webBundle，OTA web bundle #247）
-// 契约 mock 使用真实 version.json 字段（version/url/changelog + minWebVersion/webBundle，
-// 生产 schema 见 docs/specs/ota-web-bundle.md「版本与数据源」节）。
+// 契约 mock 使用真实 version.json 字段（version/url/changelog），生产 schema 见
+// packages/website/version.json。
 // oracle 溯源：
-//   - isBelowMin 期望值来自规格语义「bundle 低于 floor ⟺ floor 较新」，并用 isNewer 反参
-//     做差分断言（独立语义来源交叉验证，非从实现反推）
-//   - webBundle 缺失/残缺路径的期望值来自「显式暴露 undefined、不伪造默认值」的禁静默降级约束
+//   - hasUpdate/latestVersion 期望值来自「远端 APK 版本 > 本地版本」的规格语义
+//   - 错误路径期望值来自「显式暴露 error、禁静默降级」的契约约束
+//
+// ⚠️ OTA web bundle 双坐标（minWebVersion / webBundle / isBelowMin）的用例已随
+// ADR-0202（发布通道下线）+ ADR-0203（WebView 源码删除）整体移除——其唯一消费层
+// `packages/app/src/services/otaService.ts` 已随包删除。留存即为恒空读。
+// 反向守卫见文件末尾 describe「web bundle 契约已下线」。
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { isNewer, isBelowMin, checkForUpdate } from "../src/index";
+import { isNewer, checkForUpdate } from "../src/index";
+import type { CheckResult } from "../src/index";
 
 describe("isNewer", () => {
   it("returns false when versions are equal", () => {
@@ -205,6 +209,20 @@ describe("checkForUpdate", () => {
     expect(result.error).toBeUndefined();
   });
 
+  it("version 非字符串（脏数据）→ hasUpdate=false 且不崩溃", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ version: 9999, url: "https://example.com" }), {
+        status: 200,
+      }),
+    );
+
+    const result = await checkForUpdate("4.5.0", mockFetch);
+
+    expect(result.hasUpdate).toBe(false);
+    expect(result.latestVersion).toBe("");
+    expect(result.error).toBeUndefined();
+  });
+
   it("超过 10s 超时中止请求并返回安全默认值 + error", async () => {
     // fetchImpl 注入 seam：mock fetch 尊重 AbortSignal，永不 resolve
     const mockFetch = vi.fn(
@@ -237,73 +255,38 @@ describe("checkForUpdate", () => {
   });
 });
 
-describe("isBelowMin（OTA 强制门槛判定）", () => {
-  it("floor 高于 local → true（门槛命中）", () => {
-    expect(isBelowMin("4.20.0", "4.21.0")).toBe(true);
-  });
-
-  it("floor 等于 local → false", () => {
-    expect(isBelowMin("4.21.0", "4.21.0")).toBe(false);
-  });
-
-  it("floor 低于 local → false", () => {
-    expect(isBelowMin("4.22.0", "4.21.0")).toBe(false);
-  });
-
-  it("空 floor → false（fail-open：不设门槛）", () => {
-    expect(isBelowMin("4.21.0", "")).toBe(false);
-  });
-
-  it("undefined floor（CheckResult.minWebVersion 直传形态）→ false（fail-open）", () => {
-    expect(isBelowMin("4.21.0", undefined)).toBe(false);
-  });
-
-  it("v 前缀 / 空白 / 混合深度与 isNewer 同语义", () => {
-    expect(isBelowMin("4.21.0", "v4.22.0")).toBe(true);
-    expect(isBelowMin(" v4.21.0 ", "4.22.0")).toBe(true);
-    expect(isBelowMin("1.2", "1.2.1")).toBe(true);
-    expect(isBelowMin("1.2.1", "1.2")).toBe(false);
-  });
-
-  it("非数字段防御（按 0，不崩溃）", () => {
-    expect(isBelowMin("abc", "1.0.0")).toBe(true);
-    expect(isBelowMin("1.0.0", "abc")).toBe(false);
-  });
-
-  it("差分断言：isBelowMin(local, floor) ≡ isNewer(local, floor)（反参交叉验证）", () => {
-    const pairs: Array<[string, string]> = [
-      ["4.20.0", "4.21.0"],
-      ["4.21.0", "4.21.0"],
-      ["9.9.9", "1.0.0"],
-      ["1.0.0", "9.9.9"],
-      ["1.2", "1.2.1"],
-      ["1.2.1", "1.2"],
-      ["2.0.0+build1", "v2.0.0"],
-    ];
-    for (const [local, floor] of pairs) {
-      expect(isBelowMin(local, floor)).toBe(isNewer(local, floor));
-    }
-  });
-});
-
-describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
+// ─────────────────────────────────────────────────────────────
+// 反向守卫：web bundle 双坐标契约必须**不在**本包存在。
+// 期望值溯源：ADR-0202（发布通道下线）+ ADR-0203 / spec「决策四」（消费层随源码删除）。
+//
+// 检测式按**语义**而非按字面量：断言的是「运行时导出面」与「CheckResult 的键集合」，
+// 改名复活（isBelowMin → isWebFloor）会让导出面多出成员，照样转红——
+// 本仓已有「改名复活导致按字面量匹配的守卫全漏过」的先例。
+// ─────────────────────────────────────────────────────────────
+describe("web bundle 契约已下线（ADR-0202 发布通道 + ADR-0203 源码删除）", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("解析 minWebVersion 与 webBundle（OTA 发布 schema）", async () => {
-    // 契约样例 = 规格生产 schema：webBundle.url 为三件套资产前缀 URL
+  it("运行时导出面只剩 APK 更新检查所需成员（isNewer / checkForUpdate）", async () => {
+    const mod = await import("../src/index");
+    // 阳性对照：APK 更新检查的导出确实在，否则本断言是「什么都没了」而非「删对了」
+    expect(typeof mod.isNewer).toBe("function");
+    expect(typeof mod.checkForUpdate).toBe("function");
+    // 精确集合而非黑名单：任何新增导出（含改名后的门槛判定）都会转红
+    expect(Object.keys(mod).toSorted()).toEqual(["checkForUpdate", "isNewer"]);
+  });
+
+  it("version.json 仍带 OTA 字段时，结果对象不含任何 bundle 元数据", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // 存量 version.json 可能仍被旧发布产物写过这些键——解析层必须整体忽略
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           version: "4.21.0",
           url: "https://github.com/a1121611810/Pictelio/releases/tag/v4.21.0",
-          changelog: "...",
           minWebVersion: "4.21.0",
-          webBundle: {
-            version: "4.21.0",
-            url: "https://github.com/a1121611810/Pictelio/releases/download/v4.21.0/pictelio-4.21.0",
-          },
+          webBundle: { version: "4.21.0", url: "https://example.com/prefix" },
         }),
         { status: 200 },
       ),
@@ -311,113 +294,26 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
 
     const result = await checkForUpdate("4.20.0", mockFetch);
 
-    expect(result.minWebVersion).toBe("4.21.0");
-    expect(result.webBundle).toEqual({
-      version: "4.21.0",
-      url: "https://github.com/a1121611810/Pictelio/releases/download/v4.21.0/pictelio-4.21.0",
-    });
-    expect(result.error).toBeUndefined();
-  });
-
-  it("新字段缺失时显式暴露 undefined（不伪造默认值，fail-open 判定留给消费端）", async () => {
-    // 「缺失 → 静默」边界锁定：absent 是未发布 OTA 的常态，不得刷 warn
-    // （若 parse 层误把 undefined 当非法，此断言报警）
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ version: "9.9.9", url: "https://example.com/release" }), {
-        status: 200,
-      }),
-    );
-
-    const result = await checkForUpdate("4.5.0", mockFetch);
-
+    // 阳性对照：APK 坐标照常解析（不是把整个响应判为失败）
     expect(result.hasUpdate).toBe(true);
-    expect(result.minWebVersion).toBeUndefined();
-    expect(result.webBundle).toBeUndefined();
+    expect(result.latestVersion).toBe("4.21.0");
     expect(result.error).toBeUndefined();
+    // 语义匹配：断言键集合，不逐个点名字段
+    expect(Object.keys(result).toSorted()).toEqual([
+      "hasUpdate",
+      "latestChangelog",
+      "latestReleaseUrl",
+      "latestVersion",
+    ]);
+    // 解析层已不再关心这些键 → 不得刷 warn（否则是残留的脏数据防御还挂在上面）
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it("webBundle 残缺（缺 url / 字段非字符串 / 非对象）→ 视为不存在 + warn（契约破坏可见，禁静默）", async () => {
-    const cases = [
-      { webBundle: { version: "4.21.0" } }, // 缺 url
-      { webBundle: { url: "https://example.com" } }, // 缺 version
-      { webBundle: { version: 123, url: "https://example.com" } }, // 字段非字符串
-      { webBundle: "not-an-object" }, // 非对象
-    ];
-    for (const payload of cases) {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ version: "4.21.0", ...payload }), { status: 200 }),
-        );
-      const result = await checkForUpdate("4.20.0", mockFetch);
-      expect(result.webBundle, JSON.stringify(payload)).toBeUndefined();
-      expect(result.error, JSON.stringify(payload)).toBeUndefined();
-      expect(warnSpy, `脏 webBundle 必须 warn: ${JSON.stringify(payload)}`).toHaveBeenCalled();
-      warnSpy.mockRestore();
-    }
-  });
-
-  it("webBundle 携带未知扩展字段 → 正常采信（schema 加字段永远兼容）", async () => {
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          version: "4.21.0",
-          webBundle: { version: "4.21.0", url: "https://example.com/prefix", build: 7 },
-        }),
-        { status: 200 },
-      ),
-    );
-
-    const result = await checkForUpdate("4.20.0", mockFetch);
-
-    expect(result.webBundle).toEqual({ version: "4.21.0", url: "https://example.com/prefix" });
-  });
-
-  it("version 非字符串（脏数据）→ hasUpdate=false 且不崩溃", async () => {
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ version: 9999, url: "https://example.com" }), {
-        status: 200,
-      }),
-    );
-
-    const result = await checkForUpdate("4.5.0", mockFetch);
-
-    expect(result.hasUpdate).toBe(false);
-    expect(result.latestVersion).toBe("");
-    expect(result.error).toBeUndefined();
-  });
-
-  it("minWebVersion 纯空白 → undefined + warn（与缺失区分，契约破坏可见）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ version: "4.21.0", minWebVersion: "   " }), { status: 200 }),
-      );
-
-    const result = await checkForUpdate("4.20.0", mockFetch);
-
+  it("类型面：CheckResult 不再暴露 web bundle 字段（@ts-expect-error 失效即 tsc 转红）", () => {
+    const result = {} as CheckResult;
+    // @ts-expect-error 双坐标已下线；字段若被加回，tsc 报「未使用的 @ts-expect-error」
     expect(result.minWebVersion).toBeUndefined();
-    expect(result.error).toBeUndefined();
-    expect(warnSpy).toHaveBeenCalled();
-  });
-
-  it("minWebVersion 非字符串（数字/对象）→ undefined + warn（防御脏数据不崩溃）", async () => {
-    for (const bad of [123, { v: "4.21.0" }]) {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ version: "4.21.0", minWebVersion: bad }), { status: 200 }),
-        );
-      const result = await checkForUpdate("4.20.0", mockFetch);
-      expect(result.minWebVersion, JSON.stringify(bad)).toBeUndefined();
-      expect(result.error, JSON.stringify(bad)).toBeUndefined();
-      expect(warnSpy, `脏 minWebVersion 必须 warn: ${JSON.stringify(bad)}`).toHaveBeenCalled();
-      warnSpy.mockRestore();
-    }
+    // @ts-expect-error 同上
+    expect(result.webBundle).toBeUndefined();
   });
 });

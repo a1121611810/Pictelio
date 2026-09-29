@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// 与 lynx.config.ts 同源：APK 版本号从 app 包 package.json 读取（不自己维护）
+// 与 lynx.config.ts 同源：APK 版本号从本包 package.json 读取（不自己维护）。
+// ADR-0203 决策 3：版本号事实源已迁到 pictelio-app-lynx，不再跨包读取。
 const _root = dirname(fileURLToPath(import.meta.url))
-const _appPkg = JSON.parse(readFileSync(resolve(_root, '../app/package.json'), 'utf-8')) as {
+const _appPkg = JSON.parse(readFileSync(resolve(_root, 'package.json'), 'utf-8')) as {
   version: string
 }
 

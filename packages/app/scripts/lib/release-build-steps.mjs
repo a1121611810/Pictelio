@@ -43,10 +43,14 @@ export function gradleTasksFor(variants) {
  *
  * 顺序有依赖，不可随意调换：
  *   1) sync:credentials 先把 OAuth 配置写进 Java 源码
- *   2) 构建 Web 产物
- *   3) 构建 Lynx bundle（NODE_ENV=production 硬兜底，防 dev 凭证内联进生产包）
+ *   2) 构建 Lynx bundle（NODE_ENV=production 硬兜底，防 dev 凭证内联进生产包）
  *      再同步进 android/app/src/main/assets/main.lynx.bundle，否则 APK 无 bundle → 白屏
- *   4) 最后 gradle assemble + rename
+ *   3) 最后 gradle assemble + rename
+ *
+ * ⚠️ 原第 2 步「构建 Web 产物」（pnpm run build）已删除（ADR-0203 / spec 决策九）：
+ * WebView 客户端源码随包删除，其产物在 APK 中没有任何落点（gradle 早已不裁剪 assets，
+ * `app/build.gradle` 注释：assets 只剩 main.lynx.bundle），留着是每次发版白跑一遍构建。
+ * 复活防线见 tests/unit/scripts/release-build-steps.test.ts。
  *
  * @param {object} input
  * @param {string[]} input.variants 构建变体（= buildType），来自 resolveVariants()
@@ -56,7 +60,6 @@ export function releaseBuildSteps({ variants }) {
   const androidDir = resolvePath(rootDir, "android");
   return [
     ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
-    ["构建 Web 产物", "pnpm", ["run", "build"]],
     // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
     // 否则 APK 无 main.lynx.bundle，LynxActivity 加载失败 → 白屏。
     // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
