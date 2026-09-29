@@ -1,9 +1,9 @@
 {
-  "version": "6.2.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.2.1",
-  "changelog": "# Pictelio 更新日志\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：修复启动时的竞态问题，此前在某些时机登录会被错误标记为永久失效，刷新或重进应用后再也登不回来，现已可正常保持登录状态\n- 列表加载更多此前偶发因查询配置缺失而失败，现已恢复正常加载下一页",
+  "version": "6.3.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.3.0",
+  "changelog": "# Pictelio 更新日志\n\n## ⚡ 体验优化：统一使用 Lynx 引擎\n\n- **Lynx 引擎**：成为 App 的唯一渲染客户端，之前的 WebView 引擎已下线；之前手动选择过 WebView 的用户将直接进入 Lynx，不再可切换",
   "webBundle": {
-    "version": "6.2.1",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v6.2.1/pictelio-6.2.1"
+    "version": "6.3.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v6.3.0/pictelio-6.3.0"
   }
 }

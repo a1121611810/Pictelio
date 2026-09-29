@@ -25,8 +25,8 @@ android {
         // 是过渡分支并行期的假设，随合并作废。
         // 待定：合回后 versionCode 序列尚未拍板（另起主线 60300，还是顺延 60202），
         // 见 #819；未定案前不动本值。
-        versionCode 60201
-        versionName "6.2.1"
+        versionCode 60300
+        versionName "6.3.0"
         buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         // 沙盒 #610：client flavor 维度下线（WebView/Capacitor 线整体删除），
         // 入口写死 Lynx。占位符机制保留但不再按 flavor 注入。
