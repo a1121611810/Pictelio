@@ -59,9 +59,13 @@
 > |------|------|--------|
 > | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
 > | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
-> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时 / `-t` 过滤。**这些情形 `afterAll` 仍会执行**（vitest 源码 `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮 |
+> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。成因有两类，**后果不同**：① 该行被写回 `return`（要堵的洞）；② 该用例所属 test 本轮**没跑**——`beforeAll` 失败 / 前面断言抛错 / 超时。**这三类 `afterAll` 仍会执行**（vitest `run.C5UmxDPh.js` 的 `finally` 块明写 "afterAll runs even if beforeAll or suite children fail"），所以外层门抓得到。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮。**`-t` 过滤不在此列**——见下方第三类 |
 >
-> ⚠️ **第三类：不产生双 0，而是让门整个消失**——`describe.skipIf(SKIPPED)` 为真时 vitest 直接把 suite 标为 skip 并结束（`run.C5UmxDPh.js:4023-4025` 的 `suite.mode === "skip"` 分支**不含 `afterAll`**），台账对象根本不存在 ⇒ **不判红、结果里也不留痕迹**。在非 `pictelio_ui` 设备上跑发版门就属于这一类。已挂 #819 第 7 项（待办：`docs/release-checklist.md` 加一条「跑完核对 `Tests … | N skipped` 计数与该行 console 输出，确认发版门真的跑了」）。
+> ⚠️ **第三类：不产生双 0，而是让门整个消失**——成因是 `suite.mode` 被置为 `skip`：
+> - `describe.skipIf(SKIPPED)` 为真（**非 `pictelio_ui` 设备即属此类**）；
+> - `-t` 过滤**把 suite 内全部 test 都滤掉**——`task-utils.js:231-232` 在这种情况下把整个 suite 提升为 `mode === "skip"`。⚠️ `-t` 是**有条件**的：只要 suite 内还剩 ≥1 个 test 命中，`afterAll` 照跑、门抓得到（同第 ② 类）；**一个都没命中时**与 `describe.skipIf` 同型。
+>
+> 此时 vitest 走 `run.C5UmxDPh.js:4023-4025` 的 `suite.mode === "skip"` 分支（只有 `suite.result.state = "skip"; updateTask("suite-finished", …)`，**不含 `afterAll`**），台账对象根本不存在 ⇒ **不判红、无门结论**。⚠️ 但**并非完全不留痕迹**：`Tests … | N skipped` 计数照常打印（实测 `Test Files 1 skipped (1)` / `Tests 1 skipped (1)`），而那恰恰是唯一可观测点——所以排查时**必须**核这个计数，别因为「不判红」就以为门跑过了。已挂 #819 第 7 项（待办：`docs/release-checklist.md` 加一条「跑完核对 `Tests … | N skipped` 计数与该行 console 输出，确认发版门真的跑了」）。
 >
 > 「求和」太弱（R3 判过就能替 R1 背书）；「逐行 AND」太强（把内容形态导致的不可判定报成产品回归，得到随机红的发版门）。三态是唯一同时满足「不放过 `return` 回潮」与「不因内容形态随机红」的形态。**反事实检验**：把 skip 分支改回 `return`，实测该行立刻转红，且同轮 R3 判过 3 对也遮不住（证明是逐行而非求和）。
 >
