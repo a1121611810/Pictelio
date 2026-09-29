@@ -1,7 +1,10 @@
 /**
  * 构建安装模块：编译 debug APK 并安装到目标模拟器。
  *
- * 构建复用根脚本 `pnpm build:android`（ADR-0059 委托约定）；支持
+ * 构建复用根脚本 `pnpm build:android-host`（ADR-0204 取代 ADR-0059 的裸名指向：
+ * 宿主动作一律 `:android-host` 显式命名）。⚠️ 本文件此前写的是 `build:android`——
+ * 该脚本已随 ADR-0204 改名，E2E 遂 100% 失败于 `Missing script: build:android`。
+ * 根命令改名必须同步所有调用点，这条由不变量 10 机器化。
  * ANDROID_E2E_SKIP_BUILD=1 跳过编译直接使用既有产物（本地快速迭代）。
  */
 import { existsSync, statSync } from "node:fs";
@@ -17,18 +20,16 @@ import {
   waitFor,
 } from "./env";
 
-/** 编译 debug APK（在 monorepo 根目录跑 pnpm build:android），带超时与流式输出。
- *  E2E 构建用 --mode e2e（含 window.pictelioE2e 钩子）；普通 build:android 无钩子。 */
+/** 编译 debug APK（在 monorepo 根目录跑 pnpm build:android-host），带超时与流式输出。
+ *  E2E 钩子由 `BENCH_NAV=1` 环境变量经该入口传递注入。 */
 export async function buildDebugApk(): Promise<void> {
   if (process.env.ANDROID_E2E_SKIP_BUILD === "1") {
     console.log("[android-e2e] ANDROID_E2E_SKIP_BUILD=1，跳过编译，直接使用既有 APK");
   } else {
-    // E2E 模式：完整 build:android 流程，但 web 构建带 --mode e2e（define __E2E__=true 保留钩子）。
-    // 等价于 pnpm build:android 中 vp run build → vp build --mode e2e。
-    const buildArgs =
-      process.env.ANDROID_E2E_BUILD_MODE === "e2e"
-        ? ["run", "build:android:e2e"]
-        : ["run", "build:android"];
+    // 根脚本只有 `build:android-host` 一个真实入口。`build:android:e2e` 从未存在过
+    // （#842 前的 packages/app 也没有），该分支历史上一旦置位就必然 `Missing script`——
+    // E2E 钩子改由 `BENCH_NAV=1` 经 build:android-host 的环境传递注入，故两态同路。
+    const buildArgs = ["run", "build:android-host"];
     console.log(`[android-e2e] 编译 debug APK（${buildArgs.join(" ")}，可能耗时数分钟）...`);
     const startedAt = Date.now();
     await new Promise<void>((resolvePromise, rejectPromise) => {
@@ -41,7 +42,7 @@ export async function buildDebugApk(): Promise<void> {
         proc.kill("SIGKILL");
         rejectPromise(
           new Error(
-            `[android-e2e] 编译超时（${TIMEOUTS.build / 1000}s）。可先手动跑 pnpm build:android 后用 ANDROID_E2E_SKIP_BUILD=1 跳过`,
+            `[android-e2e] 编译超时（${TIMEOUTS.build / 1000}s）。可先手动跑 pnpm build:android-host 后用 ANDROID_E2E_SKIP_BUILD=1 跳过`,
           ),
         );
       }, TIMEOUTS.build);
@@ -66,7 +67,7 @@ export async function buildDebugApk(): Promise<void> {
   if (!existsSync(APK_PATH)) {
     throw new Error(
       `[android-e2e] APK 产物不存在: ${APK_PATH}\n` +
-        `请先在仓库根目录执行 pnpm build:android（或取消 ANDROID_E2E_SKIP_BUILD）`,
+        `请先在仓库根目录执行 pnpm build:android-host（或取消 ANDROID_E2E_SKIP_BUILD）`,
     );
   }
   const sizeMb = (statSync(APK_PATH).size / 1024 / 1024).toFixed(1);
