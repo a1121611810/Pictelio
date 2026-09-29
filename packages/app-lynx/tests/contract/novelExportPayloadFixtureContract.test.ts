@@ -1,6 +1,6 @@
 // 小说导出 golden payload 跨语言契约：**Lynx ↔ Java 契约**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：原 `app/tests/unit/differential/novelExportPayloadFixtureConsistency.test.ts`
+// 形态说明：原 `app/tests/unit/differential/novelExportPayloadFixtureConsistency.test.ts`（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // 位于 WebView 包内，但它断言的**两侧都不是 WebView 源码**：TS 侧是 workspace 包
 // `@pictelio/novel-export` 的 golden fixture，Java 侧是 Android 测试资源。
 // ⇒ 这是纯跨语言数据契约，WebView 客户端删除不影响其成立，判定为「迁」。

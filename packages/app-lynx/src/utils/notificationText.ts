@@ -1,7 +1,9 @@
 // ─── 通知文本 HTML 剥离（ADR-0188 D4 / spec 边界 4）───
 // content.text 是含 <b> 的 HTML 片段（日文为主）；lynx 无 HTML 渲染能力且注入面风险，
 // v1 一律剥标签为纯文本渲染（bold 语义损失已接受，富文本挂账）。
-// 与 webview 端（packages/app）同语义双端各自实现，differential 测试钉住。
+// 语义边界由本文件的契约测试钉住（ADR-0188 D4）。
+// ⚠️ 原注释写「与 webview 端同语义双端各自实现，differential 测试钉住」——对侧随 WebView 客户端
+// 删除后已无成立对象，ADR-0203 决策 5 要求不得仍自称 differential。
 //
 // 语义（三步，与 DOM 文本化对齐的最小实现）：
 //   ① 剔除所有标签（<b> 保留内文 = 标签本身删除、内文不动；自闭合/带属性标签同法）；

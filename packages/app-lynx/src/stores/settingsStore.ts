@@ -111,7 +111,7 @@ const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadat
 const NOVEL_EXPORT_INCLUDE_COVER_KEY = "settings_novel_export_include_cover"
 const NOVEL_EXPORT_INCLUDE_IMAGES_KEY = "settings_novel_export_include_images"
 // WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8；跨引擎共享键，
-// 键字符串与 app settingsStore 逐字一致，app 侧契约测试 differential/webdavSettingsConsistency 防漂移）
+// 键字符串与 app settingsStore 逐字一致，契约测试 tests/contract/webdavSettingsBaseline 防漂移）
 const WEBDAV_ENABLED_KEY = "settings_webdav_enabled"
 const WEBDAV_URL_KEY = "settings_webdav_url"
 const WEBDAV_USERNAME_KEY = "settings_webdav_username"

@@ -1,6 +1,6 @@
 // AI 三态设置键与取值域：**Lynx 单端行为基准**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：合并迁移自 `app/tests/unit/differential/` 的
+// 形态说明：合并迁移自 `app/tests/unit/differential/` 的（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // `aiBadgeGuardConsistency` 与 `aiFilterKeyConsistency`——两者断言的都是
 // 「WebView settingsStore/aiFilter ↔ Lynx settingsStore」。对侧删除后改为单端基准。
 //

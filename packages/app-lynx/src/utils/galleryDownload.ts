@@ -56,7 +56,7 @@ export const DOWNLOAD_FILENAME_MAX_LENGTH = 120
 /**
  * 非法字符净化（ADR-0192 D3）：路径分隔符（`/` `\`）与控制字符（`\x00-\x1f`）→ `_`，
  * 随后 trim。规则逐字镜像 Java `GallerySaver.sanitizeFileName`——双端对同一字符串
- * 得出同一结果（differential 用例钉住）；Java 侧为第二道防御，保持不动。
+ * 得出同一结果（本侧契约用例钉住）；Java 侧为第二道防御，保持不动。
  */
 export function sanitizeNameSegment(input: string): string {
   return input.replace(/[/\\\x00-\x1f]/g, "_").trim()

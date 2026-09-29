@@ -764,7 +764,7 @@ describe("settingsStore — AI 三态过滤（ADR-0155）", () => {
     vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
   })
 
-  // 3 模式 × 4 值真值表由 tests/differential/aiFilterTruthTable.test.ts 消费共享 fixture
+  // 3 模式 × 4 值真值表由 tests/contract/aiFilterTruthTable.test.ts 消费共享 fixture
   // （sharedAiFilterTruthTable.ts，与 app 侧逐字节一致）断言——两端实现直接对同一 fixture
   // 断言，任一实现漂移即失败（机器防线）；本文件不再内联第二份表（避免 duplicate oracle）。
 
@@ -1906,7 +1906,7 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
     warn.mockRestore()
   })
 
-  // ── isTagMuted 快速语义（全量真值表见 tests/differential/tagMuteTruthTable.test.ts）──
+  // ── isTagMuted 快速语义（全量真值表见 tests/contract/tagMuteTruthTable.test.ts）──
 
   it("isTagMuted：任一标签 trim 命中即 true；空集合/空 tags/undefined 放行", () => {
     userRef().value = { id: 42 }

@@ -1,6 +1,6 @@
 // WebDAV 备份格式契约：**Lynx ↔ spec + Java 契约**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：合并迁移自 `app/tests/unit/differential/` 的三个文件——
+// 形态说明：合并迁移自 `app/tests/unit/differential/` 的三个文件——（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // `backupSnapshotContract`（spec ↔ 代码）、`backupCoreConsistency`（两端 core 逐字）、
 // `backupServiceConsistency`（两端 service ↔ Java）。原三者的对侧断言一律是
 // 「WebView 副本与 Lynx 副本一致」；对侧删除后改为断言 Lynx 侧与**两个仍存在的对侧**：

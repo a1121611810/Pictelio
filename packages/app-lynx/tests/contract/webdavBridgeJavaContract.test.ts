@@ -1,6 +1,6 @@
 // WebDAV 桥跨语言契约：**Lynx ↔ Java 契约**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：原 `app/tests/unit/differential/webdavBridgeContract.test.ts` 同时比对
+// 形态说明：原 `app/tests/unit/differential/webdavBridgeContract.test.ts` 同时比对（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // Java 与**两个** TS 桥（`app/src/native/WebDav.ts` + app-lynx 桥）。WebView 侧随
 // packages/app 删除后其桥文件与被测对象一并消失，**不得**保留对它的引用；
 // 本文件只断言仍然存在的对侧：Java 宿主实现（协议/枚举/常量/注册）↔ Lynx 桥。

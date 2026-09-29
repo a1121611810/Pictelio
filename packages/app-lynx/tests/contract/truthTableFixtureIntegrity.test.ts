@@ -1,6 +1,6 @@
 // 行为真值表 fixture 自洽门（ADR-0203 决策 5 迁移件）。
 //
-// 形态：**单端行为基准**（无对侧可比）。原 `app/tests/unit/differential/` 下的
+// 形态：**单端行为基准**（无对侧可比）。原 `app/tests/unit/differential/` 下的（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // `aiFilterTruthTableConsistency` / `restrictionTruthTableConsistency` /
 // `oauthErrorCasesConsistency` / `urlRewriteCasesConsistency` /
 // `illustTypeBadgeCasesConsistency` 断言的是「WebView 副本与 Lynx 副本逐字节一致」——

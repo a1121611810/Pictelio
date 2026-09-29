@@ -1,7 +1,8 @@
-// ─── notificationPlainText differential 测试（ADR-0188 D4 / spec 测试决策）───
-// 与 webview 端（packages/app）同语义双端各自实现，期望值 = spec 边界 4 语义表
-// （<b> 保留内文 / 嵌套标签剔除 / 实体解码 / 空串 / null / trim），双端测试用例逐字同构。
+// ─── notificationPlainText 契约测试（ADR-0188 D4 / spec 测试决策）───
+// 期望值 = spec 边界 4 语义表（<b> 保留内文 / 嵌套标签剔除 / 实体解码 / 空串 / null / trim）。
 // 期望值出处独立于实现：fixture 真实样本（users/すき！通知文本）+ spec 语义表。
+// ⚠️ 原注释写「与 webview 端同语义双端各自实现，双端测试用例逐字同构」——对侧已随 WebView 客户端
+// 删除，ADR-0203 决策 5 要求不得仍自称 differential。
 import { describe, expect, it } from "vitest"
 import { notificationPlainText } from "./notificationText"
 

@@ -4,7 +4,7 @@
 //
 // oracle（真实来源，非手写自洽）：① Java 源码本身（模块名/方法名/回调形态的唯一事实源）；
 // ② TS 适配器源码（接口方法名）；③ 注册表源码（LynxRuntimeInitializer 的 registerModule 行）。
-// 先例：packages/app/tests/unit/differential/webdavBridgeContract.test.ts（同款源码提取比对）。
+// 先例：tests/contract/webdavBridgeJavaContract.test.ts（同款源码提取比对）。
 //
 // Java 路径：随宿主迁移指向 **最终位置** `packages/android-host/android/`（ADR-0203 决策 2）。
 // 本文件在 `src/utils/`（深两级），故 `../../../` 到 `packages/`，再进 `android-host/android/app/`。

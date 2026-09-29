@@ -1,6 +1,6 @@
 // WebDAV 连接配置键：**Lynx 单端行为基准**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：原 `app/tests/unit/differential/webdavSettingsConsistency.test.ts` 逐键比对
+// 形态说明：原 `app/tests/unit/differential/webdavSettingsConsistency.test.ts` 逐键比对（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // WebView 与 Lynx 两个 settingsStore。WebView 侧删除后对侧消失，**不得**保留该比对；
 // 本文件改为断言 Lynx 侧行为，oracle 分层如实标注（测试硬约束 #6，禁止自洽反推）：
 //   - `settings_webdav_*` 精确键名：spec §8 只给通配（`settings_webdav_*`），

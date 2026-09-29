@@ -15,7 +15,7 @@
  * `docs/release-checklist.md` 的人工核对项都不会触发（人工看的是 `Tests … | N skipped`，
  * 而门消失时该计数确实正常）。
  *
- * ## 做法：读 spec 源码做契约（仓内先例 `tests/unit/differential/*`）
+ * ## 做法：读 spec 源码做契约（仓内先例 `tests/contract/*`）
  *
  * oracle = 本文件「接线应当存在」的清单，独立于实现；每条都带**非空/下界断言**，
  * 避免正则失效时全称断言静默恒真（ArchUnit `failOnEmptyShould` 教训）。

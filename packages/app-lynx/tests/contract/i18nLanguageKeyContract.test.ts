@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** packages/ 根（tests/differential → ../../..）与仓库根（→ ../../../..） */
+/** packages/ 根（tests/contract → ../../..）与仓库根（→ ../../../..） */
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const repoRoot = resolve(pkgRoot, '..')
 

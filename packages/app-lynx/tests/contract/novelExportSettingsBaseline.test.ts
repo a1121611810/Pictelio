@@ -1,6 +1,6 @@
 // 小说导出设置键：**Lynx 单端行为基准**（ADR-0203 决策 5 迁移件）。
 //
-// 形态说明：原 `app/tests/unit/differential/novelExportSettingsConsistency.test.ts`
+// 形态说明：原 `app/tests/unit/differential/novelExportSettingsConsistency.test.ts`（该源已随 WebView 客户端删除，ADR-0203 决策 2）
 // 逐键比对 WebView 与 Lynx 两个 settingsStore。对侧删除后改为断言 Lynx 侧行为。
 //
 // oracle 溯源（禁自洽反推）：
