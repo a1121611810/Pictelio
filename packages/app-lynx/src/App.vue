@@ -134,8 +134,22 @@ const routeTransition = useRouteTransition()
            :style 走 inline 通道（Lynx 侧唯一无歧义的 transform 载体——transform 族
            Tailwind 工具类是死类名，ADR-0210 路径 E）。方向为 none / 减弱动效开启时
            style 是空对象 = 元素上不挂任何过渡声明（R1「不挂过渡类」的最强形态）。
-           刻意不绑 :class —— 动效只有 inline animation 一条载体，没有类可挂。 -->
-      <view class="w-full h-full" :style="routeTransition.style.value">
+           刻意不绑 :class —— 动效只有 inline animation 一条载体，没有类可挂。
+
+           ⚠️ `pb-18` 是 **GlobalFab 的占位带**（#873）：FAB 是零尺寸 `absolute` 锚点盒
+           （`GlobalFab.vue`），不参与流 ⇒ 滚动容器不为它让位 ⇒ 末屏内容被**视觉遮挡**
+           且**吞点击**（原生 LynxView 不识别 `pointer-events`，ADR-0123，透明化救不了）。
+           真机实测：同「启动时自动备份」一行，`关` chip（x[915,990]，完全落在 FAB 的
+           x≥872 内）点不动、同行同 y 的 `30 天`（x=820，FAB 外）正常切换。
+           修在此处而非 24 个页面：各页 `scroll-view` 类名各异、无共享类，唯一公共祖先
+           就是这层包裹层（与路由转场同款落点，见上方转场注释）。
+           ⚠️ 本条**依赖 Lynx 的 border-box UA 默认**：`h-full` + `pb-18` 只有在
+           border-box 下才是「内容让位」；若按 content-box 会变成总高溢出 19.2vw。
+           依据 `Login.vue:118`「web-core 预览未复刻 Lynx 的 border-box 默认」
+           （产物 CSS 里 `box-sizing` 命中 0 次，确认无 CSS 重置，靠 UA 默认）。
+           ⇒ **副作用登记**：web-core 预览下此 padding 会溢出而非让位，仅影响预览。
+           19.2vw 只在 `tailwind.config.ts` 的 `spacing: 18` 写一次，两侧不会各自漂移。 -->
+      <view class="w-full h-full pb-18" :style="routeTransition.style.value">
         <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
         <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking', 'mypixiv']">
           <component :is="Component" />
