@@ -89,12 +89,11 @@ CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· �
 
 ## OpenWiki 查询规范（OpenWiki Query）
 
-OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代码结构）互补。按主题分流使用。
+OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代码结构）互补。**路由规则见上方
+「工具触发协议」速查表**（架构/领域/集成/测试 → 先 OpenWiki；符号/调用链/影响 → CodeGraph；
+理解功能 → 先 OpenWiki 后 CodeGraph），本节只给文件索引。
 
-### 默认原则
-
-- **当问题涉及架构概览、领域概念、集成方式、测试指南等主题时，优先读取 `openwiki/` 目录下对应的文档页面，获取高层次理解后再深入代码细节。**
-- OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体流程，CodeGraph 无法替代。
+OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体流程，CodeGraph 无法替代。
 
 ### 优先级决策链
 
@@ -108,16 +107,6 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | 小说阅读器（虚拟布局、搜索、系列导航） | `openwiki/domain/novel-reader.md` | 核心交互流程 |
 | Android 原生集成（Lynx 原生模块、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
 | 测试策略（单元测试、E2E 测试） | `openwiki/testing/overview.md` | 测试分层与工具链 |
-
-### 与 CodeGraph 的协作规则（强制路由，违反视为架构违规）
-
-- **架构概览 / 领域概念 / 集成 / 测试指南** → **必须**先读 OpenWiki 获取高层次理解
-- **具体符号定义 / 调用链 / 影响分析** → **必须**使用 CodeGraph 精确追踪
-- **理解一个功能时** → **必须**先用 OpenWiki 了解"为什么这样做"，再用 CodeGraph 了解"代码在哪、怎么调用"
-
-### 禁止的默认行为
-
-未查对应 OpenWiki 页面就直接用 CodeGraph / Read 从零摸索架构层面问题。
 
 ## 命令
 
@@ -212,22 +201,11 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## Fluent Design 规范（历史存档，非现行约束）
 
-> ⚠️ **本章原为 Fluent Design 2 规范，服务的是已随 [ADR-0203](./docs/adr/ADR-0203-webview-client-source-removal.md)
-> 整包删除的 WebView 客户端，对 app-lynx 新代码无约束力。** 完整原文与**逐条适用性判定**见
-> [`glossary-fluent-design-chapter-archive.md`](docs/adr/glossary-fluent-design-chapter-archive.md)，
-> 术语见 [`glossary-webview-client-removal.md`](docs/adr/glossary-webview-client-removal.md)。
-> 拆出是因为它与现行约束无关却占用指令字节预算（运行时按 32 KiB 截断）。
-
-**判读规则**：**仍成立** = 纪律与设计系统无关，MD3 下同样有效（改用 `--md-*` 口径）；
-**存档条款** = 只对 Fluent 2 成立，不再执行；**已失效** = 载体随 WebView 客户端一并消失。
-原章的「必须 / 禁止 / 只允许」是当时的原文口吻，**不是现行约束**。
-
-**移交后仍然有效的东西**：只有**纪律**，没有**数值**。具体哪些条款在 MD3 下仍成立、哪些只对
-Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 下**仍成立**的两条纪律已并入
-「约定 → app-lynx 的 MD3 约定」：**禁硬编码令牌值**、**禁写 `:focus` / `:focus-visible` 变体**（真机实测不匹配，见「有意偏离」第 5 条）。
-
-> 两者都不适用 = 该决策**尚未记录**——补 ADR，不要就地自造规则。
-> 存档章与 MD3 节冲突时，**以「app-lynx 的 MD3 约定」那一节为准**。
+原为 Fluent Design 2 规范，服务已随 [ADR-0203](./docs/adr/ADR-0203-webview-client-source-removal.md) 删除的
+WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判定见
+[`glossary-fluent-design-chapter-archive.md`](docs/adr/glossary-fluent-design-chapter-archive.md)。
+**与下方 MD3 节冲突时以 MD3 节为准**；Fluent 纪律中在 MD3 下仍成立的两条已并入 MD3 节
+（禁硬编码令牌值、禁写 `:focus` / `:focus-visible`）。
 
 ## 约定
 
@@ -273,18 +251,19 @@ Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 �
   是**官方事实**，不是笔误
 
 **有意偏离 MD3（封闭清单，5 条）**：经 ADR-0205 决策 4 拍板**不做整改**，留痕以免每次 review 都被当成新 bug 重提。
+**只列名称与指向；理由展开与证据查 [`glossary-md3-alignment.md` §11](./docs/adr/glossary-md3-alignment.md) 与各 ADR。**
 
-| # | 偏离内容 | 理由摘要 | 依据 |
-|---|---|---|---|
-| 1 | 动态色 / 壁纸取色**不做**，保留 7 套构建期静态色板 | 有**品牌色**（logo 蓝），跟随壁纸会丢品牌识别；真做需宿主新增取色能力 + 原生模块；Android 12+ 动态色本就可选 | ADR-0205 决策 4 |
-| 2 | 搜索框保持 42px 全圆角药丸，**不改** MD3 filled 56dp | 药丸搜索框是移动端业界惯例，差异是**场景差异**不是规范错误；改 56dp 观感变钝且与 chip 体系不协调 | ADR-0205 决策 4；`SearchSheet.vue` |
-| 3 | 二级 tab 保持 48px，**不加大**到 56px | 已满足 WCAG 2.2 SC 2.5.8 AA 与 Android 48dp 建议值；chip/tab 不承担主要导航目标的尺寸外扩期望 | ADR-0205 决策 4；`SubTabBar.vue` |
-| 4 | `hover` 在纯触屏判定为「**不适用**」 | 纯触屏无 hover 语义（覆盖数为 0 不是差距） | ADR-0205 决策 4 |
-| 5 | `focus` / `focus-visible` 判定为「**不适用**」，不写这两类变体 | **真机实证**：同批探针里阳性对照 `:active` 生效，而这两类无任何变化 ⇒ 引擎不匹配；且纯触屏无键盘/D-pad 触发源。写出来即死类名、**静默无样式**（同 `bg-state-layer-*` 陷阱）。无障碍改由 `accessibility-element` + TalkBack 平台焦点环承担。证据与判读表见 ADR-0207 决策 5 | ADR-0207 决策 5 |
+| # | 偏离名称 | 指向 |
+|---|---|---|
+| 1 | 动态色 / 壁纸取色**不做**，保留 7 套构建期静态色板 | ADR-0205 决策 4 |
+| 2 | 搜索框保持 42px 全圆角药丸，不改 MD3 filled 56dp | ADR-0205 决策 4；`SearchSheet.vue` |
+| 3 | 二级 tab 保持 48px，不加大到 56px | ADR-0205 决策 4；`SubTabBar.vue` |
+| 4 | `hover` 在纯触屏判定为「不适用」 | ADR-0205 决策 4 |
+| 5 | `focus` / `focus-visible` 判定为「不适用」，不写这两类变体 | ADR-0207 决策 5 |
 
 > **该清单是封闭的**：不在表内的差距**默认按「要修」处理**。重开某条须新开 ADR 推翻 ADR-0205 决策 4。
 
-**配套 ADR**：[0205](docs/adr/ADR-0205-md3-baseline-and-scope.md) 基线与范围 · [0206](docs/adr/ADR-0206-typography-type-scale.md) 排版 · [0207](docs/adr/ADR-0207-shape-and-state-layer-guardrails.md) 形状与状态层 · [0208](docs/adr/ADR-0208-material-symbols-icons.md) 图标 · 事实底座 [`差距分析`](docs/research/material-design-3-gap-analysis-2026-09.md)
+**配套 ADR**：[0205](docs/adr/ADR-0205-md3-baseline-and-scope.md) 基线 · [0206](docs/adr/ADR-0206-typography-type-scale.md) 排版 · [0207](docs/adr/ADR-0207-shape-and-state-layer-guardrails.md) 形状与状态层 · [0208](docs/adr/ADR-0208-material-symbols-icons.md) 图标 · [0209](docs/adr/ADR-0209-md3-filled-text-field-alignment.md) 文本字段 · 事实底座 [`差距分析`](docs/research/material-design-3-gap-analysis-2026-09.md)
 ## 测试
 
 - **框架**：Vitest 5.0.1（`vp test`）
@@ -295,10 +274,7 @@ Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 �
 ### 门禁边界（#539 拍板，2026-09-15）
 
 - **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
-- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须保持不缓存**：`vp` 的
-  `run.cache = { scripts: false, tasks: true }` 使 package.json 的 script 默认不缓存。
-  **测试门禁一旦缓存命中，意味着测试根本没跑、只重放日志——绿灯是假的**（本仓反复在消灭的假绿）。
-  改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`。
+- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须不缓存**：`vp` 的 `run.cache = { scripts: false, tasks: true }` 使 script 默认不缓存。**测试门禁一旦缓存命中 = 测试根本没跑、只重放日志——绿灯是假的**（本仓反复在消灭的假绿）。改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`。
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
 ### 测试硬约束（违反视为架构违规；详版见 `docs/testing/conventions.md`，编号一一对应）
@@ -314,9 +290,7 @@ Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 �
 
 门禁的价值是**防回归**，不是**显得严谨**。两者冲突时**以前者为准**。
 
-1. **规模线**：单个门禁文件超过其**被测对象**的 30% ⇒ 停止加码，先问「我是在防回归，还是在给回归创造就业」。
-   （实例：`tests/captureScriptInvariants.test.ts` 曾达被测脚本的 46%，且连续二十三轮只产出 1 个真实
-   产品缺陷、门禁自身缺陷 20+ 个 —— 见 `docs/research/md3-visual-regression-2026-09.md` §8.8。）
+1. **规模线**：单个门禁文件超过其**被测对象**的 30% ⇒ 停止加码，先问「我是在防回归，还是在给回归创造就业」（实例与数据见 `docs/research/md3-visual-regression-2026-09.md` §8.8）。
 2. **单轮诊断**：一轮只在「自己这轮写的」里找到问题、在「要交付的东西」里找到 0 个 ⇒ 该轮判为**空转**，换方向。
 3. **变异测试的分母不自选**：「已知绕过 N/N」里的 N 是自己 imagined 的，随想象涨、不收敛。
    封住一条的唯一凭据是**外部复核**（另一方用**自己写的**攻击）把它打红；自测绿**不作为**证据。
@@ -331,9 +305,6 @@ Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 �
 - **Android APK**：本地构建，经 `pnpm release` 交互式发布 → 完整流程 `docs/release-checklist.md`
 - **本地预览**：`pnpm deploy`（复制 landing 页面到 `_site/`）
 
-## 注意事项
-
-- **路由数据规则**：`@solidjs/router` 无 loader/Suspense，路由级数据由路由组件内获取（`useParams`/`useLocation` + `createEffect` + 手动 fetch 或 TanStack Query 按需查询），不阻塞渲染（遵循「先渲染后加载」硬约束）；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
 ## 任务完成前自检
 
 - **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）

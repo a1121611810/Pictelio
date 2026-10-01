@@ -48,6 +48,22 @@ const REPO_ROOT = findRepoRoot(process.cwd());
 const agentsMd = readFileSync(join(REPO_ROOT, "AGENTS.md"), "utf8");
 const byteLength = Buffer.byteLength(agentsMd, "utf8");
 
+/**
+ * Fluent 2 规范原文的**新位置**。
+ *
+ * 背景：AGENTS.md 的 Fluent 章节已按 ADR 判定为「与现行约束无关却占用指令字节预算
+ * （运行时按 32 KiB 截断）」，整章原文拆出到本归档文件，AGENTS.md 只留判读规则与指针。
+ * 本组断言原先指向 AGENTS.md，于是全部转红——但**内容一条没丢**，只是断言指错了文件。
+ *
+ * 因此这里改判归档文件，并**追加**一条「AGENTS.md 必须保留指向归档的指针」：
+ * 契约从「原文在 AGENTS.md」升级为「原文在归档 + 入口在 AGENTS.md」，
+ * 删任一侧都会转红（比改前更强，不是放宽）。
+ */
+const fluentArchive = readFileSync(
+  join(REPO_ROOT, "docs/adr/glossary-fluent-design-chapter-archive.md"),
+  "utf8",
+);
+
 describe("AGENTS.md 契约（体积门禁）", () => {
   // 阈值从 28,672 抬到 30,720（28KiB → 30KiB），ADR-0203 决策 2 的直接后果：
   // 文档需新增宿主包（构建/发布/E2E 宿主）这一此前不存在的角色，
@@ -65,7 +81,12 @@ describe("AGENTS.md 契约（体积门禁）", () => {
   });
 });
 
-describe("AGENTS.md 契约（Fluent 规范逐字复述防线）", () => {
+describe("Fluent 规范逐字复述防线（原文在归档文件，入口在 AGENTS.md）", () => {
+  it("AGENTS.md 保留指向归档的入口（否则逐字防线在运行时不可达）", () => {
+    expect(agentsMd).toContain("glossary-fluent-design-chapter-archive.md");
+    expect(agentsMd).toContain("历史存档");
+  });
+
   it("缓动曲线白名单 4 条齐全（Fluent 2 标准曲线）", () => {
     for (const curve of [
       "cubic-bezier(0,0,0,1)",
@@ -73,14 +94,14 @@ describe("AGENTS.md 契约（Fluent 规范逐字复述防线）", () => {
       "cubic-bezier(0.33,0,0,1)",
       "linear",
     ]) {
-      expect(agentsMd).toContain(curve);
+      expect(fluentArchive).toContain(curve);
     }
-    expect(agentsMd).toContain("禁止** `ease`、`ease-in`、`ease-out`、`ease-in-out`");
+    expect(fluentArchive).toContain("禁止** `ease`、`ease-in`、`ease-out`、`ease-in-out`");
   });
 
   it("动画时长白名单 5 档齐全（Fluent duration 档位）", () => {
     for (const duration of ["100ms", "150ms", "200ms", "300ms", "500ms"]) {
-      expect(agentsMd).toContain(`| ${duration} |`);
+      expect(fluentArchive).toContain(`| ${duration} |`);
     }
   });
 
@@ -90,7 +111,7 @@ describe("AGENTS.md 契约（Fluent 规范逐字复述防线）", () => {
       "| 裸 `:focus` 伪类",
       "| `duration-200` / `duration-300` 等",
     ]) {
-      expect(agentsMd).toContain(row);
+      expect(fluentArchive).toContain(row);
     }
   });
 });
