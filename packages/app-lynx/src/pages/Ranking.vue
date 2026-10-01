@@ -19,6 +19,7 @@ import {
 import type { PixivIllust } from '../api/types'
 import { artworkTitle } from '../utils/artworkTitle'
 import { thumbUrl } from '../utils/imageUrl'
+import { useHeroSource } from '../composables/heroTransition'
 import { openExternalUrl } from '../utils/nativeUrl'
 import { createRankingFeed } from '../primitives/createRankingFeed'
 import { assignRanksThenDropMuted, type RankedRow } from '../primitives/rankingRows'
@@ -162,9 +163,19 @@ function shiftDay(delta: number) {
   applyQuery({ mode: mode.value, date: normalized })
 }
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页在 KeepAlive 白名单内 ⇒ 返回方向也成立。
+// resolveSrc 给覆盖层提供同一张缩略图（地址仍由本页 thumbUrl 决定）。
+const heroTransition = useHeroSource({
+  resolveSrc: (id: number) => {
+    const row = visibleRows.value.find((r) => r.item.id === id)
+    return row ? thumbUrl(row.item.image_urls) : ''
+  },
+})
+
 /** 受限条目（R18/R18G/AI）不跳详情，与遮罩口径一致（spec §5.6） */
 function openRow(item: PixivIllust) {
   if (isRestricted(item) || isAiRestricted(item)) return
+  heroTransition.begin(item.id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
   void navigate(`/illust/${item.id}`)
 }
 
@@ -178,7 +189,8 @@ onUnmounted(() => feed.dispose())
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-surface">
+  <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
+  <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
     <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
     <PageTopBar back :title="t('ranking.page.title')" @back="goBack" />
 
@@ -320,6 +332,7 @@ onUnmounted(() => feed.dispose())
           <view
             class="w-[14vw] h-[14vw] shrink-0 rounded-[var(--md-shape-medium)] overflow-hidden ml-2 flex items-center justify-center"
             :class="isRestricted(row.item) || isAiRestricted(row.item) ? 'bg-[var(--md-scrim)]' : ''"
+            :id="heroTransition.sourceId(row.item.id)"
           >
             <RestrictOverlay
               v-if="isRestricted(row.item)"
@@ -368,5 +381,15 @@ onUnmounted(() => feed.dispose())
     </list>
     </template>
     </RefreshableList>
+
+    <!-- hero 覆盖层（ADR-0211 决策 12 · 返回方向）：挂在 list 之外（list 裁切子节点）。
+         比例差由覆盖层内 `mode="aspectFill"` 每帧重新等比裁切吸收。 -->
+    <image
+      v-if="heroTransition.overlay.visible.value"
+      class="absolute z-50 overflow-hidden"
+      :style="heroTransition.overlay.style.value"
+      :src="heroTransition.overlay.src.value"
+      :mode="'aspectFill'"
+    />
   </view>
 </template>

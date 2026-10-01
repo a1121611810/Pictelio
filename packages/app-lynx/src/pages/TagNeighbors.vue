@@ -23,6 +23,7 @@ import {
   isBroadeningNoticeDismissed,
 } from '../stores/tagNeighbor'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useHeroSource } from '../composables/heroTransition'
 import type { TagNeighborSource } from '../primitives/collectTagNeighbors'
 import { artworkTitle } from '../utils/artworkTitle'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
@@ -92,7 +93,12 @@ onUnmounted(() => {
 })
 
 /** 点整条 → 作品详情（spec user story 24） */
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页**不在** KeepAlive 白名单内 ⇒
+// push 详情即卸载，返回时原缩略图已不存在 ⇒ 只做前进方向，返回由 heroTransition 自动降级。
+const heroTransition = useHeroSource()
+
 function openIllust(row: TagNeighborRow): void {
+  heroTransition.begin(row.illustId) // 发起矩形测量（不等待，决策 12 机制 1）
   void navigate(`/illust/${row.illustId}`)
 }
 
@@ -233,7 +239,10 @@ function onDismissBroadening(): void {
             <!-- 缩略图：照 IllustList.vue:310 的既有调用形态（外层给尺寸、组件只收 height），
                  不传 class 覆盖、不传 lazy-load。形态依据见脚本块 openTagNeighborCallShape 注释。 -->
             <view class="w-[12vw]">
-              <SkeletonImage :src="row.thumb" height="12vw" />
+              <!-- hero 起点盒的 id 挂在内层组件上：非声明 prop 的属性由 Vue 透传到
+                   CoverImage 的根 view（与 WatchLater 的 class 透传同一条机制，真机已生效），
+                   而外层 view 的字面量形态被 TagNeighbors.template.test.ts 钉住，不动。 -->
+              <SkeletonImage :id="heroTransition.sourceId(row.illustId)" :src="row.thumb" height="12vw" />
             </view>
             <view class="flex-1 flex flex-col ml-3">
               <!-- 相似度徽标 + 来源标注：M3 assist-chip 形态（类串沿用 IllustTypeBadgeRow.vue 的

@@ -17,6 +17,7 @@ import SkeletonImage from './SkeletonImage.vue'
 import AppIcon from './AppIcon.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
+import { useHeroSource } from '../composables/heroTransition'
 
 /** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
  *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
@@ -85,7 +86,15 @@ async function refresh() {
   sync()
 }
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本组件只发起**前进**方向的测量。
+// ⚠️ 本组件是嵌套在页面里的子组件，**不在**宿主页的层级 ⇒ 覆盖层不能挂在这里
+//   （`absolute` 的包含块是最近的定位祖先，不是页面根，坐标会错）。
+//   返回方向由宿主页（IllustList，本组件的唯一宿主）的 useHeroSource 消费同一个模块态完成。
+// 榜首大卡的 tap 是 openAll（进 /ranking 榜单页），不是详情，故不接。
+const heroTransition = useHeroSource()
+
 function openDetail(id: number) {
+  heroTransition.begin(id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
   void navigate(`/illust/${id}`)
 }
 
@@ -139,6 +148,7 @@ onUnmounted(() => feed.dispose())
           v-for="e in runners"
           :key="e.illust.id"
           class="relative w-[16vw] h-[16vw] rounded-[var(--md-shape-medium)] overflow-hidden"
+          :id="heroTransition.sourceId(e.illust.id)"
           accessibility-element
           :accessibility-label="t('ranking.entry.itemAria', { rank: e.rank, title: artworkTitle(e.illust.title) })"
           @tap.stop="openDetail(e.illust.id)"

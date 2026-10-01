@@ -18,6 +18,7 @@
 // （docs/research/global-search-patterns.md §4.2）。
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
+import { useHeroSource } from '../composables/heroTransition'
 import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { t, type I18nKey } from '../i18n'
@@ -277,12 +278,20 @@ function onHistoryTap(word: string): void {
   controller.search(word)
 }
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：搜索结果行也是「能点图进详情」的流。
+// 本弹层不走 KeepAlive、点结果即关层 ⇒ 只做前进方向（测量在关层前发起，返回由 heroTransition 降级）。
+const heroTransition = useHeroSource()
+
 /** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持）；小说经 openNovel 缝隙导航（ADR-0183） */
 function onResultTap(row: SearchResultItem): void {
   searchHistory.addHistory(keyword.value)
   searchSheet.closeSearch()
-  if (row.type === 'novel') openNovel(row.entity.id)
-  else void navigate(`/illust/${row.entity.id}`)
+  if (row.type === 'novel') {
+    openNovel(row.entity.id)
+    return
+  }
+  heroTransition.begin(row.entity.id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
+  void navigate(`/illust/${row.entity.id}`)
 }
 
 function onHistoryRemove(word: string): void {
@@ -694,6 +703,7 @@ onBeforeUnmount(() => {
                 <view
                   class="w-[14vw] h-[14vw] rounded-[var(--md-shape-small)] overflow-hidden flex-shrink-0 bg-surface-container-highest"
                   :class="isRowMasked(row) ? 'bg-scrim flex items-center justify-center' : ''"
+                  :id="row.type === 'illust' ? heroTransition.sourceId(row.entity.id) : undefined"
                 >
                   <SkeletonImage
                     v-if="!isRowMasked(row)"

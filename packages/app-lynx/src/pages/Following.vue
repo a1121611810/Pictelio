@@ -7,6 +7,7 @@ import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { artworkTitle } from '../utils/artworkTitle'
 import { thumbUrl } from '../utils/imageUrl'
+import { useHeroSource } from '../composables/heroTransition'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -115,7 +116,12 @@ async function loadMore() {
   sync()
 }
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页**不在** KeepAlive 白名单内 ⇒
+// push 详情即卸载，返回时原缩略图已不存在 ⇒ 只做前进方向，返回由 heroTransition 自动降级。
+const heroTransition = useHeroSource()
+
 function openDetail(id: number) {
+  heroTransition.begin(id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
   void navigate(`/illust/${id}`)
 }
 
@@ -195,7 +201,7 @@ onUnmounted(() => {
             <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
           <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
-          <view v-else class="relative" @tap.stop="onImageTap(item)">
+          <view v-else class="relative" :id="heroTransition.sourceId(item.id)" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           </view>
           <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->

@@ -15,6 +15,7 @@ defineOptions({ name: 'recommended' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 
 import { navigate } from '../router'
+import { useHeroSource } from '../composables/heroTransition'
 import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { loadRecommended, loadNext } from '../api/illust'
@@ -174,10 +175,20 @@ function onIndexChange(index: number) {
 // [真机修复] scrim 抽到页面级遮罩：按当前页索引取当前条目作为遮罩内容（文字不进被平移的 flex-row）
 const currentItem = computed(() => visibleItems.value[currentIndex.value] as MixFeedItem | undefined)
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页在 KeepAlive 白名单内 ⇒ 返回方向也成立。
+// resolveSrc 给覆盖层提供同一张封面（地址仍由本页 coverSrc 决定，不在模块里猜档位）。
+const heroTransition = useHeroSource({
+  resolveSrc: (id: number) => {
+    const item = visibleItems.value.find((i) => i.kind === 'illust' && i.id === id)
+    return item ? coverSrc(item.data) : ''
+  },
+})
+
 // 详情跳转：按 kind 分流；受限条目（理论上已被过滤）再加一道守卫。
 // 小说经 openNovel 缝隙导航（ADR-0183：介绍页先行可经设置关闭）；插画保持直达详情不变。
 function openItem(item: MixFeedItem) {
   if (item.kind === 'illust') {
+    heroTransition.begin(item.id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
     void navigate(`/illust/${item.id}`)
     return
   }
@@ -237,7 +248,8 @@ onActivated(() => {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-surface">
+  <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
+  <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
     <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
       <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>
@@ -276,7 +288,11 @@ onActivated(() => {
                  此处用档位名而非字面量。裁切靠内层 view 的 overflow-hidden + 圆角（Lynx 原生
                  按 border-radius 裁剪子元素），CoverImage 根元素自身的 overflow-hidden 不足以
                  产生圆角。底部门票级 scrim 遮罩仍覆盖卡片下缘，视觉上与留白区连成一片。 -->
-            <view class="relative flex-1 overflow-hidden rounded-[var(--md-shape-medium)]">
+            <!-- :id 只给插画条目（小说无 hero 盒）；非当前页在屏外，heroTransition 会判为「屏外」降级 -->
+            <view
+              class="relative flex-1 overflow-hidden rounded-[var(--md-shape-medium)]"
+              :id="item.kind === 'illust' ? heroTransition.sourceId(item.id) : undefined"
+            >
               <RecommendedCover
                 :src="coverSrc(item.data)"
                 :fit="coverDisplayOf(item).fit"
@@ -379,6 +395,16 @@ onActivated(() => {
         <text class="text-body-small text-error bg-surface-container-high px-3 py-1 rounded-[var(--md-shape-small)] shadow-[var(--md-elevation-1)]">{{ pageError }}</text>
       </view>
 
+      <!-- hero 覆盖层（ADR-0211 决策 12 · 返回方向）：挂在轮播容器**之外**——
+           CarouselSwiper 的 wrapper 按 translateX 平移并裁切子节点，覆盖层放进去会被切掉。
+           比例差由覆盖层内 `mode="aspectFill"` 每帧重新等比裁切吸收。 -->
+      <image
+        v-if="heroTransition.overlay.visible.value"
+        class="absolute z-50 overflow-hidden"
+        :style="heroTransition.overlay.style.value"
+        :src="heroTransition.overlay.src.value"
+        :mode="'aspectFill'"
+      />
     </view>
   </view>
 </template>

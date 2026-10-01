@@ -7,6 +7,7 @@ import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { useWatchLaterStore, type WatchLaterItem } from '../stores/watchLaterStore'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { useHeroSource } from '../composables/heroTransition'
 import { WATCH_LATER_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import PageTopBar from '../components/PageTopBar.vue'
@@ -46,8 +47,13 @@ function removeItem(item: WatchLaterItem): void {
  * 行点击 → 实时详情页（spec US6）：插画直达 `/illust/:id`（Bookmarks/IllustList 同款惯例）；
  * 小说走 openNovel seam（ADR-0183，novel_intro_first 设置生效：介绍页先行可关）。
  */
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页**不在** KeepAlive 白名单内 ⇒
+// push 详情即卸载，返回时原缩略图已不存在 ⇒ 只做前进方向，返回由 heroTransition 自动降级。
+const heroTransition = useHeroSource()
+
 function openItem(item: WatchLaterItem): void {
   if (item.kind === 'illust') {
+    heroTransition.begin(item.id) // 发起矩形测量（不等待，决策 12 机制 1）
     void navigate(`/illust/${item.id}`)
   } else {
     openNovel(item.id)
@@ -92,6 +98,7 @@ function openItem(item: WatchLaterItem): void {
           >
             <!-- 封面：快照存 API 原值，渲染时过代理（SkeletonImage 列表卡惯例 + 懒加载） -->
             <SkeletonImage
+              :id="item.kind === 'illust' ? heroTransition.sourceId(item.id) : undefined"
               :src="proxyImageUrl(item.coverUrl)"
               height="21.333vw"
               class="w-[21.333vw] rounded-[var(--md-shape-small)]"

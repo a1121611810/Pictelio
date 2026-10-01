@@ -26,6 +26,7 @@ import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
 import RelatedInlineSection from '../components/RelatedInlineSection.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
+import { useHeroSource } from '../composables/heroTransition'
 import RefreshableList from '../components/RefreshableList.vue'
 import RankingEntryCard from '../components/RankingEntryCard.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
@@ -164,14 +165,25 @@ function switchMode(m: 'recommend' | 'follow') {
   void refreshFeed()
 }
 
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页在 KeepAlive 白名单内 ⇒ 返回方向也成立。
+// resolveSrc 给覆盖层提供同一张缩略图（地址档位/代理策略仍由本页的 thumbUrl 决定）。
+const heroTransition = useHeroSource({
+  resolveSrc: (id: number) => {
+    const item = illusts.value.find((i) => i.id === id)
+    return item ? thumbUrl(item.image_urls) : ''
+  },
+})
+
 function openDetail(id: number) {
   // 记录锚点：从本页卡片进详情，返回后在该卡下方注入相关作品行（注入行内点击走 openRelated 不记录）
   related.recordAnchor(mode.value, id)
+  heroTransition.begin(id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
   void navigate(`/illust/${id}`)
 }
 
 /** 注入行内缩略图点击：进详情但不记录新锚点（防循环注入） */
 function openRelated(id: number) {
+  heroTransition.begin(id)
   void navigate(`/illust/${id}`)
 }
 
@@ -233,7 +245,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-surface">
+  <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
+  <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
     <PageTopBar :title="t('illustList.title')" />
 
@@ -310,7 +323,7 @@ onUnmounted(() => {
           <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
         <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
-        <view v-else class="relative" @tap.stop="onImageTap(item)">
+        <view v-else class="relative" :id="heroTransition.sourceId(item.id)" @tap.stop="onImageTap(item)">
           <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
         </view>
         <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
@@ -348,5 +361,17 @@ onUnmounted(() => {
     </list>
     </template>
     </RefreshableList>
+
+    <!-- hero 覆盖层（ADR-0211 决策 12 · 返回方向）：本页在 KeepAlive 白名单内，
+         返回时实例未销毁 ⇒ 原缩略图还在，能从详情页 hero 盒插值回原位。
+         比例差由覆盖层内 `mode="aspectFill"` 每帧重新等比裁切吸收（不做非等比 scale）。
+         挂在 list 之外：list/scroll-view 会裁切子节点，越界飞行会被切掉。 -->
+    <image
+      v-if="heroTransition.overlay.visible.value"
+      class="absolute z-50 overflow-hidden"
+      :style="heroTransition.overlay.style.value"
+      :src="heroTransition.overlay.src.value"
+      :mode="'aspectFill'"
+    />
   </view>
 </template>

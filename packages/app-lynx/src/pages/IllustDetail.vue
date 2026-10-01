@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { currentParams, navigate, goBack, registerBackGuard } from '../router'
 import { loadDetail, loadUgoiraMetadata } from '../api/illust'
 import { toIllustId } from '../api/id'
@@ -34,6 +34,14 @@ import { useTagNeighborStore } from '../stores/tagNeighbor'
 import { ILLUST_DETAIL_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
+import {
+  HERO_ROOT_ID,
+  armHeroBack,
+  cacheHeroRect,
+  measureHeroDetail,
+  takeHeroSource,
+  useHeroOverlay,
+} from '../composables/heroTransition'
 
 /** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
  *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
@@ -144,6 +152,11 @@ onBeforeUnmount(releaseImmersive)
 // return false = **不拦截**（决策 5 L3 明文要求），只借返回链路的时机复位。
 const unregisterBackGuard = registerBackGuard(() => {
   releaseImmersive()
+  // 返回方向的连续性转场（ADR-0211 决策 12）：借同一条守卫链的时机**同步置位**返回意图
+  // （守卫在历史栈 pop 之前裁决，此刻起点矩形已在手 ⇒ 返回零延迟、零跨线程等待）。
+  // ⚠️ 页面被滚动过时**不置位**：存下的矩形是「未滚动时 hero 的位置」，滚动后屏幕上
+  //   那张图已经不在那里了 ⇒ 从一个假位置起飞比不做连续性更糟（决策 12 机制 4）。
+  if (!scrolled.value) armHeroBack(illustId.value)
   return false
 })
 onBeforeUnmount(unregisterBackGuard)
@@ -324,6 +337,54 @@ const slideSrcs = computed(() =>
   resolvePageSrcs(pages.value, settings.detailQuality, illust.value?.meta_single_page?.original_image_url),
 )
 
+// ─── 缩略图 → 大图连续性转场 · 前进方向（ADR-0211 决策 12）───
+// 机制与时序全在 composables/heroTransition.ts（唯一实现处），本页只做三件事：
+// 给 hero 盒一个稳定 id、把列表侧点图时发起的测量消费掉、渲染覆盖层。
+// ⚠️ 本页**不持**在途矩形：`takeHeroSource` 一次性消费，别的页也拿不到（跨页共享走模块层）。
+const heroTransition = useHeroOverlay()
+
+/** hero 盒（首屏那张大图的外层容器）的稳定 id：前进终点 + 返回起点都测它。 */
+const HERO_BOX_ID = 'pictelio-hero-box'
+
+/** 本页是否已被用户滚动：返回方向的连续性只在「那张图还在原处」时成立。 */
+const scrolled = ref(false)
+/** scroll-view 的滚动信号（原生 Lynx 与 web-core 都走 detail.scrollTop，缺失按 0 处理） */
+function onScroll(e: { detail?: { scrollTop?: number } }): void {
+  scrolled.value = Number(e?.detail?.scrollTop ?? 0) > 1
+}
+
+/**
+ * 前进方向起手。
+ *
+ * 两个测量**并发**发起：列表侧那个在 `@tap` 时就已在途（跨线程异步，导航不等它），
+ * 本页的「页面根 + hero 盒」在数据落定后测。两者都拿不到即降级为普通转场
+ * （heroTransition 内部逐条落日志，禁静默降级）。
+ */
+async function playHeroForward(): Promise<void> {
+  const id = illustId.value
+  // 路由 id 与实际落地的作品不一致（守卫重定向 / 参数竞态）⇒ 不播，避免把 A 的图接到 B 上
+  if (!illust.value || illust.value.id !== id) return
+  // ugoira 是动图：覆盖层是静态 <image>，与详情里的播放器不是同一个元素 ⇒ 不假装连续
+  if (illust.value.type === 'ugoira') {
+    console.debug('[heroTransition] 降级为普通路由转场：ugoira（详情侧是动图播放器，非静态图）')
+    return
+  }
+  const src = slideSrcs.value[0]
+  if (!src) return
+  // 容器要在本轮渲染后才量得到真实盒（detailImageHeight 由数据算出）
+  await nextTick()
+  const sourcePromise = takeHeroSource(id)
+  const detail = await measureHeroDetail(HERO_BOX_ID)
+  if (detail === null) return
+  // 存下 hero 盒（返回方向的插值起点）：本页活着时测一次就够，返回时**不再测量**
+  // （真机实测：返回那一刻发起的测量不会在导航后及时落定——本页正在被销毁）。
+  // 前进即使降级也要存：返回方向的连续性与前进是否播无关。
+  cacheHeroRect(id, detail.hero)
+  const from = await sourcePromise
+  if (from === null) return
+  heroTransition.play({ from, to: detail.hero, root: detail.root, src })
+}
+
 function openAuthor() {
   if (!illust.value) return
   void navigate(`/user/${illust.value.user.id}`)
@@ -352,6 +413,9 @@ onMounted(async () => {
     }
     bm.bookmarked.value = !!res.illust.is_bookmarked
     bm.count.value = Math.max(0, res.illust.total_bookmarks ?? 0)
+    // 前进方向的连续性转场（决策 12）：数据落定 = hero 盒已有确定尺寸，可以起手了。
+    // 不 await：本页渲染不因它阻塞（先渲染后加载），失败一律降级为普通转场。
+    void playHeroForward()
   } catch (err) {
     errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
@@ -366,7 +430,11 @@ onMounted(async () => {
   <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
   <!-- 沉浸态底色切影院黑（#896）：方形作品按原比例只有 100vw 高，必然短于竖屏视口。
        非沉浸态保持 bg-surface 原样（不改既有阅读排版）。 -->
-  <view class="w-full h-full flex flex-col relative" :class="immersiveBackdropClass(chromeHidden)">
+  <view
+    class="w-full h-full flex flex-col relative"
+    :id="HERO_ROOT_ID"
+    :class="immersiveBackdropClass(chromeHidden)"
+  >
     <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194）
          沉浸态隐藏（决策 3：沉浸**不留任何可见 chrome**；页内返回入口消失，退出路径为
          系统返回键 + 图片再次单击，屏幕阅读器退出路径见图片容器的动态 a11y 标签） -->
@@ -384,7 +452,12 @@ onMounted(async () => {
     <view v-else-if="errorMsg" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
-    <scroll-view v-else-if="illust" class="w-full flex-1 min-h-0" scroll-orientation="vertical">
+    <scroll-view
+      v-else-if="illust"
+      class="w-full flex-1 min-h-0"
+      scroll-orientation="vertical"
+      @scroll="onScroll"
+    >
       <!-- [spec] 详情大图：按原图宽高比撑开高度（显式 vw，不封顶，与 webview client 一致），
            原生 LynxView 不支持动态 aspect-ratio style（ADR-0055 §2），显式高度已验证（issue #138）。
            图片级骨架屏（SkeletonImage）：@load 前 shimmer、@error 显示「图片加载失败」。
@@ -397,6 +470,7 @@ onMounted(async () => {
       <view
         v-if="illust.type === 'ugoira'"
         class="relative w-full bg-surface-container-highest overflow-hidden"
+        :id="HERO_BOX_ID"
         :style="{ height: detailImageHeight }"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="immersiveA11yLabel()"
@@ -416,6 +490,7 @@ onMounted(async () => {
           v-for="(src, i) in slideSrcs"
           :key="i"
           class="relative w-full bg-surface-container-highest overflow-hidden mb-2"
+          :id="i === 0 ? HERO_BOX_ID : undefined"
           :style="listItemStyle(i)"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="immersiveA11yLabel({ n: i + 1, total: slideSrcs.length })"
@@ -446,6 +521,7 @@ onMounted(async () => {
       <view
         v-else
         class="relative w-full bg-surface-container-highest overflow-hidden"
+        :id="HERO_BOX_ID"
         :style="{ height: detailImageHeight }"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="immersiveA11yLabel()"
@@ -628,5 +704,21 @@ onMounted(async () => {
         @saved="onBookmarkPanelSaved"
       />
     </view>
+
+    <!-- hero 覆盖层（ADR-0211 决策 12 · 前进方向）：从被点的那张缩略图盒插值到本页 hero 盒。
+         · 几何/时序全在 composables/heroTransition.ts，本处只绑三个出口；
+         · `mode="aspectFill"` 是**比例差的吸收器**：缩略图盒与 hero 盒宽高比不同，
+           盒内图每帧按新盒比例重新等比裁切（Lynx 以 mode 替代 CSS object-fit，CoverImage 同款），
+           不做非等比 transform scale ⇒ 不变形；
+         · z-50 压在弹层之上：转场期间它就是「当前那张图」，不能被评论/选页盖住；
+         · v-if 撤下：动画播完（计时器与过渡同源）后覆盖层卸载，露出下方原生大图，
+           两者同 URL ⇒ 撤下瞬间无可见跳变。 -->
+    <image
+      v-if="heroTransition.visible.value"
+      class="absolute z-50 overflow-hidden"
+      :style="heroTransition.style.value"
+      :src="heroTransition.src.value"
+      :mode="'aspectFill'"
+    />
   </view>
 </template>
