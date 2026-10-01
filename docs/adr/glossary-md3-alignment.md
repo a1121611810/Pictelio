@@ -561,6 +561,131 @@ MD3 状态层的前提是「**把一层半透明色盖在已知底色上**」（
 | **FAB 压住内容行** | 至少 2 处可复现：`Me.vue` 的「全屏模式」行、「最大重试次数」行的最右 chip 被 `GlobalFab` 覆盖 | 布局缺陷，**不在** §13.1–§13.5 任何一条决策内 ⇒ 需单独立项 |
 | **原生系统栏基础设施已验证可用** | 「全屏模式」开关 ON ⇒ 状态栏消失；OFF ⇒ 状态栏恢复（两次 A/B 均实测确认） | ✅ 支撑 ADR-0213「近乎零 Java 改动」的结论 |
 
+### 13.8 门禁已知失效面登记（#881 验收 3 / #886 验收 4）
+
+> **为什么要单列这一章**：一道**没有登记失效面**的门禁，比没有门禁更危险。
+> 没有门禁时，「这里没人管」是**默认状态**，读代码的人会自己去查；
+> 有了门禁而失效面未登记时，「这里有人管」变成**默认状态**，读代码的人会直接跳过。
+> 本仓已经为此付过两次代价，两次都不是「门禁红了」而是**「门禁绿着而缺陷在」**：
+> ① 一条 `not.toContain('registerBackGuard')` 把**缺失的功能**锁成「合规」，让它整整一个票周期无法修复；
+> ② 一条只匹配**首个**标记的正则，让第二处陈旧标记无人看守 —— 而那道门禁存在的目的
+> 恰恰是「盯住声明与现状脱节」（两处的完整经过见
+> [`ADR-0212` 复核判据 6](./ADR-0212-tonal-elevation-surface-over-shadow.md) 与
+> `packages/app-lynx/tests/adrClaimConsistency.test.ts:66-74`）。
+>
+> **读法**：下表第三列是**已核实**的失效面（每条都指到 `file:line`），
+> 第四列区分「已登记」与「未登记」。**「未登记」不是缺陷结论，是待办清单** ——
+> 它表示这道门禁的这个盲区当前**既没有被别处兜住、也没有被任何人写下**。
+
+#### 13.8.0 ⚠️ 覆盖下表全部 15 行（16 道门禁 / 17 个门禁文件）的同一条上限（先读这一条，再读表）
+
+**下表 16 道门禁没有一道能看见渲染。** 它们全部是**源码 / AST / 契约层**的门禁：
+断言的对象是文件文本、导出的值、或离线构建出的 Tailwind 产物，
+**没有一道读真机像素或真机 DOM**。这不是疏漏，是它们的职责所在；
+但它意味着「全绿」这句话的**准确含义是「源码层无已知违规」**，不是「用户看得见的动效是对的」。
+
+本仓已有**两处**可查证的同类实证，说明这条上限不是理论顾虑：
+
+- **一个属性被当作正文文本渲染** —— 页面上直接出现 `:style="listItemStyle(0)"` 这串字面量。
+  `packages/app-lynx/tests/listItemStaggerContract.test.ts:99-105` 把它记成事故全过程：
+  「**构建全绿、vue-tsc 全绿、`:style` 绑定也确实存在于源码** ⇒ 源码里 grep 得到的判据全部恒真，
+  看不出问题。**只有真机截图能看见**」。该处已回灌成门禁 `listItemBindingsOutsideTag`（`:109-127`），
+  是本仓「真机锚 → 机器判据」闭环的**唯一一个**已完成样本。
+- **沉浸模式开关切换导致整页重排** —— 本表 §13.7 第 1 行登记的既有缺陷（状态栏显隐改变安全区内边距）。
+  它至今**没有**任何机器防线：所有门禁都是源码层断言，而这一格的可观测后果完全在渲染层。
+
+⚠️ 措辞纪律：以上只列**有据可查**的两处。[ADR-0211](./ADR-0211-ui-continuity-motion-contract.md)
+的 P5 取证结论是「**通过** —— 弹层入场动画在真机真实播放」（`:518`），
+**不得**被转述成「真机发现弹层动画未播放」；引用动效类真机结论前请回读该 ADR 的
+「待真机取证清单」与 P5 / 决策 5 / 决策 6 三节**取证结果**的原文（`:509-` 起）。
+
+> **纪律**：引用任何一道下表门禁的绿灯时，必须带上这句限定。
+> 「门禁全绿」与「真机正确」之间隔着一层**只有外部信号**才能跨过的距离。
+
+#### 13.8.1 逐门禁登记表
+
+| 门禁 | 实际守住的契约 | 抓不到的情况（失效面） | 该失效面是否已登记 |
+|---|---|---|---|
+| `tests/motionContract.test.ts`（513 行） | M1 四类预设导出齐全且档位全走 `var(--*)`（`:183-223`）；M2 预设返回值零时长/曲线字面量（`:256-287`）；M3 无死 transform 工具类（`:328-394`）；M4 `motion.ts` 内零 `on-primary` 类名（`:400-423`）；M5 `.ts` 消费面声明位零字面量（`:429-468`） | ① M3 的类名扫描只认模板属性位 `class=`/`:class=`（`classTokens:113`）**加** `motion.ts` 的 `MOTION_CLASS` 登记表（`:322-324`）⇒ `.vue` 的 `<script>` 块与其余 `.ts` 里的 `active:scale-95` 完全不可见（`:348-351` 记的那次「真实变异」发生在登记表内，恰好绕开了这个盲区）<br>② M5 只判 `animation:`/`transition:` **声明**的时长位（`motionDeclarations:128`）⇒ `.ts` 里的**类串** `'duration-[var(--x)]'` 无人判<br>③ `REQUIRED_EXPORTS`（`:168-181`）是**存在性**检查：把 `press()` 换成恒返回颜色档的实现，M1 的四条「非空」断言（`:196-200`）仍全绿<br>④ 零命中处的「扫描面下界」（`:329-335`/`:430-440`）只钉**文件数**，不钉**命中形态数** | ② **已登记**（`:426` describe 标题「补 ADR-0211 判据 1 已登记的失效面」）<br>①③④ **未登记** |
+| `tests/pressStateLayerTransition.test.ts`（564 行） | 「元素实际过渡的属性集合 ⊇ 其 `active:` 形态要求过渡的属性集合」（判据内核 `judge:300-305`，主判据 A2 `:329-344`）；载体覆盖面取自**真实 Tailwind 产物**（`:104-114`）而非手抄清单；A3 前提失效自曝（`:346-363`）；A4 禁给阴影档引 `box-shadow` 过渡（`:365-376`）；B1/B2 实色档归零（`:381-401`） | ① `propertyOfToken:80` 的 `active:` 形态白名单只有 `bg-\|opacity-\|w-\|h-\|shadow-` 五族 ⇒ `active:text-*` / `active:border-*` / `active:scale-*` / `active:[transition:…]` **不要求任何载体**（`scale-` 另有 `motionContract` M3 兜，`text-` / `border-` 两者皆无）<br>② 元素抽取只认标签属性位（`ATTR_RE:164` + `elementsOf:210`）⇒ `<script>` 块内类名、`.ts` 内类串 0 命中<br>③ A4 只在 `el.tag` 上测（`:371`）⇒ `<style>` 块内 `transition: box-shadow 200ms` 0 命中（已实测）<br>④ `classTokensOf:184-185`：属性值里只要出现**任意**引号内字面量，就**只取那些字面量、丢弃全部裸 token**（fail-open 方向）<br>⑤ `coveredProperties` 只认「引用了哪个预设」（`:259-290`）⇒ 组件自写一条裸 `transition: opacity 150ms var(--motion-standard)` 时判据**认不出它覆盖了 opacity**；`:446-447` 明确「刻意不写裸属性名当期望」，但那是自我约束、不是失效面登记 | ① ② ③ ⑤ **未登记**；④ 属 fail-open，**未登记** |
+| `tests/shadowNotState.test.ts`（32 行）+ `tests/helpers/shadowStateCorpus.ts`（48 行） | 生产 `.vue` 的 class 属性位不得出现 `active:shadow*`（`shadowNotState.test.ts:13-20`），共用内核 `SHADOW_STATE_VIOLATIONS`（`shadowStateCorpus.ts:45-48`），带构造正样本防正则塌陷（`shadowNotState.test.ts:22-26`） | ① 抽取器只匹配 `class=`/`v-bind:class=` 的引号值（`shadowStateCorpus.ts:18-24`）⇒ `<script>` 块、`<style>` 块、`.ts` 全文的 `active:shadow` 一律 0 命中（三者均已实测）<br>② **不剥注释**（`scan:26-34` 直接吃整份文件文本）⇒ HTML 注释里的示例标签会被判红（已实测命中）。文件头 `:5-6` 声称「注释天然不参与」，实测只对 JS/CSS 注释成立 ⇒ **假阳性面**（方向与其他条目相反，危害等价：它会逼人加白名单）<br>③ `scan:30` 注释写「必须同时有静止阴影才算」，代码 `:29` 只测 `/active:shadow/`，未检查静止阴影 ⇒ 注释与实现不符<br>④ `walk:36-43` **不排除 `errorPrototype/`**，与 `motionContract:42` / `listItemStaggerContract:83` / `motionDurationTokens:39` 的口径不一致 | 四项全 **未登记** |
+| `tests/adrClaimConsistency.test.ts`（306 行） | ADR-0212 中 `<!-- measured:level-1=N -->` 标记**唯一**且等于 `grep` 实测值（`:167-179`）；门禁自身末尾 gate-note 的散文数字不漂移（`:271-296`） | ① **覆盖面只到 1 个文件 + 1 个档位**：`ADR_PATH` 写死 `ADR-0212`（`:38`）、`markerRe` 写死 `level-1`（`:55`）、`countInVue` 写死 `md-elevation-1`（`:44`）⇒ **ADR-0211 与其余 5 档 elevation 的声明漂移无人判**。文件名 `adrClaimConsistency` 暗示的是全 ADR 一致性<br>② 判据 2（`:181-190`）只要求「目标余额」段落里出现 `当前\|实测\|尚未\|未达成\|未满足\|解封条件` **任一词**，不核对任何数字 ⇒ 一句套话即可满足<br>③ 计数只按**令牌名出现次数**（`:44`）⇒ 绕过令牌的字面量阴影（`shadow-[0_2px_4px_rgba(…)]`）既不含令牌名也不被计 | ① ② **未登记**<br>散文不判 **已登记**（`:9`「本判据只覆盖本轮真实存在的那个缺陷…不覆盖全部余额口径」+ `:170-173`）；字面量绕过 **已登记**（[`ADR-0212`](./ADR-0212-tonal-elevation-surface-over-shadow.md) 复核判据 4 的「🚨 本判据的真实漏口」框） |
+| `tests/mojibakeGuard.test.ts`（398 行） | 4 个扫描根（`:45-50`）× 25 类扩展名（`:53-79`）内零**未登记**的 U+FFFD（`:342-345`）；豁免按「路径 + 条数 + 理由 + 原文」登记，死条目与总量上限均有棘轮（`:358-397`） | ① **刻意不含 `docs/**`**（`:44-50`）⇒ ADR / 术语表 / openwiki 里的 U+FFFD 无人判。给出的理由是「有并行会话在编辑，半成品会让门禁随机变红」—— 那是**噪声理由、不是能力边界**，噪声消失后这条盲区会静默留下<br>② 扩展名白名单（`:53-79`）之外的文本类型（`.yml` / `.yaml` / `.toml` / `.svg` / `.mdx`）不扫<br>③ 含 NUL 字节的文件被整份跳过（`:203`）⇒ 二进制内的腐化不判<br>④ 只认 **U+FFFD 这一种标记**；「解码失败但未落成 U+FFFD」的腐化不在判据内 | ① **已登记**（`:18-21` 给了理由，但是**临时**理由）<br>② ③ ④ **未登记** |
+| `tests/immersiveScrimContrast.test.ts`（431 行） | 14 套色板 `inverse-on-surface` on `inverse-surface` ≥ AA 4.5（`:246-263`）；三个消费点（`Recommended.vue` / `RankingEntryCard.vue` / `NovelIntro.vue`，`:213-230`）确实挂了稳定底色块且**开在标题之前**（`:359-429`）；渐变现状被钉住（`:316-357`） | ① **只认 3 个硬编码文件名**（`CONSUMERS:213-230`）⇒ 第 4 个沉浸卡不自动入判，也没有「新增即入判」的机制<br>② **底色改成半透明抓不到**：`:259` 的 `over(fg, 1, base)` 在数学上与 `base` 的 alpha 无关（`over` 的实现 `:44-47` 令 `alpha=1` ⇒ 结果恒等于 `fg`）⇒ 把底色写成 `bg-inverse-surface/70` 时该断言仍绿，而 `resolve:398-403` 取 `names[0]` 仍解析到不透明令牌、对比度数字纹丝不动。**作者在 `:257-258` 已把这条风险写进散文，但断言没有兑现它**<br>③ 底色块抽取用 `<view\s+class="…"`（`:375`）⇒ 单引号属性 / 跨行 class / 非 `<view>` 标签的底色块不可见<br>④ `resolve` 返回 `names[0]`，其上方注释（`:394-396`）写的是「再取最后一个（本仓类串约定颜色在末尾）」⇒ 注释与实现不符，当前靠 `titleMarker` 的类串顺序侥幸正确 | ② **已登记（作者自述 `:257-258`）但断言未兑现**；① ③ ④ **未登记** |
+| `src/components/motionDurationTokens.template.test.ts`（934 行） | ① 全仓生产 `.vue` 的 `animation:`/`transition:` **声明时长槽**必须是 tokens.css 令牌（`:334-712`）；② **类名位**零自取时长/曲线，**含令牌引用形态**（`scanClassMotion:800-825`，主判据 `:847-853`） | ① 扫描面是 **`.vue` only**（`:75` `entry.name.endsWith('.vue')`）⇒ `.ts` 里的类串与声明**完全不在判据内**。`motionContract` M5 补的是 `.ts` 的**声明位**（`tests/motionContract.test.ts:59`/`:429-468`），**`.ts` 的类名位至今无人判**（例：`src/composables/` 下 `const cls = 'duration-[var(--durationNormal)]'`）<br>② 类名位扫描**显式摘掉 `<style>` 块**（`classSurface:724`）⇒ 块内 CSS 声明不在本判据内（该文件只判 animation/transition 时长槽，影响有限；但它是「`<style>` 不在类名扫描面」这一事实的**登记点**）<br>③ 抽取面是「引号字符串的空白分词」（`classTokens:754-760`）⇒ **运行期拼接**（`['dur','ation-200'].join('')`）抓不到<br>④ `judgeArbitraryMotionValue:787-797` 对 `duration-[--durationNormal]`（裸变量、无 `var()`）三个分支全不匹配 ⇒ 判绿（Tailwind 是否为该形态产出规则**未能核实**，故按「抽取器看不见该形态」登记） | ② **已登记**（`:919-933` 专门有一条用例钉这条边界）<br>① ③ ④ **未登记** |
+| `src/composables/motion.test.ts`（326 行） | 四类预设的返回值形态（`:118-270`）；档位表引用形态（`:81-97`）；`MOTION_DURATION_MS` 与 tokens.css **逐档**对账（`:99-110`）；R1/R2/R3 降级形态（`:140-147`/`:174-180`/`:227-237`/`:261-264`） | ① 全部是**导出值的字面断言**（如 `:121-123` `toBe('sheet-enter var(--durationMedium1) …')`）⇒ `motion.ts` 的**内部实现**（怎么拼、拼几段、是否漏 `both`）不可见；改成返回同一字符串的另一条路径也全绿<br>② **`tokenValue:53-55` 取首个匹配**（`TOKENS_CSS.match(/--name:\s*([^;]+);/)`）⇒ tokens.css 正是 14 套色板各声明一遍的结构，同名变量后 13 套的值无人核。**这与 `adrClaimConsistency.test.ts:69-73` 记的「文档级 match 只取首个匹配 ⇒ 第二处陈旧标记永远没人发现」是同族缺陷，那边已修、这边未修** | ① ② **未登记** |
+| `src/composables/useSheetDismiss.test.ts`（195 行） | 相位序列 `enter→exit→gone` 且到点才 emit（`:57-75`）；计时器时长 = `exit().holdMs` 同源（`:77-86`）；幂等 / reopen / dispose（`:88-129`）；R1 降级 `holdMs` 归零（`:132-149`）；面板与遮罩用不同 keyframes（`:168-194`） | ① 全部在 vitest node 环境、只测**外部行为**（文件头 `:3-5` 自述「仓库无 vue-lynx 渲染器」）⇒ 「样式真的绑到了面板那个 view 上」由 `SheetShell.test.ts` 承担，但那一侧同样只能判源码形态<br>② `fakeMatchMedia:24-45` 的 `set()` 只保留**单个** `listener` ⇒ 只支持一个订阅者；若实现同时订阅两条查询，测试面覆盖不到<br>③ 状态机用例**全部走 `SHEET_ANIMATION`** ⇒ `DIALOG_ANIMATION` 的两段式协议只在 `:183-188` 断言了名字不同，**没走状态机** | ① **已登记**（`:3-5`）；② ③ **未登记** |
+| `src/components/SheetShell.test.ts`（627 行） | S1：6 个 keyframes 全仓唯一定义方 + 名字与登记表逐条对账（`:281-361`）；S2：7 个弹层经协议模块 + 零数字延迟计时器 + 退场计时器唯一实现点（`:408-501`）；S3：弹层零 `transition-*` 类 / 零死 transform / 无自建 `matchMedia`（`:546-604`） | ① `styleBlock:63-65` 用 `src.match(/<style[^>]*>…<\/style>/)` **只取第一个 `<style>` 块** ⇒ 「帧体集合 = 登记表」（`:294-297`）与「帧体数 = 6」（`:360`）都只看第一块；把第 7 副**孤儿**帧体写进第二个 `<style>` 块，两条断言都仍绿（`:304-316` 的唯一性只查那 6 个名字）<br>② `classTokens:260-266` 只认模板 class 属性位 ⇒ 弹层 `<script>` 块内的类串不被 S3 判<br>③ `setTimeoutDelayLiterals:106-133` 只抓**字面量**第二实参 ⇒ `setTimeout(close, holdMs * 2)` 这类「绕开字面量但仍是第二份时序」的写法不被点名（`:172-178` 登记的是**收窄口径的理由**，不是失效面）<br>④ `wiringKindOf:233-239` 的 `'passed'` 分支只验证 `:phase`/`:motion-phase` 属性存在且被 computed 驱动，**不验证该 prop 真被 `<BottomSheet>` 消费**（那一步在 `:422-432`，且只对 4 个文件） | ① ② ③ ④ **未登记** |
+| `tests/listItemStaggerContract.test.ts`（402 行） | L1：唯一出口 `listItemStyle` 的形态 / 延迟 / 上限 / 减弱（`:164-236`）；L2：七个手写 `<scroll-view>` 列表页逐页接入（`:242-330`）；L3：`RefreshableList` 不得成为第二延迟事实源 + `item-rise` 全仓唯一定义（`:336-371`） | ① `selfAuthoredAnimation:138-148` 只在 `ALL_VUE`（`:89`，`.vue` only）上跑（`:275-283`）⇒ **`.ts` 里的 `animationDelay` / `@keyframes` 不判**。⚠️ 本文件**没有**登记这条（全文读过，`.ts` 相关注释只涉及 `motion.ts` 的导出值）；显式登记在**另一道门禁** `tests/stateLayerOnPrimary.test.ts:652-716`（C6），且只覆盖 `on-primary` 状态层类名一族<br>② `LIST_ENTRY_KEYFRAMES:134` 是关键词表（`item-rise\|row-in\|list-item-in\|card-rise\|entry-in`）⇒ 自起这五个名字**之外**的帧体（`fade-up` / `slide-in-item`）不被「另起帧体」抓到；本文件抬头 `:10-15` 自称「不扫散文找关键词」，这一条正是关键词表<br>③ L2 的清单靠「全仓 `<scroll-view scroll-orientation=` 消费页集合相等」双侧夹逼（`:249-258`）⇒ 某页改用虚拟列表组件后它**同时**从两侧消失，门禁恒绿<br>④ `STAGGER_MAX_ITEMS` 之外的项折叠到 `0ms` 被钉成**期望态**（`:199-210`）⇒ 无门禁能区分「有意终态」与「意外没错峰」 | ① ② ③ ④ **未登记**（①② 与 `stateLayerOnPrimary.test.ts:652-716` 的 C6 **同源但不互通**） |
+| `tests/routeTransitionGate.test.ts`（357 行） | C1：两方向 `translateX` 异号 + forward 带 fade 而 back 不带（`:136-187`）；C2：帧体零字面量 + 转场容器零死 transform 工具类 + `App.vue` 无 `route-` animation 简写（`:193-228`）；C3：容器 ⊃ KeepAlive ⊃ 组件的接线顺序 + `router.ts` 五处方向意图（`:234-288`） | ① C2 的容器检查**只读含 `:style="routeTransition.style.value"` 的那一行**（`:209`），类名用 `/class="([^"]*)"/`（`:213`）⇒ class 属性跨行 / 单引号 / 该行无 class 时 `classAttr=''` ⇒ `dead=[]` **恒绿**<br>② C2 第三条只过滤 `d.startsWith('route-')`（`:225`）⇒ `App.vue` 里一条不叫 `route-` 的 `animation:` 简写带裸时长**不被抓**<br>③ `hasOpacityChange:79-81` 只看 `from` 帧 ⇒ 把 fade 放进 `to` 帧（`from{transform:…} to{opacity:.5}`）时「back 带上了 fade」判不出来<br>④ 全文件只读 `App.vue` / `router.ts` / `routeTransition.ts` 三个文件（`:32-35`、`:272-275`）⇒ 新页面自写转场不在判据内 | 四项全 **未登记** |
+| `src/composables/routeTransition.test.ts`（182 行） | `decideRouteDirection` 纯函数四分支（`:52-71`）；两段式计时器 = `MOTION_DURATION_MS` 同源（`:101-104`）；到点归位 / 同向重播换名 / R2 降级不留空窗（`:73-177`） | ① 全部在 vitest node 环境 + 注入的 `fakeMatchMedia`（`:38-40`）⇒ 只验**逻辑时序**，不验真机帧（测量能力边界见本表 §13.6）<br>② `tokenValue:33-35` 同样是**首个匹配**（与 `motion.test.ts` 同盲区）<br>③ `toDurationTokenName:180-182` 由档位名推导令牌名 ⇒ 档位改名而推导恰好命中 tokens.css 里另一个同名变量时，`:97-99` 的 `toBe('300ms')` 仍可能绿 | ① **已登记**（`:3-5` 同 `useSheetDismiss.test.ts`）；② ③ **未登记** |
+| `tests/md3GuardScans.test.ts`（1989 行） | 规则 1–10 在各自 scope 内零违规（`RULES:895-933`）；白名单按 `(rule, path, form)` 三元组放行 + 死条目棘轮（`:207-208`、`:1152-1170`） | ① **规则 9/10（阴影两道）是 `vue-template` scope**（`:925`、`:932`），而 `templateOf:163-168` 把 `<style>` 整块**掩成空格**、`scanFlatSurfaceShadow:884` 的 `SHADOW_DECL` 只在标签属性位（`t.attrs`）上匹配 ⇒ **`<style>` 块内的 `box-shadow: var(--md-elevation-*)` 0 命中**（已实测：同元素的类名通道与属性通道都判红，`<style>` 通道不红）。这正是 [`ADR-0212`](./ADR-0212-tonal-elevation-surface-over-shadow.md) 复核判据 3 授权而**尚未实现**的那条<br>② `collectFiles:98-116` 只收 `.vue` / `.ts` / `.css`（`:107`）⇒ `.js` / `.mjs` / `.json` 里的形态回流不判<br>③ `CLASS_ATTR = /class="([^"]*)"/`（`:845`）只认双引号，且 `CLASS_ATTR.exec` 无 `g` ⇒ **只取第一个** class 属性 ⇒ 单引号 class / 一元素两 class 属性的底色判定失效<br>④ 规则 7 `icon-glyph` 刻意只扫 `<template>`（`:67-69` 已登记该取舍） | ① **已登记且已授权，但标注为「尚未实现」**（ADR-0212 复核判据 3；其原文亦记「仓内已无可复现的反例」）<br>② ③ **未登记**；④ **已登记** |
+| `src/composables/useReducedMotion.test.ts`（560 行） | R1/R2/R3 三条降级规则在 composable 与组件上的落地（`:87-131`、`:325-467`、`:469-517`、`:519-531`）；单一事实源：全仓 `prefers-reduced-motion` 查询串只在 composable 一处（`:300-309`）+ 组件层零 `matchMedia` 调用（`:311-322`） | ① `animationComponents:195-199` 的候选面 `.filter((p) => p.endsWith('.vue'))`（`:186`）⇒ **`.ts` 里声明 animation/transition 的文件不在 R1/R2/R3 门控面内**（`.vue` 的 `<script>` 块在内，因为整文件都读）<br>② `isWired:225-230` 只判 `code.includes("from '<specifier>'")` ⇒ **import 了但没调用也判绿**。⚠️ `tests/listItemStaggerContract.test.ts:91-92` 对同一件事写的是相反口径（「不认『import 了 useMotion』这种弱信号（import 了但没用 = 没接入）」）—— **两道门禁口径冲突，且两边都没登记这个分歧**<br>③ 逐组件钉死只覆盖 6 个文件（GlobalFab / BookmarkButton / M3Switch / GlassCard / RefreshableList / App.vue）⇒ 其余含动画组件的「接入形态是否真的停掉动效」只被「必须 import」那条覆盖 | ①②③ **未登记**（② 与 `listItemStaggerContract` 构成口径冲突） |
+| `tests/unit.test.ts`（2436 行） | 混合单测：API 契约 / 路由裁决 / 认证 / Tailwind↔tokens 契约（`:544`）/ 主题色契约（`:574`）/ 图标名契约（`:1388`）/ GlobalFab 几何（`:1409`） | ⚠️ **实测 `grep -E 'R1\|R2\|R3\|reduced\|prefers-reduced\|useReducedMotion' tests/unit.test.ts` = 0 命中** ⇒ 该文件**不含任何 R1/R2/R3 偏好门控**（偏好门控 100% 由 `src/composables/useReducedMotion.test.ts` 承担）。其余失效面同该文件自身性质：全部是 API / 纯逻辑契约，不涉渲染 | 不适用（本行**不构成**一道动效门禁；此处登记是为消除「偏好门控散落在 unit.test.ts」这一**与现状不符的认知**） |
+
+#### 13.8.2 仓库级结构性盲区（按危害排序）
+
+以下 5 条不是某一道门禁的局部问题，而是**扫描面与语言形态的固有边界**，
+收窄扫描面补不上，只能从构造侧堵或显式接受。
+
+1. **`.vue` 的 `<style>` 块内的 CSS 声明，类名扫描一律看不见** —— 危害最大，且**已授权未实现**。
+   - 被打败的门禁：`md3GuardScans` 规则 9/10（`tests/md3GuardScans.test.ts:925`、`:932`，
+     `templateOf` 把 `<style>` 掩成空格 `:163-168`）、`pressStateLayerTransition` A4
+     （`tests/pressStateLayerTransition.test.ts:371` 只测 `el.tag`）、
+     `shadowNotState`（`tests/helpers/shadowStateCorpus.ts:18-24`）。
+   - 为什么溜过去：`box-shadow: var(--md-elevation-*)` 这类写在块内的声明**不含类名 token**，
+     而三道门禁的抽取器分别只认「标签内的 class 值」「标签属性串」「`<style>` 掩码后的模板区」，
+     没有一条读块内 CSS 声明体。
+   - 状态：[`ADR-0212`](./ADR-0212-tonal-elevation-surface-over-shadow.md) **复核判据 3 明确授权**这条
+     （原文：「只扫类名会漏掉直接写在样式块里的 `box-shadow: var(--md-elevation-*)`」），
+     **但同一节的抬头写着「以下判据尚未实现」**；其反例锚点已随 #884 删除，
+     原文自记「仓内已无可复现的反例，锚点从『可核对』退化为『不可核对』」。
+     ⇒ 这是**授权了、没实现、连自检用的正样本都不存在**的一格。
+   - ⚠️ `motionDurationTokens.template.test.ts:919-933` 把「`<style>` 块不受类名位判据」钉成了一条用例
+     —— 那一条是**有意摘除**（该判据只管类名位），**不等于**块内 CSS 声明已有主人。二者不要互相顶替。
+
+2. **`.ts` 全文里的类串，只有 `on-primary` 一族有主人**。
+   - 被打败的门禁：`motionDurationTokens` 的类名位判据（`src/components/motionDurationTokens.template.test.ts:75`
+     扫描面 `.vue` only）、`motionContract` M3（`tests/motionContract.test.ts:322-324` 只额外覆盖
+     `motion.ts` 的 `MOTION_CLASS` 一张登记表）、`useReducedMotion` 的含动画组件面
+     （`src/composables/useReducedMotion.test.ts:186`）、`listItemStaggerContract`
+     （`tests/listItemStaggerContract.test.ts:89`/`:275-283`，`selfAuthoredAnimation` 只跑 `.vue`）。
+   - 为什么溜过去：类名在脚本里拼好、模板只写 `:class="cls"` ⇒ 元素上没有任何字面 token 可匹配。
+     `motionContract.test.ts:106-109` 自己写着「登记表本身就是『工具类唯一的合法产生地』」——
+     而**那个合法产生地目前只对一张登记表有门禁**。
+   - 状态：**部分已登记** —— `tests/stateLayerOnPrimary.test.ts:652-716`（C6）与
+     [`ADR-0207` 决策 8 消费约束节](./ADR-0207-shape-and-state-layer-guardrails.md) 的
+     「三个结构性盲区」都明确点了 `.ts` 全文，但**只覆盖 `on-primary` 状态层类名**。
+     其余四族（transform 死类名 / 时长曲线 / 阴影 / 状态层载体）**未登记**。
+
+3. **`.vue` 自己的 `<script>` 块内拼接或存放的类名，同样只有两族有主人**。
+   - 被打败的门禁：`shadowNotState`（`tests/helpers/shadowStateCorpus.ts:18-24`）、
+     `pressStateLayerTransition`（`tests/pressStateLayerTransition.test.ts:164`、`:210`）、
+     `motionContract` M3（`tests/motionContract.test.ts:113`）、`SheetShell` S3
+     （`src/components/SheetShell.test.ts:262`）—— 四者都只认标签属性位。
+   - 有主人的两族：`on-primary` 状态层类名（`tests/stateLayerOnPrimary.test.ts:708-714` 的 C6 `<script>` 分支）；
+     时长/曲线类名（`motionDurationTokens` 的 `classSurface:722-728` **保留** `<script>` 块，
+     `classTokens:754-760` 抽全部引号字符串 —— 这正是 `M3Switch.vue` 那次违规被抓住的原因，`:897-917` 有反事实）。
+   - ⚠️ 同一形态在**同一仓**里有两副面孔：一副门禁连 `<script>` 一起扫，一副只扫模板属性位。
+     复核时**不能**用「C3/C6 已经堵了」的结论覆盖后一类。
+
+4. **`<style>` 块只取第一个**：多块 SFC 的第二块进不了任何 keyframes 断言。
+   - 被打败的门禁：`SheetShell.test.ts:63-65` 的 `styleBlock` 用非贪婪 `match` 只取首块，
+     而 S1 的「帧体集合 = 登记表」（`:294-297`）与「帧体数 = 6」（`:360`）都建立在它之上。
+   - 为什么溜过去：把第 7 副**孤儿**帧体写进第二个 `<style>` 块 ⇒ 两条断言都绿；
+     `:304-316` 的「全仓唯一定义方」只查那 6 个名字，孤儿不在其列。
+   - 状态：**未登记**。
+
+5. **`animation-delay` 在 `index ≥ STAGGER_MAX_ITEMS`（= 8）处折叠到 `0ms` 是被钉死的期望态**。
+   - 事实源：`src/composables/motion.ts:328` `STAGGER_MAX_ITEMS = 8`；
+     `src/composables/motion.test.ts:253-259` 与 `tests/listItemStaggerContract.test.ts:199-210`
+     都把它断言为**正确行为**（「虚拟滚动防末项漂移」）。
+   - 为什么这是失效面：因为期望态与失效态**取值完全相同**（都是 `0ms`），
+     所以**没有任何门禁能区分「第 9 项是有意终态」与「第 9 项是意外没错峰」**。
+     一次把 7 改成 8 的重构、或一次 `listItemStyle(i)` 误传常量 0，两侧都读不出差别。
+   - 状态：行为本身**已登记**（`listItemStaggerContract.test.ts:199-210`）；
+     **「不可区分性」这一点未登记**。
+
 ## 相关链接
 
 - 事实底座：`docs/research/material-design-3-gap-analysis-2026-09.md`
