@@ -26,6 +26,13 @@ import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 单源关注 feed（/v2/illust/follow，offset 分页）；双防抖/竞态/空页防护/15s 超时/
@@ -147,7 +154,8 @@ onUnmounted(() => {
     <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
       <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
       <view
-        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="refreshFeed"
       >
         <text class="text-label-large font-medium text-primary-on">{{ t('following.retry') }}</text>
@@ -175,7 +183,7 @@ onUnmounted(() => {
         v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden"
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">

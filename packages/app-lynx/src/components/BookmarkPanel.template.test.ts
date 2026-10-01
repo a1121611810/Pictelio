@@ -122,10 +122,30 @@ describe('BookmarkPanel 平台约束（ADR-0123 覆盖层与命中测试）', ()
     expect(code).toContain('bg-primary')
   })
 
+  it('进 / 退场动画绑定在遮罩与面板两个 view 上（相位来自两段式状态机，ADR-0211 决策 3/4）', () => {
+    // 本面板自绘壳（不用 SheetShell）：相位与动画简写直接绑在遮罩 / 面板上。
+    // 遮罩只淡入淡出、面板上下滑 ⇒ 两者是**不同** keyframes（共用一条会让遮罩跟着位移）。
+    // 绑的是**顶层 computed**：`dismiss.phase` 是普通对象的内嵌 Ref，Vue 模板不解包
+    //（直接写 :style="dismiss.scrimStyle(dismiss.phase)" 会被 vue-tsc 判红，运行期也会传进 Ref 实例）
+    expect((code.match(/:style="scrimStyle"/g) ?? []).length).toBe(1)
+    expect((code.match(/:style="panelStyle"/g) ?? []).length).toBe(1)
+    expect(code).toContain('computed(() => dismiss.scrimStyle(dismiss.phase.value))')
+    expect(code).toContain('computed(() => dismiss.panelStyle(dismiss.phase.value))')
+    expect(code).toContain("import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'")
+    expect(code).toContain("onDismissed: () => emit('close')")
+    // 面板位移**不走** Tailwind transform 工具类（死类名，ADR-0210 路径 E）
+    expect(code).not.toMatch(/(?:^|\s)(?:[a-z-]+:)*-?(?:scale|rotate|skew|translate-[xy])-[^\s"'`:]+/)
+  })
+
   it('系统返回键先关面板：挂载注册 modalStack 关闭回调、卸载注销（与 CommentOverlay 同机制）', () => {
-    expect(code).toContain('useModalStack().registerModal(() => emit(\'close\'))')
+    // ⚠️ #878：回调是 onClose（= dismiss.requestClose）而不是 emit('close')——
+    //    返回键与遮罩/× 共用两段式退场：先进 exit 相位播退场动画，计时器到点才 emit，
+    //    宿主页那一刻才卸载（Lynx 无 transitionend，退场只能显式建模，ADR-0211 决策 3）。
+    expect(code).toContain('useModalStack().registerModal(onClose)')
     expect(code).toContain('unregisterModal?.()')
     expect(code).toContain('unregisterModal = null')
+    // 卸载清退场计时器：宿主先于计时器到点卸载时不得再 emit
+    expect(code).toContain('dismiss.dispose()')
   })
 
   it('挂载即并行预填（onMounted → panel.load）、卸载即 dispose（中止在途请求）', () => {
@@ -163,9 +183,11 @@ describe('BookmarkPanel 交互接线（spec D5/D6/D11 + D2/D9）', () => {
   })
 
   it('保存失败禁用/呈现：canSave 门控按钮 + 宿主 errorMsg 渲染（禁止静默降级）', () => {
-    expect(code).toContain(':class="canSave ?')
+    expect(code).toContain(':class="[pressColor.className, canSave ?')
     expect(code).toContain('saveFailed')
-    expect(code).toContain('canSave ? \'bg-primary active:bg-state-pressed-primary\'')
+    // 类名已按 ADR-0211 决策 8 归正：实色 `active:bg-state-pressed-primary` → alpha 正路
+    // `active:bg-layer-pressed-on-primary`（同元素带 bg-primary，满足 C3 消费约束）。
+    expect(code).toContain('canSave ? \'bg-primary active:bg-layer-pressed-on-primary\'')
   })
 
   it('detail 失败禁存与标签库降级各有独立渲染分支（spec D6 两条降级路径）', () => {

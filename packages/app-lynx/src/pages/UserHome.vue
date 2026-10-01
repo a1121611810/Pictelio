@@ -266,7 +266,7 @@ onUnmounted(() => {
     <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 
     <!-- 用户信息卡 -->
-    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
       <SkeletonImage
         :src="proxyImageUrl(detail.user.profile_image_urls.medium || detail.user.profile_image_urls.px_170x170 || '')"
         aspect-ratio="1 / 1"
@@ -334,7 +334,7 @@ onUnmounted(() => {
         v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
           <view
@@ -371,7 +371,8 @@ onUnmounted(() => {
 
     <!-- 小说三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
     <view v-if="activeTab === 'novel' && novelView === 'skeleton'" class="w-full flex-1 min-h-0">
-      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
         <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[60%]" />
@@ -407,7 +408,7 @@ onUnmounted(() => {
       >
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
         <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
-        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
+        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <view class="flex flex-row mt-1.5">
                       <text class="text-label-medium text-outline mr-4">{{

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { currentParams, navigate, goBack } from '../router'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
+import { currentParams, navigate, goBack, registerBackGuard } from '../router'
 import { loadDetail, loadUgoiraMetadata } from '../api/illust'
 import { toIllustId } from '../api/id'
 import { followUser, unfollowUser } from '../api/user'
@@ -12,6 +12,9 @@ import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useBookmarkMutation } from '../composables/useBookmarkMutation'
+import { useImmersiveChrome } from '../composables/useImmersiveChrome'
+import { useImmersiveSystemBars } from '../composables/useImmersiveSystemBars'
+import { immersiveBackdropClass } from '../utils/immersiveBackdrop'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import BookmarkPanel from '../components/BookmarkPanel.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
@@ -29,6 +32,13 @@ import { useDownloadStore } from '../stores/downloadStore'
 import { useTagNeighborStore } from '../stores/tagNeighbor'
 import { ILLUST_DETAIL_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const settings = useSettingsStore()
 const tagNeighbors = useTagNeighborStore()
@@ -72,7 +82,10 @@ function openBookmarkPanel(): void {
   // 清掉上一次快速收藏的残留 errorMsg（同一实例的状态）：否则面板 footer 会把旧错误
   // 误报成「保存失败」（面板打开时的错误行只应呈现本次保存的结果）
   bm.errorMsg.value = ''
-  showBookmarkPanel.value = true
+  // 决策 3：收藏面板是需 chrome 的模态 ⇒ 打开前先退出沉浸（与评论/选页同一复合动作）
+  openImmersiveOverlay(() => {
+    showBookmarkPanel.value = true
+  })
 }
 
 /** 面板保存成功（saveWith 已乐观置位 bookmarked=true，失败则不上抛 saved）：关面板 + 补动效 */
@@ -90,6 +103,68 @@ function onBookmarkPanelSaved(): void {
 
 // ─── 评论弹层（issue #164）：入口在收藏操作行；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
+
+// ─── 沉浸看图（#887 应用内 chrome / #889 宿主系统栏；ADR-0213 决策 1、2、3、4、5、9）───
+// 两层语义各自成模块（useImmersiveChrome 管应用内 chrome、useImmersiveSystemBars 管宿主
+// 系统栏，二者生命周期不同故不合流），本页只做「同一次点击同时驱动两层」与
+// 「卸载/返回时同时复位两层」的接线。状态形态与所有权 token 见 useImmersiveChrome 头注。
+const { chromeHidden, toggleChrome, openOverlay, immersiveA11yLabel, exit } = useImmersiveChrome()
+// ── 系统栏联动（#889 / ADR-0213 决策 4、5）──
+// 包一层：页面状态机的 enter/exit 是「应用内 chrome」语义，这里补上「宿主系统栏」语义。
+// 恢复值回落到用户当前的全屏模式设定（决策 4），不硬编码 false。
+const { onImmersiveEnter, onImmersiveExit } = useImmersiveSystemBars()
+
+// ─── 决策 5 的 L2 / L3：卸载与返回两条路径上必须复位**两层**───
+// ⚠️ 缺陷来源（#889 验收未达成，code-review F1）：`useImmersiveChrome` 的 `onUnmounted`
+// 只复位应用内 chrome 与所有权，**不碰系统栏**；返回守卫也从未接线
+// ⇒ 沉浸态按返回离开本页时 `applySystemBars(false)` 从未被调用，离开后系统栏仍隐藏。
+// 复位顺序固定：先 exit()（清 chrome + 释放所有权）再 onImmersiveExit()（系统栏回落到
+// 用户全屏模式设定；决策 4 禁止硬编码 false）。
+/** 幂等复位：仅在持有沉浸时动作。L2 与 L3 共用的唯一出口。 */
+function releaseImmersive(): void {
+  if (!chromeHidden.value) return
+  exit()
+  onImmersiveExit()
+}
+
+// L2 生命周期兜底：路由 pop、页面被卸载的一切路径。
+// 用 onBeforeUnmount 而非 onUnmounted：作用域尚未销毁，且早于 useImmersiveChrome 自己的
+// onUnmounted 触发（其 exit() 幂等，两处不冲突、也不重复下发原生调用）。
+onBeforeUnmount(releaseImmersive)
+
+// L3 返回路径必经：系统返回（handleSystemBack）与页内返回（requestBack）共用守卫链，
+// 守卫在历史栈 pop **之前**裁决 ⇒ 上一页不会渲染出「没有系统栏」的一帧。
+// return false = **不拦截**（决策 5 L3 明文要求），只借返回链路的时机复位。
+const unregisterBackGuard = registerBackGuard(() => {
+  releaseImmersive()
+  return false
+})
+onBeforeUnmount(unregisterBackGuard)
+
+/** 切换沉浸：应用内 chrome 走状态机，系统栏走宿主桥，两者必须同时到位 */
+function toggleImmersive(): void {
+  const entering = !chromeHidden.value
+  toggleChrome()
+  if (entering) onImmersiveEnter()
+  else onImmersiveExit()
+}
+
+/** 浮层入口：退出沉浸 ⇒ 系统栏同步恢复（决策 3 + 决策 4） */
+function openImmersiveOverlay(open: () => void): void {
+  openOverlay(() => {
+    onImmersiveExit()
+    open()
+  })
+}
+
+/** 浮层入口统一形态（决策 3）：评论 / 选页 / 收藏面板都是需要 chrome 的模态，
+ *  沉浸态下打开会得到「一个没有关闭按钮的模态」⇒ 统一先退出沉浸再打开。
+ *  刻意不在浮层组件里反向感知沉浸（避免反向依赖）。 */
+function openComments(): void {
+  openImmersiveOverlay(() => {
+    showComments.value = true
+  })
+}
 
 // ─── 关注作者（P0-T3） ───
 const following = ref(false)
@@ -187,7 +262,10 @@ function onSaveEntry() {
     return
   }
   if (i.page_count > 1) {
-    showPicker.value = true
+    // 决策 3：选页面板是需 chrome 的模态 ⇒ 打开前先退出沉浸（ugoira/单图直存不开浮层，不退出）
+    openImmersiveOverlay(() => {
+      showPicker.value = true
+    })
     return
   }
   enqueuePages([0])
@@ -279,9 +357,13 @@ onMounted(async () => {
   <!-- [lynx:fix] 顶栏 tap 修复（issue #139）：外层显式 flex flex-col，scroll-view flex-1 min-h-0 约束在顶栏下方，
        避免 w-full h-full 溢出覆盖顶栏触摸层（与 issue #129 同型） -->
   <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
-  <view class="w-full h-full flex flex-col relative bg-surface">
-    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
-    <PageTopBar back :title="t('illustDetail.title')" @back="goBack" />
+  <!-- 沉浸态底色切影院黑（#896）：方形作品按原比例只有 100vw 高，必然短于竖屏视口。
+       非沉浸态保持 bg-surface 原样（不改既有阅读排版）。 -->
+  <view class="w-full h-full flex flex-col relative" :class="immersiveBackdropClass(chromeHidden)">
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194）
+         沉浸态隐藏（决策 3：沉浸**不留任何可见 chrome**；页内返回入口消失，退出路径为
+         系统返回键 + 图片再次单击，屏幕阅读器退出路径见图片容器的动态 a11y 标签） -->
+    <PageTopBar v-if="!chromeHidden" back :title="t('illustDetail.title')" @back="goBack" />
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
     <view v-if="loading" class="w-full flex-1 min-h-0 bg-surface">
@@ -302,11 +384,16 @@ onMounted(async () => {
            ADR-0129 多图列表：多页作品改**通栏连续大图列表**（全量渲染 + 首图 eager/其余 lazy-load），
            每图宽度盛满、高度按自身比例（占位=首图比例 detailImageHeight，@load 后 CoverImage correctHeightOnLoad 修正），
            右上角「n / N」页角标（对齐 webview LazyDetailImage）；单页/ugoira 分支保持现状。 -->
-      <!-- ugoira 动图：播放器分支（多图列表不适用，page_count=1 语义保持） -->
+      <!-- ugoira 动图：播放器分支（多图列表不适用，page_count=1 语义保持）
+           @tap = 沉浸切换（决策 2：绑**容器**而非图片元素——容器可覆盖「图未加载完成时点
+           空位」，且 UgoiraViewer 自身零手势，不会与本绑定抢事件） -->
       <view
         v-if="illust.type === 'ugoira'"
         class="relative w-full bg-surface-container-highest overflow-hidden"
         :style="{ height: detailImageHeight }"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="immersiveA11yLabel()"
+        @tap="toggleImmersive"
       >
         <UgoiraViewer :illust-id="illust.id" :height-vw="detailImageHeight" />
       </view>
@@ -318,13 +405,23 @@ onMounted(async () => {
           v-for="(src, i) in slideSrcs"
           :key="i"
           class="relative w-full bg-surface-container-highest overflow-hidden mb-2"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="immersiveA11yLabel({ n: i + 1, total: slideSrcs.length })"
+          @tap="toggleImmersive"
         >
           <SkeletonImage :src="src" :height="detailImageHeight" :lazy-load="i > 0" correct-height-on-load />
           <!-- 「n / N」页角标：absolute 悬浮右上角。
                [定位锚点约定（ADR-0123）] 原生 LynxView 把最近 view 祖先当 absolute 锚点，非全屏父盒内
                禁止 right/bottom（按父盒边缘解析→跑出屏幕）。故角标用「left:0 + w-full + flex 右对齐」：
-               只依赖 left/top 正向解析，右侧位置由 flex 布局得出，规避 right/bottom 的锚点语义。 -->
-          <view class="absolute top-2 left-0 w-full flex flex-row justify-end pr-2">
+               只依赖 left/top 正向解析，右侧位置由 flex 布局得出，规避 right/bottom 的锚点语义。
+               决策 2/3：角标是图片层的**子节点**、图片层本身不隐藏 ⇒ 隐藏角标**不能**靠父级
+               class 级联，必须**独立条件渲染**（v-if）；另补 @tap.stop 阻断冒泡，否则点角标会
+               冒泡到图片层误触发沉浸切换（沿用本页 toggleWatchLater / openTagNeighbors 同款范式）。 -->
+          <view
+            v-if="!chromeHidden"
+            class="absolute top-2 left-0 w-full flex flex-row justify-end pr-2"
+            @tap.stop
+          >
             <view
               class="px-2 h-[6.4vw] min-w-[9.6vw] rounded-[var(--md-shape-small)] bg-scrim flex items-center justify-center"
             >
@@ -338,10 +435,16 @@ onMounted(async () => {
         v-else
         class="relative w-full bg-surface-container-highest overflow-hidden"
         :style="{ height: detailImageHeight }"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="immersiveA11yLabel()"
+        @tap="toggleImmersive"
       >
         <SkeletonImage v-if="slideSrcs[0]" :src="slideSrcs[0]" :height="detailImageHeight" />
       </view>
-      <view class="p-4 bg-surface-container-lowest">
+      <!-- 操作 / 信息行（决策 3 chrome 边界之一）：沉浸态整体隐藏。
+           ⚠️ 与图片层是**兄弟**关系 ⇒ 图片层的 @tap 不会吞掉这里 8 个既有处理器
+           （头像/关注/保存/评论/稍后看/标签近邻/查看下载/标签搜索），不冒泡不冲突。 -->
+      <view v-if="!chromeHidden" class="p-4 bg-surface-container-lowest">
         <!-- T07 档位清理：原为 700 字重。作品标题是内容文本，headline-small 官方
              regular(400)、emphasized 500；此前它比顶部 PageTopBar 屏标题（title-large + 500）
              更重，层级倒置 → 500。 -->
@@ -367,7 +470,7 @@ onMounted(async () => {
           <view
             v-if="!isSelfAuthor"
             class="px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-            :class="following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
+            :class="[pressColor.className, following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
             @tap="toggleFollowAuthor"
           >
             <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
@@ -412,7 +515,7 @@ onMounted(async () => {
           <view
             v-if="illust.total_comments !== undefined"
             class="ml-4 flex flex-row items-center"
-            @tap="showComments = true"
+            @tap="openComments"
           >
             <AppIcon name="chat_bubble" :size="6.4" />
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>

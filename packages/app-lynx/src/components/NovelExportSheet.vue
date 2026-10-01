@@ -16,6 +16,13 @@ import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { safeBottom } from '../utils/safeArea'
 import BottomSheet from './BottomSheet.vue'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = defineProps<{
   /** 打开态（父页 v-if 挂载，本属性用于打开时重置选择） */
@@ -128,7 +135,8 @@ function onConfirm(): void {
       <!-- 确认导出 -->
       <view class="px-4 pt-4 pb-6">
         <view
-          class="w-full h-[12.8vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          class="w-full h-[12.8vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="t('novelExportSheet.export')"
           @tap="onConfirm"

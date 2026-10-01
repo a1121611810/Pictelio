@@ -13,10 +13,18 @@ import type { CommentsState } from '../primitives/useComments'
 import { useComments } from '../primitives/useComments'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useModalStack } from '../stores/modalStack'
+import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
 import { safeBottom } from '../utils/safeArea'
 import CommentItem from './CommentItem.vue'
 import CommentInputBar from './CommentInputBar.vue'
 import BottomSheet from './BottomSheet.vue'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = defineProps<{
   type: CommentContentType
@@ -51,9 +59,23 @@ async function handleSubmit(text: string): Promise<void> {
   if (ok) replyingTo.value = null
 }
 
+// 关闭时序：两段式退场（ADR-0211 决策 3）。遮罩 / ×（BottomSheet @close）与系统返回键
+// （modalStack）两条路径共用同一个 requestClose；退场动画播完（计时器与动画同源，
+// 减弱动效开启时归零）才 emit('close')，宿主页那一刻才卸载 → 关闭是「滑下去」而不是「瞬撤」。
+const dismiss = useSheetDismiss({ names: SHEET_ANIMATION, onDismissed: () => emit('close') })
+
+/**
+ * 相位 → 壳的 `motion-phase` prop（顶层 computed 才有模板解包）。
+ * ⚠️ 写成 `:motion-phase="dismiss.phase"` 编译期就报 TS2325：Vue 只解包**顶层** setup 绑定，
+ *    `dismiss` 是普通对象，其 `.phase` 字段在模板里仍是 Ref 实例 ⇒ prop 收到的是对象不是相位。
+ * `gone`（已卸载）归到 exit：那一刻退场动画正处于末态，语义上仍是退场。
+ */
+const motionPhase = computed<'enter' | 'exit'>(() => (dismiss.phase.value === 'enter' ? 'enter' : 'exit'))
+
+
 // 统一关闭路径：遮罩 / × / 返回键（modalStack 注册的回调）都走这里
 function onClose(): void {
-  emit('close')
+  dismiss.requestClose()
 }
 
 // 删除 / 楼层展开：数据操作经 controller（useComments 是唯一写者）
@@ -81,6 +103,8 @@ onBeforeUnmount(() => {
   unregisterModal?.()
   unregisterModal = null
   controller.dispose()
+  // 卸载时清退场计时器（宿主可能先于计时器到点卸载，如路由直接跳走）
+  dismiss.dispose()
 })
 </script>
 
@@ -91,6 +115,7 @@ onBeforeUnmount(() => {
   <view class="w-full h-full relative">
     <BottomSheet
       :title="t('commentOverlay.title', { count: state.comments.length })"
+      :motion-phase="motionPhase"
       @close="onClose"
     >
 
@@ -112,7 +137,8 @@ onBeforeUnmount(() => {
       >
         <text class="text-body-small text-error px-8 text-center">{{ state.error ?? t('commentOverlay.loadFailedRetry') }}</text>
         <view
-          class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          :class="pressColor.className"
           @tap="retry"
         >
           <text class="text-label-large font-medium text-primary-on">{{ t('commentOverlay.retry') }}</text>

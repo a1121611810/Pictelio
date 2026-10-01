@@ -53,6 +53,13 @@ import {
 } from '../utils/webdavCredentials'
 import { t, locale } from '../i18n'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -669,7 +676,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       <!-- 全屏模式组（#806）：从客户端组移出。它与引擎无关，是 Lynx 侧沉浸式功能
            （spec docs/specs/lynx-systembars.md D5：隐藏系统栏 + 边缘滑动唤出），
            不得随单引擎隐藏客户端组而一并消失。 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <view
           class="flex flex-row items-center justify-between py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -687,7 +694,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 网络组（ADR-0199 D4 / #779：限流退避四参数设置；卡片/行结构镜像客户端组） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text
           class="text-title-small font-medium text-surface-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -774,7 +781,7 @@ function pickAppearanceMode(mode: DarkModeId) {
            T2 增补（spec lynx-night-mode §4.7）：
              - 顶部加「外观模式」M3 segmented button 三格（亮/暗/跟随），点击即时切换
              - 色块同步挂 .dark 类 → 暗色 resolved 下显示对应主题的暗色色板真实主色（WYSIWYG） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.appearance.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.appearance.themeColorHint') }}</text>
         <!-- 模式组标签（i18n 键 me.appearance.mode 的真实渲染点）：原实现只有模式名（亮色/暗色/
@@ -929,7 +936,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 内容组（ADR-0051：R18/R18G 开关） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.content.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.content.hint') }}</text>
         <view
@@ -1020,7 +1027,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- T6：动图播放组 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.ugoira.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.ugoira.hint') }}</text>
         <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container（range 档二次确认仍走 pickUgoiraMode） -->
@@ -1032,7 +1039,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- issue #148 T2：详情画质档位组（medium=标准 / large=高清 / original=原图） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.quality.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.quality.hint') }}</text>
         <!-- M3 segmented button（三档）：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
@@ -1040,7 +1047,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 下载格式组（spec download-manager §5）：全局统一，不可逐图 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.download.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.download.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
@@ -1163,7 +1170,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 导出组（spec docs/specs/novel-export.md §6/§7.2）：全局默认格式 + 三项内容开关 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.export.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.export.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
@@ -1297,12 +1304,12 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 翻译设置（spec docs/specs/app-lynx-novel-translation.md §6.1；T9 #637） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <SettingsEndpoint />
       </view>
 
       <!-- 退出登录（危险操作独立沉底） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
         <view
           class="py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -1315,7 +1322,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       <!-- WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生渲染，§2 web-core 不显示） -->
       <view
         v-if="webdavAvailable"
-        class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+        class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]"
       >
         <text class="text-title-small font-medium text-surface-on">{{ t('me.webdav.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.webdav.hint') }}</text>
@@ -1655,6 +1662,7 @@ function pickAppearanceMode(mode: DarkModeId) {
         <view class="flex flex-row justify-end mt-6 gap-2">
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraCancel"
             @tap="ugoiraConfirm = false"
@@ -1663,6 +1671,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           </view>
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraConfirm"
             @tap="confirmUgoiraRange"

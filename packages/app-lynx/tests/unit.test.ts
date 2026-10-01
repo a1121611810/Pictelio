@@ -1432,7 +1432,10 @@ describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
     expect(globalFabVue).not.toMatch(/<view v-if="view\.visible"[^>]*inset-0/u)
     // 遮罩（全屏交互面）与环层整层 v-if="view.isOpen" 条件渲染——关闭态渲染树无全屏元素。
     // 外层为 z-40 零尺寸盒（钉在 (0,0) 作定位锚点，不参与命中），FAB 常显于其内。
-    expect(globalFabVue).toContain('<view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">')
+    // 外层必须「受自身可见性约束 + 受全局沉浸抑制约束」双条件渲染（ADR-0213 决策 3：
+    // 沉浸态下隐藏态不留任何可见 chrome）。**不可**为了省事只留 `view.visible` ——
+    // 真机实证过：只判自身可见性时搜索 FAB 会悬浮在画上。
+    expect(globalFabVue).toContain('<view v-if="view.visible && !chromeSuppressed" class="absolute z-40" style="top: 0; left: 0">')
     expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
     expect(globalFabVue).toMatch(/v-if="view\.isOpen" class="absolute z-20"/)
   })
@@ -1501,7 +1504,10 @@ describe('GlobalFab.vue search 模式渲染标记（ADR-0131）', () => {
 
   it('search 模式不渲染遮罩/环层：外层仍 v-if="view.visible"（search 也渲染 FAB），遮罩/环层仍 v-if="view.isOpen"（ADR-0123）', () => {
     // 深模块保证非 tab 路由 isOpen 恒 false → search 模式渲染树只有主 FAB
-    expect(globalFabVue).toContain('<view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">')
+    // 外层必须「受自身可见性约束 + 受全局沉浸抑制约束」双条件渲染（ADR-0213 决策 3：
+    // 沉浸态下隐藏态不留任何可见 chrome）。**不可**为了省事只留 `view.visible` ——
+    // 真机实证过：只判自身可见性时搜索 FAB 会悬浮在画上。
+    expect(globalFabVue).toContain('<view v-if="view.visible && !chromeSuppressed" class="absolute z-40" style="top: 0; left: 0">')
     expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
     expect(globalFabVue).toContain('v-if="view.isOpen" class="absolute z-20"')
   })
@@ -2192,11 +2198,25 @@ expect(dialogVueSource).toContain('text-error-on-container')
 it('open 期间 registerModal 注册关闭回调 = cancel（返回键优先关弹窗），关闭/卸载注销', () => {
   // Pinia 化（ADR-0139 T2）：registerModal 经 useModalStack() 入口；行为不变。
   expect(dialogVueSource).toContain("import { useModalStack } from '../stores/modalStack'")
-  expect(dialogVueSource).toContain("useModalStack().registerModal(() => emit('cancel'))")
-  // watch open 翻转注册/注销 + onBeforeUnmount 注销兜底
+  // ⚠️ #878：返回键不再直发 cancel，而是 requestDismiss(() => emit('cancel')) ——
+  // cancel 是「关闭意图」，必须晚于两段式退场（ADR-0211 决策 3）发出，否则页面先动、
+  // 弹窗还在屏幕上退场。事件名与语义都没变，变的只是「何时发」。
+  expect(dialogVueSource).toContain(
+    "useModalStack().registerModal(() => requestDismiss(() => emit('cancel')))",
+  )
   expect(dialogVueSource).toContain('() => props.open')
   expect(dialogVueSource).toContain('onBeforeUnmount')
   expect(dialogVueSource).toContain('unregisterModal?.()')
+  // 退场状态机接线：v-if 绑本地相位（不是 props.open），遮罩与卡片各绑一套动画
+  expect(dialogVueSource).toContain('useSheetDismiss({')
+  expect(dialogVueSource).toContain('v-if="visible"')
+  // ⚠️ 绑定的是**顶层 computed**（scrimStyle / panelStyle），不是模板内直接调协议模块：
+  //    `dismiss.phase` 是普通对象的内嵌 Ref，Vue 模板不解包 ⇒ prop/实参会收到 Ref 实例
+  //    （vue-tsc TS2325/TS2345 已实证）。脚本侧那两个 computed 才是相位驱动的来源。
+  expect(dialogVueSource).toContain(':style="scrimStyle"')
+  expect(dialogVueSource).toContain(':style="panelStyle"')
+  expect(dialogVueSource).toContain('computed(() => dismiss.scrimStyle(dismiss.phase.value))')
+  expect(dialogVueSource).toContain('computed(() => dismiss.panelStyle(dismiss.phase.value))')
 })
 })
 

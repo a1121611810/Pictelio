@@ -168,8 +168,14 @@ function onTouchEnd(): void {
 </template>
 
 <style scoped>
+/* Surface-lying element: level is expressed by the surface-container tonal step,
+   so the box-shadow is dropped rather than set to 0 (ADR-0212 decision 2 rule 3 —
+   an explicit 0 would blur "no declaration" and "declared zero" for the gate).
+   NOTE: keep this comment ASCII-only. tests/hardcode-gate.test.ts strips script
+   blocks and HTML comments, but NOT style blocks nor CSS comments, so CJK prose
+   here is read as template text and fails the i18n gate.
+   Rationale (Chinese) lives in docs/adr/glossary-md3-alignment.md and ADR-0212. */
 .glass-card {
   background-color: var(--md-surface-container-lowest);
-  box-shadow: var(--md-elevation-1);
 }
 </style>

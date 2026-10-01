@@ -4,6 +4,13 @@ defineOptions({ name: 'update' })
 import { useUpdateStore } from '../stores/updateStore'
 import { UPDATE_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const update = useUpdateStore()
 
@@ -56,7 +63,7 @@ const changelogLines = () =>
       </view>
 
       <!-- 更新内容（changelog 多行） -->
-      <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('update.changelogTitle') }}</text>
         <view v-if="changelogLines().length" class="mt-3 flex flex-col gap-1">
           <text
@@ -71,7 +78,8 @@ const changelogLines = () =>
 
       <!-- 下载新版本（页面唯一主动作） -->
       <view
-        class="mt-[8vw] h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-[8vw] h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.download"
         @tap="update.openReleasePage"

@@ -41,6 +41,13 @@ import {
 import type { SearchScope, SearchSort } from '../api/types'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 import { safeBottom } from '../utils/safeArea'
+import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
@@ -309,9 +316,26 @@ function onRetry(): void {
   void controller.refresh()
 }
 
-// 统一关闭路径：遮罩 / × 都走 closeSearch()（返回键由 modalStack 回调同一函数）
+// 统一关闭路径：遮罩 / × 都走 closeSearch()。
+// ⚠️ 只有「用户在本弹层内关闭」走两段式退场（ADR-0211 决策 3）：先进 exit 相位播退场动画，
+// 计时器（与动画同源、减弱动效开启时归零）到点才真正 closeSearch。
+// 两条**不走**退场的路径（searchSheetStore 不属本票范围，只能保持原样，登记在此）：
+//   ① 程序性关闭 onResultTap（关层 + navigate）：紧接着换页，延迟关闭等于延迟导航；
+//   ② 系统返回键：modalStack 的回调由 store 在 openSearch 里注册为 closeSearch 本身，
+//      绕过了本组件 ⇒ 返回键关闭仍是瞬撤（要统一需改 store 的注册目标，不在本票范围）。
+const dismiss = useSheetDismiss({ names: SHEET_ANIMATION, onDismissed: () => searchSheet.closeSearch() })
+
+/**
+ * 相位 → 壳的 `motion-phase` prop（顶层 computed 才有模板解包）。
+ * ⚠️ 写成 `:motion-phase="dismiss.phase"` 编译期就报 TS2325：Vue 只解包**顶层** setup 绑定，
+ *    `dismiss` 是普通对象，其 `.phase` 字段在模板里仍是 Ref 实例 ⇒ prop 收到的是对象不是相位。
+ * `gone`（已卸载）归到 exit：那一刻退场动画正处于末态，语义上仍是退场。
+ */
+const motionPhase = computed<'enter' | 'exit'>(() => (dismiss.phase.value === 'enter' ? 'enter' : 'exit'))
+
+
 function onClose(): void {
-  searchSheet.closeSearch()
+  dismiss.requestClose()
 }
 
 onMounted(() => {
@@ -332,6 +356,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (focusTimer !== undefined) clearTimeout(focusTimer)
+  // 清退场计时器：卸载后不得再关一次（App.vue 的 v-if 可能先于计时器到点卸载本组件）
+  dismiss.dispose()
   // 释放：abort 全部在途 + 取消待发 debounce；此后 controller 全方法 no-op
   controller.dispose()
 })
@@ -349,6 +375,7 @@ onBeforeUnmount(() => {
     <BottomSheet
       :title="t('searchSheet.title')"
       :close-accessibility-label="SEARCH_A11Y_LABELS.close"
+      :motion-phase="motionPhase"
       @close="onClose"
     >
 
@@ -607,7 +634,8 @@ onBeforeUnmount(() => {
         >
           <text class="text-body-small text-error text-center">{{ state.error ?? t('searchSheet.searchFailed') }}</text>
           <view
-            class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+            class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="SEARCH_A11Y_LABELS.retry"
             @tap="onRetry"
@@ -707,7 +735,8 @@ onBeforeUnmount(() => {
             >
               <text class="text-label-medium text-error">{{ t('searchSheet.loadMoreFailed') }}</text>
               <view
-                class="mt-3 px-5 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+                class="mt-3 px-5 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+                :class="pressColor.className"
                 :accessibility-element="A11Y_ELEMENT_ENABLED"
                 :accessibility-label="SEARCH_A11Y_LABELS.retry"
                 @tap="onLoadMore"

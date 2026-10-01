@@ -6,6 +6,13 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { presentError } from '../utils/errorPresentation'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -106,7 +113,7 @@ async function submit() {
 
     <!-- [lynx:fix] Card 用 flex column：子元素靠 stretch 拉伸填充父宽，
          规避 web-core 下 input 百分比宽度相对根容器（而非父）导致的右溢出 -->
-    <view class="w-[85%] bg-surface-container-lowest rounded-[var(--md-shape-medium)] p-6 shadow-[var(--md-elevation-1)] flex flex-col">
+    <view class="w-[85%] bg-surface-container-lowest rounded-[var(--md-shape-medium)] p-6 flex flex-col">
       <!-- [lynx:fix] input 显式 border-box + 去 UA 边框：
            web-core 预览未复刻 Lynx 的 border-box 默认（UA 无 box-sizing 规则），
            content-box 下 width:100% + padding 会溢出；原生 LynxView 默认 border-box 无副作用 -->
@@ -137,7 +144,8 @@ async function submit() {
 
       <!-- M3 filled button：primary 底 + 全圆角（pill） -->
       <view
-        class="h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="submit"
       >
         <text

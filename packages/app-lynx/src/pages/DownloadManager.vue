@@ -188,7 +188,7 @@ onMounted(() => {
         <view
           v-for="group in groups"
           :key="group.illustId"
-          class="mx-3 my-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] overflow-hidden"
+          class="mx-3 my-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)] overflow-hidden"
         >
           <view class="flex flex-row items-center p-3">
             <image

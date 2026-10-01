@@ -10,6 +10,13 @@ import M3Switch from "./M3Switch.vue"
 import { t } from "../i18n"
 import { extractHostname } from "../utils/safeParseUrl"
 import type { LlmEndpointPublic } from "../api/translate"
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const store = useNovelTranslateStore()
 const settings = useSettingsStore()
@@ -502,6 +509,7 @@ async function onClear(): Promise<void> {
       <view class="flex flex-row gap-2">
         <view
           class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
+          :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="
             apiKeyVisible
@@ -518,6 +526,7 @@ async function onClear(): Promise<void> {
         </view>
         <view
           class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
+          :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="t('novelTranslate.endpoint.apiKey.clear')"
           @tap="onClearApiKey"
@@ -685,7 +694,7 @@ async function onClear(): Promise<void> {
     <view class="flex flex-row gap-2">
       <view
         class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
-        :class="!formValid || testing ? 'opacity-50' : ''"
+        :class="[pressColor.className, !formValid || testing ? 'opacity-50' : '']"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="t('novelTranslate.endpoint.test.button')"
         @tap="onTestConnection"
@@ -698,7 +707,7 @@ async function onClear(): Promise<void> {
       </view>
       <view
         class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-primary"
-        :class="!formValid || saving ? 'opacity-50' : 'active:bg-layer-pressed-on-primary'"
+        :class="[pressColor.className, !formValid || saving ? 'opacity-50' : 'active:bg-layer-pressed-on-primary']"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="t('novelTranslate.endpoint.save')"
         @tap="onSave"
@@ -789,6 +798,7 @@ async function onClear(): Promise<void> {
         <view class="flex flex-row gap-2">
           <view
             class="flex-1 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             @tap="clearConfirming = false"
           >
             <text class="text-label-large text-surface-on">{{
@@ -797,6 +807,7 @@ async function onClear(): Promise<void> {
           </view>
           <view
             class="flex-1 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-error-container active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             @tap="onClear"
           >
             <text class="text-label-large text-on-error-container">{{

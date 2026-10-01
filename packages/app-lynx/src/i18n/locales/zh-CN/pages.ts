@@ -34,6 +34,15 @@ const zhPages = {
   "illustDetail.save.queued": "已加入下载队列（{{count}} 项），请到下载页查看",
   "illustDetail.save.ugoiraInfoFailed": "获取动图信息失败",
 
+  // ─── 沉浸看图无障碍（#887 / ADR-0213 决策 9）───
+  // 图片容器的**动态** accessibility-label：两态各一段（否则屏幕阅读器用户
+  // 「点得到图，但没人告诉他这是开关」= 无法退出沉浸）。多图分支另带「第 n / N 张」——
+  // 沉浸态角标已隐藏，位置信息不能从视觉与朗读双通道一起丢。
+  "illustDetail.a11y.immersiveEnter": "进入沉浸模式",
+  "illustDetail.a11y.immersiveExit": "退出沉浸模式",
+  "illustDetail.a11y.immersiveEnterPage": "第 {{n}} / {{total}} 张，进入沉浸模式",
+  "illustDetail.a11y.immersiveExitPage": "第 {{n}} / {{total}} 张，退出沉浸模式",
+
   // ─── 标签近邻（Tag neighbors，ADR-0197 / spec docs/specs/tag-neighbors.md）───
   // 术语红线：规范名「标签近邻」；禁用「溯源/以图搜图」（站外溯源，另一能力）
   // 与「相关作品」（官方 /v2/illust/related 黑盒关联）。见 CONTEXT.md 词条。

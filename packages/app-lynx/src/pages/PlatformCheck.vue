@@ -207,14 +207,14 @@ const summaryClass = computed(() => {
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1 px-4">
       <!-- 总体结论：N/M PASS -->
-      <view class="bg-surface-container-lowest mt-[4vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] flex flex-col">
+      <view class="bg-surface-container-lowest mt-[4vw] p-4 rounded-[var(--md-shape-medium)] flex flex-col">
         <text :class="'text-title-large font-medium ' + summaryClass">{{ passCount }}/{{ items.length }} PASS</text>
         <text class="text-body-small text-outline mt-1">预期基线：URL 全局项 FAIL = lynx 平台事实（非缺陷）；其余项应 PASS</text>
       </view>
 
       <!-- 自检矩阵：名称 / PASS|FAIL|SKIP / 实际值 -->
       <view
-        class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] flex flex-col"
+        class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] flex flex-col"
       >
         <view v-for="item in items" :key="item.name" class="py-2 flex flex-col">
           <text class="text-title-small text-surface-on">

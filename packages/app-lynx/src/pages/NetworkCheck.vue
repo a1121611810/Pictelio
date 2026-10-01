@@ -9,6 +9,13 @@ import { copyOutcome } from '../primitives/copyOutcome'
 import { useAuthStore } from '../stores/authStore'
 import { goBack } from '../router'
 import { t, type I18nKey } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const auth = useAuthStore()
 const report = ref<DiagReport | null>(null)
@@ -84,7 +91,7 @@ void run()
     </view>
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1 px-4">
-      <view class="bg-surface-container-lowest mt-[4vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] flex flex-col">
+      <view class="bg-surface-container-lowest mt-[4vw] p-4 rounded-[var(--md-shape-medium)] flex flex-col">
         <text v-if="report" :class="'text-title-medium font-medium ' + STATUS_CLASS[report.overall]">{{ report.headline }}</text>
         <text v-else class="text-body-medium text-outline">{{ t('networkCheck.running') }}</text>
         <text v-if="report?.degraded" class="text-body-small text-outline mt-1">{{ t('networkCheck.degraded') }}</text>
@@ -93,7 +100,7 @@ void run()
 
       <view
         v-if="report"
-        class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] flex flex-col"
+        class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] flex flex-col"
       >
         <view v-for="c in report.checks" :key="c.id" class="py-2 flex flex-col">
           <text class="text-title-small text-surface-on">
@@ -105,7 +112,8 @@ void run()
       </view>
 
       <view
-        class="mt-[6vw] h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-[6vw] h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="run()"
       >
         <text class="text-label-large text-primary-on font-medium">{{ running ? t('networkCheck.runningAction') : t('networkCheck.rerun') }}</text>

@@ -31,7 +31,15 @@ import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t, type I18nKey } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
+import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
 import BottomSheet from './BottomSheet.vue'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = defineProps<{
   /** 系列 id（系列行点击进入传 series.id） */
@@ -120,17 +128,35 @@ function onChapterTap(novelId: number): void {
   emit('select', novelId)
 }
 
+// ─── 关闭时序：两段式退场（ADR-0211 决策 3）───
+// Lynx 无 transitionend，退场无法事件驱动 ⇒ 关闭请求先进 exit 相位（BottomSheet 播退场动画），
+// 计时器（与退场动画同源的 holdMs；减弱动效开启时归零）到点后才 emit('close')，
+// 宿主页在那一刻才把 v-if 置 false。遮罩 / 拖把（BottomSheet @close）与系统返回键
+// （modalStack）两条路径共用同一个 requestClose，幂等：退场中重复请求不再排队。
+const dismiss = useSheetDismiss({ names: SHEET_ANIMATION, onDismissed: () => emit('close') })
+
+/**
+ * 相位 → 壳的 `motion-phase` prop（顶层 computed 才有模板解包）。
+ * ⚠️ 写成 `:motion-phase="dismiss.phase"` 编译期就报 TS2325：Vue 只解包**顶层** setup 绑定，
+ *    `dismiss` 是普通对象，其 `.phase` 字段在模板里仍是 Ref 实例 ⇒ prop 收到的是对象不是相位。
+ * `gone`（已卸载）归到 exit：那一刻退场动画正处于末态，语义上仍是退场。
+ */
+const motionPhase = computed<'enter' | 'exit'>(() => (dismiss.phase.value === 'enter' ? 'enter' : 'exit'))
+
+
 // ─── 返回键拦截（modalStack 通道）：挂载时注册，卸载/关闭时注销 ───
 let unregisterModal: (() => void) | null = null
 
 onMounted(() => {
-  unregisterModal = useModalStack().registerModal(() => emit('close'))
+  unregisterModal = useModalStack().registerModal(() => dismiss.requestClose())
   void loadInitial()
 })
 
 onBeforeUnmount(() => {
   unregisterModal?.()
   unregisterModal = null
+  // 卸载时清退场计时器：宿主可能先于计时器到点卸载（如路由直接跳走），否则卸载后仍会 emit
+  dismiss.dispose()
 })
 
 /** 暴露 loadMore 给宿主（宿主可经模板 ref 触发；本期默认不接 sentinel，留接口备扩展） */
@@ -146,9 +172,10 @@ defineExpose({ loadMore })
     <BottomSheet
       handle
       panel-height="fit"
+      :motion-phase="motionPhase"
       :scrim-accessibility-label="t('novelIntro.closeA11y')"
       :close-accessibility-label="t('novelIntro.closeA11y')"
-      @close="emit('close')"
+      @close="dismiss.requestClose()"
     >
       <!-- 标题：系列名（spec §5.3） -->
       <text
@@ -168,7 +195,8 @@ defineExpose({ loadMore })
         <view
           class="min-h-12 px-5 rounded-[var(--md-shape-full)] border border-outline
             bg-surface-container-lowest flex items-center justify-center
-            active:bg-state-pressed-on-surface"
+            active:bg-layer-pressed-on-surface"
+          :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="t('novelIntro.retry')"
           @tap="reload"
@@ -188,8 +216,8 @@ defineExpose({ loadMore })
           :key="chapter.id"
           :item-key="String(chapter.id)"
           class="min-h-12 px-4 rounded-[var(--md-shape-medium)] flex items-center justify-between
-            active:bg-state-pressed-on-surface"
-          :class="chapter.id === currentNovelId ? 'bg-secondary-container' : ''"
+            active:bg-layer-pressed-on-surface"
+          :class="[pressColor.className, chapter.id === currentNovelId ? 'bg-secondary-container' : '']"
           @tap="onChapterTap(chapter.id)"
         >
           <view class="flex-1 min-w-0">

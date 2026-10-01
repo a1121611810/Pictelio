@@ -22,6 +22,13 @@ import { computed } from 'vue'
 import SkeletonImage from './SkeletonImage.vue'
 import { proxyImageUrl } from '../utils/imageUrl'
 import type { PixivUser } from '../api/types'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = withDefaults(
   defineProps<{
@@ -54,7 +61,7 @@ function onToggle(): void {
 </script>
 
 <template>
-  <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+  <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
     <!-- 行信息区：tap 进用户主页（事件上抛；view 承载 @tap，ADR-0055 家族） -->
     <view class="flex-1 flex flex-row items-center" @tap="emit('row-tap')">
       <SkeletonImage
@@ -72,7 +79,7 @@ function onToggle(): void {
     <!-- 关注/取关按钮：is_followed 驱动两态（外框 / 实心）；业务语义留调用方 -->
     <view
       class="ml-2 px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-      :class="isFollowed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
+      :class="[pressColor.className, isFollowed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
       @tap="onToggle"
     >
       <text class="text-body-medium" :class="isFollowed ? 'text-primary' : 'text-primary-on'">

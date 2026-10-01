@@ -291,24 +291,47 @@ onActivated(() => {
            绿像素检测证实第 2+ 页 title 全屏无渲染）。scrim 本就在屏幕底部（ADR-0118），故抽为页面级固定遮罩、
            按当前页 index 更新内容，从根本上规避 <text> 落入被平移的 flex-row 子元素。
            [权衡] 遮罩为固定覆盖层，底部 scrim 区不响应滑动（真机 LynxView 的 pointer-events 对触摸事件不生效）；
-           滑动需从图片区（上部）发起；点卡进详情由本遮罩 @tap 承担（收藏按钮 @tap.stop 不冒泡）。 -->
+           滑动需从图片区（上部）发起；点卡进详情由本遮罩 @tap 承担（收藏按钮 @tap.stop 不冒泡）。
+
+           [#891] **渐变不再单独承担可读性**。真机实测（emulator-5554 / 1080×2160 / 亮色）：
+           遮罩盒高 ≈750px，标题落在盒高 0.48 处、作者在 0.37 处，而
+           `linear-gradient(to top, .82, .2 45%, 0)` 在这两处只有 **alpha 0.19 / 0.31**；
+           该盒又高过卡片下缘，文字其实压在**页面纯白底**上 ⇒ 白字对比度实测
+           **1.56:1（标题）/ 2.17:1（作者）**，远低于 AA 4.5。
+           根因是渐变色标按**盒子百分比**归一化，而盒子里标题之上是 90dp 空 padding、
+           之下是 37.5dp padding + 收藏 chip —— 最浓的一段花在了没有文字的地方。
+           百分比渐变**在原理上无法**随内容高度自适应（把 pt 调小只会让整片渐变盖住作品）。
+           故文字块另加一层**稳定不透明底色**（inverse-surface / inverse-on-surface 对），
+           渐变退回它该干的活：把底色与作品图「融」在一起。
+           ⚠️ 为什么用 inverse-* 这一对而不是新令牌：本仓已有同款先例（BookmarkButton 自带
+           inverse-surface chip，其头注写明「反差与底图解耦，深主题下派生为浅色」），
+           且 14 套色板（7 亮 + 7 暗）全部自带该对、对比度最差 10.12（暗色 sky 板；亮色 11.46–11.65 / 暗色 10.12–10.22，按 WCAG 相对亮度对 tokens.css 实算）≥ 4.5 ⇒ **无需改 tokens.css**。 -->
       <view
         class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[10vw]"
         style="background: var(--md-scrim-overlay)"
         @tap="currentItem && onSlideTap(currentItem)"
       >
-        <IllustTypeBadgeRow v-if="currentItem && currentItem.kind === 'illust'" :illust="currentItem.data" />
-        <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方）；
-             长按静音（ADR-0187 D5 / #732）：tag-long-press → muteTag -->
-        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" @tag-long-press="onTagLongPress" />
-        <text
-          v-if="currentItem"
-          class="text-title-large font-semibold text-white [max-line:2]"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="currentItem.data.title"
-          >{{ currentItem.data.title }}</text
-        >
-        <text v-if="currentItem" class="text-body-medium text-white/85 mt-2">{{ currentItem.data.user.name }}</text>
+        <view class="bg-inverse-surface rounded-lg px-4 py-3">
+          <IllustTypeBadgeRow v-if="currentItem && currentItem.kind === 'illust'" :illust="currentItem.data" />
+          <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方）；
+               长按静音（ADR-0187 D5 / #732）：tag-long-press → muteTag -->
+          <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" @tag-long-press="onTagLongPress" />
+          <text
+            v-if="currentItem"
+            class="text-title-large font-semibold text-inverse-on-surface [max-line:2]"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="currentItem.data.title"
+            >{{ currentItem.data.title }}</text
+          >
+          <!-- [#891] 原 text-white/85：white 是字面量，`/85` **确实**能产出规则，但
+               「在不可预测底图上把字调淡」本身就是对比度隐患（作者行实测 2.17 → 1.96）。
+               层级改由字号/字重承担（MD3 对 on-surface 的本意）。
+               ⚠️ 顺带一条实测结论：inverse 令牌是裸 var()、**无 <alpha-value>**，
+               所以 `text-inverse-on-surface/85` 不产出任何规则（死类名、静默无样式）——
+               换成 inverse 配对后**只能**用全不透明，别顺手加回 `/85`。
+               见 tests/immersiveScrimContrast.test.ts 的防回潮断言。 -->
+          <text v-if="currentItem" class="text-body-medium text-inverse-on-surface mt-2">{{ currentItem.data.user.name }}</text>
+        </view>
         <view v-if="currentItem && currentItem.kind === 'illust'" class="mt-5">
           <!-- [lynx:fix] :key 每卡重挂载：BookmarkButton 的状态机（useBookmarkMutation）只在 setup
                读一次 props——轮播宿主实例跨 slide 持久时收藏数/收藏态/illustId 全部冻结在首卡
@@ -320,7 +343,7 @@ onActivated(() => {
             :bookmark-count="currentItem.data.total_bookmarks"
           />
         </view>
-        <!-- 小说滑页：与插画**同槽位同形**的 ♥（票 #707 / spec docs/specs/app-lynx-recommended-novel-bookmark.md）
+        <!-- 小说滑页：与插画**同槽位同形**的 ♥（票 #707 / spec docs/specs/app-lynx-recommended-novel-bookmark.md)
              - target-kind="novel"：走小说收藏端点（add=/v2/novel/bookmark/add + restrict=public，delete=/v1/novel/bookmark/delete，
                不对称是既有事实）；同为「快速收藏」通道，**不开**长按面板（ADR-0160 D7：小说标签不在本期）；
                @tap.stop 由组件内部抑制，点 ♥ 不会冒泡到 scrim 的「进介绍页」@tap；
@@ -336,10 +359,17 @@ onActivated(() => {
             :initial-bookmarked="currentItem.data.is_bookmarked"
             :bookmark-count="currentItem.data.total_bookmarks"
           />
-          <!-- 字数：缺 text_length 时不渲染（禁止显示「0 字」；缺字段已在 mapNovels 显式 warn，不静默） -->
-          <text v-if="currentItem.data.text_length > 0" class="text-label-medium text-white/70 mt-2">{{
-            t('recommended.charCount', { count: currentItem.data.text_length })
-          }}</text>
+          <!-- 字数：缺 text_length 时不渲染（禁止显示「0 字」；缺字段已在 mapNovels 显式 warn，不静默）。
+               [#891] 它落在收藏 chip 之下、**不在**上方那块稳定底色里，故自带一层同款底色
+               （与本仓 chip 惯用法一致），不自曝于渐变最浅的那一段。 -->
+          <view
+            v-if="currentItem.data.text_length > 0"
+            class="self-start mt-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-inverse-surface"
+          >
+            <text class="text-label-medium text-inverse-on-surface">{{
+              t('recommended.charCount', { count: currentItem.data.text_length })
+            }}</text>
+          </view>
         </view>
       </view>
 

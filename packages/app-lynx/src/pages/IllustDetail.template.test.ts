@@ -122,6 +122,10 @@ describe('IllustDetail 标签近邻入口（ADR-0197 D14）', () => {
     const labelCount = (code.match(/:accessibility-label="ILLUST_DETAIL_A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (code.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(ILLUST_DETAIL_A11Y_LABELS).length)
-    expect(elementCount).toBe(labelCount)
+    // [ #887 / ADR-0213 决策 9 ] 图片容器另有 3 处**动态** a11y 标签（进入/退出沉浸模式），
+    // 走 t() 而非注册表。配平口径不变——「每个 a11y 标注都配一个 element」，故 element
+    // 总量 = 注册表标签数 + 沉浸标签数（缺任一即红）。
+    const immersiveLabelCount = (code.match(/:accessibility-label="immersiveA11yLabel/g) ?? []).length
+    expect(elementCount).toBe(labelCount + immersiveLabelCount)
   })
 })

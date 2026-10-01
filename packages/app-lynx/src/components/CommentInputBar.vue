@@ -8,6 +8,13 @@ import type { PixivComment } from '../api/types'
 import { t } from '../i18n'
 import { MAX_COMMENT_LENGTH } from '../api/comment'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = defineProps<{
   /** 发表中：发送按钮禁用并显示「发送中…」 */
@@ -127,7 +134,7 @@ function send() {
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
       <view
         class="h-[10.667vw] px-5 flex items-center justify-center rounded-[var(--md-shape-full)] flex-shrink-0"
-        :class="canSend ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-highest'"
+        :class="[pressColor.className, canSend ? 'bg-primary active:bg-layer-pressed-on-primary' : 'bg-surface-container-highest']"
         @tap="send"
       >
         <text class="text-label-large font-medium" :class="canSend ? 'text-primary-on' : 'text-outline'">

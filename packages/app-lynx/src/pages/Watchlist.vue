@@ -25,6 +25,13 @@ import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 // ─── 追更列表页（issue #225 / spec app-lynx-novel-series-watchlist §US7） ───
 // 条目是**系列**而非作品（服务端响应顶层字段即 series）：
@@ -172,7 +179,8 @@ onUnmounted(() => {
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
-      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
         <view class="flex flex-row">
           <view class="shimmer w-[21.333vw] h-[21.333vw] rounded-[var(--md-shape-small)]" />
           <view class="flex-1 ml-3">
@@ -187,7 +195,8 @@ onUnmounted(() => {
     <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
       <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
       <view
-        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="refreshFeed"
       >
         <text class="text-label-large font-medium text-primary-on">{{ t('watchlist.retry') }}</text>
@@ -227,13 +236,14 @@ onUnmounted(() => {
           <!-- mask 条目（被屏蔽/下架）：只读展示 mask_text，不可点、无取消按钮（spec §6-7） -->
           <view
             v-if="isWatchlistSeriesMasked(item)"
-            class="m-1.5 mx-3 p-3.5 min-h-[13.333vw] flex items-center bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+            class="m-1.5 mx-3 p-3.5 min-h-[13.333vw] flex items-center bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
           >
             <text class="text-body-medium text-outline">{{ item.mask_text }}</text>
           </view>
           <view
             v-else
-            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="WATCHLIST_A11Y_LABELS.openLatest"
             @tap="openLatest(item)"
@@ -288,6 +298,7 @@ onUnmounted(() => {
         <view class="flex flex-row justify-end mt-6 gap-2">
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="WATCHLIST_A11Y_LABELS.unwatchCancel"
             @tap="cancelUnwatch"
@@ -296,6 +307,7 @@ onUnmounted(() => {
           </view>
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="WATCHLIST_A11Y_LABELS.unwatchConfirm"
             @tap="confirmUnwatch"

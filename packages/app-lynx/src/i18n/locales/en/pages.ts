@@ -34,6 +34,14 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
+  // Immersive view a11y (#887 / ADR-0213 decision 9): dynamic accessibility-label per state
+  // (screen-reader users need to be told the image is a toggle, or they cannot exit immersive mode);
+  // the multi-image variant also carries "image n of N" because the badge is hidden while immersive.
+  "illustDetail.a11y.immersiveEnter": "Enter immersive mode",
+  "illustDetail.a11y.immersiveExit": "Exit immersive mode",
+  "illustDetail.a11y.immersiveEnterPage": "Image {{n}} of {{total}}, enter immersive mode",
+  "illustDetail.a11y.immersiveExitPage": "Image {{n}} of {{total}}, exit immersive mode",
+
   // Tag neighbors (ADR-0197 / spec docs/specs/tag-neighbors.md)
   "tagNeighbors.entry": "Similar by tags",
   "tagNeighbors.title": "Similar by tags",

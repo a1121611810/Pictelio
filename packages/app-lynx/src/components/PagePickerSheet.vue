@@ -4,13 +4,20 @@
 // DOM 顺序靠后覆盖（不依赖 z-index）；返回键拦截经 modalStack（ADR-0066 扩展）。
 // 打开（挂载）默认全选（批量语义默认值）；确认上抛升序 0-based 页号数组，
 // 保存流程由宿主（IllustDetail）编排。
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
+import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { safeBottom } from '../utils/safeArea'
 import SkeletonImage from './SkeletonImage.vue'
 import AppIcon from './AppIcon.vue'
+import SheetShell from './SheetShell.vue'
+
+// 面板类串（迁移前本组件自绘面板的逐字节快照，搬进 SheetShell 后仍由本组件持有：
+// 几何壳是共用的，这一串是本面板特有的 —— 与 BottomSheet 的三变体同类，不同值）
+const PANEL_CLASS =
+  'absolute left-0 right-0 bottom-0 bg-surface-container-lowest rounded-t-[var(--md-shape-large)] p-4'
 
 const props = defineProps<{
   /** 各页展示用 URL（medium/large，作缩略图） */
@@ -50,27 +57,52 @@ function confirm(): void {
 // 返回键拦截：挂载期间注册关闭回调（modalStack 后进先出），卸载时注销
 let unregisterModal: (() => void) | null = null
 
+// 关闭时序：两段式退场（ADR-0211 决策 3）。壳（遮罩 + 面板）收口 SheetShell，
+// 相位由本组件的 useSheetDismiss 驱动并经 :phase 下传；计时器与退场动画同源，
+// 到点才 emit('close')，宿主（IllustDetail）那一刻才卸载。
+const dismiss = useSheetDismiss({ names: SHEET_ANIMATION, onDismissed: () => emit('close') })
+
+/**
+ * 相位 → 壳的 `phase` prop（顶层 computed 才有模板解包）。
+ * ⚠️ 写成 `:motion-phase="dismiss.phase"` 编译期就报 TS2325：Vue 只解包**顶层** setup 绑定，
+ *    `dismiss` 是普通对象，其 `.phase` 字段在模板里仍是 Ref 实例 ⇒ prop 收到的是对象不是相位。
+ * `gone`（已卸载）归到 exit：那一刻退场动画正处于末态，语义上仍是退场。
+ */
+const motionPhase = computed<'enter' | 'exit'>(() => (dismiss.phase.value === 'enter' ? 'enter' : 'exit'))
+
+
 onMounted(() => {
-  unregisterModal = useModalStack().registerModal(() => emit('close'))
+  unregisterModal = useModalStack().registerModal(() => dismiss.requestClose())
 })
 
 onBeforeUnmount(() => {
   unregisterModal?.()
   unregisterModal = null
+  // 卸载时清退场计时器（宿主可能先于计时器到点卸载，如保存成功后直接收起面板）
+  dismiss.dispose()
 })
 </script>
 
 <template>
   <!-- 根 view：relative 提供绝对定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层 -->
   <view class="w-full h-full relative">
-    <view class="absolute inset-0 bg-scrim" @tap="emit('close')" />
-
-    <!-- 底部面板：@tap.stop 防穿透 -->
-    <view class="absolute left-0 right-0 bottom-0 bg-surface-container-lowest rounded-t-[var(--md-shape-large)] p-4" @tap.stop>
-      <!-- 色调层（tonal elevation 的着色层，ADR-0207 决策 7）：
-           MD3 表达层级的主要手段是给表面**染上主色**（surface tint），box-shadow 仅为辅。
-           本层让 elevated 弹层顶部带 8% 主色调，与面板底色 bg-surface-container-lowest 叠加成
-           「被抬起的着色表面」，而不是一片纯白。
+    <!-- 壳（遮罩 + 底部面板）收口 SheetShell（ADR-0211 决策 4：本面板几何与 BottomSheet 同款，
+         差别只在面板类串与内容，故几何壳复用、内容留在本组件插槽里）。
+         相位由本组件的 useSheetDismiss 驱动：enter 挂入场动画、exit 挂退场动画，
+         退场计时器（与动画同源）到点才 emit('close')。 -->
+    <SheetShell :phase="motionPhase" :panel-class="PANEL_CLASS" @close="dismiss.requestClose()">
+      <!-- 色调层（着色层，ADR-0207 决策 7；tint 的职责边界更正见 ADR-0212 决策 5）：
+           ⚠️ 更正一条此前的错误归因：本注释原先写「MD3 表达层级的主要手段是给表面**染上主色**
+           （surface tint），box-shadow 仅为辅」—— 那是 **MD3 官方口径**，本项目**照字面执行不了**。
+           MD3 之所以能用 tint 表达层级，靠的是 **tint 强度随 level 递增**；而本项目 14 套色板里
+           `--md-surface-tint` 与 `--md-primary` **逐个取同值**（复算：tokens.css 中两者的取值比对，
+           14/14 相同、无一例外）⇒ tint 是**单一值、没有强度阶梯**，套上去只会让所有层级染同一种色，
+           **表达不出层级差**。
+           ⇒ 本项目的「主」是 `surface-container-*` 五档**明度分档**（面板底色取最低档
+           `bg-surface-container-lowest`），不是 tint；tint 在本项目只作**状态层式叠加**，不承载层级。
+           本层即该用法：让弹层顶部带 8% 主色调（8% 口径对齐 hover 层），与面板底色叠加成
+           「被抬起的着色表面」，而不是一片纯白。**是着色叠加，不是层级手段** —— 着色层本身保留不动，
+           要改的只是上面那句错误归因。
            高度 10.667vw = p-4 内边距 16px(4.267vw) + 标题档位 title-medium 行高 48rpx(6.4vw)；
            该数值与本文件确认按钮的 h-[10.667vw] 同值，取值不是随手写的魔数。
            ⚠️ 为什么用 opacity-* 合成、而不是「背景色 / N」透明度修饰符：--md-surface-tint 在
@@ -137,6 +169,6 @@ onBeforeUnmount(() => {
       </view>
       <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
       <view :style="{ height: safeBottom + 'px' }" />
-    </view>
+    </SheetShell>
   </view>
 </template>

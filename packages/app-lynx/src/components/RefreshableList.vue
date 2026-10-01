@@ -48,6 +48,13 @@ import { FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibili
 import { useReducedMotion } from '../composables/useReducedMotion'
 import AppIcon from './AppIcon.vue'
 import ScrollIndicator from './ScrollIndicator.vue'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor, pressOpacity } = useMotion()
+
 
 const props = defineProps<{
   /** 幂等刷新函数（createMixFeed 的 refresh() 内置 generation 竞态防护 + 15s TIMEOUT 保证 settle） */
@@ -186,7 +193,8 @@ onUnmounted(() => {
     >
       <!-- 刷新项：图标（AppIcon refresh）+ label -->
       <view
-        class="menu-item item-rise-1 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+        class="menu-item item-rise-1 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+        :class="pressColor.className"
         :style="motionStyle"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.refreshList"
@@ -198,7 +206,8 @@ onUnmounted(() => {
 
       <!-- 回顶项：图标（AppIcon arrow_upward）+ label -->
       <view
-        class="menu-item item-rise-2 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+        class="menu-item item-rise-2 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+        :class="pressColor.className"
         :style="motionStyle"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.backToTop"
@@ -214,7 +223,8 @@ onUnmounted(() => {
       <template v-for="item in props.items" :key="item.key">
         <view
           v-if="item.visible()"
-          class="menu-item item-rise-extra flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+          class="menu-item item-rise-extra flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+          :class="pressColor.className"
           :style="motionStyle"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="item.accessibilityLabel"
@@ -246,8 +256,9 @@ onUnmounted(() => {
          承诺一起复核。 -->
     <view
       v-if="props.fab !== false"
-      class="absolute z-30 bottom-4 right-4 w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:bg-layer-pressed-primary flex items-center justify-center shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
-      :style="(refreshing || menu.isBusy) ? { opacity: 0.6 } : {}"
+      class="absolute z-30 bottom-4 right-4 w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:opacity-80 flex items-center justify-center shadow-[var(--md-elevation-3)]"
+      :class="pressColor.className"
+      :style="{ ...pressOpacity, ...(refreshing || menu.isBusy) ? { opacity: 0.6 } : {} }"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="FAB_MENU_A11Y_LABELS.toggleMenu"
       @tap="onFabTap"

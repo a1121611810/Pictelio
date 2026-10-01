@@ -35,6 +35,13 @@ import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const notificationStore = useNotificationStore()
 
@@ -159,7 +166,8 @@ function rowA11y(row: NotificationRow): string {
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
-      <view v-for="n in 6" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
+      <view v-for="n in 6" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
         <view class="flex flex-row items-start">
           <view class="shimmer w-[12vw] h-[12vw] rounded-[var(--md-shape-small)]" />
           <view class="flex-1 ml-3">
@@ -173,7 +181,8 @@ function rowA11y(row: NotificationRow): string {
     <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
       <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
       <view
-        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="refreshFeed"
       >
         <text class="text-label-large font-medium text-primary-on">{{ t('notifications.retry') }}</text>
@@ -211,7 +220,8 @@ function rowA11y(row: NotificationRow): string {
           <!-- 组头行：view_more 非空 → 点击展开子列表（展开单向不收起） -->
           <view
             v-if="row.kind === 'header'"
-            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="rowA11y(row)"
             @tap="openRow(row)"
@@ -242,7 +252,8 @@ function rowA11y(row: NotificationRow): string {
           <!-- 普通通知行：点击按 target_url 路由（未知 scheme 静默忽略） -->
           <view
             v-else-if="row.kind === 'item'"
-            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="rowA11y(row)"
             @tap="openRow(row)"

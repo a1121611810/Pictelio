@@ -7,6 +7,13 @@ import { computed } from "vue"
 import { useNovelTranslateStore } from "../stores/novelTranslateStore"
 import { t } from "../i18n"
 import AppIcon from "./AppIcon.vue"
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 interface Props {
   novelId: number
@@ -183,7 +190,7 @@ async function onTap(): Promise<void> {
 <template>
   <view
     class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex flex-row items-center justify-center bg-primary"
-    :class="disabled ? 'opacity-50' : 'active:bg-layer-pressed-on-primary'"
+    :class="[pressColor.className, disabled ? 'opacity-50' : 'active:bg-layer-pressed-on-primary']"
     :accessibility-element="true"
     :accessibility-label="label"
     @tap="onTap"

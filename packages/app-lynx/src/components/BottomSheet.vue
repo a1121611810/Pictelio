@@ -20,6 +20,9 @@
 //                                CommentOverlay/SearchSheet 现状无、BookmarkPanel/SeriesSheet 有）
 //   :close-accessibility-label   ×/把手 a11y 文案（可选；缺省不渲染 a11y 属性——
 //                                CommentOverlay 现状无、SearchSheet/NovelExportSheet/SeriesSheet 有）
+//   :motion-phase                时序相位（可选，缺省 'enter'）：'enter' 挂入场动画、'exit' 挂退场动画。
+//                                **本组件不发起退场**（挂载由宿主页 v-if 控制），退场计时器在调用方的
+//                                useSheetDismiss() 里（ADR-0211 决策 3 的两段式协议）；不传 = 只有入场动画。
 //   @close                       关闭请求（scrim / × / 把手点击上抛）；系统返回键与挂载生命周期
 //                                留在调用方（modalStack 注册 + 宿主 v-if 卸载，组件不感知）
 //
@@ -34,6 +37,7 @@
 // absolute inset-0 包裹（issue #139 挂载契约）原样保留在组件之外，z 序挂法逐例不动。
 import { computed } from 'vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { SHEET_ANIMATION, useSheetMotion, type SheetMotionStyle } from '../composables/useSheetDismiss'
 
 const props = withDefaults(
   defineProps<{
@@ -47,13 +51,27 @@ const props = withDefaults(
     scrimAccessibilityLabel?: string
     /** ×/把手 a11y 文案（缺省不渲染 a11y 属性） */
     closeAccessibilityLabel?: string
+    /**
+     * 时序相位（ADR-0211 决策 3）：enter 挂入场动画、exit 挂退场动画。
+     * **缺省 enter** = 只有入场动画：未接相位 prop 的调用方（NovelExportSheet）行为与改动前一致
+     * （挂载即播入场），关闭仍是宿主页 v-if 瞬撤。
+     * 接上相位的调用方（SeriesSheet / CommentOverlay / SearchSheet）由自己的
+     * `useSheetDismiss()` 在关闭请求后把相位切到 exit，动画播完才 emit('close')。
+     */
+    motionPhase?: 'enter' | 'exit'
   }>(),
-  { panelHeight: 'fixed' },
+  { panelHeight: 'fixed', motionPhase: 'enter' },
 )
 
 const emit = defineEmits<{
   close: []
 }>()
+
+// 动画简写（一次性播放，inline :style 通道）。时长与曲线全部来自 composables/motion.ts，
+// 帧体在 SheetShell.vue；面板位移**不走** Tailwind transform 工具类（死类名，ADR-0210 路径 E）。
+const motion = useSheetMotion({ names: SHEET_ANIMATION })
+const panelStyle = computed<SheetMotionStyle>(() => motion.panelStyle(props.motionPhase))
+const scrimStyle = computed<SheetMotionStyle>(() => motion.scrimStyle(props.motionPhase))
 
 /**
  * 面板类串（纯函数便于 template 测试求值；三变体 = 迁移前 CommentOverlay+SearchSheet /
@@ -83,14 +101,15 @@ const panelClass = computed(() => buildPanelClass(props.panelHeight))
     <view
       v-if="scrimAccessibilityLabel"
       class="absolute inset-0 bg-scrim"
+      :style="scrimStyle"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="scrimAccessibilityLabel"
       @tap="emit('close')"
     />
-    <view v-else class="absolute inset-0 bg-scrim" @tap="emit('close')" />
+    <view v-else class="absolute inset-0 bg-scrim" :style="scrimStyle" @tap="emit('close')" />
 
     <!-- 底部面板：@tap.stop 防面板内点击穿透到 scrim（高度三变体见 buildPanelClass） -->
-    <view :class="panelClass" @tap.stop>
+    <view :class="panelClass" :style="panelStyle" @tap.stop>
       <!-- 变体：拖把手柄（SeriesSheet 形态）——把手可点关闭，标题/内容全部走 default slot -->
       <template v-if="handle">
         <view class="w-full flex justify-center pt-2 pb-1">

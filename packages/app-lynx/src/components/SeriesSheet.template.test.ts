@@ -180,22 +180,28 @@ describe('SeriesSheet.vue ADR-0123 合规（禁 pointer-events-none 兜底）', 
   })
 
   it('全屏覆盖层（根 view）v-if 条件渲染（宿主控制挂载）——scrim/把手 @tap 关闭收口 BottomSheet 单点', () => {
-    // 关闭上抛统一走 @close="emit('close')"；scrim/把手 @tap 与 @tap.stop 由 BottomSheet 持有
+    // 关闭上抛统一走 @close="dismiss.requestClose()"；scrim/把手 @tap 与 @tap.stop 由 BottomSheet 持有
     //（组件测试锁定），本组件不再手写命中测试面
-    expect(code).toContain('@close="emit(\'close\')"')
+    // ⚠️ #878：@close 不再直接 emit('close')——先进 exit 相位播退场，计时器到点才 emit（ADR-0211 决策 3）
+    expect(code).toContain('@close="dismiss.requestClose()"')
+    // emit('close') 收敛到状态机的终态回调一处（不散落在 tap 处理器里）
+    expect(code).toContain("onDismissed: () => emit('close')")
   })
 })
 
 // ─── 验收 #5/#6：scrim 关闭 + modalStack 返回键 ───
 describe('SeriesSheet.vue 关闭路径（scrim 点击 + modalStack 返回键）', () => {
-  it('验收 #4：scrim 点击触发 close emit（BottomSheet @close="emit(\'close\')"，scrim @tap 在组件单点）', () => {
-    expect(code).toContain('@close="emit(\'close\')"')
+  it('验收 #4：scrim 点击触发关闭（BottomSheet @close 收口，scrim @tap 在组件单点；退场后 emit）', () => {
+    expect(code).toContain('@close="dismiss.requestClose()"')
   })
 
   it('返回键拦截：useModalStack 注册 + 卸载注销（与 CommentOverlay / NovelExportSheet 同款）', () => {
-    expect(code).toContain("useModalStack().registerModal(() => emit('close'))")
+    // ⚠️ #878：返回键与遮罩共用同一个 requestClose（幂等：退场中重复请求不再排队）
+    expect(code).toContain('useModalStack().registerModal(() => dismiss.requestClose())')
     expect(code).toContain('unregisterModal?.()')
     expect(code).toContain('onBeforeUnmount(')
+    // 卸载必须清退场计时器，否则宿主先卸载时仍会 emit（弹层已不在屏幕上）
+    expect(code).toContain('dismiss.dispose()')
   })
 })
 

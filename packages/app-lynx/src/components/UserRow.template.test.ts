@@ -44,10 +44,13 @@ describe('UserRow 公开接口（user + isFollowed/busy + followLabel/followedLa
 })
 
 describe('UserRow 行卡结构（FollowList 存量逐 class 快照）', () => {
-  it('行卡容器：m-1.5 mx-3 p-3.5 + surface-container-lowest 卡 + medium 圆角 + elevation-1', () => {
+  it('行卡容器：m-1.5 mx-3 p-3.5 + surface-container-lowest 卡 + medium 圆角（**零阴影**，票 #884）', () => {
     expect(code).toMatch(
-      /<view class="flex flex-row items-center m-1\.5 mx-3 p-3\.5 bg-surface-container-lowest rounded-\[var\(--md-shape-medium\)\] shadow-\[var\(--md-elevation-1\)\]">/,
+      /<view class="flex flex-row items-center m-1\.5 mx-3 p-3\.5 bg-surface-container-lowest rounded-\[var\(--md-shape-medium\)\]">/,
     )
+    // 贴面元素零阴影：层级由 surface-container 明度分档表达，box-shadow 归零
+    // （ADR-0212 决策 2 规则「贴面上限 0」+ 决策 3；门禁规则 10 同步钉住）。
+    // 本文件是**逐 class 全量快照**，故删阴影必须同步此处 —— 属**契约演进**，非门禁放宽。
   })
 
   it('行信息区 @tap 承载在 view（不绑 text 根 / list-item 根，ADR-0055 家族）', () => {
@@ -74,8 +77,12 @@ describe('UserRow 行卡结构（FollowList 存量逐 class 快照）', () => {
   })
 
   it('关注按钮两态类串逐字：已关注=外框（border outline / text-primary），未关注=实心（bg-primary / text-primary-on）', () => {
+    // ⚠️ 未关注分支的按压类已按 ADR-0211 决策 8 归正：
+    //   `active:bg-state-pressed-primary`（预计算实色）→ `active:bg-layer-pressed-on-primary`（alpha 正路）。
+    //   同元素带 `bg-primary`，满足 `stateLayerOnPrimary.test.ts` 的 C3 消费约束。
+    // 另：`:class` 首位并入 `pressColor.className`（颜色状态层的过渡载体，ADR-0211 决策 2）。
     expect(code).toMatch(
-      /:class="isFollowed \? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"/,
+      /:class="\[pressColor\.className, isFollowed \? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary'\]"/,
     )
     expect(code).toMatch(/:class="isFollowed \? 'text-primary' : 'text-primary-on'"/)
     expect(code).toContain('{{ isFollowed ? followedLabel : followLabel }}')

@@ -31,6 +31,13 @@ import FeedListFooter from '../components/FeedListFooter.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import TagPressChip from '../components/TagPressChip.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor, pressOpacity } = useMotion()
+
 
 const store = useTagNeighborStore()
 
@@ -162,6 +169,7 @@ function onDismissBroadening(): void {
       <text class="flex-1 text-body-small text-surface-on-variant">{{ broadeningNotice }}</text>
       <view
         class="h-[8.533vw] px-3 rounded-[var(--md-shape-full)] bg-surface-container-highest flex items-center active:opacity-70"
+        :style="{ transition: pressOpacity.transition }"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="TAG_NEIGHBORS_A11Y_LABELS.dismissBroadening"
         @tap.stop="onDismissBroadening"
@@ -175,10 +183,11 @@ function onDismissBroadening(): void {
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
       <view
         v-for="n in 6"
         :key="n"
-        class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+        class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
       >
         <view class="flex flex-row items-start">
           <view class="shimmer w-[12vw] h-[12vw] rounded-[var(--md-shape-small)]" />
@@ -194,7 +203,8 @@ function onDismissBroadening(): void {
     <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
       <text class="text-body-small text-error text-center">{{ errorMessage }}</text>
       <view
-        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="TAG_NEIGHBORS_A11Y_LABELS.retry"
         @tap="store.retry()"
@@ -213,7 +223,8 @@ function onDismissBroadening(): void {
         <!-- [lynx:fix] 单一稳定根 view（list-item 根不得在 v-if/v-else 间交替，Notifications 同款约束） -->
         <view class="w-full">
           <view
-            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="TAG_NEIGHBORS_A11Y_LABELS.openItem"
             @tap="openIllust(row)"

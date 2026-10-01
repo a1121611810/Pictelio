@@ -15,6 +15,13 @@ import { isEntryVisible, shouldResetDismissed } from '../primitives/rankingEntry
 import SkeletonImage from './SkeletonImage.vue'
 import AppIcon from './AppIcon.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor, pressOpacity } = useMotion()
+
 
 const props = defineProps<{ refreshEpoch?: number }>()
 
@@ -104,16 +111,26 @@ onUnmounted(() => feed.dispose())
         class="absolute inset-x-0 bottom-0 h-[36vw]"
         :style="{ background: 'var(--md-scrim-overlay)' }"
       />
-      <!-- 左下信息叠加：第 1 名徽章 / 榜名·今日 / 标题 / 作者 -->
-      <view class="absolute left-3 bottom-3 right-[30vw]">
+      <!-- 左下信息叠加：第 1 名徽章 / 榜名·今日 / 标题 / 作者
+           [#891] 渐变罩 h-[36vw](@375 = 135dp)，信息块 bottom-3 起步，按各档行高算
+           叠**纯白图**（最坏情况）时白字对比度（`--md-scrim-overlay` 解析值）：
+             「日榜 · 今日」pos 0.244 ⇒ **3.75（不达 AA 4.5）** ← 本卡真正的破口
+             标题        pos 0.170 ⇒ 5.43（过线，但余量仅 0.93）
+             作者        pos 0.074 ⇒ 9.16
+           可见**「过没过线」取决于文字恰好落在盒高的哪一段**——这正是要拿掉的东西：
+           徽章行、标题、作者三行的余量相差 5 倍，只要块内多一行（更长榜名、换行、换字号档）
+           就会整片滑下去。百分比渐变随盒高归一、与内容位置无关 ⇒ 改色标治不了「换图就失效」。
+           故整块加**稳定不透明底色**（inverse-surface / inverse-on-surface 对，14 套色板最差 10.12（暗色 sky 板），亮色 11.46–11.65 / 暗色 10.12–10.22，全部 ≥ 4.5。按 WCAG 相对亮度公式对 tokens.css 14 套色板实算。），
+           渐变退回「与作品图融合」的职责。 -->
+      <view class="absolute left-3 bottom-3 right-[30vw] bg-inverse-surface rounded-lg px-3 py-2">
         <view class="flex flex-row items-center gap-1.5">
           <view class="px-2 py-0.5 rounded-[var(--md-shape-full)] bg-primary">
             <text class="text-body-small font-medium text-primary-on">{{ t('ranking.entry.firstBadge') }}</text>
           </view>
-          <text class="text-body-small text-white">{{ t('ranking.mode.daily') }} · {{ t('ranking.today') }}</text>
+          <text class="text-body-small text-inverse-on-surface">{{ t('ranking.mode.daily') }} · {{ t('ranking.today') }}</text>
         </view>
-        <text class="text-title-medium font-medium text-white mt-1.5 [max-line:1]">{{ hero?.title }}</text>
-        <text class="text-body-small text-white opacity-80 [max-line:1]">{{ hero?.user.name }}</text>
+        <text class="text-title-medium font-medium text-inverse-on-surface mt-1.5 [max-line:1]">{{ hero?.title }}</text>
+        <text class="text-body-small text-inverse-on-surface [max-line:1]">{{ hero?.user.name }}</text>
       </view>
       <!-- 右侧竖排 2/3 名 +「全部 + › 图标」 -->
       <view class="absolute right-2.5 bottom-3 flex flex-col gap-2">
@@ -143,6 +160,7 @@ onUnmounted(() => feed.dispose())
       <!-- 收起（当次隐藏） -->
       <view
         class="absolute right-2 top-2 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-[var(--md-scrim)] active:opacity-80"
+        :style="{ transition: pressOpacity.transition }"
         accessibility-element
         :accessibility-label="t('ranking.entry.collapseAria')"
         @tap.stop="dismissed = true"

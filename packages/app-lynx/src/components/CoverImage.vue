@@ -21,6 +21,13 @@ import { resolveSkeletonStyle } from './skeletonStyle'
 import { deriveCoverState, deriveRetryState, isUnloadableSrc } from '../utils/coverImage'
 import { ratioToHeightVw } from '../utils/coverDisplay'
 import { pageHeightVw } from '../utils/imageLayout'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = withDefaults(
   defineProps<{
@@ -158,7 +165,8 @@ const state = computed(() => deriveCoverState(loaded.value, failed.value))
       <text class="text-body-medium text-outline">{{ t('coverImage.loadFailed') }}</text>
       <view
         v-if="retry"
-        class="min-w-12 min-h-12 flex items-center justify-center px-5 rounded-[var(--md-shape-full)] border border-outline bg-surface-container-lowest active:bg-state-pressed-on-surface"
+        class="min-w-12 min-h-12 flex items-center justify-center px-5 rounded-[var(--md-shape-full)] border border-outline bg-surface-container-lowest active:bg-layer-pressed-on-surface"
+        :class="pressColor.className"
         @tap.stop="onRetry"
       >
         <text class="text-label-large text-primary">{{ t('coverImage.retry') }}</text>

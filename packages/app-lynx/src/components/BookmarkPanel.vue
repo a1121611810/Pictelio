@@ -26,6 +26,14 @@ import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 import { safeBottom } from '../utils/safeArea'
+import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const props = defineProps<{
   /** 目标作品 id（面板内预填/标签库请求的作用域；变化即重载） */
@@ -134,8 +142,20 @@ function onInputConfirm(): void {
   panel.commitInput()
 }
 
+// 关闭时序：两段式退场（ADR-0211 决策 3）。本面板自绘壳（不用 SheetShell：内容与面板类串
+// 逐字节锁在本组件门禁里），所以相位与动画样式直接绑在自有的遮罩 / 面板两个 view 上；
+// 计时器与退场动画同源（减弱动效开启时归零），到点才 emit('close')，宿主那一刻才卸载。
+const dismiss = useSheetDismiss({ names: SHEET_ANIMATION, onDismissed: () => emit('close') })
+
+/**
+ * 相位驱动的动画样式（顶层 computed 才有模板解包；`dismiss.phase` 是对象内嵌 Ref，模板不解包）。
+ * 遮罩只淡入淡出、面板上下滑 ⇒ 两套 keyframes，不共用（共用会让遮罩跟着位移）。
+ */
+const scrimStyle = computed(() => dismiss.scrimStyle(dismiss.phase.value))
+const panelStyle = computed(() => dismiss.panelStyle(dismiss.phase.value))
+
 function onClose(): void {
-  emit('close')
+  dismiss.requestClose()
 }
 
 function onSave(): void {
@@ -146,7 +166,7 @@ function onSave(): void {
 let unregisterModal: (() => void) | null = null
 
 onMounted(() => {
-  unregisterModal = useModalStack().registerModal(() => emit('close'))
+  unregisterModal = useModalStack().registerModal(onClose)
   // 打开即并行预填 + 标签库（spec D6）；关闭 = 卸载 = dispose（中止在途请求）
   void panel.load()
 })
@@ -155,24 +175,30 @@ onBeforeUnmount(() => {
   unregisterModal?.()
   unregisterModal = null
   panel.dispose()
+  // 卸载时清退场计时器（宿主可能先于计时器到点卸载，如保存成功后宿主直接收起面板）
+  dismiss.dispose()
 })
 </script>
 
 <template>
   <!-- 全屏层（仅挂载期间存在；absolute 同族定位上下文 = 宿主根 view） -->
   <view class="absolute left-0 top-0 w-full h-full z-40">
-    <!-- 遮罩：@tap 关闭（原生 hit-testing：全屏层本身即交互面，ADR-0123） -->
+    <!-- 遮罩：@tap 关闭（原生 hit-testing：全屏层本身即交互面，ADR-0123）；
+         淡入 / 淡出走两段式协议（ADR-0211 决策 3），动画简写来自 composables/motion.ts -->
     <view
       class="absolute left-0 top-0 w-full h-full bg-scrim"
+      :style="scrimStyle"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="t('bookmarkPanel.closeScrimAria')"
       @tap="onClose"
     />
 
     <!-- 底部面板（80vh）：@tap.stop 防面板内点击穿透到遮罩。
-         定位只用 left/top（禁 right/bottom：ADR-0123 定位锚点规则） -->
+         定位只用 left/top（禁 right/bottom：ADR-0123 定位锚点规则）；
+         上滑 / 下滑同样走 inline 动画（Tailwind transform 族是死类名，ADR-0210 路径 E） -->
     <view
       class="absolute left-0 top-[20vh] w-full h-[80vh] bg-surface-container-lowest rounded-t-[var(--md-shape-extra-large)] flex flex-col"
+      :style="panelStyle"
       @tap.stop
     >
       <!-- 标题栏：居中标题（title-large）+ × 关闭 -->
@@ -354,7 +380,7 @@ onBeforeUnmount(() => {
         </text>
         <view
           class="h-[12vw] rounded-[var(--md-shape-full)] flex items-center justify-center"
-          :class="canSave ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-high relative'"
+          :class="[pressColor.className, canSave ? 'bg-primary active:bg-layer-pressed-on-primary' : 'bg-surface-container-high relative']"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="saveLabel"
           @tap="onSave"

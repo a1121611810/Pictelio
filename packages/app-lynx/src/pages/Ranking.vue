@@ -33,7 +33,22 @@ import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import AppIcon from '../components/AppIcon.vue'
+import { useMotion } from '../composables/motion'
 import { t } from '../i18n'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor, pressOpacity, reduced: motionReduced } = useMotion()
+
+/** 模式 chip 的 inline 过渡：**唯一一处同一元素同时有两种按压载体**的档位（选中态走
+ *  实心底上的 alpha 颜色状态层、未选中态走透明度档，两条分支落在同一元素上）。
+ *  inline 的 `transition` 简写会**整体覆盖**工具类的 transition-property，所以这里不能只写
+ *  `pressOpacity.transition`——那会把颜色层的过渡一起顶掉（回到 0ms 闪变）。
+ *  两个值都出自 motion.ts 同一档（fast + standard），此处只做拼接，不引入任何时长/曲线字面量。 */
+const modeChipTransition = computed(() =>
+  motionReduced.value ? 'none' : `${pressColor.value.transition}, ${pressOpacity.value.transition}`,
+)
 
 /** pixiv 网页端「浏览设置」（开启「显示 R-18 作品」） */
 const R18_SETTINGS_URL = 'https://www.pixiv.net/settings/viewing'
@@ -178,7 +193,8 @@ onUnmounted(() => feed.dispose())
         accessibility-element
         :accessibility-label="t(m.labelKey)"
         class="h-[10.667vw] px-3 rounded-[var(--md-shape-full)] flex items-center"
-        :class="mode === m.id ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-lowest active:opacity-80'"
+        :class="mode === m.id ? 'bg-primary active:bg-layer-pressed-on-primary' : 'bg-surface-container-lowest active:opacity-80'"
+        :style="{ transition: modeChipTransition }"
         @tap="selectMode(m.id)"
       >
         <text
@@ -194,6 +210,7 @@ onUnmounted(() => feed.dispose())
     <view class="flex flex-row items-center justify-center gap-2 px-4 py-2">
       <view
         class="w-[10.667vw] h-[10.667vw] flex items-center justify-center active:opacity-60"
+        :style="{ transition: pressOpacity.transition }"
         accessibility-element
         :accessibility-label="t('ranking.prevDayAria')"
         @tap="shiftDay(-1)"
@@ -209,6 +226,7 @@ onUnmounted(() => feed.dispose())
       </view>
       <view
         class="w-[10.667vw] h-[10.667vw] flex items-center justify-center active:opacity-60"
+        :style="{ transition: pressOpacity.transition }"
         :class="isToday ? 'opacity-40' : ''"
         accessibility-element
         :accessibility-label="t('ranking.nextDayAria')"
@@ -227,13 +245,15 @@ onUnmounted(() => feed.dispose())
       <text class="text-body-small text-surface-on-variant text-center mt-2">{{ t('ranking.r18Notice.body') }}</text>
       <view class="flex flex-row gap-2 mt-4">
         <view
-          class="px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          class="px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          :class="pressColor.className"
           @tap="openPixivSettings"
         >
           <text class="text-label-large font-medium text-primary-on">{{ t('ranking.r18Notice.action') }}</text>
         </view>
         <view
           class="px-6 h-[10.667vw] bg-surface-container-lowest active:opacity-80 rounded-[var(--md-shape-full)] flex items-center justify-center"
+          :style="{ transition: pressOpacity.transition }"
           @tap="refreshFeed"
         >
           <text class="text-label-large font-medium text-surface-on">{{ t('ranking.r18Notice.retry') }}</text>
@@ -242,10 +262,11 @@ onUnmounted(() => feed.dispose())
     </view>
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <view v-else-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
       <view
         v-for="n in 8"
         :key="n"
-        class="flex flex-row items-center mx-3 my-1.5 p-2.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+        class="flex flex-row items-center mx-3 my-1.5 p-2.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
       >
         <view class="shimmer w-[8vw] h-[5.333vw] rounded-[var(--md-shape-extra-small)]" />
         <view class="shimmer w-[14vw] h-[14vw] rounded-[var(--md-shape-medium)] ml-2" />
@@ -258,7 +279,8 @@ onUnmounted(() => feed.dispose())
     <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
       <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
       <view
-        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-layer-pressed-on-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        :class="pressColor.className"
         @tap="refreshFeed"
       >
         <text class="text-label-large font-medium text-primary-on">{{ t('ranking.page.retry') }}</text>
@@ -284,7 +306,7 @@ onUnmounted(() => feed.dispose())
     >
       <list-item v-for="row in visibleRows" :key="row.item.id" :item-key="String(row.item.id)" class="w-full">
         <view
-          class="flex flex-row items-center mx-3 p-2.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+          class="flex flex-row items-center mx-3 p-2.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
           @tap="openRow(row.item)"
         >
           <!-- 名次（ADR-0187 D4 / #732）：预过滤名次渲染，静音移除条目留洞不前移；前三名 primary 高亮 -->

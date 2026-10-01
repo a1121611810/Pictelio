@@ -46,6 +46,13 @@ import AiOverlay from '../components/AiOverlay.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import NovelCaptionSheet from '../components/NovelCaptionSheet.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走工具类；透明度/尺寸类走 inline `:style`——`.transition-colors` 的 transition-property 不含 opacity，挂工具类是静默失效。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor, pressOpacity } = useMotion()
+
 
 const settings = useSettingsStore()
 // 谓词与正文页同源（差分对齐，spec 测试决策）：R-18/R-18G 开关 + AI mask 模式
@@ -307,7 +314,8 @@ const WatchlistAction = defineComponent({
     <view v-else-if="errorMsg" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6">
       <text class="text-body-medium text-error text-center">{{ errorMsg }}</text>
       <view
-        class="min-h-12 flex items-center justify-center px-5 rounded-[var(--md-shape-full)] border border-outline bg-surface-container-lowest active:bg-state-pressed-on-surface"
+        class="min-h-12 flex items-center justify-center px-5 rounded-[var(--md-shape-full)] border border-outline bg-surface-container-lowest active:bg-layer-pressed-on-surface"
+        :class="pressColor.className"
         @tap="loadNovel"
       >
         <text class="text-label-large text-primary">{{ t('novelIntro.retry') }}</text>
@@ -321,83 +329,98 @@ const WatchlistAction = defineComponent({
         class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[6vw]"
         style="background: var(--md-scrim-overlay)"
       >
-        <!-- AI 徽章（票 #577；文案复用 aiOverlay 单点派生） -->
-        <view v-if="aiBadge" class="self-start">
-          <text class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)] bg-secondary-container text-secondary-on-container">{{ aiBadge }}</text>
-        </view>
-
-        <!-- 系列行（票 #577）：系列名 + 已追更 chip（复用 novelDetail.watchAdded 文案单点） -->
-        <view v-if="novel.series" class="mt-2 flex flex-row items-center">
-          <text class="text-label-medium text-white/85">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
-          <view v-if="prompt?.watchAdded === true" class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container">
-            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
+        <!-- [#891] 渐变不再单独承担可读性。此页遮罩盒高随内容变化，而色标按**盒子百分比**
+             归一化 ⇒ 标题/作者/简介/统计行在盒中的相对位置随内容（有无系列名、AI 徽章、
+             简介是否为空、评论入口是否渲染）漂移，同一条渐变对不同小说给出不同底色深度。
+             真机实测推荐页同一令牌下白字仅 1.56:1（详见 Recommended.vue 注释）。
+             百分比渐变**在原理上无法**对「不可预测的图 + 不可预测的内容」同时成立，
+             故整块元信息加**稳定不透明底色**（inverse-surface / inverse-on-surface 对，
+             14 套色板最差 10.12（暗色 sky 板），亮色 11.46–11.65 / 暗色 10.12–10.22，全部 ≥ 4.5。按 WCAG 相对亮度公式对 tokens.css 14 套色板实算。 ≥ 4.5），渐变退回「把底色与封面融在一起」的职责。
+             下方动作区（Row1/Row2）是自带不透明底的按钮，故留在渐变上、不进底色块。
+             ⚠️ 原 text-white 的 /85|/70|/60 变体：white 是字面量，这些变体**确实**能产出规则，
+             但「在不可预测底图上把字调淡」本身就是对比度隐患；层级改由字号/字重承担
+             （MD3 对 on-surface 的本意）。另：inverse 令牌是裸 var()、**无 <alpha-value>**，
+             故 `text-inverse-on-surface/85` 是**死类名**（不产出规则、静默无样式），
+             换成 inverse 配对后只能用全不透明——见 tests/immersiveScrimContrast.test.ts 防回潮断言。 -->
+        <view class="bg-inverse-surface rounded-lg px-4 py-3">
+          <!-- AI 徽章（票 #577；文案复用 aiOverlay 单点派生） -->
+          <view v-if="aiBadge" class="self-start">
+            <text class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)] bg-secondary-container text-secondary-on-container">{{ aiBadge }}</text>
           </view>
-        </view>
 
-        <!-- 标题 -->
-        <!-- T10/ADR-0206 决策 3：删掉自选 leading-[1.3]，行高由 text-title-large 档位携带
-             （title-large = 22sp 字号 / 28sp 行高 = 44rpx / 56rpx），与全站标题节奏一致 -->
-        <text
-          class="text-title-large font-semibold text-white [max-line:2]"
-          :class="aiBadge || novel.series ? 'mt-2' : ''"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="novel.title"
-        >{{ novel.title }}</text>
+          <!-- 系列行（票 #577）：系列名 + 已追更 chip（复用 novelDetail.watchAdded 文案单点） -->
+          <view v-if="novel.series" class="mt-2 flex flex-row items-center">
+            <text class="text-label-medium text-inverse-on-surface">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
+            <view v-if="prompt?.watchAdded === true" class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container">
+              <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
+            </view>
+          </view>
 
-        <!-- 作者行（票 #577：可点 → 用户主页） -->
-        <text
-          class="text-body-medium text-white/85 mt-2"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="t('novelIntro.authorA11y')"
-          @tap="openAuthor"
-        >{{ novel.user.name }}</text>
+          <!-- 标题 -->
+          <!-- T10/ADR-0206 决策 3：删掉自选 leading-[1.3]，行高由 text-title-large 档位携带
+               （title-large = 22sp 字号 / 28sp 行高 = 44rpx / 56rpx），与全站标题节奏一致 -->
+          <text
+            class="text-title-large font-semibold text-inverse-on-surface [max-line:2]"
+            :class="aiBadge || novel.series ? 'mt-2' : ''"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="novel.title"
+          >{{ novel.title }}</text>
 
-        <!-- 标签胶囊行（票 #577：复用「标签自适应折叠」；chip → 全局搜索弹层；长按 → 静音 #732） -->
-        <AdaptiveTagRow
-          v-if="novel.tags.length > 0"
-          class="mt-2"
-          :tags="novel.tags"
-          @tag-tap="onTagTap"
-          @tag-long-press="onTagLongPress"
-          @overflow-tap="onTagOverflow"
-        />
+          <!-- 作者行（票 #577：可点 → 用户主页） -->
+          <text
+            class="text-body-medium text-inverse-on-surface mt-2"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="t('novelIntro.authorA11y')"
+            @tap="openAuthor"
+          >{{ novel.user.name }}</text>
 
-        <!-- 简介（票 #584）：纯文本 2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰。
-             T10/ADR-0206 决策 3：删掉自选 leading-[1.5]，行高由 text-body-small 档位携带（16sp） -->
-        <view class="mt-3 relative" @tap="openCaption">
-          <text v-if="captionText" class="text-body-small text-white/85 [max-line:2]">{{ captionText }}</text>
-          <text v-else class="text-body-small text-white/60">{{ t('novelIntro.noCaption') }}</text>
-          <!-- 谓词与正文页同款（票 #580）：R-18 优先、AI mask 次之 -->
-          <RestrictOverlay v-if="r18Masked" :level="novel.x_restrict === 2 ? 2 : 1" />
-          <AiOverlay v-else-if="aiMasked" :ai-type="novel.novel_ai_type ?? 0" />
-        </view>
+          <!-- 标签胶囊行（票 #577：复用「标签自适应折叠」；chip → 全局搜索弹层；长按 → 静音 #732） -->
+          <AdaptiveTagRow
+            v-if="novel.tags.length > 0"
+            class="mt-2"
+            :tags="novel.tags"
+            @tag-tap="onTagTap"
+            @tag-long-press="onTagLongPress"
+            @overflow-tap="onTagOverflow"
+          />
 
-        <!-- 统计行（票 #577）：字数 · 收藏 · 浏览；可选字段缺省显式降级（对应段隐藏）。
-             T12/ADR-0208：♥/👁 由「文本里的符号」拆成 AppIcon + 纯数字文本 ——
-             原本 ♥ 与数字同处一个 text 元素，图标化后必须拆成两个 flex 子项（flex-row + items-center）；
-             :size=3.2vw = 原 text-label-medium（12sp = 24rpx = 12px @375），视觉尺寸不变。
-             ⚠️ favorite_border 与 favorite 在 FILL=0 子集里同码点（iconMap 头注），
-             故收藏数此处只用「形状 + 数字」，不靠字形表达选中态 -->
-        <view class="mt-3 flex flex-row items-center">
-          <text class="text-label-medium text-white/70 mr-4">{{ t('novels.charCount', { count: novel.text_length }) }}</text>
-          <AppIcon v-if="novel.total_bookmarks > 0" name="favorite_border" :size="3.2" class="text-white/70 mr-1" />
-          <text v-if="novel.total_bookmarks > 0" class="text-label-medium text-white/70 mr-4">{{ novel.total_bookmarks }}</text>
-          <AppIcon v-if="novel.total_view != null" name="visibility" :size="3.2" class="text-white/70 mr-1" />
-          <text v-if="novel.total_view != null" class="text-label-medium text-white/70">{{ novel.total_view }}</text>
-        </view>
+          <!-- 简介（票 #584）：纯文本 2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰。
+               T10/ADR-0206 决策 3：删掉自选 leading-[1.5]，行高由 text-body-small 档位携带（16sp） -->
+          <view class="mt-3 relative" @tap="openCaption">
+            <text v-if="captionText" class="text-body-small text-inverse-on-surface [max-line:2]">{{ captionText }}</text>
+            <text v-else class="text-body-small text-inverse-on-surface">{{ t('novelIntro.noCaption') }}</text>
+            <!-- 谓词与正文页同款（票 #580）：R-18 优先、AI mask 次之 -->
+            <RestrictOverlay v-if="r18Masked" :level="novel.x_restrict === 2 ? 2 : 1" />
+            <AiOverlay v-else-if="aiMasked" :ai-type="novel.novel_ai_type ?? 0" />
+          </view>
 
-        <!-- 评论入口（票 #577：两端都留） -->
-        <view
-          v-if="novel.total_comments !== undefined"
-          class="mt-3 flex flex-row items-center"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="t('novelIntro.commentsA11y')"
-          @tap="showComments = true"
-        >
-          <!-- T12/ADR-0208：💬 → Material Symbols `chat_bubble`（缺省 6.4vw = 原 text-[6.4vw]，尺寸不变）；
-               入口无障碍名称仍由外层 view 的 novelIntro.commentsA11y 承担 -->
-          <AppIcon name="chat_bubble" />
-          <text class="text-label-medium text-white/70 ml-1">{{ novel.total_comments }}</text>
+          <!-- 统计行（票 #577）：字数 · 收藏 · 浏览；可选字段缺省显式降级（对应段隐藏）。
+               T12/ADR-0208：♥/👁 由「文本里的符号」拆成 AppIcon + 纯数字文本 ——
+               原本 ♥ 与数字同处一个 text 元素，图标化后必须拆成两个 flex 子项（flex-row + items-center）；
+               :size=3.2vw = 原 text-label-medium（12sp = 24rpx = 12px @375），视觉尺寸不变。
+               ⚠️ favorite_border 与 favorite 在 FILL=0 子集里同码点（iconMap 头注），
+               故收藏数此处只用「形状 + 数字」，不靠字形表达选中态 -->
+          <view class="mt-3 flex flex-row items-center">
+            <text class="text-label-medium text-inverse-on-surface mr-4">{{ t('novels.charCount', { count: novel.text_length }) }}</text>
+            <AppIcon v-if="novel.total_bookmarks > 0" name="favorite_border" :size="3.2" class="text-inverse-on-surface mr-1" />
+            <text v-if="novel.total_bookmarks > 0" class="text-label-medium text-inverse-on-surface mr-4">{{ novel.total_bookmarks }}</text>
+            <AppIcon v-if="novel.total_view != null" name="visibility" :size="3.2" class="text-inverse-on-surface mr-1" />
+            <text v-if="novel.total_view != null" class="text-label-medium text-inverse-on-surface">{{ novel.total_view }}</text>
+          </view>
+
+          <!-- 评论入口（票 #577：两端都留） -->
+          <view
+            v-if="novel.total_comments !== undefined"
+            class="mt-3 flex flex-row items-center"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="t('novelIntro.commentsA11y')"
+            @tap="showComments = true"
+          >
+            <!-- T12/ADR-0208：💬 → Material Symbols `chat_bubble`（缺省 6.4vw = 原 text-[6.4vw]，尺寸不变）；
+                 入口无障碍名称仍由外层 view 的 novelIntro.commentsA11y 承担 -->
+            <AppIcon name="chat_bubble" class="text-inverse-on-surface" />
+            <text class="text-label-medium text-inverse-on-surface ml-1">{{ novel.total_comments }}</text>
+          </view>
         </view>
 
         <!-- 底部固定动作区（spec #734 §US5 D1 / ADR-0189 D1）：
@@ -479,6 +502,7 @@ const WatchlistAction = defineComponent({
         <view
           class="mt-3 w-full h-[12.8vw] rounded-[var(--md-shape-full)] flex items-center justify-center"
           :class="masked ? 'bg-white/20' : 'bg-primary active:opacity-80'"
+          :style="{ transition: pressOpacity.transition }"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="t('novelIntro.startReadingA11y')"
           @tap="startReading"

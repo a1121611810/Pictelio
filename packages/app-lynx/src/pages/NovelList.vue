@@ -207,7 +207,8 @@ onUnmounted(() => {
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
     <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
-      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <!-- 骨架屏阴影归零：ADR-0212 决策 7（贴面上限 0，删声明而非改写成 0；底色与真实卡同档不动） -->
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
         <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
         <view class="shimmer h-[20rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[30%]" />
@@ -244,7 +245,7 @@ onUnmounted(() => {
              高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
         <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
-        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>

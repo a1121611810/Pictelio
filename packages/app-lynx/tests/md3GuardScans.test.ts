@@ -56,9 +56,12 @@
 //   故本门禁按实测口径实现：**方向类 + 非档位后缀**才判红，档位后缀（lg/sm/xs/xl/full）放行。
 //
 // ── 扫描口径的三个刻意取舍（review 要核的就是这三条）───
-// ① 规则 4 只扫 `src/**`，不扫 `tailwind.config.ts`：那 6 条 `var(--md-state-pressed-*)`
-//    是**预计算实色到 Tailwind 颜色档位的映射表本体**，删掉就断掉 24 处 `bg-state-pressed-*`
+// ① 规则 4 只扫 `src/**`，不扫 `tailwind.config.ts`：那 4 条 `var(--md-state-pressed-*)`
+//    是**预计算实色到 Tailwind 颜色档位的映射表本体**（pressed-primary / pressed-on-surface /
+//    pressed-error / pressed-surface），删掉就断掉 24 处 `bg-state-pressed-*`
 //    存量；tokens.css 自己也写明「保留它的唯一理由是 Lynx 伪类受限时的兜底」。
+//    ⚠️ 数字以实跑为准（原文写的「6 条」是漂移，实测 4）：grep -c 'var(--md-state-pressed-' \
+//       tailwind.config.ts → 4；24 处消费面 grep -ro 'bg-state-pressed-[a-z]*' src --include='*.vue' → 24。
 // ② 规则 4 只判 `var()` 消费，**不判 Tailwind 类名**：`md3ConfigTokens.test.ts` 已把
 //    `bg-state-pressed-*` 写成「存量写法不回归」的断言，本门禁若也判红，两道门禁互相矛盾。
 // ③ 规则 7 只扫 `.vue` 的 `<template>` 区：`.ts` 里的 `utils/iconMap.ts` / `navTabs.ts`
@@ -585,6 +588,310 @@ function scanStrayFontFace(text: string, path: string): Violation[] {
   return out
 }
 
+// ═══════════════════════════ 规则 9：骨架屏零阴影（ADR-0212 决策 2 规则 1 + 决策 7）═══════════════════════════
+//
+// 口径：骨架屏 placeholder 是**贴面元素**，阴影上限 = 0（ADR-0212 决策 1 映射表 + 决策 2 规则 1）。
+// 本规则锁两件不同形态的东西：
+//   · `skeleton-shadow`            —— 页面内联骨架分支的子树内不得有任何阴影声明
+//   · `skeleton-shadow-component` —— 三个**纯骨架组件**内不得有阴影（含 scoped CSS）
+//
+// ⚠️ **为什么按「分支」扫而不是按类名扫**：本票落地后全仓仍有 44 处
+// `shadow-[var(--md-elevation-1)]` 存活（真实贴面卡 / 遮罩 / 徽标 / `GlassCard` scoped CSS /
+// 按压反馈，归属 ADR-0212 决策 3 与决策 6，不在本规则范围）。只扫类名必然误伤真实卡，
+// 所以判据问的是**另一个问题**：「这段渲染是不是加载态」—— 判据条件是
+// **某个元素的 `v-if` / `v-else-if` 条件里出现 `'skeleton'` 字面量**，范围是它的整个子树。
+// 识别方式的可信度由「反事实 A/D」与「台账棘轮」两条常驻用例承担，见各自注释。
+//
+// ⚠️ **为什么连显式零也判红**（`shadow-none` / `shadow-[var(--md-elevation-0)]`）：
+// ADR-0212 决策 2 规则 3 要求零阴影**靠删除表达**。显式零与「无声明」渲染等价，
+// 两者并存即语义含混（后人会分不清「这里归零了」与「这里本来就没阴影」），
+// 允许它就等于把这条规则变成可绕过的。归零的**明确表达**另有承担者：
+// 骨架分支里的 marker 注释（`SKELETON_ZERO_MARKER`），由台账棘轮单独锁。
+//
+// ⚠️ 解析口径的一处**已知边界（如实登记）**：`RelatedInlineSection.vue:40` 的
+// 「加载中网格」不是 `'skeleton'` 分支，而是与内容并列的独立区块，**不落在本规则范围内**。
+// 已核：它无任何阴影声明。若日后要把它也纳入，口径需扩到「含 `shimmer` 类的区块」，属另开决策。
+
+/** 一个标签的解析结果。索引全部相对**原文** —— `templateOf` 是等长掩码，偏移可跨文本使用 */
+interface TagHit {
+  readonly name: string
+  readonly start: number
+  /** 属性区（`name` 之后）的绝对起点：反事实要往属性里插内容时用它换算，别拿 `attrs` 的下标当绝对偏移 */
+  readonly attrsStart: number
+  readonly openEnd: number
+  readonly closing: boolean
+  readonly selfClosing: boolean
+  readonly attrs: string
+}
+
+/**
+ * 标签 token。属性区用「引号内字符不终止」的口径（`[^>"']` 逐字 + 引号串），
+ * 否则 `v-if="a > b"` 里的 `>` 会把标签截断、深度计数随之错位。
+ * `<!-- -->` 的 `<` 后面不是字母，天然不匹配 ⇒ 注释内的伪标签不会被当成元素。
+ */
+const TAG_TOKEN = /<(\/?)([A-Za-z][A-Za-z0-9._-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g
+
+function tagAt(text: string, from: number): TagHit | null {
+  TAG_TOKEN.lastIndex = from
+  const m = TAG_TOKEN.exec(text)
+  if (!m) return null
+  const attrs = m[3] ?? ''
+  return {
+    name: m[2]!,
+    start: m.index,
+    attrsStart: m.index + 1 + m[2]!.length,
+    openEnd: m.index + m[0].length,
+    closing: m[1] === '/',
+    selfClosing: attrs.trimEnd().endsWith('/'),
+    attrs,
+  }
+}
+
+/** 元素子树区间（开标签末尾 → 对应闭标签开头）。self-closing / 未闭合都返回 null —— 宁可漏判也不猜 */
+function elementRegion(
+  text: string,
+  openStart: number,
+): { readonly contentStart: number; readonly contentEnd: number } | null {
+  const open = tagAt(text, openStart)
+  if (!open || open.selfClosing) return null
+  let depth = 1
+  let cursor = open.openEnd
+  while (cursor < text.length) {
+    const t = tagAt(text, cursor)
+    if (!t) break
+    if (t.closing) {
+      depth--
+      if (depth === 0) return { contentStart: open.openEnd, contentEnd: t.start }
+    } else if (!t.selfClosing) depth++
+    cursor = t.openEnd
+  }
+  return null
+}
+
+/** 直接子元素（深度 0 处开标签即子元素） */
+function childElements(text: string, contentStart: number, contentEnd: number): TagHit[] {
+  const out: TagHit[] = []
+  let depth = 0
+  let cursor = contentStart
+  while (cursor < contentEnd) {
+    const t = tagAt(text, cursor)
+    if (!t || t.start >= contentEnd) break
+    if (t.closing) {
+      if (depth === 0) break
+      depth--
+    } else {
+      if (depth === 0) out.push(t)
+      if (!t.selfClosing) depth++
+    }
+    cursor = t.openEnd
+  }
+  return out
+}
+
+const SKELETON_COND = /(?:v-else-if|v-if)="([^"]*)"/g
+/** 条件里出现带引号的 `skeleton` 字面量：`view === 'skeleton'` / `novelView === 'skeleton'` */
+const isSkeletonCondition = (cond: string): boolean => /(['"`])skeleton\1/.test(cond)
+
+interface SkeletonBranch {
+  readonly cond: string
+  readonly contentStart: number
+  readonly contentEnd: number
+  /** 直接子元素里带 `v-for` 的那些 —— 骨架「假数据行」的声明点 */
+  readonly rows: readonly TagHit[]
+}
+
+function skeletonBranches(masked: string): SkeletonBranch[] {
+  const out: SkeletonBranch[] = []
+  for (const m of masked.matchAll(SKELETON_COND)) {
+    if (!isSkeletonCondition(m[1]!)) continue
+    // 条件属性所在的标签：往前找最近的 `<` + 字母
+    // ⚠️ 循环条件必须是 `>= 0`：写成 `> 0` 时，**位于文本开头的骨架分支（openStart === 0）
+    // 会被整段跳过** —— 而这正是「构造正样本」那条用例当初抓到的 fail-open
+    // （单行构造样本里分支恰好从第 0 个字符开始，真实文件因前面有注释而侥幸没踩到）。
+    let lt = masked.lastIndexOf('<', m.index)
+    let openStart = -1
+    while (lt >= 0) {
+      if (/^<[A-Za-z]/.test(masked.slice(lt, lt + 2))) {
+        openStart = lt
+        break
+      }
+      lt = masked.lastIndexOf('<', lt - 1)
+    }
+    if (openStart < 0) continue
+    const region = elementRegion(masked, openStart)
+    if (!region) continue
+    out.push({
+      cond: m[1]!,
+      contentStart: region.contentStart,
+      contentEnd: region.contentEnd,
+      rows: childElements(masked, region.contentStart, region.contentEnd).filter((t) =>
+        /\bv-for=/.test(t.attrs),
+      ),
+    })
+  }
+  return out
+}
+
+/** 形态 A：Tailwind 阴影 utility。`\b` 让 `active:shadow-[...]` / `hover:shadow-lg` 同样命中 */
+const SHADOW_UTIL = /\bshadow-(?:\[[^\]]*\]|[a-z0-9-]+)/g
+/** 形态 B：CSS 声明。内联 `style` 与组件 scoped CSS 都吃这一条（类名扫描对 scoped CSS 是盲区） */
+const SHADOW_DECL = /\bbox-shadow\s*:/g
+
+function scanSkeletonShadow(rawSource: string, path: string): Violation[] {
+  const masked = templateOf(rawSource)
+  const out: Violation[] = []
+  for (const branch of skeletonBranches(masked)) {
+    const content = masked.slice(branch.contentStart, branch.contentEnd)
+    for (const m of content.matchAll(SHADOW_UTIL)) {
+      out.push({
+        rule: 'skeleton-shadow',
+        path,
+        line: lineOf(rawSource, branch.contentStart + m.index!),
+        form: m[0],
+      })
+    }
+    for (const m of content.matchAll(SHADOW_DECL)) {
+      out.push({
+        rule: 'skeleton-shadow',
+        path,
+        line: lineOf(rawSource, branch.contentStart + m.index!),
+        form: m[0],
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * 纯骨架组件：整个组件就是「加载态占位」，故扫描面是**全文件**而不是某个分支。
+ * ⚠️ 刻意**不包含** `SkeletonImage.vue` / `CoverImage.vue` —— 它们同时服务真实内容
+ * （`CoverImage` 的 `state === 'skeleton'` 是真卡上的图片级占位），把它们纳入等于把
+ * 「真实卡长什么样」也管起来，越出本规则的口径。
+ */
+const SHARED_SKELETON_COMPONENTS: readonly string[] = [
+  'src/components/SkeletonCard.vue',
+  'src/components/SkeletonNovel.vue',
+  'src/components/CarouselSkeleton.vue',
+]
+
+function scanSharedSkeletonShadow(text: string, path: string): Violation[] {
+  const out: Violation[] = []
+  for (const m of text.matchAll(SHADOW_UTIL)) {
+    out.push({ rule: 'skeleton-shadow-component', path, line: lineOf(text, m.index!), form: m[0] })
+  }
+  for (const m of text.matchAll(SHADOW_DECL)) {
+    out.push({ rule: 'skeleton-shadow-component', path, line: lineOf(text, m.index!), form: m[0] })
+  }
+  return out
+}
+
+/**
+ * 归零台账（**棘轮**，方向只往下）：ADR-0212 决策 7 处置过的每一个内联骨架声明点。
+ *
+ * 存在的理由：门禁只能判「现在有没有错」，判不出「**这里是不是有意归零的**」——
+ * 删掉阴影和从来没加过阴影，在扫描结果里完全同形（都命中 0 条）。要让「归零」与
+ * 「漏改」可区分，归零处必须**留下可核的表达**：分支内一条 marker 注释 + 本台账的一条登记。
+ * 两者缺一都转红（见「台账棘轮」两条用例）。
+ *
+ * ⚠️ 登记与 ADR 的差异（如实记录，不追认 ADR 表格）：ADR-0212 决策 7 的表列了
+ * **7 个声明点 / 42 个渲染实例**，本台账是 **9 个 / 56 个** —— 扫描另外找出
+ * `Ranking.vue`（n in 8）与 `TagNeighbors.vue`（n in 6）两处同形态的内联骨架行，
+ * 二者形态与那 7 处完全一致（`'skeleton'` 分支 + `bg-surface-container-lowest` + `elevation-1`）。
+ * 按 ADR 决策 1/2 的规则（骨架屏上限 0）它们同属本票范围，故一并归零；
+ * ADR 表格的处数需按此更新（**该文件的改动权不在本票**）。
+ */
+const SKELETON_ZERO_SITES: readonly { readonly path: string; readonly forExpr: string }[] = [
+  { path: 'src/pages/Bookmarks.vue', forExpr: 'n in 5' },
+  { path: 'src/pages/FollowList.vue', forExpr: 'n in 8' },
+  { path: 'src/pages/MyPixiv.vue', forExpr: 'n in 8' },
+  { path: 'src/pages/NovelList.vue', forExpr: 'n in 5' },
+  { path: 'src/pages/Notifications.vue', forExpr: 'n in 6' },
+  { path: 'src/pages/Ranking.vue', forExpr: 'n in 8' },
+  { path: 'src/pages/TagNeighbors.vue', forExpr: 'n in 6' },
+  { path: 'src/pages/UserHome.vue', forExpr: 'n in 5' },
+  { path: 'src/pages/Watchlist.vue', forExpr: 'n in 5' },
+]
+
+/** 归零 marker：必须同时含「归零」与「ADR-0212 决策 7」两个 token，顺序不限（写注释的人不该被顺序绑住） */
+const ZERO_MARKER_DECISION = /ADR-0212[^\n>]*决策\s*7/
+const ZERO_MARKER_INTENT = /归零/
+const COMMENT = /<!--[\s\S]*?-->/g
+
+/** 一段区域里带归零 marker 的注释条数（>1 也算异常，由「marker 数 == 台账条数」那条棘轮兜住） */
+function zeroMarkerCount(raw: string, region: string): number {
+  let n = 0
+  for (const m of region.matchAll(COMMENT)) {
+    if (ZERO_MARKER_DECISION.test(m[0]) && ZERO_MARKER_INTENT.test(m[0])) n++
+  }
+  return n
+}
+
+// ═══════════════════════════ 规则 10：贴面元素零阴影 ═══════════════════════════
+
+/**
+ * **贴面底色档**（ADR-0212 决策 1 表「贴面列表项 / 卡片（静止）」一行）。
+ *
+ * 必须是**完整 class token**（`Set` 精确相等），不能用 `includes` / 前缀匹配 ——
+ * 前缀写法会把 `bg-surface-container-high` / `-highest`（**悬浮**档）一并吃掉，
+ * 那正是 ADR 决策 1 表里「悬浮元素按上表取档、本票不动」的行 ⇒ 误伤即越权。
+ * 另含 `bg-surface-container-low`：它当前是 0 消费的死令牌（ADR 背景 §四），
+ * 但决策 1 表已把它钉成贴面档，日后有人用它补色阶断档（候选甲）时，贴面口径应当已经生效。
+ */
+const FLAT_SURFACE_BG: ReadonlySet<string> = new Set([
+  'bg-surface-container-lowest',
+  'bg-surface-container-low',
+])
+
+const CLASS_ATTR = /class="([^"]*)"/
+
+/**
+ * 贴面元素上的任何阴影声明（ADR-0212 决策 2 规则 1：贴面上限 = 0）。
+ *
+ * ⭐ **本判据刻意与规则 9 的骨架屏判据形态不同**（那一轮的教训，见 #894）：
+ * 规则 9 靠「分支内一条 marker 注释 + 台账」双向对齐，marker 判据是**行级**匹配 ——
+> 换行即误红。**本规则不依赖任何 marker、注释或散文关键词**，判据是纯结构化的：
+ * **同一个元素**的 class token 集合里同时出现「贴面底色」与「阴影 utility」。
+ *
+ * 因此「归零」= 真删掉该 class。显式零写法（`shadow-[var(--md-elevation-0)]` /
+ * `shadow-none`）**同样判红** —— 决策 2 规则 3 要求「降档优先删声明」，
+ * 且显式零会让「归零」与「从未加过」在扫描里同形，无法区分（决策 7 订正同款理由）。
+ * 也就是说：本规则的**唯一绿灯态是「这个贴面元素上确实没有阴影声明」**，不存在「写了 0 也算过」的中间态。
+ */
+function scanFlatSurfaceShadow(rawSource: string, path: string): Violation[] {
+  const masked = templateOf(rawSource)
+  const out: Violation[] = []
+  let cursor = 0
+  // 复用规则 7/9 的标签词法（TAG_TOKEN / tagAt），不另写一套
+  while (cursor < masked.length) {
+    const t = tagAt(masked, cursor)
+    if (!t) break
+    if (!t.closing) {
+      // class 属性的值在 `t.attrs` 内的偏移（与规则 9 反事实 C 同一算法）
+      const classAt = CLASS_ATTR.exec(t.attrs)
+      if (classAt) {
+        const value = classAt[1]!
+        const valueStart = t.attrsStart + classAt.index + classAt[0].indexOf('class="') + 'class="'.length
+        const isFlat = value.split(/\s+/).some((c) => FLAT_SURFACE_BG.has(c))
+        if (isFlat) {
+          for (const m of value.matchAll(SHADOW_UTIL)) {
+            out.push({
+              rule: 'flat-surface-shadow',
+              path,
+              line: lineOf(rawSource, valueStart + m.index!),
+              form: m[0],
+            })
+          }
+          for (const m of t.attrs.matchAll(SHADOW_DECL)) {
+            out.push({ rule: 'flat-surface-shadow', path, line: lineOf(rawSource, t.attrsStart + m.index!), form: m[0] })
+          }
+        }
+      }
+    }
+    cursor = t.openEnd
+  }
+  return out
+}
+
 const RULES: readonly Rule[] = [
   { id: 'legacy-easing', scan: scanLegacyEasing, scope: 'src-and-config' },
   { id: 'radius-offtoken', scan: scanRadiusOffToken, scope: 'src-and-config' },
@@ -615,6 +922,14 @@ const RULES: readonly Rule[] = [
         '份数由 allowOnce 锁为 ≤1，那一份的内容由规则 8 的接线断言锁',
     },
   },
+  { id: 'skeleton-shadow', scan: scanSkeletonShadow, scope: 'vue-template' },
+  {
+    id: 'skeleton-shadow-component',
+    scan: scanSharedSkeletonShadow,
+    scope: 'src-only',
+    only: SHARED_SKELETON_COMPONENTS,
+  },
+  { id: 'flat-surface-shadow', scan: scanFlatSurfaceShadow, scope: 'vue-template' },
 ]
 
 /** 某条规则**实际会喂给 scan 的文件**。
@@ -742,6 +1057,15 @@ describe('MD3 形态回流门禁 · 抽取器自身有效（防正则塌陷后�
       'bare-focus': ['<style>.a:focus { outline: none; }</style>', 1],
       'icon-glyph': ['<template><text>♥</text></template>', 1],
       'stray-font-face': ['<style>@font-face { font-family: X; src: url("./x.ttf"); }</style>', 1],
+      'skeleton-shadow': [
+        `<view v-if="view === 'skeleton'"><view v-for="n in 5" class="shadow-[var(--md-elevation-1)]" /></view>`,
+        1,
+      ],
+      'skeleton-shadow-component': ['<style>.skeleton-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }</style>', 1],
+      'flat-surface-shadow': [
+        '<view class="bg-surface-container-lowest shadow-[var(--md-elevation-1)]" />',
+        1,
+      ],
     }
     for (const rule of RULES) {
       const entry = samples[rule.id]
@@ -793,6 +1117,9 @@ describe('MD3 形态回流门禁 · 抽取器自身有效（防正则塌陷后�
       'icon-glyph': 'src/components/AppIcon.vue',
       'stray-font-face': 'src/components/AppIcon.vue',
       'legacy-easing-tokens-marker': TOKENS_CSS_REL,
+      'skeleton-shadow': 'src/pages/Watchlist.vue',
+      'skeleton-shadow-component': 'src/components/SkeletonCard.vue',
+      'flat-surface-shadow': 'src/components/UserRow.vue',
     }
     for (const rule of [...RULES, TOKENS_LEGACY_MARKER_RULE]) {
       const targets = targetsOf(rule)
@@ -1320,3 +1647,343 @@ describe('MD3 形态回流门禁 · 白名单匹配粒度（精确三元组）',
   })
 })
 
+
+// ═══════════════════════════ 规则 9：骨架屏零阴影 ═══════════════════════════
+
+describe('规则 9 · 骨架屏零阴影（ADR-0212 决策 2 规则 1 + 决策 7）', () => {
+  const rel = 'src/pages/Watchlist.vue'
+  const real = FILES.find((f) => f.rel === rel)!
+
+  it('抽取器：掩码不改总长度 ⇒ 分支内报出的行号等于原文件行号（与规则 7 同一前提）', () => {
+    const masked = templateOf(real.text)
+    expect(masked.length, '掩码改变了总长度 ⇒ 行号参照系已错').toBe(real.text.length)
+    expect(masked.split('\n').length).toBe(real.text.split('\n').length)
+    // 前提：该文件确实有骨架分支，且分支落在第 170 行之后（跨过若干注释，掩码/删除两种实现才会分道扬镳）
+    const branches = skeletonBranches(masked)
+    expect(branches.length, '前提：Watchlist.vue 应有 1 个骨架分支').toBe(1)
+    expect(real.text.split('\n')[lineOf(real.text, branches[0]!.contentStart) - 1]).toContain('skeleton')
+  })
+
+  it('反事实 A（阳性对照 · 构造形态）：内联骨架行带 elevation-1 → 必须判红', () => {
+    const src = [
+      '<template>',
+      `  <view v-if="view === 'skeleton'">`,
+      '    <view v-for="n in 5" class="bg-surface-container-lowest shadow-[var(--md-elevation-1)]" />',
+      '  </view>',
+      '</template>',
+    ].join('\n')
+    expect(scanSkeletonShadow(src, 'x.vue').map(fmt)).toEqual([
+      'skeleton-shadow｜x.vue:3｜shadow-[var(--md-elevation-1)]',
+    ])
+  })
+
+  it('反事实 A′：判据是**加载态分支**而非类名 —— 同一形态写在真实卡上不得转红', () => {
+    // ⭐ 这是「区分骨架屏与真实卡片」的核心用例：两类元素在**判红元素之外逐字相同**，
+    // 唯一区别是祖先分支的 `v-if` 条件里有没有 `'skeleton'`。
+    const realCard = [
+      '<template>',
+      '  <view v-else>',
+      '    <view v-for="item in list" class="bg-surface-container-lowest shadow-[var(--md-elevation-1)]" />',
+      '  </view>',
+      '</template>',
+    ].join('\n')
+    expect(scanSkeletonShadow(realCard, 'x.vue')).toEqual([])
+
+    // 同一条的真实仓库版本：`UserRow.vue` 的**贴面列表行仍带 elevation-1**（票 #884 的未关闭存量），
+    // 但它不在任何 `'skeleton'` 分支内 ⇒ 规则 9 必须判绿。
+    // 判据能同时做到「骨架红 / 真实卡绿」，才说明它不是在扫 `elevation-1` 全文。
+    //
+    // ⚠️ 锚点换文件的原因（如实登记）：本条原先锚在 `Bookmarks.vue` 的真实卡上，
+    // 而票 #883 已把那 34 处**贴面**卡的静止阴影全数归零（含 Bookmarks 的瀑布流卡），
+    // 「同文件内骨架绿 / 真实卡红」这一形态在全仓已不复存在。换成 `UserRow.vue`
+    // **不改变本条的语义**（仍是一个「不在 skeleton 分支内的真实卡带 elevation-1 ⇒ 判绿」），
+    // 只是把「真实卡带 elevation-1」这个前提锚到票 #884 尚未处置的那一处。
+    //
+    // ⚠️ **锚点第二次迁移的原因（本条自身的设计缺陷，如实登记）**：
+    // 上一次换锚的理由是「Bookmarks 的贴面卡已被 #883 归零」，换到了 `UserRow.vue`；
+    // 但 `UserRow` 同样是一处**待处置的贴面欠账**（票 #884），本票把它删掉后，
+    // 前提**又一次**消失 ⇒ **把反事实锚在「会变动的存量」上是设计缺陷**：
+    // 每处置一处欠账就要改一次测试，改到最后只会剩下「找一个还没删的」这种反向激励。
+    //
+    // 正确锚点：语义稳定、**本就不该删**的一类 —— 遮罩块的浮起分层
+    // （`bg-[var(--md-scrim)]` 上的 elevation 是高度语义，ADR-0212 决策 3 归 #884 的「遮罩」类，
+    //  与「贴面归零」是不同裁定）。它不随任何票的推进而消失。
+    const scrimCard = FILES.find((f) => f.rel === 'src/components/RestrictedNovelCard.vue')!.text
+    expect(scrimCard, '前提：遮罩卡仍带 elevation-1（高度语义，语义稳定锚点）').toMatch(
+      /shadow-\[var\(--md-elevation-1\)\]/,
+    )
+    expect(scanSkeletonShadow(scrimCard, 'src/components/RestrictedNovelCard.vue')).toEqual([])
+  })
+
+  it('反事实 B：显式零写法同样判红（决策 2 规则 3 —— 零阴影靠删除表达，不靠写 0）', () => {
+    const mk = (cls: string): string =>
+      `<template><view v-if="view === 'skeleton'"><view v-for="n in 5" class="${cls}" /></view></template>`
+    expect(scanSkeletonShadow(mk('shadow-[var(--md-elevation-0)]'), 'x.vue').map((v) => v.form)).toEqual([
+      'shadow-[var(--md-elevation-0)]',
+    ])
+    expect(scanSkeletonShadow(mk('shadow-none'), 'x.vue').map((v) => v.form)).toEqual(['shadow-none'])
+    // 变体前缀同样命中（`active:` 态的阴影也是阴影）
+    expect(scanSkeletonShadow(mk('active:shadow-[var(--md-elevation-1)]'), 'x.vue').length).toBe(1)
+  })
+
+  it('反事实 C：**往真实仓库的骨架行注入阴影**必须转红（不落盘，对象是本票刚归零的那一处）', () => {
+    // ⭐ 阳性对照的仓库版本：形态 A 用构造字符串，只能证明「正则认得这个形态」；
+    // 本条把**真实文件**的骨架行改回带阴影，判据必须当场转红 —— 证明它在扫真仓库、
+    // 且定位到的正是本票处置的那一行。
+    const branches = skeletonBranches(templateOf(real.text))
+    const row = branches[0]!.rows[0]!
+    const at = row.attrsStart + row.attrs.indexOf('class="') + 'class="'.length
+    const injected = real.text.slice(0, at) + 'shadow-[var(--md-elevation-1)] ' + real.text.slice(at)
+    expect(injected, '前提：注入必须真的改动了那一行').not.toBe(real.text)
+    expect(scanSkeletonShadow(real.text, rel), '前提：未注入时必须为 0 条').toEqual([])
+
+    const hits = scanSkeletonShadow(injected, rel)
+    expect(hits.map(fmt)).toEqual([
+      `skeleton-shadow｜${rel}:${lineOf(real.text, row.start)}｜shadow-[var(--md-elevation-1)]`,
+    ])
+  })
+
+  it('反事实 D：注释与 script 区里的 skeleton 字样不构成骨架分支（否则门禁会漏过整类缺陷）', () => {
+    const noise = [
+      '<script setup lang="ts">',
+      `// 历史：view === 'skeleton' 时给行加过 shadow-[var(--md-elevation-1)]`,
+      "const cond = \"view === 'skeleton'\"",
+      '</script>',
+      '<template>',
+      "  <!-- v-if=\"view === 'skeleton'\" shadow-[var(--md-elevation-1)] -->",
+      '  <view v-else class="shadow-[var(--md-elevation-1)]" />',
+      '</template>',
+    ].join('\n')
+    expect(scanSkeletonShadow(noise, 'x.vue')).toEqual([])
+  })
+
+  it('反事实 E：共享骨架组件的 scoped CSS box-shadow → 判红（类名扫描对它是盲区）', () => {
+    const css = '<style>\n.card {\n  box-shadow: var(--md-elevation-1);\n}\n</style>'
+    expect(scanSharedSkeletonShadow(css, 'src/components/SkeletonCard.vue').map(fmt)).toEqual([
+      'skeleton-shadow-component｜src/components/SkeletonCard.vue:3｜box-shadow:',
+    ])
+  })
+
+  it("反事实 F：未被 'skeleton' 条件包裹的区块不在本规则范围（口径边界，非漏网）", () => {
+    // `RelatedInlineSection.vue` 的加载中网格是「与内容并列的独立区块」，不是 `'skeleton'` 分支。
+    // 本条把这条边界钉成断言：口径有意不含它，日后要纳入口径得改这里，而不是让边界含糊。
+    const parallel = [
+      '<template>',
+      '  <view v-if="list.length">',
+      '    <view v-for="n in 4" class="shimmer rounded-[var(--md-shape-medium)]" />',
+      '  </view>',
+      '</template>',
+    ].join('\n')
+    expect(scanSkeletonShadow(parallel, 'x.vue')).toEqual([])
+  })
+
+  it('全仓：内联骨架分支内零阴影（规则 9 主判据）', () => {
+    const hits = scanAll(RULES.find((r) => r.id === 'skeleton-shadow')!)
+    expect(hits.map(fmt)).toEqual([])
+  })
+
+  it('全仓：三个纯骨架组件零阴影（含 scoped CSS 形态）', () => {
+    const rule = RULES.find((r) => r.id === 'skeleton-shadow-component')!
+    // 目标集必须恰是那三个（多一个 = 口径越界到真实内容共用组件上）
+    expect(targetsOf(rule).map((f) => f.rel).sort()).toEqual([...SHARED_SKELETON_COMPONENTS].sort())
+    expect(scanAll(rule).map(fmt)).toEqual([])
+  })
+
+  it('台账棘轮 A：9 个归零声明点逐条可解析、零阴影、且带「零阴影」明确表达', () => {
+    const problems: string[] = []
+    for (const site of SKELETON_ZERO_SITES) {
+      const file = FILES.find((f) => f.rel === site.path)
+      if (!file) {
+        problems.push(`${site.path}：文件不存在，台账已死`)
+        continue
+      }
+      const branches = skeletonBranches(templateOf(file.text))
+      const rows = branches.flatMap((b) => b.rows.filter((r) => /v-for="([^"]*)"/.exec(r.attrs)?.[1] === site.forExpr))
+      if (rows.length !== 1) {
+        problems.push(
+          `${site.path}：v-for="${site.forExpr}" 的骨架行解析到 ${rows.length} 个（应恰为 1）—— 骨架被改名/删除时必须同步台账`,
+        )
+        continue
+      }
+      const branch = branches.find((b) => b.rows.includes(rows[0]!))!
+      const hits = scanSkeletonShadow(file.text, site.path)
+      if (hits.length > 0) problems.push(`${site.path}：${hits.map(fmt).join(' / ')}`)
+      const markers = zeroMarkerCount(file.text, file.text.slice(branch.contentStart, branch.contentEnd))
+      if (markers === 0) {
+        problems.push(
+          `${site.path}：归零 marker 缺失（骨架分支内须留一条含「归零」与「ADR-0212 决策 7」的注释）`,
+        )
+      } else if (markers > 1) {
+        problems.push(`${site.path}：归零 marker 重复 ${markers} 条`)
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
+  it('台账棘轮 B：全仓 marker 数 == 台账条数（多标与漏标都转红）', () => {
+    // 为什么要有这条：台账 A 只保证「登记过的都归零并留痕」，管不住反向 ——
+    // 有人给一个**不是**归零声明点的地方贴 marker，或把某个已归零点从台账里删掉。
+    // 骨架分支带 marker 的**集合**必须与台账逐条相等，两个方向的漂移都在这里暴露。
+    const marked: string[] = []
+    for (const file of VUE_FILES) {
+      for (const b of skeletonBranches(templateOf(file.text))) {
+        if (zeroMarkerCount(file.text, file.text.slice(b.contentStart, b.contentEnd)) > 0) {
+          const forExpr = b.rows.map((r) => /v-for="([^"]*)"/.exec(r.attrs)?.[1]).join('+')
+          marked.push(`${file.rel}｜v-for="${forExpr}"`)
+        }
+      }
+    }
+    const expected = SKELETON_ZERO_SITES.map((s) => `${s.path}｜v-for="${s.forExpr}"`)
+    expect(
+      marked.sort(),
+      '带归零 marker 的骨架分支与台账不一致（多标 = 有人给非声明点贴了 marker；漏标 = 台账被删了条目）',
+    ).toEqual(expected.sort())
+  })
+})
+
+// ═══════════════════════════ 规则 10：贴面元素零阴影 ═══════════════════════════
+
+describe('规则 10 · 贴面元素零阴影（ADR-0212 决策 1 映射表 + 决策 2 规则 1 + 决策 3）', () => {
+  const FLAT = 'bg-surface-container-lowest'
+
+  it('阳性对照 A（构造形态）：贴面卡带 elevation-1 → 必须判红', () => {
+    const src = [
+      '<template>',
+      `  <view class="${FLAT} rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" />`,
+      '</template>',
+    ].join('\n')
+    expect(scanFlatSurfaceShadow(src, 'x.vue').map(fmt)).toEqual([
+      'flat-surface-shadow｜x.vue:2｜shadow-[var(--md-elevation-1)]',
+    ])
+  })
+
+  it('⭐ 区分「贴面」与「悬浮」：同样带 elevation-1，底色是悬浮档则**不得**转红', () => {
+    // 这是本规则的核心用例：门禁**不是**在扫 `elevation-1` 全文。
+    // 悬浮档（决策 1 表：菜单项 elevation-2 / 底部弹层 / 对话框 / snackbar 允许有阴影）
+    // 加上已经归零的骨架屏行，都必须保持绿 —— 否则这条门禁会逼人把正确的浮层阴影也删掉。
+    const floating = [
+      '<template>',
+      '  <view class="bg-surface-container-high shadow-[var(--md-elevation-2)]" />',
+      '  <view class="bg-surface-container-highest shadow-[var(--md-elevation-3)]" />',
+      '  <view class="bg-surface-container shadow-[var(--md-elevation-3)]" />',
+      '  <view class="bg-primary-container shadow-[var(--md-elevation-3)]" />',
+      '  <view class="bg-inverse-surface shadow-[var(--md-elevation-3)]" />',
+      '  <view class="bg-[var(--md-scrim)] shadow-[var(--md-elevation-1)]" />',
+      '</template>',
+    ].join('\n')
+    expect(scanFlatSurfaceShadow(floating, 'x.vue')).toEqual([])
+
+    // 真实仓库证据 + 构造的贴面正样本，**一条判据同时切得开两者**。
+    //
+    // ⚠️ 原先这里锚的是 `UserRow.vue` 的真实贴面行（票 #884 的未关闭欠账），
+    // 该阴影已在本票收尾时删除 ⇒ 锚点消失、断言空转。
+    // 改用**构造的贴面正样本**：判别力不依赖「还有哪处欠账没删」，
+    // 也就不会在每次清欠账时被迫改测试（那个模式会形成「找一个还没删的」的反向激励）。
+    const menu = FILES.find((f) => f.rel === 'src/components/RefreshableList.vue')!
+    expect(scanFlatSurfaceShadow(menu.text, menu.rel), '悬浮菜单项不得被本规则判红').toEqual([])
+    const flatRow = `<template><view class="bg-surface-container-lowest shadow-[var(--md-elevation-1)]" /></template>`
+    expect(scanFlatSurfaceShadow(flatRow, 'x.vue').map((v) => v.form)).toEqual([
+      'shadow-[var(--md-elevation-1)]',
+    ])
+  })
+
+  it('决策 2 规则 3：贴面上的显式零写法同样判红（零阴影靠删除，不靠写 0）', () => {
+    const mk = (cls: string): string => `<template><view class="${FLAT} ${cls}" /></template>`
+    expect(scanFlatSurfaceShadow(mk('shadow-[var(--md-elevation-0)]'), 'x.vue').map((v) => v.form)).toEqual([
+      'shadow-[var(--md-elevation-0)]',
+    ])
+    expect(scanFlatSurfaceShadow(mk('shadow-none'), 'x.vue').map((v) => v.form)).toEqual(['shadow-none'])
+    // 变体前缀同样命中（贴面元素上的 `active:shadow-…` 也是阴影）
+    expect(scanFlatSurfaceShadow(mk('active:shadow-[var(--md-elevation-1)]'), 'x.vue').length).toBe(1)
+  })
+
+  it('阳性对照 B（真实仓库注入）：往真实贴面卡注入阴影必须当场判红（不落盘）', () => {
+    // ⭐ 仓库版阳性对照：形态 A 只证明「正则认得这个形态」；
+    // 本条把**真实文件**的贴面卡改回带阴影，判据必须转红 —— 证明它在扫真仓库、
+    // 且定位到的正是本票处置掉的那一处。
+    const rel = 'src/pages/IllustList.vue'
+    const real = FILES.find((f) => f.rel === rel)!
+    expect(scanFlatSurfaceShadow(real.text, rel), '前提：该文件的贴面卡已归零').toEqual([])
+
+    const at = real.text.indexOf('class="bg-surface-container-lowest')
+    expect(at, '前提：该文件确有贴面卡').toBeGreaterThanOrEqual(0)
+    const injected =
+      real.text.slice(0, at) + 'class="bg-surface-container-lowest shadow-[var(--md-elevation-1)] ' + real.text.slice(at + 'class="'.length)
+    expect(injected, '前提：注入必须真的改动了那一行').not.toBe(real.text)
+    expect(scanFlatSurfaceShadow(injected, rel).map(fmt)).toEqual([
+      `flat-surface-shadow｜${rel}:${lineOf(real.text, at)}｜shadow-[var(--md-elevation-1)]`,
+    ])
+  })
+
+  it('本票处置的 34 处贴面卡逐条可定位且已归零（防止「删了别处、漏了这里」）', () => {
+    // 不用「marker + 台账」那套（#894 登记的脆弱面：marker 是行级匹配，换行即误红）。
+    // 改用**机器可数的结构化断言**：枚举全仓每个贴面元素，断言带阴影的那些**全部命中白名单**
+    // （即白名单外一个都不剩）。「这 34 处曾经有过阴影」由 git diff 证明；门禁只守「现在没有」这一面。
+    const flatElements: string[] = []
+    let elements = 0
+    for (const file of VUE_FILES) {
+      const masked = templateOf(file.text)
+      let cursor = 0
+      while (cursor < masked.length) {
+        const t = tagAt(masked, cursor)
+        if (!t) break
+        if (!t.closing) {
+          const classAt = CLASS_ATTR.exec(t.attrs)
+          if (classAt && classAt[1]!.split(/\s+/).some((c) => FLAT_SURFACE_BG.has(c))) {
+            elements++
+            for (const m of classAt[1]!.matchAll(SHADOW_UTIL)) {
+              const v: Violation = {
+                rule: 'flat-surface-shadow',
+                path: file.rel,
+                line: lineOf(file.text, t.start),
+                form: m[0],
+              }
+              if (!isWhitelisted(v)) flatElements.push(fmt(v))
+            }
+          }
+        }
+        cursor = t.openEnd
+      }
+    }
+    // 前提：全仓确有大量贴面元素（否则本规则是空跑 ⇒ 这条断言恒真）
+    expect(elements, '前提：全仓确有大量贴面元素（实测 64 个 <view> 带贴面底色）').toBeGreaterThanOrEqual(50)
+    expect(flatElements, '仍有贴面元素带阴影，且未登记进白名单（票 #883 的处置漏了这里）').toEqual([])
+  })
+
+  it('反事实：注释区 / script 区 / 子元素的阴影都不构成「贴面元素自带阴影」', () => {
+    // templateOf 已把 script / style / 注释整块掩码 ⇒ 注释里写完整 class 也不该判红。
+    const noise = [
+      '<script setup lang="ts">',
+      `const c = '${FLAT} shadow-[var(--md-elevation-1)]'`,
+      '</script>',
+      '<template>',
+      `  <!-- <view class="${FLAT} shadow-[var(--md-elevation-1)]" /> -->`,
+      '  <view :class="rowClass" />',
+      '</template>',
+    ].join('\n')
+    expect(scanFlatSurfaceShadow(noise, 'x.vue')).toEqual([])
+  })
+
+  it('全仓：贴面元素零阴影（规则 10 主判据，白名单外）', () => {
+    const hits = scanAll(RULES.find((r) => r.id === 'flat-surface-shadow')!).filter(
+      (v) => !isWhitelisted(v),
+    )
+    expect(hits.map(fmt)).toEqual([])
+  })
+
+  it('边界成对：内联 `style="box-shadow: …"` 同样判红（类名扫描对它是盲区）', () => {
+    const src = `<template><view class="${FLAT}" style="box-shadow: var(--md-elevation-1);" /></template>`
+    expect(scanFlatSurfaceShadow(src, 'x.vue').map(fmt)).toEqual([
+      'flat-surface-shadow｜x.vue:1｜box-shadow:',
+    ])
+  })
+
+  it('接线断言：scoped CSS 里的贴面 `box-shadow` 是**已知盲区**，本规则不覆盖（ADR 复核判据 3 记录）', () => {
+    // 刻意**不**在此条转红：`<style>` 块被 templateOf 掩码掉了，贴面卡在 scoped CSS 里
+    // 声明 box-shadow 本规则看不见（GlassCard.vue 那种形态）。把这条钉成断言，
+    // 是为了防止后人误以为「贴面零阴影已全站覆盖」而漏掉这条通道 ——
+    // 真要覆盖需要另一条独立规则（与规则 9 的 skeleton-shadow-component 同款形态）。
+    const src = `<template><view class="${FLAT}" /></template>\n<style>\n.a { box-shadow: var(--md-elevation-1); }\n</style>`
+    expect(scanFlatSurfaceShadow(src, 'x.vue')).toEqual([])
+  })
+})

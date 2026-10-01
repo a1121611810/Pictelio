@@ -18,6 +18,13 @@ export interface M3SegmentOption<T extends string> {
 
 <script setup lang="ts" generic="T extends string">
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const modelValue = defineModel<T>({ required: true })
 
@@ -62,7 +69,7 @@ function select(value: T): void {
     <view
       v-for="(option, index) in options"
       :key="option.value"
-      :class="segmentClass(modelValue === option.value, index)"
+      :class="[pressColor.className, segmentClass(modelValue === option.value, index)]"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="option.a11yLabel"
       @tap="select(option.value)"

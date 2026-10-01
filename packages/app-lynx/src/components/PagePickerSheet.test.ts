@@ -54,6 +54,8 @@ function classAttrContaining(token: string): string[] {
 }
 
 const TEMPLATE = stripHtmlComments(SOURCE)
+/** 再剥整行 `//` 注释：本文件头注里会提到 @tap.stop 等字样，负向断言必须落在代码本文上 */
+const CODE = TEMPLATE.replace(/^\s*\/\/.*$/gm, '')
 const TOKENS = classAttrTokens(SOURCE)
 const TINT = 'bg-surface-tint'
 
@@ -156,11 +158,28 @@ describe('PagePickerSheet 真实消费表面色调令牌（--md-surface-tint）'
   })
 
   it('色调层是面板的首个子元素（裸区 tap 仍冒泡到面板的 @tap.stop，防穿透语义不变）', () => {
-    const panel = TEMPLATE.indexOf('@tap.stop')
+    // ⚠️ #878 起面板是 <SheetShell>（几何壳收口，ADR-0211 决策 4），@tap.stop 因此**不在本文件**。
+    //    这条断言原先靠 `indexOf('@tap.stop')` 定位面板，而本文件里的 @tap.stop 只在注释中出现
+    //    —— 判据实际命中的是散文（属「扫散文找关键词」那类脆弱形态）。改为结构化定位：
+    //    面板 = 本文件唯一的 <SheetShell> 标签；色调层必须落在它之后、头部行之前。
+    const panel = TEMPLATE.indexOf('<SheetShell')
     const layer = TEMPLATE.indexOf(TINT)
     const header = TEMPLATE.indexOf('t(\'pagePicker.title\')')
-    expect(panel, '找不到底部面板').toBeGreaterThan(-1)
-    expect(layer).toBeGreaterThan(panel)
-    expect(layer).toBeLessThan(header)
+    expect(panel, '找不到底部面板（<SheetShell>）').toBeGreaterThan(-1)
+    expect(layer, '找不到色调层').toBeGreaterThan(panel)
+    expect(layer, '色调层必须排在头部行之前').toBeLessThan(header)
+    // 面板自身的防穿透面不得回退到本文件手写（命中测试语义单点化在 SheetShell）
+    expect(CODE, '面板 @tap.stop 不应回到本组件').not.toContain('@tap.stop')
+  })
+
+  it('壳的两段式退场接线：相位下传 + 关闭走状态机（不是直接 emit）', () => {
+    // ADR-0211 决策 3：Lynx 无 transitionend，退场只能显式建模（exit 相位 → 计时器 → emit）
+    // 顶层 computed 形态（`dismiss.phase` 是内嵌 Ref，模板不解包 ⇒ 必须经 computed 转一层）
+    expect(TEMPLATE).toContain(':phase="motionPhase"')
+    expect(SOURCE).toContain("computed<'enter' | 'exit'>(() => (dismiss.phase.value === 'enter' ? 'enter' : 'exit'))")
+    expect(TEMPLATE).toContain('@close="dismiss.requestClose()"')
+    expect(TEMPLATE).toContain(':panel-class="PANEL_CLASS"')
+    expect(SOURCE).toContain("onDismissed: () => emit('close')")
+    expect(SOURCE).toContain('dismiss.dispose()')
   })
 })

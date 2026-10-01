@@ -38,7 +38,14 @@ describe('推荐轮播小说滑页收藏入口（票 #707）', () => {
     expect(code.match(/class="mt-5"/g) ?? []).toHaveLength(2)
     // 字数仍在（小说滑页保留「N 字」），且退到 ♥ 下方次行
     expect(code).toMatch(/t\('recommended\.charCount'/)
-    expect(code).toContain('class="text-label-medium text-white/70 mt-2"')
+    // [#891] 「次行」现在还自带一层稳定底色：它落在收藏 chip 之下、**不在**上方那块
+    // inverse-surface 底色里，不给它自己的底就会重新落回渐变最浅的那一段
+    // （真机实测该处白字 ≈1.4:1）。断言因此从「白字类名」改为「底色块 + 次行位置」——
+    // 断言的**意图**（字数是 ♥ 下方的次级行）没变，变的只是它靠什么保证可读。
+    expect(code).toContain('class="text-label-medium text-inverse-on-surface"')
+    expect(code).toMatch(
+      /class="self-start mt-2 px-2 py-0\.5 rounded-\[var\(--md-shape-full\)\] bg-inverse-surface"/,
+    )
   })
 
   it('两 kind 的 :key 取 feed 跨 kind 唯一键（禁止裸 id：插画/小说 id 相同会复用实例 → init-only props 冻结）', () => {

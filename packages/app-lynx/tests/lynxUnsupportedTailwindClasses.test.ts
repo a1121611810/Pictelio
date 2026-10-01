@@ -18,8 +18,21 @@
  *
  * 根因（实跑定位，非推断）：`@lynx-js/tailwind-preset@0.5.1` 的 `lynx.js` 里设了
  * `corePlugins: DEFAULT_CORE_PLUGINS` —— 一份 **57 项白名单**，`pointerEvents` 不在其中
- * （同样被裁掉的还有 `transition` / `cursor` / `select` / `transform`；`opacity` 在）。
+ * （同样被裁掉的还有 `cursor` / `select`；`opacity` 在）。
  * Lynx 原生 hit-testing 不实现 `pointer-events` 这个 CSS 属性，preset 是**故意**裁掉的。
+ *
+ * ⚠️ **「不在白名单 ⇒ 死类名」不能当通用判据用**（本段原先把 `transition` / `transform`
+ * 一并写成「同样被裁」，两处都已被实跑推翻，故此列只保留确定被裁的项）：
+ *   · `transition` 族（`transitionProperty` / `transitionDuration` /
+ *     `transitionTimingFunction`）确实不在白名单里，但 preset 用**自定义 plugin**
+ *     （`createPlugin` + `matchUtilities`）把它们**补了回来、绕开白名单过滤**
+ *     ⇒ 产物里 `transition-colors` / `duration-[…]` / `ease-[…]` 都是真规则，
+ *     真机取样也确认过渡会插值。**`transition-*` 不是死类名。**
+ *   · `transform` 族走同一条自定义 plugin 通道，工具类**能产出规则**；它失效的原因是规则引用的
+ *     `--tw-*` 变量在产物里**从未被定义**（Tailwind 的 `* { --tw-tx: 0; … }` 默认值块不在
+ *     产物中），`var()` 取不到值 ⇒ **渲染为空**。
+ *   ⇒ 白名单只回答「官方 corePlugin 有没有被保留」，**不**回答「这个类名在 Lynx 上能不能用」。
+ *     判死类名的判据是**产物里有没有对应规则**；下方白名单快照只锁「前提」这一层。
  *
  * ⚠️ 「57」这个数**曾经被我写成 129**（凭印象，没数）。preset 升级会改它，所以本文件
  * 下方有一条 `白名单快照` 判据把真实内容钉住并在 preset 升级时转红 —— **数字以那条

@@ -6,6 +6,13 @@ import { useAuthStore } from '../stores/authStore'
 import { fatalError, presentError } from '../utils/errorPresentation'
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 // 会话失效（UNAUTHORIZED）全屏错误页 —— 定稿方案 C（全屏品牌色块，UI 原型选定）：
 // - 进入语义：router 装配的 handler resetHistory + navigate('/error', { replace }) → 历史栈为空，返回键
@@ -40,6 +47,7 @@ function backToLogin() {
     <!-- M3 反色 filled 按钮：on-primary 底 + primary 字（全圆角 pill） -->
     <view
       class="mt-12 px-12 h-[10.667vw] rounded-[var(--md-shape-full)] bg-primary-on active:bg-layer-pressed-on-surface flex items-center justify-center"
+      :class="pressColor.className"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
       @tap="backToLogin"

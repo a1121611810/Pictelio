@@ -12,6 +12,13 @@ import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 // ─── 稍后看列表页（ADR-0191 D5 / spec docs/specs/lynx-watch-later.md D7 / #753 T4）───
 // 列表数据是本地同步快照（store.items，新在前）：**全量渲染、零网络依赖、无分页、无列表尾**
@@ -76,7 +83,8 @@ function openItem(item: WatchLaterItem): void {
         <view class="w-full">
           <!-- 快照卡：行点击进实时详情（事件绑内层 view——list-item 根级 @tap 原生无效，ADR-0055 家族） -->
           <view
-            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"
+            :class="pressColor.className"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="WATCH_LATER_A11Y_LABELS.openItem"
             @tap="openItem(item)"

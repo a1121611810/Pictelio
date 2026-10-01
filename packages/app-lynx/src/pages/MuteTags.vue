@@ -15,6 +15,13 @@ import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { MUTE_TAGS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
+
+/** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
+ *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写时长/曲线字面量；
+ *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
+const { pressColor } = useMotion()
+
 
 const settings = useSettingsStore()
 
@@ -49,13 +56,14 @@ function removeTag(name: string): void {
       <view
         v-for="name in tags"
         :key="name"
-        class="flex flex-row items-center justify-between m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+        class="flex flex-row items-center justify-between m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="name"
       >
         <text class="flex-1 text-body-medium text-surface-on [max-line:2]">{{ name }}</text>
         <view
           class="self-center h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] active:bg-layer-pressed-on-surface"
+          :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="MUTE_TAGS_A11Y_LABELS.remove"
           @tap="removeTag(name)"

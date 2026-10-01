@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import { t } from '../i18n'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { useReducedMotion } from '../composables/useReducedMotion'
+import { useMotion } from '../composables/motion'
+import { chromeSuppressed } from '../composables/useImmersiveChrome'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import { screenHeightVw as deriveScreenHeightVw, type ViewportContentSize, type ViewportSystemInfo } from '../utils/viewportGeometry'
 import { subscribeViewportSize } from '../utils/viewportSizeBridge'
@@ -101,7 +103,11 @@ const scrimStyle = computed<Record<string, string>>(() => ({
 
 /** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。
  *  search 模式（ADR-0132 全局搜索）较 menu 模式上移一档：feed 分页 FAB 同角竖排堆叠不遮挡。 */
+const { pressOpacity } = useMotion()
+
 const fabStyle = computed<Record<string, string>>(() => ({
+  // 按压过渡合进同一个 style：此元素已有 transform 等几何值，另挂 :style 会整条覆盖它们
+  ...pressOpacity.value,
   left: `${fabCx}vw`,
   top: `${view.value.mode === 'search' ? fabCySearch.value : fabCy.value}vw`,
   width: `${FAB_SIZE_VW}vw`,
@@ -205,7 +211,7 @@ function onFabTap(): void {
        自身又不参与命中测试。
        [lynx:fix] 原生 LynxView hit-testing 不识别 pointer-events（ADR-0123）：
        全屏元素在关闭态必须从渲染树移除（v-if），否则吞掉页面全部点击。 -->
-  <view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">
+  <view v-if="view.visible && !chromeSuppressed" class="absolute z-40" style="top: 0; left: 0">
     <!-- 遮罩：展开时覆盖全屏（显式 vw 尺寸），点空白收起（全屏交互面，@tap 必须） -->
     <view
       v-if="view.isOpen"
@@ -258,7 +264,7 @@ function onFabTap(): void {
          上移一档与 feed 分页 FAB 竖排堆叠；遮罩/环层 v-if="view.isOpen"（非 tab 路由恒 false，
          关闭态渲染树无全屏元素——ADR-0123 约束）。 -->
     <view
-      class="absolute z-30 flex items-center justify-center rounded-[var(--md-shape-large)] bg-primary-container shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
+      class="absolute z-30 flex items-center justify-center rounded-[var(--md-shape-large)] bg-primary-container shadow-[var(--md-elevation-3)] active:opacity-80"
       :class="view.isBusy ? 'opacity-60' : ''"
       :style="fabStyle"
       :accessibility-element="A11Y_ELEMENT_ENABLED"

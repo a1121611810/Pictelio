@@ -224,11 +224,18 @@ describe('SearchSheet 数据流与生命周期', () => {
     expect(source).toContain('void controller.loadMore()')
   })
 
-  it('关闭：scrim/× 统一 BottomSheet @close="onClose" → closeSearch()（返回键由 searchSheetStore 注册的 modalStack 承担）', () => {
+  it('关闭：scrim/× 统一 BottomSheet @close="onClose" → 两段式退场后 closeSearch()（返回键由 searchSheetStore 注册的 modalStack 承担）', () => {
     expect(source).toContain('@close="onClose"')
+    // ⚠️ #878：onClose 不再直接 closeSearch()——先进 exit 相位播退场动画，
+    //    计时器（与退场动画同源、减弱动效开启时归零）到点才真正 closeSearch。
+    //    Lynx 无 transitionend，退场无法事件驱动，只能显式建模（ADR-0211 决策 3）。
     const fn = /function onClose\(\): void \{[\s\S]*?\n\}/.exec(source)
     expect(fn).not.toBeNull()
-    expect(fn![0]).toContain('closeSearch()')
+    expect(fn![0]).toContain('dismiss.requestClose()')
+    // closeSearch 收敛在状态机的终态回调里（唯一一处），不在 tap 处理器里
+    const machine = /useSheetDismiss\(\{[\s\S]*?\}\)/.exec(source)
+    expect(machine, '未接两段式退场状态机').not.toBeNull()
+    expect(machine![0]).toContain('onDismissed: () => searchSheet.closeSearch()')
     // 弹层不重复注册返回键（D4：searchSheetStore.openSearch 已注册）——防双注册
     // （语义化断言：注册行为 = 出现 registerModal 字样，风格无关）
     expect(source).not.toContain('registerModal')

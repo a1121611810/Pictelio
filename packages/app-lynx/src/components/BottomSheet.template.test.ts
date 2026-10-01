@@ -32,7 +32,13 @@ describe('BottomSheet 命中测试语义四要素（ADR-0123/0147，禁止改动
   it('② scrim = absolute inset-0 bg-scrim + @tap 关闭（原生 hit-testing：全屏层必须自身是交互面）', () => {
     expect(code).toContain('class="absolute inset-0 bg-scrim"')
     // 缺省（无 a11y）分支：类串与 @tap 同标签逐字节相邻（CommentOverlay/SearchSheet 迁移前写法）
-    expect(code).toMatch(/v-else class="absolute inset-0 bg-scrim" @tap="emit\('close'\)" \/>/)
+    // ⚠️ #878 起两分支都多一个 :style="scrimStyle"（遮罩淡入/淡出，ADR-0211 决策 4）：
+    //    淡入是**一次性播放**的入场动画，只能走 @keyframes（Tailwind 无 opacity 关键帧工具类），
+    //    且 Lynx 无 transitionend 事件可挂 ⇒ 退场相位由 :motion-phase prop 切换、计时器在调用方。
+    expect(code).toMatch(/v-else class="absolute inset-0 bg-scrim" :style="scrimStyle" @tap="emit\('close'\)" \/>/)
+    // 动画绑定点两处（遮罩 + 面板）都必须存在，否则「有相位 prop 但没绑样式」= 静默无动效
+    expect((code.match(/:style="scrimStyle"/g) ?? []).length).toBe(2)
+    expect((code.match(/:style="panelStyle"/g) ?? []).length).toBe(1)
   })
 
   it('④ z 序 scrim < 面板：DOM 顺序 scrim 在前（同层兄弟靠后覆盖，不依赖 z-index）', () => {
@@ -153,8 +159,23 @@ describe('BottomSheet 纪律（ADR-0116 / ADR-0190 排除面 / Tailwind 约定�
   })
 
   it('无 scoped/手写 style 块、无 rem、无硬编码色值（app-lynx Tailwind 硬性约定）', () => {
+    // ⚠️ keyframes 不在本组件：帧体在 SheetShell.vue（BottomSheet 只发 inline 简写）。
+    //   顺带一条纪律红利——本组件因此连 <style> 块都没有，帧体改错也不会被局部样式作用域掩盖。
     expect(src).not.toContain('<style')
     expect(code).not.toMatch(/[0-9]rem/)
     expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+  })
+
+  it('动效档位经 composables 唯一入口（motionPhase 只做相位，不自带时长/曲线）', () => {
+    expect(code).toContain("from '../composables/useSheetDismiss'")
+    expect(code).toContain('SHEET_ANIMATION')
+    expect(code).toContain('motion.panelStyle(props.motionPhase)')
+    expect(code).toContain('motion.scrimStyle(props.motionPhase)')
+    // 时长/曲线字面量零出现（唯一入口纪律；档位在 composables/motion.ts）
+    expect(code).not.toMatch(/\d+ms/)
+    expect(code).not.toMatch(/cubic-bezier/)
+    // 相位 prop 必须有缺省值：不传 = 只有入场动画（未接相位的调用方行为不变）
+    expect(code).toContain("motionPhase?: 'enter' | 'exit'")
+    expect(code).toContain("{ panelHeight: 'fixed', motionPhase: 'enter' }")
   })
 })
