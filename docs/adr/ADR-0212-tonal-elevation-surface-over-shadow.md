@@ -291,7 +291,8 @@ grep -rhoE 'active:shadow' --include='*.vue' packages/app-lynx/src | wc -l
    - 决策 8 的多层 `box-shadow` 探针**阳性**（证明多层渲染在真机可用）；
    - 出现一个**确实需要高于 level-3 悬浮度**的 UI（须写明它为什么不是 bottom sheet / dialog）；
    - 真机截图对比确认观感可接受。
-   届时**先补 `surface-container-highest` 的色调档位**（该档已有 28 处消费，是现成的最高色阶），
+   届时**先补 `surface-container-highest` 的色调档位**（该档已有 29 处消费，是现成的最高色阶；
+   2026-10-01 快照，复算：`grep -rhoE 'surface-container-highest' --include='*.vue' packages/app-lynx/src | wc -l`），
    再开阴影档 —— 仍是「主在前、辅在后」。
 
 ### 决策 5：`--md-surface-tint` 的角色边界 —— 它**不承载**层级
@@ -508,8 +509,9 @@ ADR-0207 决策 7 留了一条**未验证的引擎约束**：
 - **`active:shadow-elevation-*` 出清后，按压反馈只剩状态层与 opacity 两条通道**，
   而 `primary-container` 底色的状态层档位**缺失**（决策 6）⇒ 该缺口需要在令牌层补齐，
   本 ADR 不越界处理。
-- **静态门禁的口径必须从「类名」扩到「CSS 声明」**（`GlassCard.vue` 是既有反例），
-  否则新的 elevation 门禁会留一个已知盲区。
+- **静态门禁的口径必须从「类名」扩到「CSS 声明」**（理由见复核判据 3：**类名与 CSS 声明是
+  两条互不覆盖的扫描路径**；原反例锚点 `GlassCard.vue` 的声明已随 #884 删除，仓内现存
+  `box-shadow` 声明为 0 处），否则新的 elevation 门禁会留一个已知盲区。
 
 ## 复核判据
 
@@ -522,7 +524,14 @@ ADR-0207 决策 7 留了一条**未验证的引擎约束**：
    `v-for="n in …"` 骨架块内或列表行容器内者，**不得**带任何 `shadow-[var(--md-elevation-1..5)]`。
 2. **无 `active:shadow`**：`src/**/*.vue` 中 **`active:shadow-[var(--md-elevation-*)]` 命中数必须为 0**。
 3. **扫描面覆盖 CSS 声明**：判据 1/2 的扫描**必须同时覆盖 `.vue` 的 `<style>` 块**
-   （反例锚点：`GlassCard.vue` 的 scoped `box-shadow: var(--md-elevation-1)`）。
+   （只扫类名会漏掉直接写在样式块里的 `box-shadow: var(--md-elevation-*)`）。
+   ⚠️ **锚点已失效，勿再引用**：本条最初以 `GlassCard.vue` 的 scoped
+   `box-shadow: var(--md-elevation-1)` 作反例锚点，但该声明已随 **#884** 删除
+   （归零 = 删声明，见决策 2 规则 3）。**2026-10-01 复算：`src/**/*.vue` 中存活的
+   `box-shadow` 声明为 0 处** ⇒ 仓内已无可复现的反例，锚点从「可核对」退化为「不可核对」。
+   保留本条的**理由不是那个文件**，而是**结构性理由**：类名扫描与 CSS 声明扫描是两条
+   互不覆盖的路径，只要其中一条不实现，盲区就在。实现时请自行构造一个正样本临时注入
+   以验证抽取面（不得落盘到 `src/`），不要指望仓内还留着一个现成反例。
    ⚠️ 已知结构性边界：`.ts` 全文与 `.vue` 的 `<script>` 块内拼接的类名仍是盲区
    （与 ADR-0207 决策 8 消费约束节登记的 C3 盲区同源，此处不重复展开）。
 4. **外推档零消费**：`--md-elevation-4` / `-5` 在 `src/**/*.vue` 的消费处数必须为 **0**；
