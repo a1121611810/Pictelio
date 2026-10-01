@@ -110,13 +110,22 @@ const NESTED_DIR_ANCHOR = /^pages\/.*\.vue$/
 /** 各文件切出的声明条数下界（防正则塌陷）。按**条数**计（逗号分段的多值 transition 各自算一条）。
  *  实测：全仓 75 个生产 .vue 里只有这 5 个用 CSS / 脚本对象字面量声明 animation/transition
  *  （其余组件要么无动效，要么走 useReducedMotion 的 :style 绑定），故下界贴齐现状、不虚高。
- *  这张表同时是「文件掉出扫描面」的哨兵：某文件被删/被改名后 count 变 0 即转红。 */
+ *  这张表同时是「文件掉出扫描面」的哨兵：某文件被删/被改名后 count 变 0 即转红。
+ *
+ * ⚠️ `RefreshableList.vue` 的下界在 #879（ADR-0211 决策 5）后由 6 降到 3：
+ *   删除的恰是 `.item-rise-1/2/extra` 三条，它们把错峰延迟写死在 CSS 里。
+ *   菜单项入场的 animation 简写改由 composables/motion.ts 的 listItemStyle(i) 以
+ *   **inline :style 运行时拼装**产出，故本门禁的「源码内声明」抽取器切不到它
+ *   ——这不是扫描面塌陷（该文件的 scrim-in / fab-spin 两条仍在，见本文件与
+ *   tests/listItemStaggerContract.test.ts 的 L1 对时长的断言）。
+ *   ⚠️ 由此产生一条**已登记的失效面**：inline 形态的动效声明不在本门禁扫描面内，
+ *     改由 tests/motionContract.test.ts 的 M2（导出的预设返回值）承担。 */
 const DECLARATION_LOWER_BOUND: Record<string, number> = {
   'App.vue': 1,
   'components/BookmarkButton.vue': 4,
   'components/GlassCard.vue': 1,
   'components/GlobalFab.vue': 4,
-  'components/RefreshableList.vue': 6,
+  'components/RefreshableList.vue': 3,
 }
 const DECLARATION_TOTAL_LOWER_BOUND = 15
 
@@ -541,14 +550,21 @@ describe('时长令牌化（#854 验收 3）：全仓生产 .vue 的 animation/t
 
     const refreshable = stripComments(SOURCES['components/RefreshableList.vue']!)
     expect(refreshable).toMatch(/\.scrim-in \{[^}]*animation: scrim-in var\(--durationNormal\)/)
-    for (const cls of ['item-rise-1', 'item-rise-2', 'item-rise-extra']) {
-      expect(refreshable).toMatch(
-        new RegExp(`\\.${cls} \\{[^}]*animation: item-rise var\\(--durationMedium1\\)`),
-      )
-    }
-    // stagger 延迟按验收条件保留字面量（改了就红：不是本票授权的改动面）
-    expect(refreshable).toMatch(/\.item-rise-2 \{[^}]*animation: item-rise var\(--durationMedium1\) var\(--motion-emphasized-decelerate\) 60ms both;/)
-    expect(refreshable).toMatch(/\.item-rise-extra \{[^}]*animation: item-rise var\(--durationMedium1\) var\(--motion-emphasized-decelerate\) 120ms both;/)
+    // ⚠️ #879（ADR-0211 决策 5）后 `.item-rise-1/2/extra` 三个类**已删除**：
+    // 它们把 0/60/120ms 的错峰延迟写死在 CSS 里，而错峰必须来自 motion.ts 预设。
+    // 帧体（几何量）仍在本文件定义并被 7 个列表页跨文件消费；时长/曲线/延迟槽
+    // 改由 composables/motion.ts 的 listItemStyle(i) 单点提供。
+    // 本组断言改为钉住**新的等价载体**（时长时间槽仍是 var(--durationMedium1)），
+    // 并反向断言旧类确已消失（防止「删了类又留一份字面量延迟」）。
+    expect(refreshable).toMatch(/@keyframes item-rise/)
+    expect(refreshable).toMatch(/:style="listItemStyle\(0\)"/)
+    expect(refreshable).toMatch(/:style="listItemStyle\(2\)"/)
+    expect(refreshable, '旧的硬编码错峰类应已删除（延迟归 motion.ts 预设）').not.toMatch(
+      /\.item-rise-(?:1|2|extra)\s*\{/,
+    )
+    // stagger 延迟按验收条件不由本门禁判（ADR-0211 决策 5 起归 motion.ts 预设）；
+    // 其「时长槽仍是 250ms 令牌」由 tests/motionContract.test.ts 的 M2 + 本文件的
+    // token 登记表共同钉住，时长档位没有因本次迁移而改变。
 
     const fab = stripComments(SOURCES['components/GlobalFab.vue']!)
     // 缓动槽的 oracle 取自 tokens.css：与被换掉的行内 cubic-bezier **等值**的 motion 令牌。
@@ -604,12 +620,15 @@ describe('时长令牌化（#854 验收 3）：全仓生产 .vue 的 animation/t
       expect(scanDurations(file, src).violations, `${file} 真实源码当前必须无违规`).toEqual([])
     }
     const listPath = 'components/RefreshableList.vue'
+    // ⚠️ 原反事实注入点是 `.item-rise-2` 那一行（#879 后随该类一并删除）。
+    // 改注入到本文件**仍然存在**的等价行 `.scrim-in`（同样是 200ms 档的
+    // item/scrim 入场声明）⇒ 判据内核不变，注入点随资产迁移而迁移。
     const brokenList = SOURCES[listPath]!.replace(
-      'animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 60ms both;',
-      'animation: item-rise 250ms var(--motion-emphasized-decelerate) 60ms both;',
+      'animation: scrim-in var(--durationNormal) var(--motion-emphasized-decelerate) both;',
+      'animation: scrim-in 200ms var(--motion-emphasized-decelerate) both;',
     )
     expect(brokenList, '改动没落到源码上，反事实无效').not.toBe(SOURCES[listPath])
-    expect(scanDurations(listPath, brokenList).violations.join('|')).toContain('250ms')
+    expect(scanDurations(listPath, brokenList).violations.join('|')).toContain('200ms')
 
     const fabPath = 'components/GlobalFab.vue'
     const motion = motionTokensWithValue('0.05,0.7,0.1,1')[0]!

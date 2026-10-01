@@ -60,6 +60,17 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor } = useMotion()
 
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：设置分组卡片逐块错峰入场，延迟来自预设。
+ *
+ * ⚠️ **账户组（首个 `<GlassCard>`）刻意不接入**，理由是技术冲突而非遗漏：
+ *  GlassCard 自带 inline `transform`（液态弹性跟手，`createLiquidElastic` 输出），
+ *  而 `item-rise` 的 `both` 填充会让终态 `transform: translateY(0) scale(1)` **长期驻留**
+ *  ——CSS 动画在播放期与填充期都高于 inline 声明，两者会在同一属性上互相覆盖。
+ *  给 GlassCard 挂入场会静默废掉它的弹性跟手（构建全绿、单测全绿、真机才有感）。
+ *  ⇒ 账户组保持原样，其余分组卡片走统一出口；这是本仓已登记的同类取舍
+ *  （与 M3Switch 收口同一原则：不为观感改动破坏已验证的交互面）。 */
+const { listItemStyle } = useMotion()
+
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -676,7 +687,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       <!-- 全屏模式组（#806）：从客户端组移出。它与引擎无关，是 Lynx 侧沉浸式功能
            （spec docs/specs/lynx-systembars.md D5：隐藏系统栏 + 边缘滑动唤出），
            不得随单引擎隐藏客户端组而一并消失。 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(0)">
         <view
           class="flex flex-row items-center justify-between py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -694,7 +705,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 网络组（ADR-0199 D4 / #779：限流退避四参数设置；卡片/行结构镜像客户端组） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(1)">
         <text
           class="text-title-small font-medium text-surface-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -781,7 +792,7 @@ function pickAppearanceMode(mode: DarkModeId) {
            T2 增补（spec lynx-night-mode §4.7）：
              - 顶部加「外观模式」M3 segmented button 三格（亮/暗/跟随），点击即时切换
              - 色块同步挂 .dark 类 → 暗色 resolved 下显示对应主题的暗色色板真实主色（WYSIWYG） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(2)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.appearance.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.appearance.themeColorHint') }}</text>
         <!-- 模式组标签（i18n 键 me.appearance.mode 的真实渲染点）：原实现只有模式名（亮色/暗色/
@@ -936,7 +947,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 内容组（ADR-0051：R18/R18G 开关） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(3)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.content.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.content.hint') }}</text>
         <view
@@ -1027,7 +1038,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- T6：动图播放组 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(4)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.ugoira.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.ugoira.hint') }}</text>
         <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container（range 档二次确认仍走 pickUgoiraMode） -->
@@ -1039,7 +1050,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- issue #148 T2：详情画质档位组（medium=标准 / large=高清 / original=原图） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(5)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.quality.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.quality.hint') }}</text>
         <!-- M3 segmented button（三档）：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
@@ -1047,7 +1058,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 下载格式组（spec download-manager §5）：全局统一，不可逐图 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(6)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.download.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.download.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
@@ -1170,7 +1181,7 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 导出组（spec docs/specs/novel-export.md §6/§7.2）：全局默认格式 + 三项内容开关 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(7)">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.export.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.export.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
@@ -1304,12 +1315,12 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 翻译设置（spec docs/specs/app-lynx-novel-translation.md §6.1；T9 #637） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(8)">
         <SettingsEndpoint />
       </view>
 
       <!-- 退出登录（危险操作独立沉底） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(9)">
         <view
           class="py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"

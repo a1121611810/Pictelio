@@ -201,6 +201,10 @@ export interface EnterOptions {
   easing?: MotionEasingKey
   /** `@keyframes` 的动画名（帧体由消费方的 `<style>` 块定义） */
   animationName: string
+  /** `animation-delay` 槽（ms）。省略则**不写该槽**。
+   *  ⚠️ 只接受 `staggerDelay()` 的产出——延迟是时序编排量，组件自定即第二事实源
+   *  （ADR-0211 决策 5 的收敛点）。R2 开启时本槽整体不生效（animation 已是 `none`）。 */
+  delayMs?: number
   /** R2 降级标记：true 时 animation 置 `none` */
   reduced?: boolean
 }
@@ -247,10 +251,12 @@ export function enter(options: EnterOptions): MotionEnterPreset {
   const name = options.animationName
   const duration = MOTION_DURATION[options.duration ?? 'medium']
   const easing = MOTION_EASING[options.easing ?? 'decelerate']
+  // 延迟槽位置在 `both` 之前（animation 简写语法位序：名 时长 曲线 延迟 填充模式）
+  const delay = options.delayMs === undefined ? '' : ` ${options.delayMs}ms`
   return {
     className: MOTION_CLASS.enterSheet,
     // R2：整条 animation 置 none（含 infinite 循环）
-    animation: options.reduced ? 'none' : `${name} ${duration} ${easing} both`,
+    animation: options.reduced ? 'none' : `${name} ${duration} ${easing}${delay} both`,
   }
 }
 
@@ -335,6 +341,65 @@ export function staggerDelay(index: number, options: StaggerOptions = {}): numbe
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// 预设五：列表逐项铺开 LIST_ITEM（ADR-0211 决策 5 / issue issue 879）
+//
+// 本函数是**列表项入场的唯一出口**：既有列表基类（RefreshableList 的 item-rise）
+// 与 7 个手写 <scroll-view> 列表页全部走它，故「错峰延迟来自预设」是结构性的
+// ——组件拿到的只是一段 inline 值，没有任何途径自己写延迟。
+//
+// ── 为什么是 inline `:style` 而不是类名（三条都是本仓已被抓过的坑）───
+// ① **类名无法参数化**：延迟随 index 变，`item-rise-1/2/3` 这类有限档位表达不了
+//    第 9、10、… 项；而运行时拼接类名 JIT 扫不到 ⇒ 产物零规则、渲染零动画、构建全绿。
+// ② **transform 族工具类是死类名**（ADR-0210 路径 E），位移只能走 `@keyframes` 帧体
+//    或 inline 值。本预设两者都不用工具类，只引用帧体名。
+// ③ **`.transition-colors` 不含 transform/opacity**（motionContract M2 已钉），
+//    挂过渡类是静默失效。
+//
+// ── `@keyframes item-rise` 的定义方 = `components/RefreshableList.vue` 的**非 scoped**
+//    `<style>` 块。本栈非 scoped keyframes 跨文件全局生效（与 SheetShell 的
+//    sheet-enter 同机制，已真机取证），故本页无需 import 即可引用该帧体。
+//    ⚠️ 反向依赖是刻意的：若把帧体搬进本 .ts，会让「唯一定义方」随消费方增减而漂移；
+//    帧体是几何量（travel/scale），按 motion.ts 抬头约束属于调用方而非本文件。
+// ───────────────────────────────────────────────────────────────────────────
+
+/** 列表项入场帧体名（与 RefreshableList 的 `@keyframes item-rise` 同名同体）。 */
+export const LIST_ITEM_ANIMATION = 'item-rise'
+
+export interface ListItemOptions extends StaggerOptions {
+  /** 时长档（缺省 `medium` 250ms，与既有 item-rise 同档） */
+  duration?: MotionDurationKey
+  /** 缓动档（缺省 `decelerate`，进场减速落位） */
+  easing?: MotionEasingKey
+  /** R2 降级标记：true 时 animation 整条置 `none` */
+  reduced?: boolean
+}
+
+/** 列表项入场：第 `index` 项的 inline `:style` 值（整段绑 `:style`）。
+ *
+ *  ```ts
+ *  const { listItemStyle } = useMotion()
+ *  // <view v-for="(row, i) in rows" :style="listItemStyle(i)">…</view>
+ *  ```
+ *
+ *  行为契约：
+ *  - 偏好开启（R2）⇒ `{ animation: 'none' }`，**延迟槽同时消失**（R3 增量第 2 条：
+ *    错峰本身即运动，只降时长无效）；
+ *  - `index >= STAGGER_MAX_ITEMS` ⇒ 延迟 0ms，该项直接终态
+ *    （虚拟滚动下若对全部项逐项延迟，末项入场时间随列表长度线性漂移）。
+ */
+export function listItemStyle(index: number, options: ListItemOptions = {}): Record<string, string> {
+  return {
+    animation: enter({
+      animationName: LIST_ITEM_ANIMATION,
+      duration: options.duration ?? 'medium',
+      easing: options.easing ?? 'decelerate',
+      delayMs: staggerDelay(index, { stepMs: options.stepMs, reduced: options.reduced }),
+      reduced: options.reduced,
+    }).animation,
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // 组合入口：把 useReducedMotion 的 R1/R2/R3 判定接到四类预设上
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -369,6 +434,10 @@ export function useMotion(options: UseMotionOptions = {}): {
   staggerStepMs: ComputedRef<MotionStaggerPreset>
   /** 逐项错峰延迟（ms）—— 已内建上限与 R3 归零 */
   staggerDelay(index: number): number
+  /** 列表项入场 inline `:style`（ADR-0211 决策 5 / issue 879 的**唯一接入点**）：
+   *  `listItemStyle(i)` 已内建 R2 归零、R3 延迟归零与 STAGGER_MAX_ITEMS 上限。
+   *  页面只绑这一处，不得自写 animation / animation-delay。 */
+  listItemStyle(index: number): Record<string, string>
   /** 解除偏好监听（组件内自动；裸调用需手动） */
   dispose(): void
 } {
@@ -398,6 +467,9 @@ export function useMotion(options: UseMotionOptions = {}): {
     pressSize: computed(() => press({ property: 'width', reduced: reduced.value })),
     staggerStepMs: computed(() => stagger({ reduced: reduced.value })),
     staggerDelay: (index: number) => staggerDelay(index, { reduced: reduced.value }),
+    // 列表项入场：与 enterListItem 同一条帧体，额外并入 staggerDelay 的延迟槽。
+    // ⚠️ 走 computed 保持与其它预设同一形态：偏好可在运行中切换，快照会拿到过期值。
+    listItemStyle: (index: number) => listItemStyle(index, { reduced: reduced.value }),
     dispose: rm.dispose,
   }
 }

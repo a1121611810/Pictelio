@@ -7,6 +7,7 @@ import { unquoteNativeString } from '../utils/tokenStorage'
 import { getNativeModules } from '../api/client'
 import { goBack } from '../router'
 import AppIcon from '../components/AppIcon.vue'
+import { useMotion } from '../composables/motion'
 
 // ─── 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4，issue #550）───
 // debug 自检路由：对项目依赖的平台 API 面跑规范派生断言，渲染 PASS/FAIL 矩阵，
@@ -176,6 +177,10 @@ function runBridgeProbe(): void {
 void runBridgeProbe()
 
 const passCount = computed(() => items.value.filter((i) => i.status === 'pass').length)
+
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：自检矩阵逐行错峰入场，延迟来自预设，
+ *  本页不自定步长。R2 下整条置 none。 */
+const { listItemStyle } = useMotion()
 const summaryClass = computed(() => {
   if (passCount.value === items.value.length) return 'text-success'
   if (items.value.some((i) => i.status === 'fail')) return 'text-error'
@@ -216,7 +221,12 @@ const summaryClass = computed(() => {
       <view
         class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] flex flex-col"
       >
-        <view v-for="item in items" :key="item.name" class="py-2 flex flex-col">
+        <view
+          v-for="(item, i) in items"
+          :key="item.name"
+          class="py-2 flex flex-col"
+          :style="listItemStyle(i)"
+        >
           <text class="text-title-small text-surface-on">
             <text :class="STATUS_CLASS[item.status]">[{{ STATUS_LABEL[item.status] }}] </text>{{ item.name }}
           </text>

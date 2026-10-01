@@ -23,11 +23,17 @@ import { DOWNLOAD_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibili
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { t } from '../i18n'
+import { useMotion } from '../composables/motion'
 
 // ─── 下载管理页（spec docs/specs/download-manager.md §7.2） ───
 // 列表 + 单选/多选 + 对全部或选中项的开始/暂停/停止/删除；删除二次确认二分；已完成可系统分享。
 // 数据与动作来自 downloadStore（深模块），派生逻辑来自 utils/downloadsViewModel（纯函数）。
 const dl = useDownloadStore()
+
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：按作品分组的卡片逐组错峰入场，延迟来自预设。
+ *  本页 scroll-view **非虚拟滚动**（全量渲染，任务数有限），但组数随下载历史增长 ⇒
+ *  STAGGER_MAX_ITEMS 上限保证「下载越多、最后一组出现越晚」不会发生。 */
+const { listItemStyle } = useMotion()
 
 const selected = ref<ReadonlySet<string>>(new Set<string>())
 const deleteTarget = ref<readonly string[] | null>(null)
@@ -186,9 +192,10 @@ onMounted(() => {
       <view class="w-full flex-1 min-h-0">
       <scroll-view scroll-orientation="vertical" class="w-full h-full">
         <view
-          v-for="group in groups"
+          v-for="(group, i) in groups"
           :key="group.illustId"
           class="mx-3 my-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)] overflow-hidden"
+          :style="listItemStyle(i)"
         >
           <view class="flex flex-row items-center p-3">
             <image

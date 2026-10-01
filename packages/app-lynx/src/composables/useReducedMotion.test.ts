@@ -430,9 +430,16 @@ function refreshableListUnwired(src: string): string[] {
     out.push('motionStyle 未由 animationStyle 驱动（降级值到不了 CSS）')
   }
   // 5 个动画宿主：scrim / 刷新项 / 回顶项 / 扩展项 / fab-spin 承载 view
-  const hosts = code.match(/:style="motionStyle"/g) ?? []
-  if (hosts.length !== 5) {
-    out.push(`:style="motionStyle" 绑定点 ${hosts.length} 处（应为 5：scrim / 刷新项 / 回顶项 / 扩展项 / fab-spin 承载 view）`)
+  // ⚠️ #879（ADR-0211 决策 5）后**降级分两条通道**：scrim 与 fab-spin 仍绑 motionStyle
+  // （类名驱动，只能 inline 覆盖）；菜单项三项改绑 listItemStyle(i)（其内部走 useMotion，
+  // R2 置 none + R3 延迟归零）。故此处按「每通道各自的绑定点数」判定，合计仍是 5 个宿主 ——
+  // 覆盖未减少，只是承载通道更完整。
+  const inlineHosts = code.match(/:style="motionStyle"/g) ?? []
+  const presetHosts = code.match(/:style="listItemStyle\(/g) ?? []
+  if (inlineHosts.length + presetHosts.length !== 5) {
+    out.push(
+      `动画宿主绑定点 ${inlineHosts.length + presetHosts.length} 处（应为 5：scrim / 刷新项 / 回顶项 / 扩展项 / fab-spin 承载 view）`,
+    )
   }
   return out
 }
@@ -472,13 +479,15 @@ describe('RefreshableList 接入：5 处动画（含 infinite 循环 fab-spin）
     // ② 遮罩淡入（该类还被 GlobalFab 复用 → 本组件是定义方）
     expect(code).toMatch(/@keyframes scrim-in/)
     expect(code).toMatch(/\.scrim-in \{[^}]*animation: scrim-in /)
-    // ③ 菜单项浮出 ×3（item-rise 同一条 keyframes，三个错峰类）
+    // ③ 菜单项浮出 ×3：帧体仍是本组件唯一定义方（几何量归调用方组件，见文件底部注释）。
+    //    #879 后三个错峰类（.item-rise-1/2/extra，CSS 里写死 0/60/120ms）已删除，
+    //    延迟改由 motion.ts 的 listItemStyle(i) 提供 ⇒ 错峰只有一处事实源。
+    //    本组断言的是「帧体存在 + 三个宿主都接了预设」，不再断言已删除的类。
     expect(code).toMatch(/@keyframes item-rise/)
-    for (const cls of ['item-rise-1', 'item-rise-2', 'item-rise-extra']) {
-      expect(code).toMatch(new RegExp(`\\.${cls} \\{[^}]*animation: item-rise `))
-    }
-    // 宿主元素确实带上了绑定（5 处，与 motionStyle 判据同数）
-    expect(code.match(/:style="motionStyle"/g) ?? []).toHaveLength(5)
+    expect(code.match(/:style="listItemStyle\([012]\)"/g) ?? []).toHaveLength(3)
+    expect(code, '三个错峰类应已删除（延迟归 motion.ts 预设）').not.toMatch(/\.item-rise-\w+ \{/)
+    // 宿主元素确实带上了绑定（5 处：2 motionStyle + 3 listItemStyle，与 unwired 判据同数）
+    expect((code.match(/:style="motionStyle"/g) ?? []).length + (code.match(/:style="listItemStyle\(/g) ?? []).length).toBe(5)
   })
 
   it('不得自建第二份偏好读取（收敛为单一事实源）', () => {
@@ -496,7 +505,11 @@ describe('RefreshableList 接入：5 处动画（含 infinite 循环 fab-spin）
     // 改回即恢复（防「判据恒红」的自欺）
     expect(refreshableListUnwired(REFRESHABLE_LIST_SRC)).toEqual([])
 
-    const noHosts = REFRESHABLE_LIST_SRC.replace(/:style="motionStyle"/g, '')
+    // 抽掉两条通道的绑定（#879 后分 motionStyle 与 listItemStyle 两条）→ 宿主数不足 5
+    const noHosts = REFRESHABLE_LIST_SRC.replace(/:style="motionStyle"/g, '').replace(
+      /:style="listItemStyle\([012]\)"/g,
+      '',
+    )
     expect(noHosts, '改动没落到源码上，反事实无效').not.toBe(REFRESHABLE_LIST_SRC)
     expect(refreshableListUnwired(noHosts).join('|')).toContain('应为 5')
     expect(refreshableListUnwired(REFRESHABLE_LIST_SRC)).toEqual([])

@@ -15,6 +15,7 @@ import {
   type Router,
 } from 'vue-router'
 import { evaluateBackRoute, createBackGuardRegistry, runBackGuards, hasBackEntryIn, decideRequiresAuth, type BackGuard } from './routerCore'
+import { beginRouteTransition, decideRouteDirection, type RouteDirection } from './composables/routeTransition'
 import { isNativeMode, getNativeModules } from './api/client'
 import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -167,16 +168,45 @@ export const routeState = ref<RouteState>({
 })
 
 // currentRoute → routeState 同步（页面取 currentParams / FAB 取 name 均经此）
-router.afterEach((to) => {
+// 同一个钩子顺带把「转场意图」落成方向：afterEach 与 finalizeNavigation 同一微任务内同步执行，
+// 早于 Vue 的渲染 flush ⇒ 新页面首帧即带入场动画（时序取证见 composables/routeTransition.ts）。
+router.afterEach((to, _from, failure) => {
   routeState.value = {
     name: typeof to.name === 'string' ? to.name : '',
     path: to.path,
     params: to.params as Record<string, string>,
   }
+  commitRouteTransition(to.fullPath, failure)
 })
 
 /** 当前路由参数（兼容导出；页面取参方式不变） */
 export const currentParams = computed(() => routeState.value.params)
+
+// ─── 转场意图 → 方向（ADR-0211 决策 6）───
+// navigate/goBack 只在**发起前**写「意图 + 预期落点」，方向由上面的 afterEach 落成。
+// _pendingTransitionTarget 用于对账：落点与预期不一致 = 被守卫重定向或导航被取消
+// ⇒ 判 none，不给一个没真正发生的导航挂转场。
+let _pendingTransition: RouteDirection = 'none'
+let _pendingTransitionTarget: string | null = null
+
+/** 发起一次带方向的导航（内部用；`navigate` / `goBack` 的唯一方向入口） */
+function requestRouteTransition(direction: RouteDirection, target: string | null): void {
+  _pendingTransition = direction
+  _pendingTransitionTarget = target
+}
+
+/** afterEach 消费意图并落成方向（导航落定 → 页面容器按状态挂入场类） */
+function commitRouteTransition(landed: string, failure: unknown): void {
+  const direction = _pendingTransition
+  const target = _pendingTransitionTarget
+  _pendingTransition = 'none'
+  _pendingTransitionTarget = null
+  if (failure || (target !== null && landed !== target)) {
+    beginRouteTransition('none')
+    return
+  }
+  beginRouteTransition(direction)
+}
 
 export interface NavigateOptions {
   /** replace 语义：不入历史栈（登录/登出/首路由） */
@@ -188,14 +218,21 @@ export async function navigate(path: string, opts?: NavigateOptions): Promise<vo
   // matched 为空 → RouterView 渲染空白；显式兜底保持旧语义。
   // 统一 replace（P3-2）：登录页不被返回（ADR-0049），与 opts.replace 无关
   if (router.resolve(path, router.currentRoute.value).matched.length === 0) {
+    // 兜底落登录页不是「进入更深层级」⇒ 不挂转场
+    requestRouteTransition(decideRouteDirection({ replace: true }), '/login')
     await router.replace('/login')
     return
   }
   if (opts?.replace) {
+    // replace 的全部调用点（登录 / 登出 / 首路由 / 会话错误页 / 深链 benchNav / tab 切换）
+    // 都不是层级进出 ⇒ none（#880 验收 4：深链直达不出现异常转场）
+    requestRouteTransition(decideRouteDirection({ replace: true }), path)
     await router.replace(path)
     return
   }
   const cur = router.currentRoute.value.fullPath
+  // push = 进入更深层级 ⇒ forward（裁决是纯函数，见 composables/routeTransition.ts）
+  requestRouteTransition(decideRouteDirection(opts), path)
   // 镜像在导航确认后入栈（P3-1）：守卫重定向/被取消的 push 不入栈
   //（重定向后 currentRoute 已是 /login ≠ path，以最终落点为准防垃圾镜像条目）
   await router.push(path)
@@ -240,11 +277,16 @@ export function goBack(): void {
   // 镜像弹栈先行：镜像有上一页 → 队列探测确认（看门狗防漂移）→ 官方 API 回退（ADR-0049）；
   // 镜像与队列不一致（有导航绕过镜像漂移）→ 清镜像降级为回推荐页
   if (_sessionStack.length > 0 && hasBackEntryIn(router.options.history)) {
+    // 预期落点取镜像栈顶：它是「真实上一页」的决策主源（ADR-0138 决策 5 修订）
+    const target = _sessionStack[_sessionStack.length - 1] ?? null
     _sessionStack.pop()
+    requestRouteTransition(decideRouteDirection({ declared: 'back' }), target)
     void router.back()
     return
   }
   _sessionStack.length = 0
+  // 栈空降级回推荐页：物理上是 replace，但语义仍是「返回上层」⇒ 显式声明 back 覆盖 replace 档
+  requestRouteTransition(decideRouteDirection({ declared: 'back' }), RECOMMENDED_PATH)
   void router.replace(RECOMMENDED_PATH)
 }
 

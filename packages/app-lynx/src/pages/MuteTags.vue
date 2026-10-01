@@ -22,6 +22,11 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor } = useMotion()
 
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：错峰延迟来自预设，本页不自定步长。
+ *  `listItemStyle(i)` 已内建 R2 归零、R3 延迟归零与 STAGGER_MAX_ITEMS 上限
+ *  （静音标签是本地集合、条数有限，超过上限的项直接终态，不产生末项漂移）。 */
+const { listItemStyle } = useMotion()
+
 
 const settings = useSettingsStore()
 
@@ -54,9 +59,10 @@ function removeTag(name: string): void {
     <!-- 列表态：本地集合（量级小）不做虚拟化，纵列平铺于 scroll-view -->
     <scroll-view v-else class="w-full flex-1 min-h-0" scroll-orientation="vertical">
       <view
-        v-for="name in tags"
+        v-for="(name, i) in tags"
         :key="name"
         class="flex flex-row items-center justify-between m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
+        :style="listItemStyle(i)"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="name"
       >

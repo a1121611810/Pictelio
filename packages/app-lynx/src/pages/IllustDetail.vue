@@ -39,6 +39,12 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor } = useMotion()
 
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：多图列表逐页错峰入场，延迟来自预设。
+ *  ⚠️ **沉浸态不消费**：沉浸（决策 3）不留任何可见 chrome，图片层是唯一内容——
+ *  若在沉浸切换后再叠加入场，会让「点一下看全屏」变成「全屏里图片还在动」，
+ *  破坏沉浸契约。故只接多图分支的静态挂载态，延迟亦远小于用户可感知的手动操作间隔。 */
+const { listItemStyle } = useMotion()
+
 
 const settings = useSettingsStore()
 const tagNeighbors = useTagNeighborStore()
@@ -401,10 +407,15 @@ onMounted(async () => {
            外层**不定高**（占位高度由 SkeletonImage 的 height prop 承担；correctHeightOnLoad 修正的是内层
            CoverImage 容器高度——外层定高会裁掉修正后更高的图）；外层仅作 relative 定位上下文（角标）。 -->
       <template v-else-if="slideSrcs.length > 1">
+        <!-- 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：多图列表逐页错峰入场，延迟来自预设。
+             ⚠️ 本页图片数上限由上游 page_count 决定（可达数十上百）⇒ STAGGER_MAX_ITEMS
+             上限在此页最关键：超过上限的页直接落终态，不出现「作品图越多、最后一页出现越晚」。
+             ⚠️ 只接多图分支：单图/ugoira 分支只有一项，错峰无从谈起（index 恒 0）。 -->
         <view
           v-for="(src, i) in slideSrcs"
           :key="i"
           class="relative w-full bg-surface-container-highest overflow-hidden mb-2"
+          :style="listItemStyle(i)"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="immersiveA11yLabel({ n: i + 1, total: slideSrcs.length })"
           @tap="toggleImmersive"

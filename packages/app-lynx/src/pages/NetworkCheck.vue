@@ -16,6 +16,10 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor } = useMotion()
 
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：诊断矩阵逐行错峰入场，延迟来自预设。
+ *  R2 下整条置 none（诊断页是一次性排查，动效不承载信息）。 */
+const { listItemStyle } = useMotion()
+
 
 const auth = useAuthStore()
 const report = ref<DiagReport | null>(null)
@@ -102,7 +106,12 @@ void run()
         v-if="report"
         class="bg-surface-container-lowest mt-3 p-4 rounded-[var(--md-shape-medium)] flex flex-col"
       >
-        <view v-for="c in report.checks" :key="c.id" class="py-2 flex flex-col">
+        <view
+          v-for="(c, i) in report.checks"
+          :key="c.id"
+          class="py-2 flex flex-col"
+          :style="listItemStyle(i)"
+        >
           <text class="text-title-small text-surface-on">
             <text :class="STATUS_CLASS[c.status]">[{{ t(STATUS_KEY[c.status]) }}] </text>{{ c.title }}<text v-if="c.latencyMs !== undefined"> · {{ c.latencyMs }}ms</text>
           </text>

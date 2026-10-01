@@ -55,6 +55,13 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor, pressOpacity } = useMotion()
 
+/** FAB 菜单三项的入场（ADR-0211 决策 5 / issue 879）：**错峰延迟来自预设**，不再由本组件
+ *  自定 0/60/120ms 三档字面量。`listItemStyle(i)` 已内建 R2 归零 + R3 延迟归零 +
+ *  STAGGER_MAX_ITEMS 上限，与 7 个手写列表页共用同一出口 ⇒ 全仓列表错峰只有一处事实源。
+ *  ⚠️ 帧体 `@keyframes item-rise` 仍定义在本文件下方的非 scoped `<style>`（几何量归调用方），
+ *  本栈非 scoped keyframes 跨文件全局生效。 */
+const { listItemStyle } = useMotion()
+
 
 const props = defineProps<{
   /** 幂等刷新函数（createMixFeed 的 refresh() 内置 generation 竞态防护 + 15s TIMEOUT 保证 settle） */
@@ -79,16 +86,21 @@ const indicator = useScrollIndicator()
 /** 刷新中：主 FAB 禁用态/旋转 + 防重入；与 menu.busy 同步 */
 const refreshing = ref(false)
 
-// ─── 减弱动效偏好（T03 / issue #851 验收 2）：本组件 5 处动画统一走 useReducedMotion ───
-// 资产清单：fab-spin（infinite 循环）+ scrim-in（遮罩淡入）+ item-rise-1/2/extra（菜单项浮出）。
+// ─── 减弱动效偏好（T03 / issue #851 验收 2）────────────────────────────────
+// 资产清单：fab-spin（infinite 循环）+ scrim-in（遮罩淡入）+ 菜单项浮出（item-rise 帧体）。
 // 降级口径 = composable 的 R2：animation 整条置 `none`（**不是**放慢）——fab-spin 是无限循环，
-// 循环动画对前庭障碍影响最大，必须停；item-rise-* 虽是一次性，但其位移/缩放本身即「运动」，
-// 降时长无效（R3 同理），故连同 0/60/120ms 的 stagger 一起被 `none` 整条关掉。
+// 循环动画对前庭障碍影响最大，必须停；菜单项浮出虽是一次性，但其位移/缩放本身即「运动」，
+// 降时长无效（R3 同理），故连同 stagger 延迟一起被 `none` 整条关掉。
 //
-// 为何用 inline 覆盖而不是「不挂类」：五个类名（fab-spin / scrim-in / item-rise-*）由本组件的
-// 全局 <style> 定义，其中 .scrim-in 还被 GlobalFab 复用（那边已在 scrimStyle 里用同一手法
-// inline 覆盖），保持单一手法；inline 优先级高于类，故偏好关闭时**完全不产生覆盖**，
-// 类里的原声明逐字保留。
+// ⚠️ **本组件的降级分两条通道**（issue 879 / ADR-0211 决策 5 后）：
+//   · scrim / fab-spin 仍绑 `motionStyle`（类名驱动，只能 inline 覆盖）；
+//   · 菜单项三项改绑 `listItemStyle(i)`——它内部走 useMotion()，R2 置 none、
+//     R3 延迟归零，**比原先更完整**（旧的 motionStyle 只能整条关，无法让延迟单独归零）。
+// 两者最终都落到 `animation: none`，语义一致；`useReducedMotion` 仍是唯一偏好事实源。
+//
+// 为何用 inline 覆盖而不是「不挂类」：fab-spin / scrim-in 由本组件的全局 <style> 定义，
+// 其中 .scrim-in 还被 GlobalFab 复用（那边已在 scrimStyle 里用同一手法 inline 覆盖），
+// 保持单一手法；inline 优先级高于类，故偏好关闭时**完全不产生覆盖**，类里的原声明逐字保留。
 const { animationStyle } = useReducedMotion()
 const motionStyle = computed<Record<string, string>>(() => ({
   ...(animationStyle.value ? { animation: animationStyle.value } : {}),
@@ -191,11 +203,15 @@ onUnmounted(() => {
       v-if="menu.isOpen && props.fab !== false"
       class="absolute z-20 right-4 bottom-[20.267vw] flex flex-col items-end gap-[1.067vw]"
     >
-      <!-- 刷新项：图标（AppIcon refresh）+ label -->
+      <!-- 刷新项：图标（AppIcon refresh）+ label。
+           ⚠️ 入场走 listItemStyle(0) 而非 .item-rise-1 类：错峰延迟必须来自 motion.ts 预设
+           （ADR-0211 决策 5 / issue 879），而延迟随 index 变化，类名表达不了（运行时拼接则 JIT
+           扫不到 ⇒ 产物零规则、渲染零动画、构建全绿）。R2 下返回 animation: none、
+           R3 下延迟归零，覆盖等价于原 motionStyle。 -->
       <view
-        class="menu-item item-rise-1 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+        class="menu-item flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
         :class="pressColor.className"
-        :style="motionStyle"
+        :style="listItemStyle(0)"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.refreshList"
         @tap="onRefreshItemTap"
@@ -206,9 +222,9 @@ onUnmounted(() => {
 
       <!-- 回顶项：图标（AppIcon arrow_upward）+ label -->
       <view
-        class="menu-item item-rise-2 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+        class="menu-item flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
         :class="pressColor.className"
-        :style="motionStyle"
+        :style="listItemStyle(1)"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.backToTop"
         @tap="onBackToTopItemTap"
@@ -218,14 +234,14 @@ onUnmounted(() => {
       </view>
 
       <!-- 扩展项（T4）：页面按需配置（上一页/下一页等），visible 控制显隐；
-           item-rise-extra 共用浮出动画（120ms 延迟，排在刷新/回顶之后）。
+           listItemStyle(2) 共用同一条浮出帧体，错峰落在刷新/回顶之后，延迟由预设算。
            用 template v-for 包裹（v-if 与 v-for 同元素是 Vue 3 反模式） -->
       <template v-for="item in props.items" :key="item.key">
         <view
           v-if="item.visible()"
-          class="menu-item item-rise-extra flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
+          class="menu-item flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:bg-layer-pressed-on-surface"
           :class="pressColor.className"
-          :style="motionStyle"
+          :style="listItemStyle(2)"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="item.accessibilityLabel"
           @tap="onExtraItemTap(item)"
@@ -295,7 +311,12 @@ onUnmounted(() => {
   animation: scrim-in var(--durationNormal) var(--motion-emphasized-decelerate) both;
 }
 
-/* menu item 从 FAB top-trailing edge 浮出（ADR-0111） */
+/* menu item 从 FAB top-trailing edge 浮出（ADR-0111）。
+   ⚠️ 帧体是**几何量**（travel 12px / scale 0.92）⇒ 归调用方组件（motion.ts 抬头约束
+   「唯一入口只管时长与曲线」），故定义在此而非 motion.ts。
+   ⚠️ 非 scoped ⇒ 本栈跨文件全局生效，7 个手写列表页无需 import 即可引用（与 SheetShell
+   的 sheet-enter 同机制，真机已取证）。tests/listItemStaggerContract.test.ts 的 L3
+   钉住「本文件是帧体唯一定义方」，防止第二个组件另起一条同义帧体。 */
 @keyframes item-rise {
   from {
     opacity: 0;
@@ -309,15 +330,8 @@ onUnmounted(() => {
 .menu-item {
   transform-origin: right bottom;
 }
-.item-rise-1 {
-  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 0ms both;
-}
-.item-rise-2 {
-  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 60ms both;
-}
-/* 扩展菜单项浮出动画（T4）：排在刷新/回顶之后，延迟 120ms（stagger 延迟无 M3 官方值，
-   按 #854 验收 3「stagger 延迟可留」保留字面量；R3 下由 motionStyle 整条置 none） */
-.item-rise-extra {
-  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 120ms both;
-}
+/* 延迟槽**不再**在 CSS 里：原 `.item-rise-1/2/extra` 三档把 0/60/120ms 写死，
+   那正是「错峰延迟由组件自定」的形态（ADR-0211 决策 5 要收口的那一处）。
+   现统一走 motion.ts 的 listItemStyle(i) —— 与 7 个列表页同一出口、同一 STAGGER 步长，
+   且 R3 下延迟随整条 animation 一起归零（原先 R3 只能靠 motionStyle 置 none 覆盖）。 */
 </style>

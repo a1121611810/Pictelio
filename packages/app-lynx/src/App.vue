@@ -15,6 +15,7 @@ import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
 import { initSafeArea, safeBottom, safeTop } from './utils/safeArea'
 import { useReducedMotion } from './composables/useReducedMotion'
+import { useRouteTransition } from './composables/routeTransition'
 
 const searchSheet = useSearchSheetStore()
 // 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
@@ -96,6 +97,23 @@ const rootStyle = computed<Record<string, string>>(() => ({
   // R2 关键帧降级：整条 animation 声明置 none（覆盖 infinite 循环），不是「放慢」
   ...(animationStyle.value ? { [SHIMMER_MOTION_VAR]: animationStyle.value } : {}),
 }))
+
+// ─── 路由转场（ADR-0211 决策 6 / issue #880）───
+// Lynx 侧无路由 transition 能力 ⇒ 转场自建于**导航层**：方向由 router.ts 的 afterEach 写入
+// composables/routeTransition.ts 的模块状态，本页容器按状态挂一次性入场动画
+// （时长/曲线来自 composables/motion.ts，本文件不写任何时长/曲线字面量）。
+//
+// 为什么落点是这里（零逐页改动）：`.Root` 是全树唯一的页面公共祖先，
+// 而 24 条路由的页面组件各自根节点类名/结构不同，改逐页挂类要么漏页要么改抽象边界。
+// 包裹层是**在流内**的 `w-full h-full` 块：`.Root` 非 flex，故包裹层与页面根节点同盒，
+// 静息态布局与改动前逐像素一致（真机截图对拍核验，2026-10-01）。
+//
+// ⚠️ **transform 会让本包裹层成为 `position:absolute` 后代的包含块**：入场动画播放的那
+//   ROUTE_TRANSITION_HOLD_MS 窗口内，页内全屏层（评论弹层 / 删除确认 / loading 遮罩）的
+//   包含块由视口收窄到内容盒（上下各差一个安全区）。该窗口内不可能有全屏层打开
+//   （全屏层只由页内 tap 打开，导航期间用户无从触发），且计时器到点即摘除 transform，
+//   故不是持久布局变更。这是**已登记的取舍**，不是零成本。
+const routeTransition = useRouteTransition()
 </script>
 
 <template>
@@ -112,10 +130,17 @@ const rootStyle = computed<Record<string, string>>(() => ({
          KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
          详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
     <RouterView v-slot="{ Component }">
-      <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
-      <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking', 'mypixiv']">
-        <component :is="Component" />
-      </KeepAlive>
+      <!-- 路由转场容器（ADR-0211 决策 6 / #880）：包裹层持有「方向 + 阶段」，
+           :style 走 inline 通道（Lynx 侧唯一无歧义的 transform 载体——transform 族
+           Tailwind 工具类是死类名，ADR-0210 路径 E）。方向为 none / 减弱动效开启时
+           style 是空对象 = 元素上不挂任何过渡声明（R1「不挂过渡类」的最强形态）。
+           刻意不绑 :class —— 动效只有 inline animation 一条载体，没有类可挂。 -->
+      <view class="w-full h-full" :style="routeTransition.style.value">
+        <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
+        <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking', 'mypixiv']">
+          <component :is="Component" />
+        </KeepAlive>
+      </view>
     </RouterView>
     <!-- 放射导航悬浮 FAB（ADR-0120）：全局单 FAB，外层=4 tab、内层=页动作；替换各页 NavigationBar 与自身 FAB -->
     <GlobalFab />
@@ -224,5 +249,71 @@ const rootStyle = computed<Record<string, string>>(() => ({
   );
   background-size: 200% 100%;
   animation: var(--shimmer-motion, shimmer 1.5s linear infinite);
+}
+
+/* ─── 路由转场帧体（ADR-0211 决策 6 / issue #880）───
+ * 全仓**唯一定义方** = 本文件（方向名登记表在 composables/routeTransition.ts）。
+ * 沿用本文件 shimmer 的既有形态：非 scoped <style> 里的 @keyframes 在 Lynx 原生全局生效
+ * （2026-10-01 真机实证），消费方只写 animation 名，不需要 import 本组件。
+ *
+ * 方向语义（ADR-0211 决策 6 的方向表）：
+ *   forward（进入更深层级）= 新页面**从右侧**滑入 + fade（平台约定：前进 = 内容右移）
+ *   back（返回上层）        = 重新进入的旧页**从左侧**滑入
+ *
+ * ⚠️ **两者刻意不对称**（forward 带 opacity、back 纯位移）：若做成严格镜像就成了
+ *   「同一段动画正放倒放」，#880 验收 1 明确不接受那种糊弄。
+ *
+ * ⚠️ **已登记的能力削减**（ADR-0211 决策 6 约束 2）：back 不是真实反向。Lynx 无
+ *   transitionend（ADR-0111）可挂，且 vue-router 的 push/back 是硬替换——旧页在动画
+ *   开始前已离开渲染树，所以旧页**没有滑出过程**，只给重新进入的旧页一个自左侧的滑入。
+ *
+ * ⚠️ `-alt` 变体帧体与本体逐字相同，不是冗余：同向连续两次导航时 animation-name 必须
+ *   变化才会重播（同名 animation 在同一元素上不重放）；变体名切换是本仓已在用的重播形态
+ *   （useSheetDismiss 的 sheet-enter ⇄ sheet-exit 即此机制）。
+ *
+ * ⚠️ 帧体里**只写 transform / opacity**；时长与曲线一律由 composables/motion.ts 的
+ *   enter() 拼装后经 inline :style 下发（本文件不出现时长/曲线字面量）。
+ * ⚠️ 位移走帧体内的手写 transform 声明（已实证）；**不写** Tailwind transform 工具类
+ *   ——那些是死类名（产出规则但引用的 --tw-* 从未定义 ⇒ 渲染 transform: none，ADR-0210 路径 E）。
+ *
+ * ⚠️ 位移量 8% = M3 shared axis X 的 30dp：按 glossary-lynx-units 的 375 设计稿基准
+ *   （30dp / 375 = 8%）。用 % 而非 vw：SheetShell 的 keyframes 帧体只实证过 % 与 px，
+ *   vw 未取证 —— ADR-0210「未验证的路径要么取证后再用、要么不用」，不押注。 */
+@keyframes route-forward-in {
+  from {
+    opacity: 0;
+    transform: translateX(8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes route-forward-in-alt {
+  from {
+    opacity: 0;
+    transform: translateX(8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+/* back 只位移不淡入：与 forward 构成可辨识的方向差（见上方「刻意不对称」） */
+@keyframes route-back-in {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes route-back-in-alt {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 </style>

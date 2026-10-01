@@ -1646,7 +1646,10 @@ describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
     expect(refreshableListSource).toContain('v-if="item.visible()"')
     expect(refreshableListSource).toContain('@tap="onExtraItemTap(item)"')
     expect(refreshableListSource).toContain('onExtraItemTap(item: FabMenuExtraItem)')
-    expect(refreshableListSource).toContain('item-rise-extra')
+    // 扩展项参与浮出动画：#879 起入场改走 motion.ts 的统一出口 listItemStyle(2)
+    // （原 .item-rise-extra 类把 120ms 延迟写死在 CSS 里，属「错峰由组件自定」的形态）。
+    // 断言改为绑定形态——扩展项仍错峰入场，且延迟来自预设。
+    expect(refreshableListSource).toContain(':style="listItemStyle(2)"')
     // 异步回调复用 busy 维度（与刷新同互斥规则）：操作中禁展开/禁其他项
     expect(refreshableListSource).toContain('menu.startRefresh()')
     expect(refreshableListSource).toContain('menu.endRefresh()')

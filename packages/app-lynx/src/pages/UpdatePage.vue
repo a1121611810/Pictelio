@@ -11,6 +11,11 @@ import { useMotion } from '../composables/motion'
  *  R1 降级（prefers-reduced-motion）由 useMotion 统一处理，组件内不自行判断偏好。 */
 const { pressColor } = useMotion()
 
+/** 列表项逐项铺开（ADR-0211 决策 5 / issue 879）：更新日志逐行错峰入场，延迟来自预设。
+ *  ⚠️ changelog 行数不定（上游文本长度不可控）⇒ STAGGER_MAX_ITEMS 上限在此页最关键：
+ *  超过上限的行直接落终态，不会出现「日志越长、最后一行出现得越晚」的漂移。 */
+const { listItemStyle } = useMotion()
+
 
 const update = useUpdateStore()
 
@@ -70,6 +75,7 @@ const changelogLines = () =>
             v-for="(line, i) in changelogLines()"
             :key="i"
             class="text-body-small text-surface-on-variant"
+            :style="listItemStyle(i)"
             >{{ line }}</text
           >
         </view>
