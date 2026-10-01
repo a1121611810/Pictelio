@@ -80,13 +80,20 @@
  * 心形检测限定左下角且用「实心块」判据而非颜色）。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import JSON5 from "json5";
-import { createCanvas, loadImage } from "canvas";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
-import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
+import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runOrThrow } from "../env";
+import {
+  assertDeviceGeometry as assertGeometry,
+  boxesOf,
+  colorAt,
+  screenshot as shoot,
+  toPixels,
+  type Pixels,
+} from "../pixel";
 import {
   currentTopActivity,
   forceStopApp,
@@ -165,47 +172,30 @@ let illustId = "";
 
 // ─── 设备侧基建 ───
 
-/** 校验目标 AVD 分辨率/密度（坐标推导依赖；漂移时快速失败而非静默错点）。 */
+/**
+ * 校验目标 AVD 分辨率/密度（坐标推导依赖；漂移时快速失败而非静默错点）。
+ *
+ * ⚠️ 与另两个 spec 的差异是**有意保留**：本 spec 收敛前就只校验这两项、没有第三项
+ * （稳定区高度）。共享版 `assertDeviceGeometry` 把第三项做成可选参数（省略 = 不校验），
+ * 就是为了不在「重构」里顺带给本 spec 加一条新断言——那会改变它在别的 ROM /
+ * 导航模式下的通过-失败结论（既有覆盖面的静默变更）。要补这条请单独立项。
+ */
 function assertDeviceGeometry(): void {
-  const size = runCapture(adbPath(), ["-s", serial, "shell", "wm", "size"]).stdout;
-  const density = runCapture(adbPath(), ["-s", serial, "shell", "wm", "density"]).stdout;
-  expect(size).toMatch(/1080x2160/u);
-  expect(density).toMatch(/480/u);
+  assertGeometry(serial);
 }
 
-/** 截屏（exec-out 直取 PNG 字节流，20MB 上限防 1080×2160 PNG 触发 ENOBUFS）并落盘留证。 */
+/**
+ * 截屏（exec-out 直取 PNG 字节流，20MB 上限防 1080×2160 PNG 触发 ENOBUFS）并落盘留证。
+ *
+ * #852：实现收敛到 `../pixel` 的 `screenshot`，此处只绑定本 spec 的 serial 与证据目录。
+ */
 function screenshot(name: string): Buffer {
-  const buf = execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  writeFileSync(resolve(EVIDENCE_DIR, `${name}.png`), buf);
-  return buf;
-}
-
-/** 像素视图（canvas 解码 + getImageData；与 fab 回归同款依赖） */
-interface Pixels {
-  w: number;
-  h: number;
-  data: Uint8ClampedArray;
-}
-
-async function toPixels(png: Buffer): Promise<Pixels> {
-  const img = await loadImage(png);
-  const canvas = createCanvas(img.width, img.height);
-  const c2d = canvas.getContext("2d");
-  c2d.drawImage(img, 0, 0);
-  const { data } = c2d.getImageData(0, 0, img.width, img.height);
-  return { w: img.width, h: img.height, data };
-}
-
-function pixelAt(p: Pixels, x: number, y: number): [number, number, number] {
-  const i = (Math.round(y) * p.w + Math.round(x)) * 4;
-  return [p.data[i], p.data[i + 1], p.data[i + 2]];
+  return shoot(serial, name, EVIDENCE_DIR);
 }
 
 /** 饱和度（max−min）；用于区分「选中态实色 chip」与「未选中态浅灰 chip」 */
 function saturation(p: Pixels, x: number, y: number): number {
-  const [r, g, b] = pixelAt(p, x, y);
+  const [r, g, b] = colorAt(p, x, y);
   return Math.max(r, g, b) - Math.min(r, g, b);
 }
 
@@ -288,13 +278,13 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
   const xEnd = Math.min(130, Math.floor(p.w * 0.15));
   for (let y = Math.floor(p.h * 0.5); y < Math.floor(p.h * 0.99); y += 2) {
     for (let x = 40; x < xEnd; x += 1) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       const isInk = Math.max(r, g, b) < 170;
       const isRed = r > 170 && g < 90 && b < 90;
       if (isInk || isRed) dark.push([x, y]);
     }
   }
-  const capsules = connectedBoxes(dark, 8);
+  const capsules = boxesOf(dark, 8);
   // 容器下限：心形所在胶囊实测 170×103（x<130 窗内被裁成 ≥84×103）。取足够大的下界，
   // 既容纳胶囊，又能与「标题文字」「作者头像」等小块区分开。
   const capsulesBig = capsules.filter((b) => b.y1 - b.y0 + 1 >= 70 && b.x1 - b.x0 + 1 >= 50);
@@ -305,14 +295,14 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
     const bright: [number, number][] = [];
     for (let y = cap.y0; y <= cap.y1; y += 1) {
       for (let x = cap.x0; x <= cap.x1; x += 1) {
-        const [r, g, b] = pixelAt(p, x, y);
+        const [r, g, b] = colorAt(p, x, y);
         // 近白且近灰（排除彩色插画像素）
         if (Math.min(r, g, b) > 190 && Math.max(r, g, b) - Math.min(r, g, b) < 40) {
           bright.push([x, y]);
         }
       }
     }
-    for (const blob of connectedBoxes(bright, 6)) {
+    for (const blob of boxesOf(bright, 6)) {
       // 严格内嵌：至少留 3px 边距 ⇒ 排除胶囊四角露出的白色背景（它们贴边）
       if (
         blob.x0 <= cap.x0 + 3 ||
@@ -347,59 +337,12 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
   return best ? { x: best.cx, y: best.cy } : null;
 }
 
-interface Box {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  n: number;
-}
-
 /**
  * 8 连通域 + 按 `cell` 像素分桶，返回每个分量的包围盒与实心像素数。
  * 纯函数，供心形定位复用（原先内联在 findHeartGlyph 里，两段式判据需要用两次）。
+ *
+ * #852：实现收敛到 `../pixel` 的 `boxesOf`（三 spec 共用一份），函数体逐字未改。
  */
-function connectedBoxes(pts: [number, number][], cell: number): Box[] {
-  const cells = new Map<string, [number, number][]>();
-  for (const [x, y] of pts) {
-    const key = `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
-    const bucket = cells.get(key);
-    if (bucket) bucket.push([x, y]);
-    else cells.set(key, [[x, y]]);
-  }
-  const seen = new Set<string>();
-  const out: Box[] = [];
-  for (const key of cells.keys()) {
-    if (seen.has(key)) continue;
-    const stack = [key];
-    seen.add(key);
-    const comp: [number, number][] = [];
-    while (stack.length > 0) {
-      const cur = stack.pop()!;
-      comp.push(...(cells.get(cur) ?? []));
-      const [cxi, cyi] = cur.split(",").map(Number);
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          const nk = `${cxi + dx},${cyi + dy}`;
-          if (cells.has(nk) && !seen.has(nk)) {
-            seen.add(nk);
-            stack.push(nk);
-          }
-        }
-      }
-    }
-    const xs = comp.map((c) => c[0]);
-    const ys = comp.map((c) => c[1]);
-    out.push({
-      x0: Math.min(...xs),
-      y0: Math.min(...ys),
-      x1: Math.max(...xs),
-      y1: Math.max(...ys),
-      n: comp.length,
-    });
-  }
-  return out;
-}
 
 /**
  * 心形胶囊是否处于「已收藏」态。
@@ -427,7 +370,7 @@ function heartFilled(p: Pixels, spot: { x: number; y: number }): boolean {
   for (let y = spot.y - 22; y <= spot.y + 22; y += 4) {
     for (let x = spot.x - 19; x <= spot.x + 19; x += 4) {
       n++;
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       if (g - r >= 25 && b - r >= 25 && g < 200) teal++;
     }
   }
@@ -446,7 +389,7 @@ function panelOpen(p: Pixels): boolean {
   for (let y = SAVE_BAND_WINDOW.y0; y < SAVE_BAND_WINDOW.y1; y += 2) {
     let row = 0;
     for (let x = 30; x < p.w - 30; x += 6) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       if (Math.max(r, g, b) - Math.min(r, g, b) > 45 && Math.max(r, g, b) > 110) row++;
     }
     total += row;
@@ -463,7 +406,7 @@ function findSaveButton(p: Pixels): { x: number; y: number } | null {
   let x1 = 0;
   for (let y = SAVE_BAND_WINDOW.y0; y < SAVE_BAND_WINDOW.y1; y += 2) {
     for (let x = 30; x < p.w - 30; x += 6) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       if (Math.max(r, g, b) - Math.min(r, g, b) > 45 && Math.max(r, g, b) > 110) {
         if (y0 < 0) y0 = y;
         y1 = y;
@@ -563,7 +506,7 @@ function findPills(
 
 /** 未选中 chip 的填充色：`bg-surface-container-high`（M3 中性容器高）。 */
 function isIdleChipFill(x: number, y: number, p: Pixels): boolean {
-  const [r, g, b] = pixelAt(p, x, y);
+  const [r, g, b] = colorAt(p, x, y);
   return Math.abs(r - 230) < 10 && Math.abs(g - 232) < 10 && Math.abs(b - 238) < 10;
 }
 
@@ -867,7 +810,7 @@ function recommendedLoaded(p: Pixels): boolean {
   const buckets = new Set<string>();
   for (let y = 220; y < 1500; y += 16) {
     for (let x = 20; x < p.w - 20; x += 16) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       buckets.add(`${Math.floor(r / 24)},${Math.floor(g / 24)},${Math.floor(b / 24)}`);
     }
   }
@@ -888,7 +831,7 @@ function multiPageWork(p: Pixels): boolean {
   let gray = 0;
   for (let y = 820; y < 980; y += 2) {
     for (let x = 820; x < 1060; x += 2) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       const mx = Math.max(r, g, b);
       const mn = Math.min(r, g, b);
       if (mx - mn < 18 && mx > 70 && mx < 190) gray++;

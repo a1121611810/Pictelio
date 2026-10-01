@@ -65,8 +65,7 @@
  * - 断言证据：截图逐帧落盘 test-results/android-e2e/transition-matrix/。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createCanvas, loadImage } from "canvas";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
@@ -87,6 +86,14 @@ import {
   readAppLogcat,
   startMainActivity,
 } from "../prefs";
+import {
+  assertDeviceGeometry as assertGeometry,
+  colorAt,
+  screenshot as shoot,
+  toPixels,
+  waitForStableFrame as waitStable,
+  type Pixels,
+} from "../pixel";
 import {
   CONTENT_BOTTOM,
   CONTENT_RIGHT,
@@ -272,7 +279,7 @@ const REGION_CAROUSEL_IMAGE: Region = { x0: 0, y0: 300, x1: 1080, y1: 1150 };
 /** 深色 scrim 胶囊行探测（R3 收藏行）：canvas 薄封装，委托纯逻辑到 transition-geometry。 */
 function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: number } | null {
   const gray: GrayAt = (x, y) => {
-    const [r, g, b] = pixelAt(p, x, y);
+    const [r, g, b] = colorAt(p, x, y);
     return (r + g + b) / 3;
   };
   return detectBookmarkRow(region, gray);
@@ -330,37 +337,15 @@ let serial = "";
  * （gestural ↔ threebutton）会让稳定区高度变化，此时旧常量会**静默点到空处**
  * （2026-09-28 实测：全屏口径 2033 vs 实际 1889，偏 144px，落在 FAB 盒外）。
  * 像素级 UI 断言在坐标错位时表现为「功能坏了」，极易被误判为产品回归。
+ *
+ * #852：实现已收敛到 `../pixel` 的 `assertDeviceGeometry`（三 spec 共用一份），
+ * 此处只做参数绑定（稳定区期望值 + 报错文案里的用途），断言体未改一字。
  */
 function assertDeviceGeometry(s: string): void {
-  const size = runCapture(adbPath(), ["-s", s, "shell", "wm", "size"]).stdout;
-  const density = runCapture(adbPath(), ["-s", s, "shell", "wm", "density"]).stdout;
-  expect(size).toMatch(/1080x2160/u);
-  expect(density).toMatch(/480/u);
-
-  // 稳定区高度（= Lynx contentSize.h 口径，也是 FAB 等坐标常量的 H 基准）
-  const displays = runCapture(adbPath(), [
-    "-s",
-    s,
-    "shell",
-    "dumpsys",
-    "window",
-    "displays",
-  ]).stdout;
-  const rng = /rng=\d+x\d+-\d+x(\d+)/u.exec(displays);
-  expect(
-    rng,
-    `无法从 dumpsys window displays 解析稳定区高度（坐标常量依赖它）。原始输出片段：${displays
-      .split("\n")
-      .find((l) => l.includes("rng="))
-      ?.trim()}`,
-  ).not.toBeNull();
-  const contentHeight = Number(rng?.[1]);
-  expect(
-    contentHeight,
-    `稳定区高度应为 ${CONTENT_BOTTOM}（状态栏 72 + 手势条 72 之外）；实测 ${contentHeight}。` +
-      `本 spec 的 FAB / 采样窗口常量按 ${CONTENT_BOTTOM} 校准，换 ROM 或切换导航模式后需重新校准` +
-      `（gestural ↔ threebutton 会改变底部系统条高度）。`,
-  ).toBe(CONTENT_BOTTOM);
+  assertGeometry(s, {
+    contentHeight: CONTENT_BOTTOM,
+    consumer: "本 spec 的 FAB / 采样窗口常量",
+  });
 }
 
 /** APK 内 lynx bundle 必须含 benchNav 深链钩子（BENCH_NAV=1 整链构建），否则快速失败并给指令。 */
@@ -380,34 +365,14 @@ function assertDeepLinkHookPresent(): void {
   }
 }
 
-/** 截屏（exec-out 直取 PNG 字节流，20MB 上限防 1080×2160 PNG 触发 ENOBUFS）并落盘留证。 */
+/**
+ * 截屏（exec-out 直取 PNG 字节流，20MB 上限防 1080×2160 PNG 触发 ENOBUFS）并落盘留证。
+ *
+ * #852：实现收敛到 `../pixel` 的 `screenshot`，此处只绑定本 spec 的 serial 与证据目录，
+ * 落盘行为（恒落盘）与收敛前一致。
+ */
 function screenshot(name: string): Buffer {
-  const buf = execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  writeFileSync(resolve(EVIDENCE_DIR, `${name}.png`), buf);
-  return buf;
-}
-
-/** 像素视图（canvas 解码 + getImageData；与 fab 回归同款依赖）。 */
-interface Pixels {
-  w: number;
-  h: number;
-  data: Uint8ClampedArray;
-}
-
-async function toPixels(png: Buffer): Promise<Pixels> {
-  const img = await loadImage(png);
-  const canvas = createCanvas(img.width, img.height);
-  const c2d = canvas.getContext("2d");
-  c2d.drawImage(img, 0, 0);
-  const { data } = c2d.getImageData(0, 0, img.width, img.height);
-  return { w: img.width, h: img.height, data };
-}
-
-function pixelAt(p: Pixels, x: number, y: number): [number, number, number] {
-  const i = (Math.round(y) * p.w + Math.round(x)) * 4;
-  return [p.data[i], p.data[i + 1], p.data[i + 2]];
+  return shoot(serial, name, EVIDENCE_DIR);
 }
 
 /**
@@ -457,7 +422,7 @@ function colorBuckets(p: Pixels, region: Region): number {
   const buckets = new Set<string>();
   for (let y = region.y0; y < region.y1; y += 16) {
     for (let x = region.x0; x < region.x1; x += 16) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       buckets.add(`${Math.floor(r / 24)},${Math.floor(g / 24)},${Math.floor(b / 24)}`);
     }
   }
@@ -475,7 +440,7 @@ async function avgBrightness(png: Buffer, region: Region): Promise<number> {
   let n = 0;
   for (let y = region.y0; y < region.y1; y += 4) {
     for (let x = region.x0; x < region.x1; x += 4) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       sum += (r + g + b) / 3;
       n++;
     }
@@ -524,7 +489,7 @@ function redTextSamples(p: Pixels, region: Region): number {
   let red = 0;
   for (let y = region.y0; y < region.y1; y += 2) {
     for (let x = region.x0; x < region.x1; x += 2) {
-      const [r, g, b] = pixelAt(p, x, y);
+      const [r, g, b] = colorAt(p, x, y);
       if (r > 150 && g < 110 && b < 110) red++;
     }
   }
@@ -633,21 +598,23 @@ async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
 /**
  * 帧稳定等待：连拍两帧对比 ≤ STABLE_TH 即认为画面静止，返回后一帧。
  * 用于「列表加载完成」「返回落地」「翻页触底」等无法条件等待的渲染收敛场景。
+ *
+ * #852：轮询实现收敛到 `../pixel` 的 `waitForStableFrame`；差异度量（区域化
+ * `diffRegion`）、阈值（`STABLE_TH`）、间隔（1.2s）全部由本 spec 传入，
+ * 与收敛前逐字一致——收敛的是循环骨架，不是判定强度。
  */
 async function waitForStableFrame(
   label: string,
   region: Region,
   timeoutMs = 30_000,
 ): Promise<Buffer> {
-  const deadline = Date.now() + timeoutMs;
-  let prev = await screenshot(`stable-${label}`);
-  while (Date.now() < deadline) {
-    await SLEEP(1_200);
-    const cur = await screenshot(`stable-${label}`);
-    if ((await diffRegion(prev, cur, region)) <= STABLE_TH) return cur;
-    prev = cur;
-  }
-  throw new Error(`等待画面稳定超时（${label}，${timeoutMs}ms）——证据 stable-${label}.png`);
+  return waitStable({
+    label,
+    capture: () => screenshot(`stable-${label}`),
+    diff: (prev, cur) => diffRegion(prev, cur, region),
+    stableThreshold: STABLE_TH,
+    timeoutMs,
+  });
 }
 
 /**

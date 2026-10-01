@@ -43,9 +43,9 @@
  * 旧值 (635,1195)/(384,1187)，误差 ≤1px；beforeAll 校验分辨率防 AVD 漂移）。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { assertDeviceGeometry as assertGeometry, screenshot as shoot } from "../pixel";
 import {
   currentTopActivity,
   forceStopApp,
@@ -127,37 +127,15 @@ const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
  * 高度而非全屏 2160。换 ROM 或切换导航模式（gestural ↔ threebutton）会让稳定区高度变化，
  * 此时旧常量会**静默点到空处**——2026-09-28 实测：全屏口径 2033 vs 实际 1889，偏 144px，
  * 落在 FAB 盒外。像素级 UI 断言在坐标错位时表现为「功能坏了」，极易被误判为产品回归。
+ *
+ * #852：实现收敛到 `../pixel` 的 `assertDeviceGeometry`（三 spec 共用一份），此处只做
+ * 参数绑定（稳定区期望值 + 报错文案里的用途），断言体未改一字。
  */
 function assertDeviceGeometry(serial: string): void {
-  const size = runCapture(adbPath(), ["-s", serial, "shell", "wm", "size"]).stdout;
-  const density = runCapture(adbPath(), ["-s", serial, "shell", "wm", "density"]).stdout;
-  expect(size).toMatch(/1080x2160/u);
-  expect(density).toMatch(/480/u);
-
-  // 稳定区高度（= Lynx contentSize.h 口径，也是 FAB 圆心推导的 H 基准）
-  const displays = runCapture(adbPath(), [
-    "-s",
-    serial,
-    "shell",
-    "dumpsys",
-    "window",
-    "displays",
-  ]).stdout;
-  const rng = /rng=\d+x\d+-\d+x(\d+)/u.exec(displays);
-  expect(
-    rng,
-    `无法从 dumpsys window displays 解析稳定区高度（FAB_TAP 坐标依赖它）。原始输出片段：${displays
-      .split("\n")
-      .find((l) => l.includes("rng="))
-      ?.trim()}`,
-  ).not.toBeNull();
-  const contentHeight = Number(rng?.[1]);
-  expect(
-    contentHeight,
-    `稳定区高度应为 ${CONTENT_BOTTOM}（全屏 2160 减去顶部状态栏 72 + 底部手势条 72）；实测 ${contentHeight}。` +
-      `本 spec 的 FAB / Me 页行常量按 ${CONTENT_BOTTOM} 校准，换 ROM 或切换导航模式后需重新校准` +
-      `（gestural ↔ threebutton 会改变底部系统条高度）。`,
-  ).toBe(CONTENT_BOTTOM);
+  assertGeometry(serial, {
+    contentHeight: CONTENT_BOTTOM,
+    consumer: "本 spec 的 FAB / Me 页行常量",
+  });
 }
 
 /** 等待前台 Activity 变为期望值（adb 轮询，prefs.currentTopActivity 归一化全名比对）。 */
@@ -201,13 +179,12 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
  * 断言失败时**零证据**——只能看到一个裸数字（实测「差异 8」），无从判断是
  * 没点击、点错位置、还是页面确实变了（状态栏时钟本身就会贡献几十像素差）。
  * 落盘后失败即可对着两帧逐段复算差异来源。
+ *
+ * #852：实现收敛到 `../pixel` 的 `screenshot`（三 spec 共用一份），此处只绑定
+ * 本 spec 的证据目录；`label` 可选、不传就不落盘的行为与收敛前一致。
  */
 function screenshot(serial: string, label?: string): Buffer {
-  const buf = execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  if (label) writeFileSync(resolve(EVIDENCE_DIR, `${label}.png`), buf);
-  return buf;
+  return shoot(serial, label, EVIDENCE_DIR);
 }
 
 /** 像素 diff（canvas 解码 PNG；采样步长 2，逐通道阈值 24），返回差异采样点数。 */

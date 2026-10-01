@@ -183,6 +183,88 @@ export function writePrefKey(serial: string, key: string, value: string): void {
   }
 }
 
+/**
+ * 外观（主题色 / 明暗）播种契约（issue #852）。
+ *
+ * 与 `writePrefKey` 的关系：`seedAppearance` 是**多键原子播种 + 回读校验**的便捷层，
+ * 落盘仍走 `writePrefKey`（同一份 XML 序列化口径），不引入第二条写盘路径。
+ *
+ * ## 键名 oracle（单一事实源在 app 侧，不在本文件）
+ *
+ *  - `settings_theme_color` —— `packages/app-lynx/src/stores/settingsStore.ts`
+ *    `THEME_COLOR_KEY`；值域见 `utils/themeColor.THEME_COLOR_OPTIONS`（sky/violet/pink/
+ *    green/orange/teal/bili）。非法值在 JS 侧 `themeColorClass` 会 warn 并回退 sky，
+ *    **不会崩**——所以写错值的表现是「颜色没变」，不是报错（#852 A3 断言正是靠这一点
+ *    构成负向对照：主题类没生效时读到的是回退色板，与目标色板必然不同）。
+ *  - `settings_dark_mode` —— 同文件 `DARK_MODE_KEY`；值域 `light` / `dark` / `auto`。
+ *    原生侧 `LynxActivity.readDarkModeRaw` + `normalizeDarkMode` 读同一个键
+ *    （状态栏/启动页配色与 JS 侧读点同源）。
+ * 两者都落在 `CapacitorStorage` 这个 SharedPreferences 文件里（与
+ * `PictelioPrefsModule.PREFS_FILE`、`LynxActivity.SYSTEMBARS_PREFS` 同一份）。
+ *
+ * ## 为什么要先 force-stop
+ *
+ * `writePrefKey` 是**直写 XML 文件**，绕过了 app 进程内的 `SharedPreferences` 内存缓存。
+ * app 在运行时若持有同一键的旧值并随后调 `editor.apply()`，会把文件**覆写回旧值**，
+ * 表现为「刚写的主题色重启后又变回去」。故调用方**必须**先 `forceStopApp` 再播种。
+ * 本函数不代劳 force-stop：是否需要保活由用例决定（#852 的 spec 在播种前已停进程）。
+ */
+export interface AppearanceSeed {
+  /** 主题色 id（THEME_COLOR_OPTIONS 之一）；省略 = 不动该键 */
+  themeColor?: string;
+  /** 明暗模式（`light` / `dark` / `auto`）；省略 = 不动该键 */
+  darkMode?: string;
+}
+
+/** 外观两键的键名（写盘与回读校验共用，避免两处各写一份字符串） */
+export const APPEARANCE_KEYS = {
+  themeColor: "settings_theme_color",
+  darkMode: "settings_dark_mode",
+} as const;
+
+/**
+ * 播种外观键并回读校验（write-then-verify，秒级区分「写失败」与「读不到」）。
+ *
+ * @param serial adb 设备序列号
+ * @param seed 要写入的键值；至少给一个，否则直接抛错（空播种是调用方 bug，不静默通过）
+ */
+export function seedAppearance(serial: string, seed: AppearanceSeed): void {
+  if (seed.themeColor === undefined && seed.darkMode === undefined) {
+    throw new Error(
+      "[android-e2e] seedAppearance 未给任何键——空播种会让用例「什么都没改就判通过」。" +
+        `期望键名: ${APPEARANCE_KEYS.themeColor} / ${APPEARANCE_KEYS.darkMode}`,
+    );
+  }
+  if (seed.themeColor !== undefined) {
+    writePrefKey(serial, APPEARANCE_KEYS.themeColor, seed.themeColor);
+  }
+  if (seed.darkMode !== undefined) {
+    writePrefKey(serial, APPEARANCE_KEYS.darkMode, seed.darkMode);
+  }
+  // 回读校验：写入后必须真的能在 XML 里读到，否则后续断言会在一个「没播种」的
+  // 设备上跑出与期望无关的红，报错指向错误的根因。
+  for (const [key, want] of [
+    [APPEARANCE_KEYS.themeColor, seed.themeColor],
+    [APPEARANCE_KEYS.darkMode, seed.darkMode],
+  ] as const) {
+    if (want === undefined) continue;
+    const got = readPrefValue(serial, key);
+    if (got !== want) {
+      throw new Error(
+        `[android-e2e] 播种 ${key} 回读不一致：写入 ${want}，读到 ${got ?? "(缺失)"}。` +
+          "（app 进程是否仍在运行并覆写了 SharedPreferences？先 forceStopApp 再播种）",
+      );
+    }
+  }
+  console.log(
+    `[android-e2e] ✓ 已播种外观 ${
+      seed.themeColor === undefined ? "" : `${APPEARANCE_KEYS.themeColor}=${seed.themeColor}`
+    }${seed.themeColor !== undefined && seed.darkMode !== undefined ? " " : ""}${
+      seed.darkMode === undefined ? "" : `${APPEARANCE_KEYS.darkMode}=${seed.darkMode}`
+    }`,
+  );
+}
+
 /** 强制停止 app（清后台进程，重启时走 onCreate 入口路由）。
  *  注意：不等待 pidof 消失——force-stop 后 am start 会启动新进程读最新 prefs；
  *  等待反而可能因旧进程未死透被 am start 复用（读缓存 prefs）导致不分发。 */
