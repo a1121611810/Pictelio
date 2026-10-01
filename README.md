@@ -153,7 +153,6 @@ script, in parallel. `lint` / `fmt` / `fmt:check` / `outdated` are repo-wide sin
 | `pnpm dev:android-host` | Build the debug APK and install it on the connected device |
 | `pnpm release:android-host` | Interactive release flow |
 | `pnpm sync:app-lynx-bundle` | Sync lynx bundle into Android assets |
-| `pnpm release` | Interactive one-shot release (bump version → build → tag → GitHub Release) |
 | `pnpm deploy` | Preview landing page to `_site/` |
 
 </details>

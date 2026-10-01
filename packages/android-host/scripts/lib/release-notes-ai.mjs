@@ -4,7 +4,7 @@
 // - 通道通用化：不绑死任何供应商，只认两种协议形态 —— Chat Completions
 //   （POST {base}/chat/completions）与 Responses（POST {base}/responses）。
 //   DeepSeek / OpenAI / Azure / 本地 Ollama 等只要兼容其一即可用，换供应商只改 .env。
-// - 配置全部无默认值（四个键都必须显式填在 packages/android-host/.env，该文件不进 git）；
+// - 配置全部无默认值（四个键都必须显式填在 packages/app-lynx/.env，该文件不进 git）；
 //   缺任一键 = 未配置 → 调用方跳过本步骤并打 warn（不静默、也不问一个做不到的问题）。
 // - 请求只发最小必需字段（model + 消息体），不发 temperature / max_tokens：
 //   不同供应商对可选参数的支持不一（部分模型直接 400 拒绝），长度改用提示词约束。
@@ -16,7 +16,20 @@
 // - 本文件不直接读文件系统、不读 process.env：读文本与 env 都走端口注入
 //   （readText / env，见 loadAiConfig），故全部函数可单测。
 
-/** 四个配置键（packages/android-host/.env，值全部留空由使用者自填） */
+/**
+ * AI 配置 .env 的读取路径（相对 packages/android-host，由 release-utils 的 readText 解析）。
+ *
+ * ⚠️ 这里曾踩过一次「随包迁移的静默偏移」：readText 按**脚本自身位置**解析相对路径，
+ * ADR-0203 把发布脚本从 packages/app/ 搬进 packages/android-host/ 后，readText(".env")
+ * 自动跟着搬到了 packages/android-host/.env —— 而使用者的 .env 从来就在唯一客户端包
+ * pictelio-app-lynx 里。结果是 ENOENT 被静默吞掉，warn 反过来指责「没填配置」，
+ * 配好的四个键明明齐全却一步都不跑。故路径显式写死并集中在此，与本包其它迁入脚本同口径。
+ */
+export const AI_ENV_PATH = "../app-lynx/.env";
+/** 面向使用者的仓库相对路径（warn 点名用：给相对路径等于让人拿着相对根目录的路径去找文件） */
+const AI_ENV_DISPLAY = "packages/app-lynx/.env";
+
+/** 四个配置键（packages/app-lynx/.env，值全部留空由使用者自填） */
 export const AI_CONFIG_KEYS = {
   protocol: "PICTELIO_AI_PROTOCOL",
   baseUrl: "PICTELIO_AI_BASE_URL",
@@ -169,10 +182,10 @@ export function resolveAiConfig({ env = {}, envFile = {} } = {}) {
 export async function loadAiConfig({ readText, env = {}, warn = console.warn } = {}) {
   let envFileText = "";
   try {
-    envFileText = await readText(".env");
+    envFileText = await readText(AI_ENV_PATH);
   } catch (e) {
     if (e?.code !== "ENOENT") {
-      warn(`读取 packages/android-host/.env 失败（按未配置处理）: ${e?.message ?? e}`);
+      warn(`读取 ${AI_ENV_DISPLAY} 失败（按未配置处理）: ${e?.message ?? e}`);
     }
   }
   return resolveAiConfig({ env, envFile: parseEnvFile(envFileText) });

@@ -20,7 +20,7 @@
  *                                   三处一并切到该分支。过渡版发版用：
  *                                   PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 pnpm release）
  *
- * 发布文案「模型总结」的可选配置（-i 与 -c 共用；值填在 packages/android-host/.env，该文件不进 git，
+ * 发布文案「模型总结」的可选配置（-i 与 -c 共用；值填在 packages/app-lynx/.env，该文件不进 git，
  * 四个键缺任一 = 未配置 → 跳过该步骤并打 warn）:
  *   PICTELIO_AI_BASE_URL         - OpenAI 兼容服务的 base URL（脚本追加 /chat/completions 或 /responses）
  *   PICTELIO_AI_API_KEY          - 服务方 API key
@@ -347,16 +347,18 @@ async function interactivePickVersion(currentVersion) {
 }
 
 // ── 模型总结（可选步骤：-i 与 -c 两种模式共用）──
-// 配置读 packages/android-host/.env（该文件不进 git，四个键的值由使用者自填）；缺任一键 = 未配置 →
+// 配置读 packages/app-lynx/.env（该文件不进 git，四个键的值由使用者自填）；缺任一键 = 未配置 →
 // 打 warn 跳过本步骤（不去问一个做不到的问题）。读取与交互闭环都在 lib/release-notes-ai.mjs
 // （端口注入、有单测），这里只负责端口接线与日志口吻。
+// ⚠️ 该 .env 在唯一客户端包内而非本包内：ADR-0203 把本脚本搬进宿主包时，readText 的相对解析
+// 跟着搬了一路，曾导致此处指向一个从未被创建过的 packages/android-host/.env（见 AI_ENV_PATH）。
 const aiWarn = (message) => console.warn(`[release] ⚠ ${message}`);
 
 async function maybeSummarizeChangelog(changelog) {
   const config = await loadAiConfig({ readText, env: process.env, warn: aiWarn });
   if (!config.configured) {
     aiWarn(
-      `未配置发布文案模型（缺或为空：${config.missing.join("、")}；填在 packages/android-host/.env 后可用），` +
+      `未配置发布文案模型（缺或为空：${config.missing.join("、")}；填在 packages/app-lynx/.env 后可用），` +
         `跳过「模型总结」，使用原始文案`,
     );
     return changelog;

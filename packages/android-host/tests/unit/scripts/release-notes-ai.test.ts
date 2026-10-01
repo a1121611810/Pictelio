@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   AI_CONFIG_KEYS,
+  AI_ENV_PATH,
   DEFAULT_ATTEMPTS,
   DEFAULT_TIMEOUT_MS,
   PROTOCOL_PATHS,
@@ -590,8 +591,11 @@ describe("loadAiConfig - .env 读取（唯一 IO 边界，成功与失败双路�
     expect(config.configured).toBe(true);
     expect(config.model).toBe("deepseek-flash");
     expect(config.protocol).toBe("chat");
-    // 路径写错会退化成「静默未配置 + 缺键」——把成因指向使用者的配置，故钉住
-    expect(seen).toEqual([".env"]);
+    // 路径写错会退化成「静默未配置 + 缺键」——把成因指向使用者的配置，故钉住。
+    // 此处曾钉 ".env"：那是**相对脚本自身包**的解析基准，ADR-0203 搬包后它自动漂移成
+    // packages/android-host/.env（一个从未被创建的文件），于是 ENOENT 被静默吞掉、
+    // 配置明明齐全却跳过本步。故改为钉显式常量，由下面的跨脚本一致性断言兜住再漂移。
+    expect(seen).toEqual([AI_ENV_PATH]);
   });
 
   it("ENOENT（没有 .env）→ 静默按未配置处理，不打 warn", async () => {
@@ -627,26 +631,42 @@ describe("loadAiConfig - .env 读取（唯一 IO 边界，成功与失败双路�
     });
 
     expect(warns).toHaveLength(1);
-    // oracle = ADR-0203 决策 2：发布脚本随宿主迁到 packages/android-host，
-    // 它的 AI 配置 .env 与脚本同在宿主包内。旧断言钉的是 `packages/app/.env`
-    // （脚本搬走后即恒假——本仓的「改名复活」先例：字面量匹配在改名后全部漏过）。
-    // 故此处钉**新归属**，并在下面补一条 doc-parity：warn 点名的路径必须与
-    // 实现里声明的那个一致——只改实现不改这里会红，两边都改则上面那条会红。
-    expect(warns[0]).toContain("读取 packages/android-host/.env 失败");
+    // oracle = 使用者的 .env 在唯一客户端包 pictelio-app-lynx 内（本仓所有随 ADR-0203
+    // 迁入宿主的脚本都读 ../app-lynx/，见下面那条跨脚本一致性断言）。
+    // 注意此处**不是**"warn 必须写 android-host"——那是本次缺陷的成因：注释、warn、
+    // 读取三处一致地指向一个不存在的文件，自洽却全错，对真实缺陷零判别力。
+    expect(warns[0]).toContain("读取 packages/app-lynx/.env 失败");
     expect(warns[0]).toContain("EACCES");
     expect(config.configured).toBe(false);
   });
 
-  it("doc-parity：warn 点名的 .env 路径 = 实现声明的路径（改名不静默通过）", () => {
+  it("跨脚本一致性：AI 配置 .env 与本包其它迁入脚本读同一个包（再漂移即红）", () => {
+    // 这才是本缺陷真正该有的防线。旧的 doc-parity 断言拿「实现注释里写的是不是
+    // packages/xxx/.env」当判据——缺陷发生时它是绿的，因为它只检查内部一致性，
+    // 不检查那个路径是否真的存在、是否是使用者填配置的地方。改为钉**跨脚本**：
+    // 凡随 ADR-0203 迁入 packages/android-host/ 的脚本，其包外资源一律读 ../app-lynx/。
+    // AI_ENV_PATH 一旦再漂成宿主包内或别的路径，本条与上面那条 seen 断言同时转红。
+    for (const f of ["sync-android-version.mjs", "sync-credentials.mjs"]) {
+      const src = readFileSync(new URL(`../../../scripts/${f}`, import.meta.url), "utf8");
+      expect(src, `${f} 应与 AI_ENV_PATH 同口径读 ../app-lynx/`).toContain(
+        'resolve(rootDir, "..", "app-lynx")',
+      );
+    }
+    expect(AI_ENV_PATH.startsWith("../app-lynx/")).toBe(true);
+  });
+
+  it("doc-parity：warn 点名的路径由读取路径派生（不给使用者指一个不被读的文件）", () => {
+    // 不再断言「注释里的字面量前缀是什么」——注释不是运行时行为。
+    // 改判 warn 点名路径与实际读取路径**同源**：两者错开时，使用者会拿着
+    // warn 里的路径去填一个脚本根本不读的文件，且永远不知道自己填错了地方。
     const src = readFileSync(
       new URL("../../../scripts/lib/release-notes-ai.mjs", import.meta.url),
       "utf8",
     );
-    const declared = [...src.matchAll(/(packages\/[\w-]+\/\.env)/g)].map((m) => m[1]);
-    expect(declared.length, "实现里至少声明了一处 .env 路径").toBeGreaterThan(0);
-    for (const p of new Set(declared)) {
-      expect(p.startsWith("packages/android-host/"), `实现声明的 .env 路径：${p}`).toBe(true);
-    }
+    const display = src.match(/AI_ENV_DISPLAY = "([^"]+)"/)?.[1];
+    expect(display, "实现必须导出 AI_ENV_DISPLAY 供 warn 点名").toBeDefined();
+    // packages/<pkg>/.env ← 由 ../<pkg>/.env 去掉包外前缀得到，二者必须指向同一个包
+    expect(display).toBe(`packages/${AI_ENV_PATH.replace(/^\.\.\//, "")}`);
   });
 
   it("process.env 优先于 .env 文件（同键时以环境为准）", async () => {
