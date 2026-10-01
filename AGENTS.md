@@ -302,7 +302,7 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 ## 部署
 
 - **Website**：push 到 `main` 且改动 `packages/website/**` → GitHub Actions 部署 GitHub Pages（`.github/workflows/deploy.yml`）
-- **Android APK**：本地构建，经 `pnpm release` 交互式发布 → 完整流程 `docs/release-checklist.md`
+- **Android APK**：本地构建，经 `pnpm release:android-host` 交互式发布 → 完整流程 `docs/release-checklist.md`
 - **本地预览**：`pnpm deploy`（复制 landing 页面到 `_site/`）
 
 ## 任务完成前自检
