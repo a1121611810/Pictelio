@@ -55,6 +55,9 @@ import * as Vue from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import * as bookmarkMutationMod from '../composables/useBookmarkMutation'
 import * as longPressMod from '../composables/useLongPress'
+import * as reducedMotionMod from '../composables/useReducedMotion'
+import * as iconMapMod from '../utils/iconMap'
+import * as accessibilityMod from '../utils/accessibility'
 import { apiClient } from '../api/client'
 
 // ─── 编译真实 SFC → 可挂载组件定义 ───
@@ -70,19 +73,32 @@ function resolveModule(spec: string): Record<string, unknown> {
   if (spec === 'vue') return Vue
   if (spec === '../composables/useBookmarkMutation') return bookmarkMutationMod
   if (spec === '../composables/useLongPress') return longPressMod
+  if (spec === '../composables/useReducedMotion') return reducedMotionMod
+  // 图标位统一经 AppIcon（ADR-0208 决策 3）：编译真实 SFC 而非 mirror —— 本文件的心形
+  // 断言要验的是「图标位真的走了 <AppIcon> + 映射表」这条契约，mirror 会把该契约自证掉
+  if (spec === './AppIcon.vue') return { default: loadAppIcon() }
   throw new Error(`未映射的 SFC import：${spec}（BookmarkButton.vue 新增依赖时请在此补表）`)
 }
 
-let cachedComponent: Component | null = null
+/** AppIcon.vue 的 import 映射表（组件只依赖 vue + 两个纯 TS utils） */
+function resolveAppIconModule(spec: string): Record<string, unknown> {
+  if (spec === 'vue') return Vue
+  if (spec === '../utils/iconMap') return iconMapMod
+  if (spec === '../utils/accessibility') return accessibilityMod
+  throw new Error(`未映射的 SFC import：${spec}（AppIcon.vue 新增依赖时请在此补表）`)
+}
 
-/** 编译并求值 BookmarkButton.vue（同文件只编译一次） */
-function loadBookmarkButton(): Component {
-  if (cachedComponent) return cachedComponent
-  const path = fileURLToPath(new URL('./BookmarkButton.vue', import.meta.url))
+const sfcCache = new Map<string, Component>()
+
+/** 编译并求值一个 SFC（按文件名缓存；同一 loader 家族共用） */
+function compileSfc(fileName: string, resolve: (spec: string) => Record<string, unknown>): Component {
+  const cached = sfcCache.get(fileName)
+  if (cached !== undefined) return cached
+  const path = fileURLToPath(new URL(`./${fileName}`, import.meta.url))
   const { descriptor, errors } = parse(readFileSync(path, 'utf8'), { filename: path })
   if (errors.length > 0) throw new Error(`SFC parse 失败：${JSON.stringify(errors)}`)
   // inlineTemplate：模板渲染函数内联进 setup 产物，单模块可直接求值
-  const compiled = compileScript(descriptor, { id: 'bookmark-button-host-matrix', inlineTemplate: true })
+  const compiled = compileScript(descriptor, { id: `host-matrix-${fileName}`, inlineTemplate: true })
   // compileScript 产物仍含 TS（interface / 泛型 / 注解），用 Node 内置剥离（仓库 Node ≥ 22.22）。
   // strip 模式即可覆盖本 SFC 的可擦除语法（无 enum / namespace / 参数属性）。
   const js = stripTypeScriptTypes(compiled.content, { mode: 'strip' })
@@ -120,10 +136,21 @@ function loadBookmarkButton(): Component {
   if (exportCount !== 1) throw new Error(`编译产物应恰有一个 export default，实际 ${exportCount} 个`)
   code = code.replace(/export default/g, 'return')
 
-  const registry = bindings.map((b) => resolveModule(b.spec))
+  const registry = bindings.map((b) => resolve(b.spec))
   const factory = new Function('__mods', `'use strict';\n${code}`)
-  cachedComponent = factory(registry) as Component
-  return cachedComponent
+  const component = factory(registry) as Component
+  sfcCache.set(fileName, component)
+  return component
+}
+
+/** 编译并求值 BookmarkButton.vue */
+function loadBookmarkButton(): Component {
+  return compileSfc('BookmarkButton.vue', resolveModule)
+}
+
+/** 编译并求值 AppIcon.vue（真实图标组件，见 resolveModule 内 ADR-0208 决策 3 说明） */
+function loadAppIcon(): Component {
+  return compileSfc('AppIcon.vue', resolveAppIconModule)
 }
 
 // ─── 自定义 nodeOps 渲染器（无 DOM 的纯对象节点；只承载 Vue patch 语义）───
@@ -246,15 +273,24 @@ function subtreeText(el: FakeNode): string {
   return out
 }
 
-/** 心形元素：直接持有 ♥（U+2665）文本子节点的元素（模板里类绑定 text-tertiary-on / text-inverse-on-surface 之所在 —— chip 容器配色（spec §E「Dark Glass」）：未收藏 = inverse-surface 上的前景色，已收藏 = tertiary 上的 on-tertiary，对应心形色类名） */
+/**
+ * 心形字形 oracle = `iconChar('favorite_border')`（utils/iconMap.ts 唯一事实源 + ADR-0208 决策 2：
+ * 映射表同时是字体子集生成输入 / 运行时查表依据 / 门禁 oracle）。
+ * 语义选型依据 = iconMap 动作组「favorite_border: ♡ 未收藏（选中态用色，不用 favorite——码点同）」
+ * —— 本按钮 = 收藏，故取心形族而非 star（star 语义 = 评分 / 要点 / 已加入列表）。
+ * 反向防线：`findHeart` 找不到即抛错，模板退回裸 ♥ 文本节点时整组用例转红。
+ */
+const HEART_GLYPH = iconMapMod.iconChar('favorite_border')
+
+/** 心形元素：直接持有 favorite_border 字形文本子节点的元素（模板里类绑定 text-tertiary-on / text-inverse-on-surface 之所在 —— chip 容器配色（spec §E「Dark Glass」）：未收藏 = inverse-surface 上的前景色，已收藏 = tertiary 上的 on-tertiary，对应心形色类名） */
 function findHeart(scope: FakeNode): FakeNode {
   const hit = findByPredicate(
     scope,
     (n) =>
       n.nodeType === 1 &&
-      n.children.some((c) => c.nodeType === 3 && (c.text ?? '').includes('\u2665')),
+      n.children.some((c) => c.nodeType === 3 && (c.text ?? '').includes(HEART_GLYPH)),
   )
-  if (hit === undefined) throw new Error('未找到心形元素（模板 ♥ 文本节点）')
+  if (hit === undefined) throw new Error('未找到心形元素（<AppIcon name="favorite_border"> 渲染出的字形文本节点）')
   return hit
 }
 
@@ -262,11 +298,27 @@ function heartClass(scope: FakeNode): string {
   return String(findHeart(scope).props.class ?? '')
 }
 
+/** 树内全部 class 字符串（断言动效类名 bookmark-pop-* / bookmark-ring-* 是否被挂上） */
+function allClasses(scope: FakeNode): string {
+  let out = ''
+  walk(scope, (n) => {
+    if (n.props.class !== undefined) out += ` ${String(n.props.class)}`
+  })
+  return out
+}
+
 /** 按钮 tap 入口：模板根 view 的 @tap.stop 处理器（withModifiers 包装） */
 function tap(scope: FakeNode): void {
   const hit = findByPredicate(scope, (n) => typeof n.props.onTap === 'function')
   if (hit === undefined) throw new Error('未找到 @tap 处理器')
   ;(hit.props.onTap as (e: { stopPropagation(): void }) => void)({ stopPropagation() {} })
+}
+
+/** 触摸通道入口：模板根 view 的 @touchstart / @touchmove / @touchend 处理器（单指，不位移） */
+function touch(scope: FakeNode, prop: 'onTouchstart' | 'onTouchmove' | 'onTouchend'): void {
+  const hit = findByPredicate(scope, (n) => typeof n.props[prop] === 'function')
+  if (hit === undefined) throw new Error(`未找到 ${prop} 处理器`)
+  ;(hit.props[prop] as (e: unknown) => void)({ touches: [{ clientX: 100, clientY: 100 }] })
 }
 
 /** 微任务 + 宏任务双冲刷：等待 toggle 的 mutateAsync 结算与响应式渲染 */
@@ -310,6 +362,21 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
 
   // ── (a) 列表宿主形态 ──
   describe('(a) 列表宿主形态：v-for / list-item 每卡独立实例（IllustList / Following / Bookmarks / UserHome）', () => {
+    it('心形图标位经 <AppIcon name="favorite_border"> 渲染：无裸 ♥（U+2665）字形节点，字形 = 映射表 favorite_border 码点', async () => {
+      const BookmarkButton = loadBookmarkButton()
+      const { container } = mountHost(() =>
+        h(BookmarkButton, { illustId: 101, initialBookmarked: false, bookmarkCount: 10 }),
+      )
+      await flush()
+      // 正向：渲染出的心形字形逐字节等于 iconMap 登记的 favorite_border 码点
+      expect(subtreeText(container)).toContain(HEART_GLYPH)
+      // 负向：旧裸字形（含 U+FE0E 变体选择符）零残留——ADR-0112 的 emoji 解析陷阱不得复活
+      expect(subtreeText(container)).not.toContain('\u2665')
+      expect(subtreeText(container)).not.toContain('\uFE0E')
+      // 渲染位确实落在 <AppIcon> 产出的 <text> 上（AppIcon 自带 leading-none，模板不重复写）
+      expect(findHeart(container).props.class).toContain('leading-none')
+    })
+
     it('两个独立实例分别以 props A(illustId 101 / count 10 / 未收藏) 与 B(illustId 202 / count 20 / 已收藏) 初始化：各自渲染正确、互不影响', async () => {
       const postSpy = spyPost()
       const BookmarkButton = loadBookmarkButton()
@@ -510,6 +577,204 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
       await flush()
       expect(postSpy).toHaveBeenCalledOnce()
       expect(postSpy).toHaveBeenCalledWith('/v1/novel/bookmark/delete', { novel_id: '902' })
+    })
+  })
+
+  // ── (d) 屏蔽态宿主形态（issue #865：NovelIntro masked 态收藏仍可写入）──
+  //
+  // 契约：BookmarkButton 的 disabled 是**输入闸门**（tap / 长按 / state-layer 反馈三条通道），
+  // 不是视觉开关。宿主（NovelIntro.vue）传 disabled 后，屏蔽态下点 ♥ 必须既不出网、
+  // 不翻转状态机、也不发 change——否则页面已整体置灰却仍能真的写入收藏（#865 缺陷本体）。
+  //
+  // 期望值出处（Oracle 溯源）：
+  // - 「屏蔽态下 5 个按钮一致置灰」= spec docs/specs/app-lynx-novel-intro-action-row.md D6
+  //   （原文：全部 5 个按钮（收藏·追更·下载·系列目录·开始阅读）一致置灰）——收藏是 5 个之一，
+  //   缺陷正是收藏这一路漏了拦截（同页追更/下载/系列目录/稍后看均已传 :disabled="masked"）；
+  // - 「拦截靠处理器守卫、不靠 CSS」= ActionButton.vue 头注 + tests/lynxUnsupportedTailwindClasses.test.ts
+  //   （pointer-events 是死类名，`@lynx-js/tailwind-preset` 白名单裁掉 pointerEvents），
+  //   故本组用例一律以「副作用是否发生」为判据，不以类名为判据；
+  // - 端点/载荷 oracle = 本文件既有 (a)(c) 组已锁的 novel 契约（add=/v2/novel/bookmark/add
+  //   + restrict=public），非从新实现反推。
+  describe('(d) 屏蔽态宿主形态：disabled 拦截（#865）', () => {
+    it('disabled=true 时点击：不出网、不翻转收藏态/计数、不发 change（拦截在 tap 入口）', async () => {
+      const postSpy = spyPost()
+      const changeSpy = vi.fn()
+      const BookmarkButton = loadBookmarkButton()
+      // 模拟 NovelIntro.vue 屏蔽态宿主：target-kind="novel" + :disabled="masked"（masked=true）
+      const { container } = mountHost(() =>
+        h(BookmarkButton, {
+          key: 'n-901',
+          targetKind: 'novel',
+          illustId: 901,
+          initialBookmarked: false,
+          bookmarkCount: 7,
+          disabled: true,
+          onChange: changeSpy,
+        }),
+      )
+      await flush()
+      // 前置：初始渲染 = props（对照组，证明拦截不是因为组件没渲染出来）
+      expect(subtreeText(container)).toContain('7')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
+
+      tap(container)
+      await flush()
+
+      // 副作用三连：不出网（无 API 写入）、状态机不翻转、无上抛
+      expect(postSpy).not.toHaveBeenCalled()
+      expect(subtreeText(container)).toContain('7') // 计数不乐观 +1
+      expect(subtreeText(container)).not.toContain('8')
+      expect(heartClass(container)).toContain('text-inverse-on-surface') // 收藏态不翻转
+      expect(heartClass(container)).not.toContain('text-tertiary-on')
+      expect(changeSpy).not.toHaveBeenCalled()
+    })
+
+    it('disabled=true 时无 state-layer 反馈（不播 ring / pop——否则「按了有动画却没写入」）', async () => {
+      spyPost()
+      const BookmarkButton = loadBookmarkButton()
+      // 阳性对照：disabled 缺省（列表卡片既有形态）→ 动效照播，证明断言落在 disabled 差异上
+      const enabled = mountHost(() =>
+        h(BookmarkButton, {
+          key: 'n-901',
+          targetKind: 'novel',
+          illustId: 901,
+          initialBookmarked: false,
+          bookmarkCount: 7,
+        }),
+      )
+      await flush()
+      tap(enabled.container)
+      await flush()
+      expect(subtreeText(enabled.container)).toContain('8')
+      expect(allClasses(enabled.container)).toContain('bookmark-pop-add')
+      expect(allClasses(enabled.container)).toContain('bookmark-ring-out')
+
+      // 屏蔽态：同一组件、同一手势，动画与写入同时不发生
+      const disabled = mountHost(() =>
+        h(BookmarkButton, {
+          key: 'n-901',
+          targetKind: 'novel',
+          illustId: 901,
+          initialBookmarked: false,
+          bookmarkCount: 7,
+          disabled: true,
+        }),
+      )
+      await flush()
+      tap(disabled.container)
+      await flush()
+      expect(subtreeText(disabled.container)).toContain('7')
+      expect(allClasses(disabled.container)).not.toContain('bookmark-pop-add')
+      expect(allClasses(disabled.container)).not.toContain('bookmark-pop-remove')
+      expect(allClasses(disabled.container)).not.toContain('bookmark-ring-out')
+      expect(allClasses(disabled.container)).not.toContain('bookmark-ring-in')
+    })
+
+    it('disabled=true 时长按通道一并关闭：不注册计时、不 emit longPress（面板不可由长按打开）', async () => {
+      const longPressSpy = vi.fn()
+      const BookmarkButton = loadBookmarkButton()
+      vi.useFakeTimers()
+      try {
+        const hostProps = reactive({ disabled: false })
+        const { container } = mountHost(() =>
+          h(BookmarkButton, {
+            key: 'n-901',
+            targetKind: 'novel',
+            illustId: 901,
+            initialBookmarked: false,
+            bookmarkCount: 7,
+            enableLongPress: true,
+            disabled: hostProps.disabled,
+            onLongPress: longPressSpy,
+          }),
+        )
+        // 阳性对照：disabled=false 时按住满 500ms → longPress 触发（证明计时/事件接线本身是通的）
+        touch(container, 'onTouchstart')
+        vi.advanceTimersByTime(longPressMod.LONG_PRESS_MS)
+        expect(longPressSpy).toHaveBeenCalledOnce()
+
+        // 切到屏蔽态：同样手势不得再开面板（否则置灰页面仍能弹出可写收藏的面板）
+        hostProps.disabled = true
+        await nextTick()
+        longPressSpy.mockClear()
+        touch(container, 'onTouchstart')
+        vi.advanceTimersByTime(longPressMod.LONG_PRESS_MS)
+        expect(longPressSpy).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('disabled 是响应式 prop（非 init-only）：同一实例 masked 由 true 翻 false 后立即恢复可写', async () => {
+      const postSpy = spyPost()
+      const BookmarkButton = loadBookmarkButton()
+      // init-only 契约（ADR-0163）只覆盖 illustId / initialBookmarked / bookmarkCount / targetKind
+      // ——这四个进状态机构造；disabled 是每次交互读的事件闸门，必须跟随宿主（masked 由 novel 数据
+      // 与设置 store 派生，运行中可变），不得被误实现为 setup 时读一次的冻结值。
+      const hostProps = reactive({ disabled: true })
+      const { container } = mountHost(() =>
+        h(BookmarkButton, {
+          key: 'n-901',
+          targetKind: 'novel',
+          illustId: 901,
+          initialBookmarked: false,
+          bookmarkCount: 7,
+          disabled: hostProps.disabled,
+        }),
+      )
+      await flush()
+      tap(container)
+      await flush()
+      expect(postSpy).not.toHaveBeenCalled()
+
+      // 解除屏蔽 → 同一实例立即可写（若 disabled 被实现为 init-only，此处会红）
+      hostProps.disabled = false
+      await flush()
+      tap(container)
+      await flush()
+      expect(postSpy).toHaveBeenCalledOnce()
+      expect(postSpy).toHaveBeenCalledWith('/v2/novel/bookmark/add', {
+        novel_id: '901',
+        restrict: 'public',
+      })
+      expect(subtreeText(container)).toContain('8')
+    })
+
+    it('mutation 注入路径同样受 disabled 约束（闸门在本组件输入边界，与状态机来源无关）', async () => {
+      const postSpy = spyPost()
+      const BookmarkButton = loadBookmarkButton()
+      // 注入路径 = 详情页形态（IllustDetail.vue 把页面级 mutation 传进心形）。若 disabled 只在
+      // 自建路径生效、注入路径漏拦，同一缺陷会在注入宿主复现——故本用例锁「注入路径同样不出网」。
+      const InjectedHost: Component = {
+        setup() {
+          // 真实 composable（非手写 mock）：本用例断言的是「注入实例不被触发」这一副作用事实
+          const bm = bookmarkMutationMod.useBookmarkMutation({
+            illustId: 901,
+            initialBookmarked: false,
+            initialCount: 7,
+            targetKind: 'novel',
+          })
+          return () =>
+            h(BookmarkButton, {
+              key: 'n-901',
+              targetKind: 'novel',
+              illustId: 901,
+              initialBookmarked: false,
+              bookmarkCount: 7,
+              mutation: bm,
+              disabled: true,
+            })
+        },
+      }
+      const { container } = mountHost(() => h(InjectedHost))
+      await flush()
+      expect(subtreeText(container)).toContain('7')
+
+      tap(container)
+      await flush()
+      expect(postSpy).not.toHaveBeenCalled()
+      expect(subtreeText(container)).toContain('7')
+      expect(heartClass(container)).not.toContain('text-tertiary-on')
     })
   })
 })

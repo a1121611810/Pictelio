@@ -4,8 +4,9 @@
 // 期望值出处（Oracle 溯源）：
 // - toggle + 已加入态高亮 + 快照零新增请求 = ADR-0191 D5 / spec D6
 // - @tap.stop 防卡片导航误触 = #751 T3 验收行（TagPressChip 防冒泡同款惯例）
-// - 时钟字形 VS15（U+FE0E 强制 text presentation）= ADR-0112 平台事实（裸 ♥ 实证）
 // - i18n 键前缀 later.* + 双字典消费 = spec D9（术语红线：禁 watchlist 词根）
+// - 图标消费契约（IconName 经 AppIcon / ActionButton prop）= ADR-0208 决策 3；
+//   「值是图标名而非字形」这一条由 utils/watchLaterGlyph.test.ts 独立钉住，本文件只守接线形态
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -43,10 +44,16 @@ describe('IllustDetail 稍后看入口（ADR-0191 D5）', () => {
     expect(illust).toContain("t('later.action.add')")
   })
 
-  it('时钟字形带 VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实）', () => {
-    // 字形单一事实源经 utils/watchLaterGlyph 导入（VS15 依据由 watchLaterGlyph 单测钉住）
+  it('LATER_ICON 经 <AppIcon> 渲染图标名，不作裸文本插值（ADR-0208 决策 3）', () => {
+    // T12 收口：LATER_ICON 的值是 **图标名**（'schedule'，IconName），不是字形。
+    // 裸 `<text>{{ LATER_ICON }}</text>` 会把字符串 "schedule" 当正文渲染出来——
+    // vue-tsc 抓不到（IconName ⊂ string），是纯静默视觉损坏（本仓「禁静默降级」）。
+    // Oracle 溯源：ADR-0208 决策 3（图标位一律经 AppIcon）+ utils/watchLaterGlyph.test.ts
+    // （钉 LATER_ICON === 'schedule' 且 !/^\u/ —— 「不是字形」由该单测独立承担）。
     expect(illust).toContain("import { LATER_ICON } from '../utils/watchLaterGlyph'")
-    expect(illust).toContain('{{ LATER_ICON }}')
+    expect(illust).toContain('<AppIcon :name="LATER_ICON"')
+    // 反向断言：裸插值一旦回流立刻判红（不做减法式放宽）
+    expect(illust).not.toContain('{{ LATER_ICON }}')
   })
 })
 
@@ -85,8 +92,14 @@ describe('NovelIntro 稍后看入口（ADR-0191 D5：动作行第五动作）', 
     expect(laterBlock).toContain("t('later.action.add')")
   })
 
-  it('时钟字形带 VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实）', () => {
-    // 字形单一事实源经 utils/watchLaterGlyph 导入（VS15 依据由 watchLaterGlyph 单测钉住）
+  it('LATER_ICON 经 ActionButton 的 icon prop 传递（IconName，非字形串）', () => {
+    // T12 收口：ActionButton.icon 契约已收窄为 IconName，内部走 <AppIcon>；故此处
+    // prop 直传即正确消费方式，与 IllustDetail 的裸插值 bug 相对。
+    // Oracle：ADR-0208 决策 3 + utils/watchLaterGlyph.test.ts（值是 'schedule'）。
+    // 反向断言覆盖**两种绑定写法**（`:icon="'⏱'"` 模板绑定 / `icon: '⏱'` render fn），
+    // 只判其一会漏（实测：只写 icon: 形式时模板绑定回流不转红）。
     expect(intro).toContain("import { LATER_ICON } from '../utils/watchLaterGlyph'")
+    expect(intro).not.toMatch(/(?::icon|:icon)=?["']["']?\s*[:=]\s*["'][⏱]/)
+    expect(intro).not.toContain("'⏱'")
   })
 })

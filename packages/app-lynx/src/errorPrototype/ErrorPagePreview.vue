@@ -1,5 +1,13 @@
 <script setup lang="ts">
 // ─── 错误页预览（方案 C 内联样式版，仅 web 预览入口使用） ───
+//
+// 【归档原型 · 非设计范例】#850 / ADR-0205 决策 2。本文件**不在 `router.ts` 中**，
+// 只由 `lynx.config.ts` 的 dev web entry `error-preview` 经 `src/errorPreview.ts` 引用。
+// 下面的 px / hex 硬编码是**有意保留**的，AGENTS.md「禁硬编码」条款**不覆盖本文件**
+// （留痕见 AGENTS.md「约定」→ app-lynx 的 MD3 约定）。**不要把这里的写法复制到生产代码**。
+// 完整删除需要同时改 `errorPreview.ts` / `lynx.config.ts` 与 tests/ 下两张白名单，
+// 不在 #850 范围内，故此处只做「明确标记为归档原型」这一处置。
+//
 // web-core 预览下 M3 令牌色（var(--md-*)）不解析（:root 变量未注入 shadowRoot，
 // 全局限制，现有页面的品牌色在 web 预览同样缺失，仅白底设计不明显）。
 // 错误页 C 为全屏品牌紫，缺失时退化为白底 → 预览用内联具体色值展示效果；

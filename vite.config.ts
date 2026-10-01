@@ -18,23 +18,30 @@ export default defineConfig({
       // 仍按**具体路径**收窄（ADR-0186 review P2：通配 **/android/** 会误伤
       // packages/android-host/tests/unit/android/ 的 R8 keep 规则契约测试）。
       // 逐条列出的理由——oxfmt/oxlint 不读 .gitignore，故生成物必须显式排除：
-      //   ① .gradle/ 是 GRADLE_USER_HOME，内含整个 Gradle 发行版的 HTML 文档
-      //   ② **/build/ 是 AGP 构建产物
-      //   ③ 源树里 oxfmt 真正会碰的只有两类：res/raw/upgrade.html（Android 资源，
+      // ① .gradle/ 是 GRADLE_USER_HOME，内含整个 Gradle 发行版的 HTML 文档
+      //   ⚠️ ADR-0203 迁移后的真实路径是**包根**下的 .gradle/（`build:android` 以
+      //   `GRADLE_USER_HOME=$(pwd)/.gradle` 从 packages/android-host 起 gradle），
+      //   不是 android/.gradle/。旧条目漏了真实路径 ⇒ oxlint 扫进 Gradle 发行版的
+      //   Javadoc/JS，`pnpm lint` 恒 exit≠0 而诊断 0 条来自本仓源码。
+      // ② **/build/ 是 AGP 构建产物
+      // ③ 源树里 oxfmt 真正会碰的只有两类：res/raw/upgrade.html（Android 资源，
       //      随 APK 分发）与 src/test/resources/*.json（Java 测试资源，与
       //      novel-export payload 逐字节比对，重排即破契约）
       // Java / .gradle / .pro / .xml 不在两者的支持面内，不列。
+      "packages/android-host/.gradle/**",
       "packages/android-host/android/.gradle/**",
       "packages/android-host/android/**/build/**",
       "packages/android-host/android/**/*.html",
       "packages/android-host/android/**/*.json",
-      // 旧宿主路径：T10 删包前仍有本机 git-ignored 的 Gradle 缓存与 Capacitor 生成物
-      // 残留（glossary §口径纠正：那是未清理的磁盘垃圾，不是状态）。oxfmt/oxlint 不读
-      // .gitignore，故同样按生成物目录 + 文件类型排除；T10 删包后整条可清理。
-      "packages/app/android/.gradle/**",
-      "packages/app/android/**/build/**",
-      "packages/app/android/**/*.html",
-      "packages/app/android/**/*.json",
+      // 旧宿主路径（packages/app/）曾在此列 4 条忽略项，注释同时写着「不要重建
+      // 对已删包的长期忽略契约」—— 注释与代码自相矛盾。已按注释删除，实测它们
+      // 什么都匹配不到：oxlint/oxfmt 的文件发现按 **workspace 成员**收敛，
+      // `packages/app` 已不是成员（ADR-0203 整包删除，pnpm-workspace 只认
+      // `packages/*` 下真实存在的包）。阳性对照实测：磁盘上重建一个带
+      // package.json 的完整 packages/app/ 并放入 .json/.html/.ts 垃圾文件，
+      // `pnpm fmt:check` 扫描文件数恒为 163、0 条来自该目录；同一时刻
+      // packages/update-check/src/ 里的同类垃圾被抓出并转红。
+      // ⇒ 本机若真有残留垃圾，正确处置是删掉那个目录，不是往这里加条目。
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",
@@ -153,18 +160,18 @@ export default defineConfig({
       // 那会误伤 packages/android-host/tests/unit/android/ 的 R8 keep 规则契约测试），
       // 逐条理由见上：oxfmt 不读 .gitignore，故 .gradle/ 与 **/build/ 显式排除；
       // 源树里只有 res/raw/upgrade.html 与 src/test/resources/*.json 两类会被碰。
+      // ⚠️ 与上方 lint 块（line 31）**必须保持同一组路径**：ADR-0203 迁移后真实
+      // GRADLE_USER_HOME 在包根（`build:android` 用 `GRADLE_USER_HOME=$(pwd)/.gradle`），
+      // 本块曾只列 android/.gradle/ 而漏了它 ⇒ oxfmt 扫进 Gradle 发行版的 JDK 文档，
+      // `pnpm fmt:check` 恒红而诊断 0 条来自本仓源码。两个块各改一处就会再次漂移。
+      "packages/android-host/.gradle/**",
       "packages/android-host/android/.gradle/**",
       "packages/android-host/android/**/build/**",
       "packages/android-host/android/**/*.html",
       "packages/android-host/android/**/*.json",
-      // 旧宿主路径：T10 删包前的本机 git-ignored 残留，同上方 lint 块的理由；删包后可清理。
-      // 其中 assets/public/ 是 #610 前 Web 客户端打进 APK 的 web 产物（spec 决策九
-      // 列为「本机未追踪的残留」，gradle 早已不裁剪 assets）——本机垃圾，不是源码。
-      "packages/app/android/.gradle/**",
-      "packages/app/android/**/build/**",
-      "packages/app/android/app/src/main/assets/public/**",
-      "packages/app/android/**/*.html",
-      "packages/app/android/**/*.json",
+      // 旧宿主路径（packages/app/）：T10 删包前的本机 git-ignored 残留，曾在此列
+      // 5 条。已按 lint 块同一份实测删除（含 fmt 侧独有的 assets/public/**）。
+      // 判据与证据见 lint 块注释：文件发现按 workspace 成员收敛，该目录扫不到。
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",

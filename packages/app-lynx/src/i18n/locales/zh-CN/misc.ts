@@ -41,9 +41,9 @@ const zhMisc = {
   "aiOverlay.assisted": "AI辅助",
   "aiOverlay.maskHint": "AI 作品，已在设置中遮罩",
 
-  // ─── IllustTypeBadgeRow.vue（类型徽章；\u25B6\uFE0E/\u29C9 为图标 unicode） ───
-  "illustTypeBadgeRow.ugoira": "▶︎ 动图",
-  "illustTypeBadgeRow.multiPages": "⧉ {{count}} 图",
+  // ─── IllustTypeBadgeRow.vue（类型徽章；**只放文字**，图标由组件侧 <AppIcon> 渲染，图标名见 utils/iconMap.ts 的 play_arrow / photo_library，ADR-0208 决策 3；原 U+25B6+U+FE0E / U+29C9 裸符号已随组件一并移出字典） ───
+  "illustTypeBadgeRow.ugoira": "动图",
+  "illustTypeBadgeRow.multiPages": "{{count}} 图",
 
   // ─── UgoiraViewer.vue（播放器错误） ───
   "ugoiraViewer.noFrames": "动图无帧数据",
@@ -146,6 +146,18 @@ const zhMisc = {
   "me.webdav.passwordPlaceholder": "密码（加密存储）",
   "me.webdav.dirPlaceholder": "目录（默认 Pictelio/backup）",
   "me.webdav.backupPasswordPlaceholder": "备份密码（可选，加密备份文件）",
+  // ── 浮动 label 专用短文案（ADR-0209 决策 3）──
+  // 为什么与 *Placeholder 分家：placeholder 是「提示」，可以带括号补充说明；
+  // label 是 MD3 filled text field 的**字段名**，浮到 56dp 容器顶部后与输入文字同行，
+  // 「备份密码（可选，加密备份文件）」这类长文案会与输入文字挤在一起。故 label 一律用短名，
+  // 补充说明仍留在 placeholder。**两处抄本不得互相推导**（ADR-0205 决策 1 的取数纪律）。
+  "me.webdav.urlLabel": "服务器地址",
+  "me.webdav.passwordLabel": "密码",
+  "me.webdav.dirLabel": "目录",
+  "me.webdav.backupPasswordLabel": "备份密码",
+  // 另两处同理：与 placeholder 同 key 会让 label 与 placeholder 在「聚焦且空值」时同框渲染两次
+  "me.webdav.usernameLabel": "用户名",
+  "me.webdav.restorePromptLabel": "备份密码",
   "me.webdav.sensitiveExclusionHint": "敏感项排除（勾选后不进入备份文件）",
   "me.webdav.autoBackup": "启动时自动备份",
   "me.webdav.lastBackup": "上次备份：{{value}}",

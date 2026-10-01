@@ -11,6 +11,7 @@ import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/no
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from '../components/AppIcon.vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useNovelTranslateStore } from '../stores/novelTranslateStore'
@@ -389,8 +390,12 @@ function onWatchlistCancel(): void {
          [T1 不迁移] 返回守卫源级锁（unit.test.ts 断言本页含 @tap="requestBack"）——
          PageTopBar 化需语义改测试，与「既有页面测试零语义修改」硬门禁冲突，保留手写头 -->
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('novelDetail.title') }}</text>
+      <!-- 返回箭头：T12/ADR-0208 收口——`‹`（U+2039）已登记为 iconMap 的 arrow_back
+           （决策 3：凡在映射表内的一律算图标位），改走 <AppIcon>。
+           尺寸/size 由 AppIcon 自带 leading-none + 默认 6.4vw 承担（ADR-0206 决策 3 装饰性例外）。
+           另注：本页 requestBack 源级锁被 unit.test.ts 断言，a11y 注册表绑定形态不动 -->
+      <view class="py-1 pr-2" @tap="requestBack"><AppIcon name="arrow_back" class="text-surface-on" /></view>
+      <text class="flex-1 text-title-large font-regular text-surface-on">{{ t('novelDetail.title') }}</text>
     </view>
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
@@ -415,15 +420,20 @@ function onWatchlistCancel(): void {
         <!-- 头部精简（spec #585 / 票 #589）：标题 + 作者小字；字数/收藏/系列信息由介绍页（NovelIntro）承载。
              系列判定数据（novel.series）仍经详情端点加载——追更询问（prompt getSeries）依赖它，不随行移除而移除。 -->
         <view class="py-5 px-4 bg-surface-container-lowest mb-3">
-        <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
+        <!-- T07 档位清理：原为 700 字重。作品标题是内容文本，title-large 官方 regular(400)、
+             emphasized 500；此前它比同页「屏标题」（PageTopBar 屏标题 title-large + 500，:398）
+             还重，层级是倒的 → 500。受限小说分支（下方）同一判定。 -->
+        <text class="text-title-large font-regular text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
-        <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例）；票 #578 两端都留 -->
+        <!-- 评论入口（issue #164）：T12/ADR-0208 💬 → Material Symbols `chat_bubble`（缺省 6.4vw = 原
+             text-[6.4vw]，尺寸不变）。⚠️ 本入口改造前**就没有** accessibility-label（存量如此），
+             本票只换字形不加标注——读屏语义由相邻的评论数文本承担；补 label 属独立可达性债。 -->
         <view
           v-if="novel?.total_comments !== undefined"
           class="mt-2 flex flex-row items-center"
           @tap="showComments = true"
         >
-          <text class="text-[6.4vw] leading-none">💬</text>
+          <AppIcon name="chat_bubble" />
           <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
         <!-- 导出入口（spec §7.2）：仅正文可用时渲染；label 内联，不进 ME_A11Y_LABELS -->
@@ -434,7 +444,8 @@ function onWatchlistCancel(): void {
           :accessibility-label="t('novelDetail.export.a11y')"
           @tap="exportOpen = true"
         >
-          <text class="text-[6.4vw] leading-none">⬆</text>
+          <!-- T12/ADR-0208：⬆ → Material Symbols `upload`（缺省 6.4vw = 原 text-[6.4vw]，尺寸不变） -->
+          <AppIcon name="upload" />
           <text class="text-label-medium text-outline ml-1">{{ t('novelDetail.export.action') }}</text>
         </view>
         <!-- 翻译入口（spec §6.2 顶部 banner 位置）：FAB 内联；R18/AI 受限时隐藏 -->
@@ -478,12 +489,17 @@ function onWatchlistCancel(): void {
         class="w-full px-4 mb-4"
       >
         <!-- 正文选中（spec app-lynx-novel-text-selection）：三条属性**必须静态字面量**——
-             vue-lynx 会吞掉动态布尔绑定（设备实证），届时引擎自带菜单不会被替换 -->
+             vue-lynx 会吞掉动态布尔绑定（设备实证），届时引擎自带菜单不会被替换。
+             T10/ADR-0206 决策 3：删掉自选 leading-[44rpx]，行高由 text-body-large 档位携带
+             （body-large = 16sp 字号 / 24sp 行高 = 32rpx / 48rpx）。
+             ⚠️ 连带项：`primitives/novelParagraphEstimate.ts` 的 lineHeightPx=22（=44rpx@375）
+             仍按旧行高估算列表 estimated 高度（该文件自述「仅影响滚动条预热，不影响正确性」），
+             需另开改动同步为 24（=48rpx@375）；不在本票可改范围。 -->
         <text
           :id="selection.paragraphId(idx)"
           :class="p === untranslatedPlaceholder
-            ? 'text-body-large leading-[44rpx] italic text-surface-on-variant'
-            : 'text-body-large leading-[44rpx] text-surface-on'"
+            ? 'text-body-large italic text-surface-on-variant'
+            : 'text-body-large text-surface-on'"
           text-selection="true"
           flatten="false"
           custom-context-menu="true"
@@ -502,7 +518,8 @@ function onWatchlistCancel(): void {
     <view v-else class="w-full flex-1 min-h-0 p-4 relative">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <!-- 头部精简同 meta 卡（票 #589）；受限遮罩/追更询问行为不变 -->
-        <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
+        <!-- T07 档位清理：同上（与 meta 卡同一判定：内容标题 → 500，不压过屏标题） -->
+        <text class="text-title-large font-regular text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <!-- 评论入口（与 meta 卡一致） -->
         <view
@@ -510,7 +527,7 @@ function onWatchlistCancel(): void {
           class="mt-2 flex flex-row items-center"
           @tap="showComments = true"
         >
-          <text class="text-[6.4vw] leading-none">💬</text>
+          <AppIcon name="chat_bubble" />
           <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
       </view>

@@ -167,21 +167,54 @@ const ROLES = [
   '--md-shape-large',
   '--md-shape-extra-large',
   '--md-shape-full',
+  '--md-elevation-0',
   '--md-elevation-1',
   '--md-elevation-2',
   '--md-elevation-3',
+  '--md-elevation-4',
+  '--md-elevation-5',
   '--md-state-pressed-primary',
   '--md-state-pressed-on-surface',
   '--md-state-pressed-surface',
   '--md-state-pressed-error',
+  // 状态层四态 alpha 叠加层（ADR-0207 决策 4）：官方 v0.192 _md-sys-state.scss 的
+  // hover .08 / focus .12 / pressed .12 / dragged .16，每态 × 四语义色。
+  // 「每个色板块自含同一套角色」是 tokens.css 的既有不变量
+  // （tests/unit.test.ts「每个主题色板类都覆盖同一套可主题角色」），故本段进 ROLES。
+  '--md-state-layer-hover-primary',
+  '--md-state-layer-hover-on-surface',
+  '--md-state-layer-hover-error',
+  '--md-state-layer-hover-surface',
+  '--md-state-layer-hover-on-primary',
+  '--md-state-layer-focus-primary',
+  '--md-state-layer-focus-on-surface',
+  '--md-state-layer-focus-error',
+  '--md-state-layer-focus-surface',
+  '--md-state-layer-focus-on-primary',
   '--md-state-layer-pressed-primary',
   '--md-state-layer-pressed-on-surface',
+  '--md-state-layer-pressed-error',
+  '--md-state-layer-pressed-surface',
+  '--md-state-layer-pressed-on-primary',
+  '--md-state-layer-dragged-primary',
+  '--md-state-layer-dragged-on-surface',
+  '--md-state-layer-dragged-error',
+  '--md-state-layer-dragged-surface',
+  '--md-state-layer-dragged-on-primary',
   '--md-state-disabled-container',
   '--md-state-disabled-on-surface',
   '--md-scroll-indicator',
 ]
 
-/** 与模式无关的常量值（shape 6 档 / elevation 3 档 / scrim / scrim-overlay）——
+/** 状态层四态 opacity（官方 v0.192 _md-sys-state.scss，唯一事实源；勿按记忆改） */
+const STATE_LAYER_OPACITIES = {
+  hover: 0.08,
+  focus: 0.12,
+  pressed: 0.12,
+  dragged: 0.16,
+}
+
+/** 与模式无关的常量值（shape 6 档 / elevation 6 档 / scrim / scrim-overlay）——
  * 暗色色板与亮色同值，但显式声明以防 token 隐式重构时漏改（M3 shape 不分模式；
  * elevation 用纯黑 rgba 阴影；scrim 为通用遮罩语义）。 */
 const MODE_INDEPENDENT_VALUES = {
@@ -193,9 +226,13 @@ const MODE_INDEPENDENT_VALUES = {
   '--md-shape-large': '4.267vw',
   '--md-shape-extra-large': '7.467vw',
   '--md-shape-full': '9999px',
+  '--md-elevation-0': 'none',
   '--md-elevation-1': '0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15)',
   '--md-elevation-2': '0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15)',
   '--md-elevation-3': '0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3)',
+  // level 4/5 = **外推、非官方全表**（与 tokens.css 基础块同规则同值，见那里的可复算说明）
+  '--md-elevation-4': '0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3)',
+  '--md-elevation-5': '0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3)',
 }
 
 /** 从 DynamicScheme 读角色 → hex 字符串（on*Container 强制走 tone 10 = 与基础 page 同模式）
@@ -264,8 +301,38 @@ function readScheme(scheme) {
     '--md-state-pressed-on-surface': get(md.onSurface()),
     '--md-state-pressed-surface': get(md.surfaceContainerHigh()),
     '--md-state-pressed-error': get(md.onErrorContainer()),
-    '--md-state-layer-pressed-primary': `rgba(${hexToRgb(get(md.primary())).join(', ')}, 0.12)`,
-    '--md-state-layer-pressed-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
+    // ⚠️ 这里**不能**再单独写 pressed-primary / pressed-on-surface：紧随其后的
+    // `...Object.fromEntries(STATE_LAYER_OPACITIES…)` 会用同一对键覆盖它们，
+    // 留下的是**死条目** —— 改上面的 STATE_LAYER_OPACITIES 时它们悄悄不动。
+    // 状态层四态 alpha 叠加层（ADR-0207 决策 4）：opacity 取自 material-web v0.192
+    // `_md-sys-state.scss` = hover .08 / focus .12 / pressed .12 / dragged .16
+    // （focus 是 .12 不是 .10，见差距分析 §8.4）。
+    // `*-surface` 档用 var() 别名指回 `*-primary`：与亮色基础块同口径（覆盖在 surface
+    // 容器上的强调层，色相取 primary），用别名而非重复字面量可让两套色板永远同源。
+    // `*-on-primary` 档（#866/#867）取 onPrimary 作色：MD3 语义上「实心 primary 容器上的
+    // 状态层用 on-primary」，亮色 7 套的 on-primary 全是 #ffffff，暗色 7 套则由 M3
+    // SchemeTonalSpot 逐套派生（**各不相同**）—— 故此段必须由本脚本生成，
+    // 手改 tokens.css 会被 tests/palettes-drift.test.ts 的双向锁定判红。
+    //
+    // ⚠️ #867：on-primary 档**唯一**改为「预合成不透明色」。Tailwind `bg-*` 直接替换
+    // `background-color`（不与容器色合成），而 Lynx 不渲染 `color-mix`（真机实测：B 块
+    // 按下后 = 容器白，声明彻底失效），所以 alpha 状态层在实心 primary 按钮上按压会让
+    // **填色整个消失**（真机 RGB (26,111,168)→(249,251,255) ≈ 页面色）。改为把 onPrimary 按 opacity 直接混进
+    // primary，得到与 MD3 叠加等价的不透明色。其余 4 个 role 画在 surface 底上、
+    // ΔE 最大仅 16.81（阈值 25），保持 alpha。范围判定见
+    // scripts/state-layer-collapse-audit.mjs（阈值由真机两个锚点夹逼，数据空档 46）。
+    ...Object.fromEntries(
+      Object.entries(STATE_LAYER_OPACITIES).flatMap(([state, opacity]) => [
+        [`--md-state-layer-${state}-primary`, `rgba(${hexToRgb(get(md.primary())).join(', ')}, ${opacity})`],
+        [`--md-state-layer-${state}-on-surface`, `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, ${opacity})`],
+        [`--md-state-layer-${state}-error`, `rgba(${hexToRgb(get(md.error())).join(', ')}, ${opacity})`],
+        [`--md-state-layer-${state}-surface`, `var(--md-state-layer-${state}-primary)`],
+        [
+          `--md-state-layer-${state}-on-primary`,
+          mixHex(get(md.primary()), get(md.onPrimary()), opacity),
+        ],
+      ]),
+    ),
     '--md-state-disabled-container': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.38)`,
     // scroll-indicator：暗色按**各主题** outline（M3 暗色 scheme = tone 60）+ 35% alpha 派生，

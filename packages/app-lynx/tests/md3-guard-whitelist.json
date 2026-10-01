@@ -1,0 +1,58 @@
+{
+  "entries": [
+    {
+      "rule": "legacy-color-alias",
+      "path": "src/components/AiOverlay.vue",
+      "form": "--colorOverlayForeground",
+      "reason": "存量 scrim 上的前景文本色：MD3 没有 on-scrim 角色令牌，迁移须先在 tokens.css 新增角色再改消费点，属 .vue 层另开票的范围；本票只读，故按文件+形态精确放行"
+    },
+    {
+      "rule": "legacy-color-alias",
+      "path": "src/components/PagePickerSheet.vue",
+      "form": "--colorOverlayForeground",
+      "reason": "存量 scrim 上的前景文本色：MD3 没有 on-scrim 角色令牌，迁移须先在 tokens.css 新增角色再改消费点，属 .vue 层另开票的范围；本票只读，故按文件+形态精确放行"
+    },
+    {
+      "rule": "legacy-color-alias",
+      "path": "src/components/RestrictOverlay.vue",
+      "form": "--colorOverlayForeground",
+      "reason": "存量 scrim 上的前景文本色：MD3 没有 on-scrim 角色令牌，迁移须先在 tokens.css 新增角色再改消费点，属 .vue 层另开票的范围；本票只读，故按文件+形态精确放行"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/BookmarkPanel.vue",
+      "form": "text-[6.4vw] + leading-none",
+      "reason": "图标字形刻意收紧排版：text-[…] 是任意尺寸、不存在档位行高可继承，ADR-0206 决策 1「行高已由档位决定」对它不适用；全站此类共 45 处，是刻意用法（差距分析 §8.5 原文「leading-none 45 处属刻意收紧排版」）。本票只读不改 .vue"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/BottomSheet.vue",
+      "form": "text-[6.4vw] + leading-none",
+      "reason": "图标字形刻意收紧排版：text-[…] 是任意尺寸、不存在档位行高可继承，ADR-0206 决策 1「行高已由档位决定」对它不适用；全站此类共 45 处，是刻意用法（差距分析 §8.5 原文「leading-none 45 处属刻意收紧排版」）。本票只读不改 .vue"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/SearchSheet.vue",
+      "form": "text-[3.2vw] + leading-none",
+      "reason": "图标字形刻意收紧排版：text-[…] 是任意尺寸、不存在档位行高可继承，ADR-0206 决策 1「行高已由档位决定」对它不适用；全站此类共 45 处，是刻意用法（差距分析 §8.5 原文「leading-none 45 处属刻意收紧排版」）。本票只读不改 .vue"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/SearchSheet.vue",
+      "form": "text-[5.5vw] + leading-none",
+      "reason": "图标字形刻意收紧排版：text-[…] 是任意尺寸、不存在档位行高可继承，ADR-0206 决策 1「行高已由档位决定」对它不适用；全站此类共 45 处，是刻意用法（差距分析 §8.5 原文「leading-none 45 处属刻意收紧排版」）。本票只读不改 .vue"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/TextSelectionToolbar.vue",
+      "form": "text-[2.4vw] + leading-[3vw]",
+      "reason": "图标字形刻意收紧排版：text-[…] 是任意尺寸、不存在档位行高可继承，ADR-0206 决策 1「行高已由档位决定」对它不适用；全站此类共 45 处，是刻意用法（差距分析 §8.5 原文「leading-none 45 处属刻意收紧排版」）。本票只读不改 .vue"
+    },
+    {
+      "rule": "self-chosen-leading",
+      "path": "src/components/RefreshableList.vue",
+      "form": "text-[3.733vw] + leading-none",
+      "reason": "菜单项 label / 扩展项文本仍用 text-[…]（任意尺寸）——ADR-0206 决策 1「行高已由档位决定」对 text-[…] 不适用（不存在档位行高可继承），属全站刻意收紧排版。图标位本身已全部改走 <AppIcon>（T12/ADR-0208），本条只覆盖随存量保留的文本类。"
+    }
+  ]
+}

@@ -6,6 +6,7 @@
 // 算法收敛在 primitives/createLiquidElastic（纯函数，唯一测试接缝）；本组件只做事件接线。
 import { computed, ref } from 'vue'
 import { createLiquidElastic, type ElasticRect, type ElasticPoint } from '../primitives/createLiquidElastic'
+import { useReducedMotion } from '../composables/useReducedMotion'
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +23,14 @@ const props = withDefaults(
 // 卡片选择器 id（createSelectorQuery 布局查询用）
 const cardId = `glass-card-${Math.random().toString(36).slice(2, 10)}`
 
+// 减弱动效偏好（T03 #851）：R1 过渡整条置 none + R3 弹性动效本身不发生。
+// 液态弹性是「跟手位移 + 方向性拉伸 + 松手回弹」，纯位移类前庭反应，降时长无效 → 直接关停，
+// 卡片仍响应触摸（无任何形变），布局查询等其余行为不变。
+const { reducedMotion, transitionStyle } = useReducedMotion()
+
+/** 弹性总闸：prop 关闭或偏好开启时都为零监听零几何改动 */
+const elasticOn = computed(() => props.elastic && !reducedMotion.value)
+
 const elastic = computed(() => createLiquidElastic({ elasticity: props.elasticity }))
 
 // 元素矩形缓存：touchstart 时查询一次，touchmove 期间不重复查询（性能约束）
@@ -34,10 +43,15 @@ const touching = ref(false)
 const cardStyle = computed(() => ({
   borderRadius: props.radius,
   transform: `translate(${translateTransform.value.x}px, ${translateTransform.value.y}px) ${scaleTransform.value || 'scale(1)'}`,
-  // 触摸中直跟手指（无过渡）；松手经 transition 回弹
-  transition: touching.value
-    ? 'none'
-    : 'transform var(--durationNormal) cubic-bezier(0.33, 0, 0.67, 1)',
+  // 触摸中直跟手指（无过渡）；松手经 transition 回弹；
+  // 减弱动效下整条置 none（R1）——此时 elasticOn 恒 false，transform 也不再变化
+  // ⚠️ 曲线走令牌：原为 Fluent 遗留的 cubic-bezier(0.33,0,0.67,1)（MD3 四条曲线内没有它），
+  // 按 ADR-0207 §决策与 issue #854 验收改为 --motion-emphasized-decelerate
+  // （0.05,0.7,0.1,1）。写死字面量会让「缓动已整改」变成不可判的声明。
+  transition:
+    touching.value || transitionStyle.value
+      ? 'none'
+      : 'transform var(--durationNormal) var(--motion-emphasized-decelerate)',
 }))
 
 interface BoundingRect {
@@ -102,7 +116,7 @@ function applyElastic(p: ElasticPoint): void {
 }
 
 function onTouchStart(e: LynxTouchEvent): void {
-  if (!props.elastic) return
+  if (!elasticOn.value) return
   touching.value = true
   const p = pointOf(e)
   if (cachedRect) {
@@ -114,7 +128,7 @@ function onTouchStart(e: LynxTouchEvent): void {
 }
 
 function onTouchMove(e: LynxTouchEvent): void {
-  if (!props.elastic || !touching.value) return
+  if (!elasticOn.value || !touching.value) return
   const p = pointOf(e)
   if (!p) return
   pendingPoint = p
@@ -128,7 +142,7 @@ function onTouchMove(e: LynxTouchEvent): void {
 }
 
 function onTouchEnd(): void {
-  if (!props.elastic || !touching.value) return
+  if (!elasticOn.value || !touching.value) return
   touching.value = false
   pendingPoint = null
   pendingFirstPoint = null

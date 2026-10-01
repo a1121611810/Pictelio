@@ -81,10 +81,10 @@ onBeforeUnmount(() => {
   >
     <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
       <text class="text-headline-small font-medium text-surface-on">{{ t('watchlistPrompt.title') }}</text>
-      <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
+      <text class="text-body-medium text-surface-on-variant mt-4">
         《{{ seriesTitle }}》· {{ authorName }}
       </text>
-      <text class="text-body-small text-surface-on-variant mt-1.5 leading-snug">
+      <text class="text-body-small text-surface-on-variant mt-1.5">
         {{ t('watchlistPrompt.hint') }}
       </text>
 

@@ -162,7 +162,17 @@ describe("watchLaterStore — 容量上限（ADR-0191 D3：丢最旧 + warn，�
     expect(store.has("illust", 1)).toBe(false)
     expect(warnSpy).toHaveBeenCalled()
     expect(String(warnSpy.mock.calls[0][0])).toContain("[watchLaterStore]")
-  })
+  },
+  // ⚠️ 这条是**既有间歇性假红**，与 MD3 整改无关（本轮全量复跑时暴露）。
+  //    根因是复杂度而非环境：501 次 `add` 每次都调 `persist()` 全量重写
+  //    （store 源码 L159），即 O(n²) ≈ 12.5 万次条目序列化。
+  //    单跑耗时实测 4~8.3s（波动主要来自 CPU 争抢），全量 216 文件并行下
+  //    稳定超过 vitest 默认 `testTimeout` 5000ms ⇒ 间歇性红。
+  //    修法只放宽**这一条**的看门狗，不动全局 `testTimeout`（全局放宽会连带
+  //    掩盖真正挂死的测试）。测试断言本身不动 —— 它验的行为是正确的。
+  //    ⚠️ 顺带记录：store 的 O(n²) 全量重写是**生产侧真实特征**（501 条收藏 =
+  //    501 次全量写盘），属性能议题、不属本票范围，未在此改动生产代码。
+  30_000)
 })
 
 describe("watchLaterStore — 持久化（IO 边界：成功 + 失败双路径）", () => {

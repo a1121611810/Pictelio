@@ -154,7 +154,7 @@ onUnmounted(() => {
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="♡" :title="t('following.empty.title')" :hint="t('following.empty.hint')" />
+      <EmptyState icon="favorite_border" :title="t('following.empty.title')" :hint="t('following.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">

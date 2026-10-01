@@ -58,6 +58,7 @@ import {
 } from 'vue'
 import * as Vue from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { iconChar } from '../utils/iconMap'
 import { t } from '../i18n'
 
 // ─── useNovelWatchlistToggle mock（spy 形态，捕获 setup 调用入参 + 暴露 controllable added）───
@@ -96,12 +97,23 @@ vi.mock('../composables/useNovelWatchlistToggle', () => ({
   WATCHLIST_ANIMATION_MS: 350,
 }))
 
+/**
+ * 图标字形 oracle = `iconChar('star_outline')`（utils/iconMap.ts 唯一事实源，ADR-0208 决策 2：
+ * 映射表同时是字体子集生成输入 / 运行时查表依据 / 门禁 oracle）。
+ * 旧 `\u2605`/`\u2606`（★/☆）裸字形已随 ADR-0208 决策 3 退役：FILL=0 子集里 star 与
+ * star_outline 同映射 f09a，两态同字形，状态由配色（text-tertiary / text-white/85）+ label 表达。
+ */
+const STAR_GLYPH = iconChar('star_outline')
+
 // ─── test-local ActionButton mirror（FakeNode-only 渲染，只承载 WatchlistAction → ActionButton
 // ─── props 接线契约的断言形状：icon / label / active / disabled + onTap 处理器）───
 //
 // 实际 ActionButton 是 .vue 文件（vitest node 环境无 SFC loader），不能在测试中直接 import。
 // 这里 mirror 出 render function 等价的 FakeNode 节点结构；模板细节由 ActionButton.template.test.ts
 // 锁死，本文件不重复。
+//
+// 图标位（ADR-0208 决策 3）：`icon` prop 承载的是映射表图标名（IconName），mirror 的渲染
+// 与真实 ActionButton 一致地把名字过 iconChar() 取字形，故断言打在「映射表码点」上。
 //
 // 注：用 defineComponent + setup 返回 render function 形式（**不**用 plain function component）——
 // plain function 在 Vue 3 下 props 不正确传递（`props.disabled` 评估为 false/null，导致 onTap
@@ -127,7 +139,7 @@ const ActionButtonMirror = defineComponent({
           ],
           onTap: props.disabled ? null : props.onTap,
         },
-        [h('text', { class: 'icon' }, props.icon), h('text', { class: 'label' }, props.label)],
+        [h('text', { class: 'icon' }, iconChar(props.icon)), h('text', { class: 'label' }, props.label)],
       )
   },
 })
@@ -158,7 +170,10 @@ const WatchlistAction = defineComponent({
     return () => {
       const added = wl.added.value
       return h(ActionButtonMirror, {
-        icon: added ? '\u2605' : '\u2606', // ★ / ☆（与源 Unicode 字面量对齐）
+        // ★ / ☆ → 单一 star_outline 码点（FILL=0 子集里 star 与 star_outline 同映射 f09a，
+        // ADR-0208 决策 1：选中态用色 / label 表达，不换字形）。iconMap 注释自身即把
+        // star_outline 登记为「★/☆ 收藏数 / 追更」= 本图标的独立来源（非从被测实现反推）。
+        icon: 'star_outline',
         label: added ? t('novelIntro.actionWatched') : t('novelIntro.actionWatch'),
         active: added,
         disabled: props.masked,
@@ -354,17 +369,19 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
 
   // ── (a) 首次 mount：state = initialAdded + 模板接线正确 ──
   describe('(a) 首次 mount：state = initialAdded + 模板接线正确', () => {
-    it('initialAdded=false → 渲染 ☆ + 「追更」 + active=false（容器 class 走默认态分支）', () => {
+    it('initialAdded=false → 渲染 star_outline 字形 + 「追更」 + active=false（容器 class 走默认态分支）', () => {
       const { container } = mountHost(() =>
         h(WatchlistAction, { seriesId: 101, initialAdded: false, masked: false }),
       )
       // setup 调用入参 = props（oracle：composable 一次性读 props）
       expect(calls).toHaveLength(1)
       expect(calls[0]).toEqual({ seriesId: 101, initialAdded: false, onChange: undefined })
-      // 模板渲染：图标 ☆ + label 「追更」
-      expect(subtreeText(container)).toContain('\u2606') // ☆
+      // 模板渲染：图标 = 映射表 star_outline 码点 + label 「追更」
+      expect(subtreeText(container)).toContain(STAR_GLYPH)
       expect(subtreeText(container)).toContain('追更') // spec zh-CN 字面量
-      expect(subtreeText(container)).not.toContain('\u2605') // ★ 不应出现
+      // 旧 ★/☆ 裸字形零残留（★ 与 ☆ 已退役为字形，ADR-0208 决策 1/3）
+      expect(subtreeText(container)).not.toContain('\u2605')
+      expect(subtreeText(container)).not.toContain('\u2606')
       // active=false → 容器走 text-white/85 分支（active class 不应出现）
       expect(containerClass(container)).not.toContain('text-tertiary')
       expect(containerClass(container)).toContain('text-white/85')
@@ -376,15 +393,15 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
       expect(typeof onTap).toBe('function')
     })
 
-    it('initialAdded=true → 渲染 ★ + 「已追更」 + active=true（容器 class 走 text-tertiary 分支）', () => {
+    it('initialAdded=true → 渲染 star_outline 字形 + 「已追更」 + active=true（容器 class 走 text-tertiary 分支）', () => {
       const { container } = mountHost(() =>
         h(WatchlistAction, { seriesId: 202, initialAdded: true, masked: false }),
       )
       expect(calls).toHaveLength(1)
       expect(calls[0]).toEqual({ seriesId: 202, initialAdded: true, onChange: undefined })
-      // 完整渲染文本 = 「★已追更」（不出现「☆」「追更」单字）——逐字断言避免子串误判（「已追更」
+      // 完整渲染文本 = 「<star_outline 码点>已追更」——逐字断言避免子串误判（「已追更」
       // 字面包含「追更」，无法用 .not.toContain 反向断言）
-      expect(subtreeText(container)).toBe('\u2605已追更')
+      expect(subtreeText(container)).toBe(`${STAR_GLYPH}已追更`)
       expect(containerClass(container)).toContain('text-tertiary')
       expect(containerClass(container)).not.toContain('text-white/85')
     })
@@ -406,7 +423,7 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
 
   // ── (b) 复用宿主形态——无 :key，props 变化（init-only 契约边界）───
   describe('(b) 复用宿主形态：同实例跨 series 不 remount → 状态冻结在首卡（init-only 契约）', () => {
-    it('宿主 props A→B 但无 :key 变化：composable 仅 setup 时读一次 props → 状态冻结在 A 的 initialAdded（首卡 ☆ 「追更」）', async () => {
+    it('宿主 props A→B 但无 :key 变化：composable 仅 setup 时读一次 props → 状态冻结在 A 的 initialAdded（首卡「追更」）', async () => {
       // 模拟修复前宿主（无 :key remount）：同一 WatchlistAction 实例，宿主响应式 props 从 A 刷成 B
       const hostProps = reactive({
         seriesId: 101,
@@ -423,8 +440,8 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
           key: hostProps.key,
         }),
       )
-      // 首卡 props = A：渲染 ☆ + 「追更」
-      expect(subtreeText(container)).toContain('\u2606')
+      // 首卡 props = A：渲染 star_outline 字形 + 「追更」
+      expect(subtreeText(container)).toContain(STAR_GLYPH)
       expect(subtreeText(container)).toContain('追更')
       expect(calls).toHaveLength(1)
       expect(calls[0]).toEqual({ seriesId: 101, initialAdded: false, onChange: undefined })
@@ -436,8 +453,8 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
 
       // init-only 契约钉死点：setup 只读一次 props，此后再改不生效 → 仍渲染 A 的初始值
       expect(calls).toHaveLength(1) // composable 未被再次调用
-      // 完整渲染文本 = 「☆追更」（首卡 A 的初始值，B 的 props 未生效）
-      expect(subtreeText(container)).toBe('\u2606追更')
+      // 完整渲染文本 = 「<star_outline 码点>追更」（首卡 A 的初始值，B 的 props 未生效）
+      expect(subtreeText(container)).toBe(`${STAR_GLYPH}追更`)
       // added ref 自身仍反映 setup 时的 initialAdded（不被动刷新）
       expect(addedRefs[0]!.value).toBe(false)
     })
@@ -480,7 +497,7 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
 
   // ── (c) 复用宿主形态——:key 变化强制 remount（契约正向）───
   describe('(c) 复用宿主形态：:key 随 series 变化 → 强制 remount → 状态机随新卡 props 重建', () => {
-    it('首次 mount A：渲染 ☆ + 「追更」；:key 变 B → 旧实例卸载、新实例以 B props 重建 → 渲染 ★ + 「已追更」', async () => {
+    it('首次 mount A：渲染「追更」；:key 变 B → 旧实例卸载、新实例以 B props 重建 → 渲染「已追更」', async () => {
       // 模拟修复后的宿主（:key="seriesId"，BookmarButton :key 同范式）
       const hostProps = reactive({
         seriesId: 101,
@@ -496,7 +513,7 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
           key: hostProps.key,
         }),
       )
-      expect(subtreeText(container)).toContain('\u2606')
+      expect(subtreeText(container)).toContain(STAR_GLYPH)
       expect(subtreeText(container)).toContain('追更')
       expect(calls).toHaveLength(1)
       expect(calls[0]!.seriesId).toBe(101)
@@ -511,8 +528,8 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
       expect(calls).toHaveLength(2)
       expect(calls[1]!.seriesId).toBe(202)
       expect(calls[1]!.initialAdded).toBe(true)
-      // 渲染 = B 的完整文本「★已追更」（避免「已追更」含「追更」子串的负向断言陷阱）
-      expect(subtreeText(container)).toBe('\u2605已追更')
+      // 渲染 = B 的完整文本「<star_outline 码点>已追更」（避免「已追更」含「追更」子串的负向断言陷阱）
+      expect(subtreeText(container)).toBe(`${STAR_GLYPH}已追更`)
       // 第二个实例的 added ref = true（B 的 initialAdded）
       expect(addedRefs[1]!.value).toBe(true)
       // 第一个实例的 added ref 不受新实例影响（隔离）
@@ -589,12 +606,12 @@ describe('WatchlistAction 宿主矩阵（T3：init-only props 契约，ADR-0163 
       expect(calls[0]).toEqual({ seriesId: 101, initialAdded: false, onChange: undefined })
       expect(calls[1]).toEqual({ seriesId: 202, initialAdded: true, onChange: undefined })
 
-      // 卡 A 渲染 ☆ + 「追更」（未追更）
-      expect(subtreeText(card101!)).toContain('\u2606')
+      // 卡 A 渲染 star_outline 字形 + 「追更」（未追更）
+      expect(subtreeText(card101!)).toContain(STAR_GLYPH)
       expect(subtreeText(card101!)).toContain('追更')
       expect(containerClass(card101!)).toContain('text-white/85')
-      // 卡 B 渲染 ★ + 「已追更」（已追更）
-      expect(subtreeText(card202!)).toContain('\u2605')
+      // 卡 B 渲染 star_outline 字形 + 「已追更」（已追更）
+      expect(subtreeText(card202!)).toContain(STAR_GLYPH)
       expect(subtreeText(card202!)).toContain('已追更')
       expect(containerClass(card202!)).toContain('text-tertiary')
 

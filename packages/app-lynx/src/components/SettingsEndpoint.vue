@@ -32,6 +32,62 @@ const sourceLang = ref<string>("ja")
 const apiKeyVisible = ref<boolean>(false)
 let apiKeyVisibleTimer: ReturnType<typeof setTimeout> | null = null
 
+// ── M3 filled text field 聚焦态（ADR-0209 决策 2） ──
+/**
+ * 本表单的 5 个**字段**（不是模板里 6 个 input 元素）：apiKey 的密文/明文是同一字段的两个
+ * `type` 变体，两分支互斥渲染，故按字段计数。
+ *
+ * ⚠️ 注释里**不要写 input 标签的字面量**（连不带尖括号的标签名都不要）：tests/
+ * md3FilledTextField.test.ts 的抽取器用正则扫源码且**不剥注释**（同
+ * lynxUnsupportedTailwindClasses.test.ts 已记录的理由），注释里出现标签字面量会被当成一个
+ * class 为空的真实输入框，把门禁顶红成假阳性 —— 写这条说明时本人就踩过一次。
+ */
+type EndpointField = "baseURL" | "apiKey" | "model" | "targetLang" | "sourceLang"
+
+/**
+ * 当前聚焦的字段（null = 无）。
+ *
+ * 为什么是**单值**而不是每字段一个 boolean：同一时刻至多一个输入框持有焦点，单值模型让
+ * 「焦点从 A 移到 B」变成一次赋值，结构上不可能出现两个字段同时呈聚焦态（逐字段 boolean
+ * 在 Lynx 事件乱序时会残留脏 true，而脏 true 表现为「指示条停在 2px primary」这种静默偏差）。
+ */
+const focusedField = ref<EndpointField | null>(null)
+
+function onFieldFocus(field: EndpointField): void {
+  focusedField.value = field
+}
+
+/**
+ * 失焦：只清**自己**的聚焦态。
+ *
+ * 为什么必须带字段参数而不是无脑置 null：焦点从 A 移到 B 时，Lynx 的 focus(B) 与 blur(A)
+ * 到达顺序不受控；若无条件置 null，后到的 blur(A) 会把已经聚焦的 B 的状态抹掉（label 回落 +
+ * 指示条退回 1px）。按字段比对后，A 的迟到 blur 不再影响 B。
+ *
+ * ⚠️ 这是本组件唯一的异步竞态点（AGENTS.md 硬约束 3）。这里用「写入者身份校验」而非
+ * generation 计数器：无网络请求、无乱序响应，计数器没有可计的对象。
+ */
+function onFieldBlur(field: EndpointField): void {
+  if (focusedField.value === field) focusedField.value = null
+}
+
+function isFocused(field: EndpointField): boolean {
+  return focusedField.value === field
+}
+
+/**
+ * 「浮动态」判定（官方语义：有值 **或** 聚焦）。
+ *
+ * 为什么派生而不是在事件里手动同步：值有三条**绕过 focus/blur** 的写入路径 ——
+ * `loadFromKeystore` 回填、`onSave` 成功后清空 apiKey、`onClear` 全量重置。命令式同步必然
+ * 在这三条路径上与实际值脱节（最典型的：Keystore 回填后 label 仍停在静止态，把已填好的
+ * baseURL 显示成「像空的一样」）。派生的价值是**只有一条写入路径**，从根上不存在
+ * 「先改值、后改 label」的时序竞态。
+ */
+function isFloated(field: EndpointField, value: string): boolean {
+  return isFocused(field) || value.length > 0
+}
+
 const saving = ref<boolean>(false)
 const testing = ref<boolean>(false)
 /** 清除确认：lynx 无浏览器 confirm()（Web API 面不可用）→ 行内二次确认，不依赖平台弹窗 */
@@ -342,18 +398,49 @@ async function onClear(): Promise<void> {
 
     <!-- base URL -->
     <view class="flex flex-col gap-1">
-      <text class="text-label-medium text-surface-on-variant">{{
-        t("novelTranslate.endpoint.baseUrl.label")
-      }}</text>
-      <input
-        v-model="baseURL"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.baseUrl.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.baseUrl.label')"
-        @input="scheduleCompatibilityProbe"
-      />
+      <!-- M3 filled text field（ADR-0209）：label 的官方位置在**容器内**（静止居中、聚焦上浮），
+           故原先容器外那行独立 label 文本不再保留 —— 两者并存会让字段名在同一屏出现两次。
+           高度/圆角/底色/指示条全部挂在 input 上（input 本身就是 56dp 容器），
+           外层 view 只提供 absolute label 的定位上下文。 -->
+      <view class="relative">
+        <input
+          v-model="baseURL"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('baseURL', baseURL) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('baseURL', baseURL) ? t('novelTranslate.endpoint.baseUrl.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.baseUrl.label')"
+          @input="scheduleCompatibilityProbe"
+          @focus="onFieldFocus('baseURL')"
+          @blur="onFieldBlur('baseURL')"
+        />
+        <!-- 聚焦态指示条：官方 focus-active-indicator-height = 2px、color = primary
+             （tokens/.../_md-comp-filled-text-field.scss）。做成**独立元素**而不是给
+             input 换一对 border-b 类：静态类里已钉住未聚焦的 1px + on-surface-variant
+             （官方 active-indicator-color；**不是** outline-variant —— 后者是 outlined
+             变体的色，见 ADR-0209 决策 1），同一个 CSS 属性上再叠互斥类，胜负由 Tailwind
+             产物里的声明顺序决定 —— 实测 .border-b-primary 排在 .border-b-surface-on-variant
+             之前，颜色侧会静默停在未聚焦色。正是 AGENTS.md 点名的「静默无样式」陷阱。
+             2px 覆盖在 1px 之上，视觉即「指示条加粗转主色」。 -->
+        <view
+          v-if="isFocused('baseURL')"
+          class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+        />
+        <!-- label 覆盖在容器上方：静止时**就是** placeholder 位（故 :placeholder 在静止态传空串，
+             否则原生 placeholder 与 label 在同一个居中位置重叠）。聚焦/有值后 placeholder 才回来。 -->
+        <text
+          class="absolute left-4"
+          :class="
+            isFloated('baseURL', baseURL)
+              ? 'top-0.5 text-body-small text-primary'
+              : 'top-4 text-body-large text-surface-on-variant'
+          "
+          >{{ t("novelTranslate.endpoint.baseUrl.label") }}</text
+        >
+      </view>
       <!-- 端点兼容性 chip（地址层；debounce 600ms 自动探测，ADR-0173 D2/D3） -->
       <text class="text-label-small" :class="compatClass">{{ compatText }}</text>
       <text v-if="!urlValid && baseURL.length > 0" class="text-label-small text-error">{{
@@ -363,30 +450,55 @@ async function onClear(): Promise<void> {
 
     <!-- API key -->
     <view class="flex flex-col gap-1">
-      <text class="text-label-medium text-surface-on-variant">{{
-        t("novelTranslate.endpoint.apiKey.label")
-      }}</text>
-      <!-- 密码框 + show/hide toggle（5s 自动隐藏）+ 字段级清空（#637 P0-2）。
-           v-if/v-else 两分支绕过 vue-lynx 的 _vModelDynamic 编译问题（同字段只能静态 type） -->
-      <input
-        v-if="!apiKeyVisible"
-        v-model="apiKey"
-        type="password"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.apiKey.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
-      />
-      <input
-        v-else
-        v-model="apiKey"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.apiKey.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
-      />
+      <!-- 同 baseURL 的 M3 filled 结构；两分支是**同一字段**的两个 type 变体，
+           故共用一个浮动态 label 与一份聚焦态（字段级而非 input 级计数，见 EndpointField）。 -->
+      <view class="relative">
+        <!-- 密码框 + show/hide toggle（5s 自动隐藏）+ 字段级清空（#637 P0-2）。
+             v-if/v-else 两分支绕过 vue-lynx 的 _vModelDynamic 编译问题（同字段只能静态 type） -->
+        <input
+          v-if="!apiKeyVisible"
+          v-model="apiKey"
+          type="password"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('apiKey', apiKey) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('apiKey', apiKey) ? t('novelTranslate.endpoint.apiKey.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
+          @focus="onFieldFocus('apiKey')"
+          @blur="onFieldBlur('apiKey')"
+        />
+        <input
+          v-else
+          v-model="apiKey"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('apiKey', apiKey) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('apiKey', apiKey) ? t('novelTranslate.endpoint.apiKey.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
+          @focus="onFieldFocus('apiKey')"
+          @blur="onFieldBlur('apiKey')"
+        />
+        <!-- 指示条两分支共用（同一字段，见 baseURL 处的同款说明） -->
+        <view
+          v-if="isFocused('apiKey')"
+          class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+        />
+        <text
+          class="absolute left-4"
+          :class="
+            isFloated('apiKey', apiKey)
+              ? 'top-0.5 text-body-small text-primary'
+              : 'top-4 text-body-large text-surface-on-variant'
+          "
+          >{{ t("novelTranslate.endpoint.apiKey.label") }}</text
+        >
+      </view>
       <view class="flex flex-row gap-2">
         <view
           class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
@@ -428,17 +540,34 @@ async function onClear(): Promise<void> {
 
     <!-- model -->
     <view class="flex flex-col gap-1">
-      <text class="text-label-medium text-surface-on-variant">{{
-        t("novelTranslate.endpoint.model.label")
-      }}</text>
-      <input
-        v-model="model"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.model.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.model.label')"
-      />
+      <view class="relative">
+        <input
+          v-model="model"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('model', model) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('model', model) ? t('novelTranslate.endpoint.model.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.model.label')"
+          @focus="onFieldFocus('model')"
+          @blur="onFieldBlur('model')"
+        />
+        <view
+          v-if="isFocused('model')"
+          class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+        />
+        <text
+          class="absolute left-4"
+          :class="
+            isFloated('model', model)
+              ? 'top-0.5 text-body-small text-primary'
+              : 'top-4 text-body-large text-surface-on-variant'
+          "
+          >{{ t("novelTranslate.endpoint.model.label") }}</text
+        >
+      </view>
       <text v-if="!modelValid && model.length > 0" class="text-label-small text-error">{{
         t("novelTranslate.endpoint.invalid.model")
       }}</text>
@@ -446,32 +575,66 @@ async function onClear(): Promise<void> {
 
     <!-- target language（#637 P0-1：数据层已就绪，纯 UI 缺口） -->
     <view class="flex flex-col gap-1">
-      <text class="text-label-medium text-surface-on-variant">{{
-        t("novelTranslate.endpoint.targetLang.label")
-      }}</text>
-      <input
-        v-model="targetLang"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.targetLang.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.targetLang.label')"
-      />
+      <view class="relative">
+        <input
+          v-model="targetLang"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('targetLang', targetLang) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('targetLang', targetLang) ? t('novelTranslate.endpoint.targetLang.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.targetLang.label')"
+          @focus="onFieldFocus('targetLang')"
+          @blur="onFieldBlur('targetLang')"
+        />
+        <view
+          v-if="isFocused('targetLang')"
+          class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+        />
+        <text
+          class="absolute left-4"
+          :class="
+            isFloated('targetLang', targetLang)
+              ? 'top-0.5 text-body-small text-primary'
+              : 'top-4 text-body-large text-surface-on-variant'
+          "
+          >{{ t("novelTranslate.endpoint.targetLang.label") }}</text
+        >
+      </view>
     </view>
 
     <!-- source language -->
     <view class="flex flex-col gap-1">
-      <text class="text-label-medium text-surface-on-variant">{{
-        t("novelTranslate.endpoint.sourceLang.label")
-      }}</text>
-      <input
-        v-model="sourceLang"
-        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
-        :placeholder="t('novelTranslate.endpoint.sourceLang.hint')"
-        placeholder-class="text-outline"
-        accessibility-element
-        :accessibility-label="t('novelTranslate.endpoint.sourceLang.label')"
-      />
+      <view class="relative">
+        <input
+          v-model="sourceLang"
+          class="h-[14.933vw] px-4 box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on"
+          :class="isFloated('sourceLang', sourceLang) ? 'pt-5' : 'pt-0'"
+          :placeholder="
+            isFloated('sourceLang', sourceLang) ? t('novelTranslate.endpoint.sourceLang.hint') : ''
+          "
+          placeholder-class="text-outline"
+          accessibility-element
+          :accessibility-label="t('novelTranslate.endpoint.sourceLang.label')"
+          @focus="onFieldFocus('sourceLang')"
+          @blur="onFieldBlur('sourceLang')"
+        />
+        <view
+          v-if="isFocused('sourceLang')"
+          class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+        />
+        <text
+          class="absolute left-4"
+          :class="
+            isFloated('sourceLang', sourceLang)
+              ? 'top-0.5 text-body-small text-primary'
+              : 'top-4 text-body-large text-surface-on-variant'
+          "
+          >{{ t("novelTranslate.endpoint.sourceLang.label") }}</text
+        >
+      </view>
     </view>
 
     <!-- 状态条：已配置 / 未配置 -->
@@ -534,8 +697,8 @@ async function onClear(): Promise<void> {
         }}</text>
       </view>
       <view
-        class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-primary active:bg-layer-pressed-on-primary"
-        :class="!formValid || saving ? 'opacity-50' : ''"
+        class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-primary"
+        :class="!formValid || saving ? 'opacity-50' : 'active:bg-layer-pressed-on-primary'"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="t('novelTranslate.endpoint.save')"
         @tap="onSave"

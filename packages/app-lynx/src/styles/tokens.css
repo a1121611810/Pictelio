@@ -64,23 +64,76 @@ page,
   --md-on-tertiary-fixed-variant: #204b58;
   --md-surface-tint: #1a6fa8;
 
-  /* ── M3 状态层（state layers，覆盖在容器色之上） ──
-   * 交互反馈：hover 8% / pressed 12%。Lynx 伪类支持有限，MVP 用预计算
-   * 的 pressed 目标色（容器色 + 12% 黑/primary 叠加）配合 Tailwind active:
-   * 变体（web-core 预览生效；原生 LynxView 待真机验证）。
-   * 值说明：pressedOnSurface = primary 叠加在 surface 上 12%（直接取 primary，
-   * 视觉近似）；pressedSurface = surface-container-lowest + 12% primary 预计算。 */
+  /* ── M3 状态层（① 半透明 alpha 叠加层 —— 官方正路） ──
+   * 官方 v0.192 `_md-sys-state.scss` 的四态 opacity：
+   *   hover 0.08 / focus 0.12 / pressed 0.12 / dragged 0.16
+   * （**focus 是 0.12 不是 0.10**，2026-09 复核按令牌文件更正过，见差距分析 §8.4；
+   *   disabled 另有 on-surface 12% 容器 / 38% 内容，见本块下方。）
+   * 官方只定义**每态的 opacity 标量**，颜色由组件自己的 on-* 角色决定；本项目把它
+   * 展开成「四态 × 四语义色」的矩阵，便于 Tailwind 侧直接取 utility
+   * （`bg-layer-hover-primary` 等，见 tailwind.config.ts extend.colors.state）。
+   *
+   * 语义色四档口径：
+   *   primary    = primary 角色（选中/强调容器上的层）
+   *   on-surface = on-surface 角色（surface 容器上的常规交互层）
+   *   error      = error 角色（破坏性控件）
+   *   surface    = 覆盖在 surface 容器上的强调层，色相取 primary —— 与下方预计算实色
+   *               `--md-state-pressed-surface`（primary 12% 叠在 surface-container-lowest 上）
+   *               同口径，故本块用 var() 别名指回 primary 档，**不是复制粘贴错误**；
+   *               用 var() 也让这一档随色板自动生效，不必在 14 套色板里各写一遍。
+   *   on-primary = on-primary 角色（**实心 primary 容器**上的层，#866 补入）——
+   *               M3 语义上「压在 primary 实心底上的层」用 on-primary 作色，
+   *               否则白字按钮按下时叠一层黑，方向与 MD3 相反。
+   *               ⚠️ 亮色 7 套的 on-primary 全是 #ffffff，故本组逐板取值**恰好相同**；
+   *               暗色 7 套各不相同（由 scripts/generate-theme-palettes.mjs 派生，见
+   *               文件末尾的脚本产物段）⇒ 必须逐色板声明。
+   *               当前消费方只有 pressed（SettingsEndpoint / TranslateButton 两处
+   *               `active:bg-layer-pressed-on-primary`，此前是死类名，见 #866）；
+   *               其余三态一并补齐是为将来接外设时不必回头改色板。
+   *
+   * 逐色板取值：亮色各主题在下方 .theme-X 块内覆盖 primary / on-surface / on-primary 三组
+   * （亮色 7 主题共用同一 error，故 error 组只在基础板声明）；暗色各主题在文件末尾
+   * 「暗色状态层补充段」覆盖（暗色板本体由脚本生成，见该段说明）。
+   *
+   * 消费口径：hover 在本项目（纯触屏）判定为「有意偏离·不适用」，focus 需
+   * :focus-visible（Lynx 支持度待真机验证）——**但四态令牌一律补齐**，
+   * 将来接外接鼠标/键盘外设时无需再回头改色板。 */
+  --md-state-layer-hover-primary: rgba(26, 111, 168, 0.08); /* 8% primary */
+  --md-state-layer-hover-on-surface: rgba(25, 28, 32, 0.08); /* 8% on-surface */
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08); /* 8% error */
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary); /* 见上：surface 档 = primary 色相 */
+  --md-state-layer-hover-on-primary: #2c7baf; /* 8% on-primary 预合成于 .theme-sky 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #1a6fa8 + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(26, 111, 168, 0.12); /* 12% primary */
+  --md-state-layer-focus-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12); /* 12% error */
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary); /* 见上 */
+  --md-state-layer-focus-on-primary: #3580b2; /* 12% on-primary 预合成于 .theme-sky 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #1a6fa8 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(26, 111, 168, 0.12); /* 12% primary */
+  --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12); /* 12% error */
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary); /* 见上 */
+  --md-state-layer-pressed-on-primary: #3580b2; /* 12% on-primary 预合成于 .theme-sky 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #1a6fa8 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(26, 111, 168, 0.16); /* 16% primary */
+  --md-state-layer-dragged-on-surface: rgba(25, 28, 32, 0.16); /* 16% on-surface */
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16); /* 16% error */
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary); /* 见上 */
+  --md-state-layer-dragged-on-primary: #3f86b6; /* 16% on-primary 预合成于 .theme-sky 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #1a6fa8 + on-primary #ffffff 按 0.16 复算）*/
+  /* Disabled（官方：on-surface 12% 容器 / 38% 内容；与上面四态并存，互不替代） */
+  --md-state-disabled-container: rgba(25, 28, 32, 0.12); /* on-surface 12% */
+  --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
+
+  /* ── M3 状态层（② 预计算实色 —— 视觉近似 + 仅作伪类受限时的兜底） ──
+   * ⚠️ 这一套**不是 MD3 的表达方式**，MD3 一律用上面的 alpha 叠加层。这里的值是
+   * 「容器色 + 12% 黑/primary 叠加」的**人工预计算结果，视觉近似、不是精确合成**
+   * （注释自述 pressedOnSurface 就是直接取 primary 的近似做法）。
+   * 保留它的唯一理由：Lynx 伪类支持有限，pressed 态靠 Tailwind `active:` 变体近似
+   * （web-core 预览生效；原生 LynxView 待真机验证），而存量组件在消费这一套
+   * （active:bg-pressed-*）。官方 alpha 层不提供 pressed-only 的实色，故它不是
+   * alpha 层的替代品，**两套并存是有意的，不是待合并的重复**。 */
   --md-state-pressed-primary: #155b8a; /* primary + 12% black */
   --md-state-pressed-on-surface: #1a6fa8; /* primary 12% 叠加于 surface（近似） */
   --md-state-pressed-error: #9a1f1a; /* error + 12% black */
   --md-state-pressed-surface: #e4e9f1; /* surface-container-lowest(#fff) + 12% primary(#1a6fa8) alpha 合成 */
-
-  /* ── M3 状态层（半透明叠加层，MD3 官方用 alpha 层而非预计算实色） ──
-   * 官方：pressed = 容器色 + 12% primary/on-surface 半透明层；disabled = on-surface 12%/38%。 */
-  --md-state-layer-pressed-primary: rgba(26, 111, 168, 0.12); /* 12% primary */
-  --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
-  --md-state-disabled-container: rgba(25, 28, 32, 0.12); /* on-surface 12% */
-  --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
   --md-scroll-indicator: rgba(73, 69, 79, 0.35); /* M3 基线 neutral 派生（#49454F ≈ 基线
                                                   * onSurfaceVariant / neutral tone 30，非 outline
                                                   * tone 50）+ 35% alpha；**亮色 7 主题共用此基础值
@@ -140,10 +193,31 @@ page,
   --borderRadius2XLarge: var(--md-shape-extra-large); /* 28px */
   --borderRadiusCircular: 50%;
 
-  /* ── M3 高度（elevation，Android tokens 简化版 box-shadow） ── */
+  /* ── M3 高度（elevation）──
+   * ⚠️ 取值来源与可信度**必须分层读**：
+   *  - level 0 = none，是官方定义（MD3 level 0 即「无阴影」），非外推；
+   *  - level 1/2/3 = 既有 Android tokens 简化版 box-shadow，**保持原值不动**；
+   *  - level 4/5 = **外推、非官方全表**。material-web v0.192 的 elevation 0–5 完整
+   *    配方表未能从一手来源取到（差距分析未取证），故不凭记忆填「看起来像官方」的
+   *    数值，而是按下面这条**可复算的规则**从既有两档接续外推。将来若取到一手配方表，
+   *    以官方为准改写 4/5 并同步删掉本段规则说明。
+   *
+   * 外推规则（沿用 level 1/2/3 的两层结构：ambient alpha .15 + key alpha .30）：
+   *  - ambient 层的 (offsetY, blur, spread) 自 level 2 起每升一级各 +2 / +2 / +1：
+   *      L2 (2,6,2) → L3 (4,8,3) → L4 (6,10,4) → L5 (8,12,5)
+   *  - key 层的 (offsetY, blur) 自 level 3 起各 +1 / +1：
+   *      L3 (1,3) → L4 (2,4) → L5 (3,5)
+   *
+   * 层级表达口径（ADR-0207 决策 7）：MD3 的 elevation **主手段是表面色调**
+   * （surface-container-lowest/low/container/high/highest 五档已在位），
+   * box-shadow 只是「辅」。纯靠阴影叠加是 MD2 的做法。已知引擎约束：Lynx 对多层
+   * box-shadow 的支持度未真机验证，若不生效则层级完全由表面色调承担，主路径不受影响。 */
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3); /* 外推 */
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3); /* 外推 */
 
   /* 兼容别名（旧 --elevation2/4 引用） */
   --elevation2: var(--md-elevation-1);
@@ -156,6 +230,22 @@ page,
   /* M3 duration scale 补档（ADR-0112 收藏动效 state-layer 环）：medium1 250ms / medium3 350ms */
   --durationMedium1: 250ms;
   --durationMedium3: 350ms;
+  /* extra-long4 = 1000ms（RefreshableList 的 .fab-spin 无限循环旋转）。
+   * 官方值来源：material-web `tokens/versions/v0_192/_md-sys-motion.scss`
+   * 的 `'duration-extra-long4': 1000ms`（2026-09-30 联网核对，非凭记忆）。
+   * 此前 .fab-spin 写的是字面量 `1s`，理由是「令牌不存在」——本条就是补上那个令牌。 */
+  --durationExtraLong4: 1000ms;
+
+  /* 骨架屏 shimmer 动画闸门（--shimmer-motion）：**动画简写的整体值**，不是时长值——
+   * .shimmer 写的是 `animation: var(--shimmer-motion, …)`，整条 animation 由它决定，
+   * 若这里只给 `1000ms` 则简写退化成「只有时长、无 animation-name」⇒ name 取 none ⇒ 动画不播。
+   * 根 <page> 在「减弱动效」偏好开启时经内联 :style 注入 `none` 覆盖本条（App.vue，
+   * 变量名与脚本内 SHIMMER_MOTION_VAR 配对）；偏好关闭时走这里，周期 = extra-long4 1000ms，
+   * 与同为无限转圈的 .fab-spin / .fab-ring-spin 同款。
+   * ⚠️ App.vue 的 var() 回退实参里另有一个 `1.5s` 字面量：那是门闸失效时的 fail-open 兜底
+   * （被 src/shimmerGate.test.ts 与 useReducedMotion.test.ts 逐字锁定），不是本条的值；
+   * 两者周期不同是有登记的已知偏差，见 motionDurationTokens.template.test.ts 的 LITERAL_EXCEPTIONS。 */
+  --shimmer-motion: shimmer var(--durationExtraLong4) linear infinite;
 
   /* ── M3 运动曲线（motion easing） ──
    * standard 线性强调进出、emphasized 更强的进出强调（material 3 motion tokens）。
@@ -221,6 +311,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(29, 27, 32, 0.12);
   --md-state-disabled-container: rgba(29, 27, 32, 0.12);
   --md-state-disabled-on-surface: rgba(29, 27, 32, 0.38);
+  --md-state-layer-hover-primary: rgba(101, 85, 143, 0.08);
+  --md-state-layer-hover-on-surface: rgba(29, 27, 32, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #716398; /* 8% on-primary 预合成于 .theme-violet 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #65558f + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(101, 85, 143, 0.12);
+  --md-state-layer-focus-on-surface: rgba(29, 27, 32, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #77699c; /* 12% on-primary 预合成于 .theme-violet 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #65558f + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(101, 85, 143, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(29, 27, 32, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #77699c; /* 12% on-primary 预合成于 .theme-violet 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #65558f + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(101, 85, 143, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(29, 27, 32, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #7e70a1; /* 16% on-primary 预合成于 .theme-violet 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #65558f + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 .theme-pink {
@@ -272,6 +383,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(34, 25, 28, 0.12);
   --md-state-disabled-container: rgba(34, 25, 28, 0.12);
   --md-state-disabled-on-surface: rgba(34, 25, 28, 0.38);
+  --md-state-layer-hover-primary: rgba(139, 74, 97, 0.08);
+  --md-state-layer-hover-on-surface: rgba(34, 25, 28, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #94586e; /* 8% on-primary 预合成于 .theme-pink 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #8b4a61 + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(139, 74, 97, 0.12);
+  --md-state-layer-focus-on-surface: rgba(34, 25, 28, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #996074; /* 12% on-primary 预合成于 .theme-pink 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #8b4a61 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(139, 74, 97, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(34, 25, 28, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #996074; /* 12% on-primary 预合成于 .theme-pink 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #8b4a61 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(139, 74, 97, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(34, 25, 28, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #9e677a; /* 16% on-primary 预合成于 .theme-pink 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #8b4a61 + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 .theme-green {
@@ -323,6 +455,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(25, 29, 23, 0.12);
   --md-state-disabled-container: rgba(25, 29, 23, 0.12);
   --md-state-disabled-on-surface: rgba(25, 29, 23, 0.38);
+  --md-state-layer-hover-primary: rgba(60, 105, 57, 0.08);
+  --md-state-layer-hover-on-surface: rgba(25, 29, 23, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #4c7549; /* 8% on-primary 预合成于 .theme-green 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #3c6939 + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(60, 105, 57, 0.12);
+  --md-state-layer-focus-on-surface: rgba(25, 29, 23, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #537b51; /* 12% on-primary 预合成于 .theme-green 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #3c6939 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(60, 105, 57, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(25, 29, 23, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #537b51; /* 12% on-primary 预合成于 .theme-green 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #3c6939 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(60, 105, 57, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(25, 29, 23, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #5b8159; /* 16% on-primary 预合成于 .theme-green 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #3c6939 + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 .theme-orange {
@@ -374,6 +527,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(33, 26, 20, 0.12);
   --md-state-disabled-container: rgba(33, 26, 20, 0.12);
   --md-state-disabled-on-surface: rgba(33, 26, 20, 0.38);
+  --md-state-layer-hover-primary: rgba(133, 83, 23, 0.08);
+  --md-state-layer-hover-on-surface: rgba(33, 26, 20, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #8f612a; /* 8% on-primary 预合成于 .theme-orange 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #855317 + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(133, 83, 23, 0.12);
+  --md-state-layer-focus-on-surface: rgba(33, 26, 20, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #946833; /* 12% on-primary 预合成于 .theme-orange 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #855317 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(133, 83, 23, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(33, 26, 20, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #946833; /* 12% on-primary 预合成于 .theme-orange 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #855317 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(133, 83, 23, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(33, 26, 20, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #996f3c; /* 16% on-primary 预合成于 .theme-orange 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #855317 + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 .theme-teal {
@@ -425,6 +599,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(22, 29, 29, 0.12);
   --md-state-disabled-container: rgba(22, 29, 29, 0.12);
   --md-state-disabled-on-surface: rgba(22, 29, 29, 0.38);
+  --md-state-layer-hover-primary: rgba(0, 105, 109, 0.08);
+  --md-state-layer-hover-on-surface: rgba(22, 29, 29, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #147579; /* 8% on-primary 预合成于 .theme-teal 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #00696d + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(0, 105, 109, 0.12);
+  --md-state-layer-focus-on-surface: rgba(22, 29, 29, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #1f7b7f; /* 12% on-primary 预合成于 .theme-teal 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #00696d + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(0, 105, 109, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(22, 29, 29, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #1f7b7f; /* 12% on-primary 预合成于 .theme-teal 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #00696d + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(0, 105, 109, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(22, 29, 29, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #298184; /* 16% on-primary 预合成于 .theme-teal 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #00696d + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 /* bili（哔哩粉）：bilibili v12 官方令牌手工映射（L2），映射表与出处见 docs/specs/lynx-bili-theme.md / ADR-0198 */
@@ -477,6 +672,27 @@ page,
   --md-state-layer-pressed-on-surface: rgba(24, 25, 28, 0.12);
   --md-state-disabled-container: rgba(24, 25, 28, 0.12);
   --md-state-disabled-on-surface: rgba(24, 25, 28, 0.38);
+  --md-state-layer-hover-primary: rgba(208, 49, 113, 0.08);
+  --md-state-layer-hover-on-surface: rgba(24, 25, 28, 0.08);
+  --md-state-layer-hover-error: rgba(179, 38, 30, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #d4417c; /* 8% on-primary 预合成于 .theme-bili 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #d03171 + on-primary #ffffff 按 0.08 复算）*/
+  --md-state-layer-focus-primary: rgba(208, 49, 113, 0.12);
+  --md-state-layer-focus-on-surface: rgba(24, 25, 28, 0.12);
+  --md-state-layer-focus-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #d64a82; /* 12% on-primary 预合成于 .theme-bili 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #d03171 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-pressed-primary: rgba(208, 49, 113, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(24, 25, 28, 0.12);
+  --md-state-layer-pressed-error: rgba(179, 38, 30, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #d64a82; /* 12% on-primary 预合成于 .theme-bili 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #d03171 + on-primary #ffffff 按 0.12 复算）*/
+  --md-state-layer-dragged-primary: rgba(208, 49, 113, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(24, 25, 28, 0.16);
+  --md-state-layer-dragged-error: rgba(179, 38, 30, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #d85288; /* 16% on-primary 预合成于 .theme-bili 的 primary（#867：bg-* 替换而非合成，alpha 会让实心按钮填色消失；可由 primary #d03171 + on-primary #ffffff 按 0.16 复算）*/
+
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -541,15 +757,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #a7d1fb;
   --md-state-pressed-on-surface: #e0e2e8;
   --md-state-pressed-surface: #272a2f;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(155, 203, 250, 0.08);
+  --md-state-layer-hover-on-surface: rgba(224, 226, 232, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #8fbfed;
+  --md-state-layer-focus-primary: rgba(155, 203, 250, 0.12);
+  --md-state-layer-focus-on-surface: rgba(224, 226, 232, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #88b9e6;
   --md-state-layer-pressed-primary: rgba(155, 203, 250, 0.12);
   --md-state-layer-pressed-on-surface: rgba(224, 226, 232, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #88b9e6;
+  --md-state-layer-dragged-primary: rgba(155, 203, 250, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(224, 226, 232, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #82b3df;
   --md-state-disabled-container: rgba(224, 226, 232, 0.12);
   --md-state-disabled-on-surface: rgba(224, 226, 232, 0.38);
   --md-scroll-indicator: rgba(140, 145, 152, 0.35);
@@ -610,15 +847,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #d5c5fe;
   --md-state-pressed-on-surface: #e6e0e9;
   --md-state-pressed-surface: #2b292f;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(207, 189, 254, 0.08);
+  --md-state-layer-hover-on-surface: rgba(230, 224, 233, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #c3b1f1;
+  --md-state-layer-focus-primary: rgba(207, 189, 254, 0.12);
+  --md-state-layer-focus-on-surface: rgba(230, 224, 233, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #bdabeb;
   --md-state-layer-pressed-primary: rgba(207, 189, 254, 0.12);
   --md-state-layer-pressed-on-surface: rgba(230, 224, 233, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #bdabeb;
+  --md-state-layer-dragged-primary: rgba(207, 189, 254, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(230, 224, 233, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #b7a5e4;
   --md-state-disabled-container: rgba(230, 224, 233, 0.12);
   --md-state-disabled-on-surface: rgba(230, 224, 233, 0.38);
   --md-scroll-indicator: rgba(148, 143, 153, 0.35);
@@ -679,15 +937,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #ffb9cf;
   --md-state-pressed-on-surface: #efdfe1;
   --md-state-pressed-surface: #31282a;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(255, 176, 201, 0.08);
+  --md-state-layer-hover-on-surface: rgba(239, 223, 225, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #f1a4bd;
+  --md-state-layer-focus-primary: rgba(255, 176, 201, 0.12);
+  --md-state-layer-focus-on-surface: rgba(239, 223, 225, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #ea9eb7;
   --md-state-layer-pressed-primary: rgba(255, 176, 201, 0.12);
   --md-state-layer-pressed-on-surface: rgba(239, 223, 225, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #ea9eb7;
+  --md-state-layer-dragged-primary: rgba(255, 176, 201, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(239, 223, 225, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #e498b1;
   --md-state-disabled-container: rgba(239, 223, 225, 0.12);
   --md-state-disabled-on-surface: rgba(239, 223, 225, 0.38);
   --md-scroll-indicator: rgba(158, 140, 144, 0.35);
@@ -748,15 +1027,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #acd8a5;
   --md-state-pressed-on-surface: #e0e4db;
   --md-state-pressed-surface: #272b25;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(161, 211, 153, 0.08);
+  --md-state-layer-hover-on-surface: rgba(224, 228, 219, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #95c78e;
+  --md-state-layer-focus-primary: rgba(161, 211, 153, 0.12);
+  --md-state-layer-focus-on-surface: rgba(224, 228, 219, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #8fc188;
   --md-state-layer-pressed-primary: rgba(161, 211, 153, 0.12);
   --md-state-layer-pressed-on-surface: rgba(224, 228, 219, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #8fc188;
+  --md-state-layer-dragged-primary: rgba(161, 211, 153, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(224, 228, 219, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #89ba83;
   --md-state-disabled-container: rgba(224, 228, 219, 0.12);
   --md-state-disabled-on-surface: rgba(224, 228, 219, 0.38);
   --md-scroll-indicator: rgba(140, 147, 136, 0.35);
@@ -817,15 +1117,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #fcc185;
   --md-state-pressed-on-surface: #eee0d5;
   --md-state-pressed-surface: #302921;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(252, 185, 116, 0.08);
+  --md-state-layer-hover-on-surface: rgba(238, 224, 213, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #eead6b;
+  --md-state-layer-focus-primary: rgba(252, 185, 116, 0.12);
+  --md-state-layer-focus-on-surface: rgba(238, 224, 213, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #e7a866;
   --md-state-layer-pressed-primary: rgba(252, 185, 116, 0.12);
   --md-state-layer-pressed-on-surface: rgba(238, 224, 213, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #e7a866;
+  --md-state-layer-dragged-primary: rgba(252, 185, 116, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(238, 224, 213, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #dfa261;
   --md-state-disabled-container: rgba(238, 224, 213, 0.12);
   --md-state-disabled-on-surface: rgba(238, 224, 213, 0.38);
   --md-scroll-indicator: rgba(157, 142, 129, 0.35);
@@ -886,15 +1207,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #8fd9dd;
   --md-state-pressed-on-surface: #dde4e3;
   --md-state-pressed-surface: #252b2b;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(128, 212, 216, 0.08);
+  --md-state-layer-hover-on-surface: rgba(221, 228, 227, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #76c7cb;
+  --md-state-layer-focus-primary: rgba(128, 212, 216, 0.12);
+  --md-state-layer-focus-on-surface: rgba(221, 228, 227, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #71c1c5;
   --md-state-layer-pressed-primary: rgba(128, 212, 216, 0.12);
   --md-state-layer-pressed-on-surface: rgba(221, 228, 227, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #71c1c5;
+  --md-state-layer-dragged-primary: rgba(128, 212, 216, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(221, 228, 227, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #6cbbbf;
   --md-state-disabled-container: rgba(221, 228, 227, 0.12);
   --md-state-disabled-on-surface: rgba(221, 228, 227, 0.38);
   --md-scroll-indicator: rgba(137, 147, 147, 0.35);
@@ -955,15 +1297,36 @@ page,
   --md-shape-large: 4.267vw;
   --md-shape-extra-large: 7.467vw;
   --md-shape-full: 9999px;
+  --md-elevation-0: none;
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0 6px 10px 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0 8px 12px 5px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #ffbacc;
   --md-state-pressed-on-surface: #efdfe1;
   --md-state-pressed-surface: #31282a;
   --md-state-pressed-error: #ffdad6;
+  --md-state-layer-hover-primary: rgba(255, 177, 197, 0.08);
+  --md-state-layer-hover-on-surface: rgba(239, 223, 225, 0.08);
+  --md-state-layer-hover-error: rgba(255, 180, 171, 0.08);
+  --md-state-layer-hover-surface: var(--md-state-layer-hover-primary);
+  --md-state-layer-hover-on-primary: #f1a5b9;
+  --md-state-layer-focus-primary: rgba(255, 177, 197, 0.12);
+  --md-state-layer-focus-on-surface: rgba(239, 223, 225, 0.12);
+  --md-state-layer-focus-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-focus-surface: var(--md-state-layer-focus-primary);
+  --md-state-layer-focus-on-primary: #eb9fb3;
   --md-state-layer-pressed-primary: rgba(255, 177, 197, 0.12);
   --md-state-layer-pressed-on-surface: rgba(239, 223, 225, 0.12);
+  --md-state-layer-pressed-error: rgba(255, 180, 171, 0.12);
+  --md-state-layer-pressed-surface: var(--md-state-layer-pressed-primary);
+  --md-state-layer-pressed-on-primary: #eb9fb3;
+  --md-state-layer-dragged-primary: rgba(255, 177, 197, 0.16);
+  --md-state-layer-dragged-on-surface: rgba(239, 223, 225, 0.16);
+  --md-state-layer-dragged-error: rgba(255, 180, 171, 0.16);
+  --md-state-layer-dragged-surface: var(--md-state-layer-dragged-primary);
+  --md-state-layer-dragged-on-primary: #e499ad;
   --md-state-disabled-container: rgba(239, 223, 225, 0.12);
   --md-state-disabled-on-surface: rgba(239, 223, 225, 0.38);
   --md-scroll-indicator: rgba(158, 140, 144, 0.35);

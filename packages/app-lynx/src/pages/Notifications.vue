@@ -29,6 +29,7 @@ import { formatRelativeTime } from '../utils/dateFormat'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { NOTIFICATIONS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import NotificationChildren from '../components/NotificationChildren.vue'
+import AppIcon from '../components/AppIcon.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
@@ -180,7 +181,10 @@ function rowA11y(row: NotificationRow): string {
     </view>
     <!-- 空态 -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="◇" :title="t('notifications.empty.title')" :hint="t('notifications.empty.hint')" />
+      <!-- T12 未收口：EmptyState 的 icon prop 契约是「裸文本字形」（组件内以默认字体渲染
+           `text-[10.667vw]`，无字体族可切），换成 Material Symbols 私用区码点会渲染成空白 ——
+           需 EmptyState 侧新增走 AppIcon 的入口（不属本票可改范围）。台账条目暂留。 -->
+      <EmptyState icon="notifications" :title="t('notifications.empty.title')" :hint="t('notifications.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -222,8 +226,10 @@ function rowA11y(row: NotificationRow): string {
               <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ headerTitle(row.item) || rowText(row.item) || t('notifications.noContent') }}</text>
               <text class="text-body-small text-surface-on-variant mt-1 [max-line:2]">{{ rowText(row.item) }}</text>
             </view>
-            <!-- 展开 affordance（spec D4）：‹ 旋转语义用 › 表示可展开 -->
-            <text class="self-center text-title-medium text-outline ml-2">›</text>
+            <!-- 展开 affordance（spec D4）：‹ 旋转语义用 › 表示可展开。
+                 T12 收口：`›`（U+203A）已登记为 iconMap 的 arrow_forward
+                 （ADR-0208 决策 3：凡在映射表内的一律算图标位），改走 <AppIcon> -->
+            <AppIcon name="arrow_forward" :size="4.27" class="self-center text-outline ml-2" />
           </view>
 
           <!-- 子列表内嵌段（ADR-0162 结构规避，方案 B）：条件渲染在组头行 list-item 根 view
@@ -248,7 +254,9 @@ function rowA11y(row: NotificationRow): string {
               @error="onThumbError(row)"
             />
             <view class="flex-1 flex flex-col ml-3">
-              <text class="text-body-medium text-surface-on leading-snug [max-line:2]">{{ rowText(row.item) || t('notifications.noContent') }}</text>
+              <!-- T10/ADR-0206 决策 3：删掉自选 leading-snug，行高由 text-body-medium 档位携带（20sp）。
+                   通知正文 2 行截断（[max-line:2]）的高度随之由档位决定 -->
+              <text class="text-body-medium text-surface-on [max-line:2]">{{ rowText(row.item) || t('notifications.noContent') }}</text>
               <text class="text-label-medium text-surface-on-variant mt-1.5">{{ formatRelativeTime(row.item.created_datetime) }}</text>
             </view>
           </view>

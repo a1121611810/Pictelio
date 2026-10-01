@@ -46,10 +46,17 @@ function collectTsLiterals(source: string, kind: ts.ScriptKind): string[] {
 }
 
 /** vue 模板区：先扫属性值（静态 placeholder/aria-label/title 等，review P1-2 实证盲区——
- * 剥标签会把属性值一并剥掉），再剥插值与标签扫文本节点 */
+ *  剥标签会把属性值一并剥掉），再剥插值与标签扫文本节点 */
 function collectVueTemplate(source: string): string[] {
   const hits: string[] = [];
-  const noScript = source.replace(/<script[\s\S]*?<\/script>/g, "");
+  // ⚠️ 必须先剥 HTML 注释，且必须用注释专用正则——不能指望下面的 /<[^>]*>/g。
+  // 该正则把 `<!--` 当成标签起点，于是注释内**含 `>` 时**只剥掉 `<!-- …>` 这一段，
+  // 剩下的 `… 正文 -->` 落入"文本节点"扫描，被当成硬编码文案（假阳性）。
+  // 实证：T12 迁移写入的中文注释里只要有 `:active 表达。 -->` 这类含 `>` 的片段就会触发。
+  // 注释不渲染，不是用户可见文案，故应当豁免——与 console 参数豁免同款。
+  const noScript = source
+    .replace(/<script[\s\S]*?<\/script>/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "\n");
   const attrRe = /[\w:-]+\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
   for (const m of noScript.matchAll(attrRe)) {
     const v = (m[1] ?? m[2] ?? "").trim();

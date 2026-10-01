@@ -6,10 +6,13 @@
 // 期望值出处（Oracle 溯源）：
 // - 容器 `flex-1 min-w-0 flex flex-col` = spec §5.1 「等宽四列」原文
 // - 文本色 `text-white/85` / `text-tertiary` = spec §5.1 「默认态」/「已激活」逐字
-// - `pointer-events-none` 仅 disabled 分支 = spec §5.1 「masked」+ ADR-0123 红线（仅合法禁用语义，
-//   禁止全屏遮罩期望下层穿透的反模式）
+// - disabled 态 = `opacity-50` 置灰 + `@tap` 处理器短路。**不含** `pointer-events-none`：
+//   它在 Lynx 下是死类名（preset 的 corePlugins 白名单裁掉了 `pointerEvents`），
+//   写了不产生任何规则 ⇒ 锁它等于锁一个不存在的防护。详见文件末尾的 describe。
 // - `:accessibility-element` 绑 A11Y_ELEMENT_ENABLED 常量 = accessibility.ts:213-214
 // - `text-[6.4vw]` 图标 / `text-label-small` 标签 = spec §5.1 逐字 + ADR-0086（vw 强制，禁 rem）
+//   ⚠️ ADR-0208 决策 3（2026-09 图标迁移）后：6.4vw 不再是本组件的 text 字面量，而由
+//   `<AppIcon>` 缺省 :size 承担（= 24dp），IconName 类型取代 string 图标 prop。
 //
 // 契约边界：ActionButton = 纯展示基础组件（无 i18n、无 store、无 API、仅 props + emit('tap')）。
 // i18n 责任归宿主 NovelIntro（label 由父组件传入已翻译文本，spec §5.1 注释）。
@@ -19,6 +22,9 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'vue/compiler-sfc'
 
 const src = readFileSync(fileURLToPath(new URL('./ActionButton.vue', import.meta.url)), 'utf8')
+/** IconName 定义源（= ICON_CODEPOINTS 键联合，ADR-0208 决策 2）与图标缺省字号的定义源 */
+const iconMapSrc = readFileSync(fileURLToPath(new URL('../utils/iconMap.ts', import.meta.url)), 'utf8')
+const appIconSrc = readFileSync(fileURLToPath(new URL('./AppIcon.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与整行行注释（约束说明本身会提到被禁止的串，负向断言必须在代码本文上做） */
 const code = src
   .replace(/<!--[\s\S]*?-->/g, '')
@@ -39,12 +45,17 @@ describe('ActionButton.vue SFC 编译（验收 #1：组件能 mount）', () => {
 
 // ─── 验收 #2 / #3：接入契约（spec §5.1 props + emit） ───
 describe('ActionButton.vue 接入契约（spec §5.1：4 props + 1 emit）', () => {
-  it('defineProps 包含 icon / label / active / disabled 四个 prop，类型 string/boolean', () => {
+  it('defineProps 包含 icon / label / active / disabled 四个 prop，类型 IconName/string/boolean', () => {
     // 4 个 prop 与 spec §5.1 完全一致
-    expect(code).toMatch(/icon\s*:\s*string/)
+    expect(code).toMatch(/icon\s*:\s*IconName/)
     expect(code).toMatch(/label\s*:\s*string/)
     expect(code).toMatch(/active\s*:\s*boolean/)
     expect(code).toMatch(/disabled\s*:\s*boolean/)
+    // 反向锁：icon 退回 string 即退回字形串（ADR-0208 决策 2/3：传码点会被默认字体静默渲染成空白）
+    expect(code).not.toMatch(/icon\s*:\s*string/)
+    // IconName 的定义源 = ICON_CODEPOINTS 键联合（utils/iconMap.ts），非本组件另立一套
+    expect(iconMapSrc).toMatch(/export type IconName = keyof typeof ICON_CODEPOINTS/)
+    expect(code).toMatch(/import type \{ IconName \} from '\.\.\/utils\/iconMap'/)
     // 不允许多带 a11y 字符串 prop（a11y 注入责任在组件自身，但参数只有 label 一个字符串）
     expect(code).not.toMatch(/ariaLabel\s*:\s*string/)
     expect(code).not.toMatch(/accessibilityLabel\s*:\s*string/)
@@ -87,12 +98,15 @@ describe('ActionButton.vue 视觉族（spec §5.1：flex-1 等宽 + 图标+文�
     expect(code).not.toMatch(/rounded-\[\d+(?:\.\d+)?(?:px|rem)\]/)
   })
 
-  it('图标 text-[6.4vw] leading-none + 标签 text-label-small mt-1（spec §5.1 逐字）', () => {
-    // ADR-0086 强制：vw 字号，禁 rem
-    expect(code).toContain('text-[6.4vw]')
-    expect(code).toContain('leading-none')
-    // 图标字符 / 标签文字均从 props 取（i18n 不在此处）
-    expect(code).toContain('{{ props.icon }}')
+  it('图标位经 <AppIcon :name="props.icon"> 走 24dp 缺省字号（spec §5.1 的 6.4vw）+ 标签 text-label-small mt-1', () => {
+    // ADR-0208 决策 3：图标位只传图标名，字形由 <AppIcon> 查 ICON_CODEPOINTS 渲染。
+    expect(code).toContain('<AppIcon :name="props.icon" />')
+    // spec §5.1 的 6.4vw 不再是本组件的 text 字面量，而由 AppIcon 缺省 :size 承担（24dp）——
+    // 因此本组件不得覆盖 :size（覆盖即脱离 spec 逐字给出的 24dp 口径）。
+    expect(code).not.toMatch(/<AppIcon[^>]*:size=/)
+    expect(appIconSrc).toMatch(/size:\s*6\.4/) // 缺省 24dp 字号的事实源
+    expect(appIconSrc).toContain('`${props.size}vw`') // 单位恒为 vw（ADR-0086 禁 rem）
+    // 标签文字从 props 取（i18n 不在此处）
     expect(code).toContain('{{ props.label }}')
     expect(code).toContain('text-label-small')
     expect(code).toContain('mt-1')
@@ -101,9 +115,10 @@ describe('ActionButton.vue 视觉族（spec §5.1：flex-1 等宽 + 图标+文�
 
 // ─── 验收 #6 / #7 / #8 / #9：状态机（spec §5.1 默认 / active / disabled 三态） ───
 describe('ActionButton.vue 三态（spec §5.1：default / active / disabled）', () => {
-  it('disabled 分支：opacity-50 pointer-events-none（spec §5.1 masked 态）', () => {
-    // disabled 态 = 视觉置灰 + 不响应 tap（pointer-events-none 合法禁用语义，区别于全屏遮罩反模式）
-    expect(code).toMatch(/disabled\s*\?\s*['"]opacity-50 pointer-events-none['"]/)
+  it('disabled 分支：opacity-50 置灰（spec §5.1 masked 态）', () => {
+    // 视觉置灰 + @tap 不 emit。**不含** pointer-events-none —— 它在 Lynx 下不产出规则，
+    // 详见本文件下方 describe 的说明。
+    expect(code).toMatch(/disabled\s*\?\s*['"]opacity-50['"]/)
   })
 
   it('非 disabled 分支：active:bg-white/10（hover/active 态按下色 spec §5.1 提示）', () => {
@@ -147,41 +162,47 @@ describe('ActionButton.vue a11y 标注（accessibility.ts A11Y_ELEMENT_ENABLED +
   })
 })
 
-// ─── ADR-0123 合规（lynx 原生 hit-testing 不识别 pointer-events CSS，红线 = 全屏遮罩 pointer-events-none） ───
-describe('ActionButton.vue ADR-0123 合规（禁 pointer-events-none 反模式）', () => {
-  it('pointer-events-none 仅出现在 disabled 分支（三元左侧 true 字面量），不做全屏遮罩', () => {
-    // pointer-events-none 必须严格被 disabled 守卫，不能裸用 + 不能作为兜底穿透手段
-    const matches = code.match(/pointer-events-none/g) ?? []
-    expect(matches).toHaveLength(1) // 模板只 1 处合法使用
-    // 该处必须在 disabled ? ... : ... 分支的左侧（if 分支命中）
-    expect(code).toMatch(/disabled\s*\?\s*['"]opacity-50 pointer-events-none['"]/)
-    expect(code).not.toMatch(/class="pointer-events-none"/) // 禁用类名裸绑（无三元守卫）
+// ─── ADR-0123 合规（Lynx 原生 hit-testing 不识别 pointer-events CSS ⇒ 该类名是**死类名**） ───
+//
+// ⚠️ 本 describe 原先断言「`pointer-events-none` 只出现在 disabled 分支」——而那条断言
+// **锁的是一个不存在的效果**：`@lynx-js/tailwind-preset@0.5.1` 的 `corePlugins: DEFAULT_CORE_PLUGINS`
+// 白名单（57 项）裁掉了 `pointerEvents`，实测产物里 `.pointer-events-none` / `.pointer-events-auto`
+// 均为 0 处（同批 `opacity-50`、`bg-surface-tint` 正常产出，作阳性对照）。
+// 即「以为在防护、实际不防护」。真实防护是模板里的 `@tap` 处理器短路（见下）。
+// 全仓级门禁见 `tests/lynxUnsupportedTailwindClasses.test.ts`。
+describe('ActionButton.vue 的 disabled 防护不依赖 CSS（Lynx 无 pointer-events）', () => {
+  it('模板 class 上不得出现 pointer-events-*（死类名，不产出规则）', () => {
+    // 剥掉注释后再断言：组件抬头那段**必须**能解释为什么不用它。
+    const bare = code.replace(/<!--[\s\S]*?-->/g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ')
+    expect(bare).not.toMatch(/pointer-events-/)
+  })
+
+  it('真实防护是 @tap 处理器短路（disabled 时不 emit）', () => {
+    expect(code).toMatch(/@tap="props\.disabled \? null : emit\('tap'\)"/)
   })
 
   it('根元素非全屏遮罩（无 absolute inset-0 + 无 fixed inset-0 等全屏形态）', () => {
     // ActionButton 是行内 flex item，不做全屏覆盖层；与 SeriesSheet / NovelExportSheet 全屏遮罩范式区分
     expect(code).not.toMatch(/absolute\s+inset-0/)
     expect(code).not.toMatch(/fixed\s+inset-0/)
-    // 反向锁：禁止「class 含 pointer-events-none 又不在 disabled 分支」
-    expect(code).not.toMatch(/['"]\s*pointer-events-none\s*['"]/)
-  })
-
-  it('@tap 绑定存在且不依赖 pointer-events 兜底（ADT-0123 平台约束）', () => {
-    // 原生 tap 事件必须落到 @tap 上；不能"用 pointer-events-none 屏蔽外面然后 @tap 绑内层"
-    expect(code).toMatch(/@tap=/)
   })
 })
 
-// ─── ADR-0086 合规（spacing=vw / fontSize=rpx；图标虽为文本但 spec §5.1 逐字给了 vw，禁 rem） ───
+// ─── ADR-0086 合规（spacing=vw / fontSize=rpx；图标经 AppIcon 拿 vw 缺省字号，禁 rem） ───
 describe('ActionButton.vue ADR-0086 合规（vw 字号，禁 rem）', () => {
-  it('字号类仅含 vw 值（text-[6.4vw]），无 rem / em / px 字面量', () => {
-    const fontSizes = Array.from(
-      code.matchAll(/text-\[(\d+(?:\.\d+)?)(px|rem|em|vw|rpx)\]/g),
-    ).map((m) => `${m[1]}${m[2]}`)
-    // 必须含 6.4vw（spec §5.1 图标）+ 含 text-label-small utility（非 arbitrary 值）
-    expect(fontSizes).toContain('6.4vw')
-    // 任何 rem / em / px 字号都视为违规
-    const nonVw = fontSizes.filter((s) => !s.endsWith('vw'))
-    expect(nonVw, `非 vw 字号违规：${nonVw.join(',')}`).toEqual([])
+  it('禁 rem / em / px 字面量：任意长度单位只允许 vw，图标字号由 AppIcon 的 vw 缺省承担', () => {
+    // ADR-0208 决策 3 后本组件不再持有 text-[6.4vw]（字号下沉到 AppIcon），
+    // 但 ADR-0086 的红线不变——扫描面从「text-[…]」扩到全部 `-[Nunit]` 任意长度值。
+    const units = Array.from(code.matchAll(/-\[(\d+(?:\.\d+)?)(px|rem|em|vw|rpx)\]/g)).map(
+      (m) => `${m[1]}${m[2]}`,
+    )
+    const nonVw = units.filter((s) => !s.endsWith('vw'))
+    expect(nonVw, `非 vw 任意长度单位违规：${nonVw.join(',')}`).toEqual([])
+    // 图标字号不写在本组件 ⇒ 由 AppIcon 承担，其单位恒为 vw（禁 rem 的最后一道面）
+    expect(code).not.toMatch(/<AppIcon[^>]*:size=/)
+    expect(appIconSrc).toContain('`${props.size}vw`')
+    expect(appIconSrc).toMatch(/size:\s*6\.4/) // 24dp 缺省 = spec §5.1 的 6.4vw
+    // 标签字号走语义档位（text-label-small），不是 arbitrary 字面量
+    expect(code).toContain('text-label-small')
   })
 })

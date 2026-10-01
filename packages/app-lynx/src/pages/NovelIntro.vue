@@ -35,6 +35,7 @@ import { useWatchLaterStore, toNovelSnapshot } from '../stores/watchLaterStore'
 import { createWatchlistPrompt, type WatchlistPromptController } from '../primitives/createWatchlistPrompt'
 import { useNovelWatchlistToggle } from '../composables/useNovelWatchlistToggle'
 import CoverImage from '../components/CoverImage.vue'
+import AppIcon from '../components/AppIcon.vue'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import ActionButton from '../components/ActionButton.vue'
@@ -196,7 +197,7 @@ const seriesSheetOpen = ref(false)
 const exportNotice = ref('')
 let exportNoticeTimer: ReturnType<typeof setTimeout> | undefined
 
-/** 打开导出面板：受限态下 ActionButton 已 opacity-50 pointer-events-none；此处再守一道防御 */
+/** 打开导出面板：受限态下 ActionButton 的 @tap 守卫已拦一道；此处再守一道防御 */
 function openExportSheet(): void {
   if (masked.value) return
   exportOpen.value = true
@@ -262,7 +263,8 @@ function enqueueNovelExport(format: NovelExportFormat): void {
 //   1. composable 顶层 setup 内调用（不在 v-if / computed 内）
 //   2. series 切换通过 :key="novel.series.id" 强制 remount 承载（BookmarkButton :key 同范式）
 //   3. active 态 = filled star ★ / label 切「已追更」；默认 ☆ / 「追更」（spec §5.1 三态表）
-//   4. masked 态 = opacity-50 + pointer-events-none（ActionButton 内部 disabled 分支）
+//   4. masked 态 = opacity-50 + @tap 短路（ActionButton 内部 disabled 分支；CSS 的
+//      pointer-events 在 Lynx 不可用，不是防护手段）
 // 该组件不导出——script-setup 顶层 const 自动暴露给同文件模板（<script setup> 编译契约）。
 const WatchlistAction = defineComponent({
   name: 'WatchlistAction',
@@ -280,7 +282,10 @@ const WatchlistAction = defineComponent({
     return () => {
       const added = wl.added.value
       return h(ActionButton, {
-        icon: added ? '★' : '☆',
+        // T12/ADR-0208：`icon` 契约是 IconName（图标名），不是字形。★/☆ 在 FILL=0
+        // 子集字体里同码点（iconMap 头注），故 active 态靠 `active` + label 表达，
+        // 不靠字形切换。
+        icon: 'star_outline',
         label: added
           ? t('novelIntro.actionWatched')
           : t('novelIntro.actionWatch'),
@@ -330,8 +335,10 @@ const WatchlistAction = defineComponent({
         </view>
 
         <!-- 标题 -->
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-[1.3]，行高由 text-title-large 档位携带
+             （title-large = 22sp 字号 / 28sp 行高 = 44rpx / 56rpx），与全站标题节奏一致 -->
         <text
-          class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]"
+          class="text-title-large font-semibold text-white [max-line:2]"
           :class="aiBadge || novel.series ? 'mt-2' : ''"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="novel.title"
@@ -355,20 +362,28 @@ const WatchlistAction = defineComponent({
           @overflow-tap="onTagOverflow"
         />
 
-        <!-- 简介（票 #584）：纯文本 2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰 -->
+        <!-- 简介（票 #584）：纯文本 2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰。
+             T10/ADR-0206 决策 3：删掉自选 leading-[1.5]，行高由 text-body-small 档位携带（16sp） -->
         <view class="mt-3 relative" @tap="openCaption">
-          <text v-if="captionText" class="text-body-small text-white/85 leading-[1.5] [max-line:2]">{{ captionText }}</text>
-          <text v-else class="text-body-small text-white/60 leading-[1.5]">{{ t('novelIntro.noCaption') }}</text>
+          <text v-if="captionText" class="text-body-small text-white/85 [max-line:2]">{{ captionText }}</text>
+          <text v-else class="text-body-small text-white/60">{{ t('novelIntro.noCaption') }}</text>
           <!-- 谓词与正文页同款（票 #580）：R-18 优先、AI mask 次之 -->
           <RestrictOverlay v-if="r18Masked" :level="novel.x_restrict === 2 ? 2 : 1" />
           <AiOverlay v-else-if="aiMasked" :ai-type="novel.novel_ai_type ?? 0" />
         </view>
 
-        <!-- 统计行（票 #577）：字数 · 收藏 · 浏览；可选字段缺省显式降级（对应段隐藏） -->
+        <!-- 统计行（票 #577）：字数 · 收藏 · 浏览；可选字段缺省显式降级（对应段隐藏）。
+             T12/ADR-0208：♥/👁 由「文本里的符号」拆成 AppIcon + 纯数字文本 ——
+             原本 ♥ 与数字同处一个 text 元素，图标化后必须拆成两个 flex 子项（flex-row + items-center）；
+             :size=3.2vw = 原 text-label-medium（12sp = 24rpx = 12px @375），视觉尺寸不变。
+             ⚠️ favorite_border 与 favorite 在 FILL=0 子集里同码点（iconMap 头注），
+             故收藏数此处只用「形状 + 数字」，不靠字形表达选中态 -->
         <view class="mt-3 flex flex-row items-center">
           <text class="text-label-medium text-white/70 mr-4">{{ t('novels.charCount', { count: novel.text_length }) }}</text>
-          <text v-if="novel.total_bookmarks > 0" class="text-label-medium text-white/70 mr-4">♥ {{ novel.total_bookmarks }}</text>
-          <text v-if="novel.total_view != null" class="text-label-medium text-white/70">👁 {{ novel.total_view }}</text>
+          <AppIcon v-if="novel.total_bookmarks > 0" name="favorite_border" :size="3.2" class="text-white/70 mr-1" />
+          <text v-if="novel.total_bookmarks > 0" class="text-label-medium text-white/70 mr-4">{{ novel.total_bookmarks }}</text>
+          <AppIcon v-if="novel.total_view != null" name="visibility" :size="3.2" class="text-white/70 mr-1" />
+          <text v-if="novel.total_view != null" class="text-label-medium text-white/70">{{ novel.total_view }}</text>
         </view>
 
         <!-- 评论入口（票 #577：两端都留） -->
@@ -379,7 +394,9 @@ const WatchlistAction = defineComponent({
           :accessibility-label="t('novelIntro.commentsA11y')"
           @tap="showComments = true"
         >
-          <text class="text-[6.4vw] leading-none">💬</text>
+          <!-- T12/ADR-0208：💬 → Material Symbols `chat_bubble`（缺省 6.4vw = 原 text-[6.4vw]，尺寸不变）；
+               入口无障碍名称仍由外层 view 的 novelIntro.commentsA11y 承担 -->
+          <AppIcon name="chat_bubble" />
           <text class="text-label-medium text-white/70 ml-1">{{ novel.total_comments }}</text>
         </view>
 
@@ -387,14 +404,21 @@ const WatchlistAction = defineComponent({
              Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看，等宽 flex-1 列；
              稍后看第五动作 = ADR-0191 D5 / #751 T3），追更/系列目录仅 series 存在时渲染；
              Row 2 = 全宽主 CTA「开始阅读」。两行按钮在 R-18/R-18G/AI 屏蔽态一致置灰（#580 / spec D6）。
-             ADR-0123：opacity-50 + pointer-events-none 仅用于真正的 disabled 态（ActionButton 内部），
-             不用于全屏遮罩期望下层穿透的反模式；BookmarkButton 无 disabled prop → 外层 wrap 一道置灰。 -->
+             屏蔽态的拦截一律走**处理器守卫**（本文件 `if (masked.value) return`，或
+             ActionButton 的 `@tap` 短路），**不靠 CSS**：`pointer-events-none` 在本项目是死类名
+             （`@lynx-js/tailwind-preset@0.5.1` 的 `corePlugins: DEFAULT_CORE_PLUGINS` 白名单
+             裁掉了 `pointerEvents`），写着也不产生任何规则。 -->
         <view class="mt-4 flex flex-row items-stretch">
-          <!-- 收藏：BookmarkButton 自带 chip+计数；wrap 一道 flex-1 + masked 置灰（件外置 pointer-events-none 合法禁用语义）
+          <!-- 收藏：BookmarkButton 自带 chip+计数；wrap 一道 flex-1 + masked 置灰。
+               拦截走 BookmarkButton 自身的 disabled prop（#865 已修）：组件在 tap 入口短路，
+               一并关掉长按通道与 burst 动效（否则「按了有动画却没写入」）。
+               此前此处靠 wrap 的 `pointer-events-none`，而该类名在本项目是死类名
+               （`@lynx-js/tailwind-preset@0.5.1` 的 `corePlugins` 白名单裁掉了 `pointerEvents`），
+               实测产物 0 命中 ⇒ 页面已整体置灰而收藏仍能真的写入。现仅保留 opacity-50 的视觉置灰。
                self-center 保留以让 chip 在 row 中垂直居中（hit-chip 默认 hug content，align-self 由 wrap 决定） -->
           <view
             class="flex-1 flex items-center justify-center"
-            :class="masked ? 'opacity-50 pointer-events-none' : ''"
+            :class="masked ? 'opacity-50' : ''"
           >
             <BookmarkButton
               class="self-center"
@@ -403,6 +427,7 @@ const WatchlistAction = defineComponent({
               :illust-id="novel.id"
               :initial-bookmarked="novel.is_bookmarked"
               :bookmark-count="novel.total_bookmarks"
+              :disabled="masked"
             />
           </view>
           <!-- 追更（仅 series 存在，D8）：:key 强制重挂载承载 series 切换（BookmarkButton :key 同范式） -->
@@ -413,9 +438,11 @@ const WatchlistAction = defineComponent({
             :initial-added="prompt?.watchAdded === true"
             :masked="masked"
           />
-          <!-- 下载（D10：始终渲染；已下载态同样可点，按 D11 重新打开格式选择器） -->
+          <!-- 下载（D10：始终渲染；已下载态同样可点，按 D11 重新打开格式选择器）
+               T12/ADR-0208 收口：icon 契约是 IconName，✓/↓ 已登记为 check / file_download
+               （ActionButton 内部走 <AppIcon>，无需本文件关心字体）。已下载态由 :active 表达。 -->
           <ActionButton
-            :icon="downloaded ? '✓' : '↓'"
+            :icon="downloaded ? 'check' : 'file_download'"
             :label="downloaded
               ? t('novelIntro.actionDownloaded')
               : t('novelIntro.actionDownload')"
@@ -423,10 +450,10 @@ const WatchlistAction = defineComponent({
             :disabled="masked"
             @tap="openExportSheet"
           />
-          <!-- 系列目录（D9：仅 series 存在） -->
+          <!-- 系列目录（D9：仅 series 存在）。T12/ADR-0208 收口：≡ → list -->
           <ActionButton
             v-if="novel.series"
-            :icon="'≡'"
+            :icon="'list'"
             :label="t('novelIntro.actionSeries')"
             :active="false"
             :disabled="masked"
@@ -463,9 +490,13 @@ const WatchlistAction = defineComponent({
 
     <!-- 返回键：三态之上、弹层宿主之下（DOM 顺序即层序，原生 LynxView 不吃 z-index）——
          弹层打开时盖住返回键，返回路径统一走 modalStack（系统返回键优先关弹层，#163）；
-         code-review P1：直连 goBack 的按钮若浮于弹层之上，会把「关面板」变成「弹掉整页」 -->
+         code-review P1：直连 goBack 的按钮若浮于弹层之上，会把「关面板」变成「弹掉整页」。
+         T12/ADR-0208 收口：`‹`（U+2039）已登记为 iconMap 的 arrow_back
+         （决策 3：凡在映射表内的一律算图标位），改走 <AppIcon>；
+         尺寸由 AppIcon 缺省 6.4vw + 自带 leading-none 承担（= 原 text-[6.4vw]，
+         ADR-0206 决策 3 装饰性例外：行高 = 字号才能在 items-center 容器里视觉居中） -->
     <view class="absolute top-2 left-1 py-1 pr-2" @tap="goBack">
-      <text class="text-[6.4vw] leading-none text-white">‹</text>
+      <AppIcon name="arrow_back" class="text-white" />
     </view>
 
     <!-- 评论弹层（挂载契约同正文页：absolute inset-0 宿主脱离文档流） -->

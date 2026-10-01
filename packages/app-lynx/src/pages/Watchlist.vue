@@ -20,6 +20,7 @@ import { setWatchState } from '../stores/watchlistStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import RefreshableList from '../components/RefreshableList.vue'
+import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
@@ -152,7 +153,10 @@ onUnmounted(() => {
         :accessibility-label="WATCHLIST_A11Y_LABELS.back"
         @tap="goBack"
       >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+        <!-- 返回箭头：T12 收口——`‹`（U+2039）已登记为 iconMap 的 arrow_back
+             （ADR-0208 决策 3：凡在映射表内的一律算图标位），改走 <AppIcon>。
+             尺寸/size 由 AppIcon 自带 leading-none + 默认 6.4vw 承担（ADR-0206 决策 3 装饰性例外） -->
+        <AppIcon name="arrow_back" class="text-surface-on" />
       </view>
       <text
         class="flex-1 text-title-large font-medium text-surface-on"
@@ -191,7 +195,10 @@ onUnmounted(() => {
     </view>
     <!-- 空态 -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="✦" :title="t('watchlist.empty.title')" :hint="t('watchlist.empty.hint')" />
+      <!-- T12 未收口：EmptyState 的 icon prop 契约是「裸文本字形」（组件内以默认字体渲染
+           `text-[10.667vw]`，无字体族可切），换成 Material Symbols 私用区码点会渲染成空白 ——
+           需 EmptyState 侧新增走 AppIcon 的入口（不属本票可改范围）。台账条目暂留。 -->
+      <EmptyState icon="explore" :title="t('watchlist.empty.title')" :hint="t('watchlist.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -273,7 +280,8 @@ onUnmounted(() => {
     <view v-if="unwatchTarget" class="fixed inset-0 bg-scrim z-50 flex items-center justify-center">
       <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
         <text class="text-headline-small font-medium text-surface-on">{{ t('watchlist.unwatchTitle') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-snug，行高由 text-body-medium 档位携带（20sp） -->
+        <text class="text-body-medium text-surface-on-variant mt-4">
           {{ t('watchlist.unwatchBody', { title: unwatchTarget.title }) }}
         </text>
         <text v-if="unwatchToggle?.errorMsg" class="text-body-small text-error mt-3">{{ unwatchToggle.errorMsg }}</text>

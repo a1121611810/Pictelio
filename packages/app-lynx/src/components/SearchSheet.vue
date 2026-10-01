@@ -30,6 +30,7 @@ import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
 import BottomSheet from './BottomSheet.vue'
+import AppIcon from './AppIcon.vue'
 import {
   BOOKMARK_BANDS,
   countActiveFilters,
@@ -484,7 +485,11 @@ onBeforeUnmount(() => {
           >
             <text class="text-[3.2vw] leading-none text-primary-on">{{ activeFilterCount }}</text>
           </view>
-          <text class="text-label-medium ml-auto text-surface-on-variant">{{ filterOpen ? '⌃' : '⌄' }}</text>
+          <AppIcon
+            :name="filterOpen ? 'expand_less' : 'expand_more'"
+            :size="3.2"
+            class="ml-auto text-surface-on-variant"
+          />
         </view>
       </view>
 

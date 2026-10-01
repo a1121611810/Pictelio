@@ -166,7 +166,7 @@ const refreshEpoch = ref(0)
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="◎" :title="isFollowing ? t('followList.empty.following') : t('followList.empty.followers')" :hint="isFollowing ? t('followList.empty.followingHint') : t('followList.empty.followersHint')" />
+      <EmptyState icon="person" :title="isFollowing ? t('followList.empty.following') : t('followList.empty.followers')" :hint="isFollowing ? t('followList.empty.followingHint') : t('followList.empty.followersHint')" />
     </view>
 
     <RefreshableList v-else :refresh="fetchFirstPage" @back-to-top="refreshEpoch++">

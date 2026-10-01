@@ -6,6 +6,7 @@ import { extractHostname } from '../utils/safeParseUrl'
 import { unquoteNativeString } from '../utils/tokenStorage'
 import { getNativeModules } from '../api/client'
 import { goBack } from '../router'
+import AppIcon from '../components/AppIcon.vue'
 
 // ─── 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4，issue #550）───
 // debug 自检路由：对项目依赖的平台 API 面跑规范派生断言，渲染 PASS/FAIL 矩阵，
@@ -190,8 +191,16 @@ const summaryClass = computed(() => {
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack()">
-        <text class="text-label-large text-primary pr-4">‹ 返回</text>
+      <!-- T12/ADR-0208 收口：`‹`（U+2039）已登记为 iconMap 的 arrow_back
+           （决策 3：凡在映射表内的一律算图标位）。原为「图标 + 文字同处一个 <text>」，
+           字体族必须整元素统一，无法只给字形切子集字体 ⇒ 拆成两个 flex 子项。
+           :size=3.73vw 由 text-label-large 档位换算：28rpx × 0.1333vw/rpx = 3.73vw
+           （= 14sp，ADR-0086：字号走 rpx，1sp = 2rpx = 0.2667vw）。
+           间距沿用原嵌套值：view 的 pr-2 + 文字的 pr-4 全部保留，只把图标挪成
+           兄弟子项（mr-1 = 4px，替代原文里「‹」与「返回」之间的半角空格）。 -->
+      <view class="py-1 pr-2 flex flex-row items-center" @tap="goBack()">
+        <AppIcon name="arrow_back" :size="3.73" class="text-primary mr-1" />
+        <text class="text-label-large text-primary pr-4">返回</text>
       </view>
       <text class="flex-1 text-title-large font-medium text-surface-on">平台一致性自检</text>
     </view>
@@ -211,8 +220,8 @@ const summaryClass = computed(() => {
           <text class="text-title-small text-surface-on">
             <text :class="STATUS_CLASS[item.status]">[{{ STATUS_LABEL[item.status] }}] </text>{{ item.name }}
           </text>
-          <text class="text-body-small text-surface-on-variant leading-snug">{{ item.actual }}</text>
-          <text class="text-body-small text-outline leading-snug">{{ item.expect }}</text>
+          <text class="text-body-small text-surface-on-variant">{{ item.actual }}</text>
+          <text class="text-body-small text-outline">{{ item.expect }}</text>
         </view>
       </view>
       <view class="h-[8vw]" />

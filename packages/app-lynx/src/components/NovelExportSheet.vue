@@ -111,7 +111,7 @@ function onConfirm(): void {
             >{{ NOVEL_EXPORT_FORMAT_LABELS[fmt] }}</text>
           </view>
         </view>
-        <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
+        <text class="text-label-medium text-surface-on-variant mt-2">
           {{ t('novelExportSheet.formatHint') }}
         </text>
       </view>
@@ -119,10 +119,10 @@ function onConfirm(): void {
       <!-- 内容摘要（只读）：正文恒含，三项开关取设置页快照 -->
       <view class="px-4 pt-3">
         <text class="text-title-small font-medium text-surface-on">{{ t('novelExportSheet.contentTitle') }}</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 leading-snug">
+        <text class="text-label-medium text-surface-on-variant mt-1">
           {{ contentSummary }}
         </text>
-        <text class="text-label-medium text-outline mt-1 leading-snug">{{ t('novelExportSheet.contentHint') }}</text>
+        <text class="text-label-medium text-outline mt-1">{{ t('novelExportSheet.contentHint') }}</text>
       </view>
 
       <!-- 确认导出 -->

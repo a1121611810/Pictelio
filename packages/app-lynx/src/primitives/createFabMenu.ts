@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import type { IconName } from '../utils/iconMap'
 
 /**
  * RefreshableList FAB menu 扩展菜单项配置（T4，spec: app-lynx-feed-pagination-buttons §3.3）。
@@ -7,8 +8,10 @@ import { ref } from 'vue'
 export interface FabMenuExtraItem {
   /** 唯一 key（v-for） */
   key: string
-  /** 图标 unicode 符号（Lynx 无图标库约定） */
-  icon: string
+  /** 图标名（IconName）。**不是字形串**——ADR-0208 收口后所有图标位经
+   *  `<AppIcon :name>` 渲染；写成 string 会让页面能传私用区码点给默认字体，
+   *  静默渲染成空白（无 tofu、无报错）。见 utils/iconMap.ts。 */
+  icon: IconName
   /** label 文本 */
   label: string
   /** accessibility-label（菜单项 label 与 UI 文本一致；扩展项 label 由页面定，组件不硬编码） */

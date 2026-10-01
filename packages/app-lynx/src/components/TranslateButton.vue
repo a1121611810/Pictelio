@@ -6,6 +6,7 @@
 import { computed } from "vue"
 import { useNovelTranslateStore } from "../stores/novelTranslateStore"
 import { t } from "../i18n"
+import AppIcon from "./AppIcon.vue"
 
 interface Props {
   novelId: number
@@ -181,32 +182,31 @@ async function onTap(): Promise<void> {
 
 <template>
   <view
-    class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex flex-row items-center justify-center bg-primary active:bg-layer-pressed-on-primary"
-    :class="disabled ? 'opacity-50' : ''"
-    :hover-class="disabled ? '' : 'bg-layer-hovered-on-primary'"
+    class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex flex-row items-center justify-center bg-primary"
+    :class="disabled ? 'opacity-50' : 'active:bg-layer-pressed-on-primary'"
     :accessibility-element="true"
     :accessibility-label="label"
     @tap="onTap"
   >
+    <!-- 图标位全部经 AppIcon（ADR-0208 决策 3）。外层 view 已带 :accessibility-label="label"，
+         图标纯装饰不重复标注（ADR-0208 决策 4：图标不承载语义，label 保留在外层 tap 目标上）。
+         字号 5.333vw 与原 text-[5.333vw] 同口径。 -->
     <!-- 默认态：翻译图标 -->
-    <text
+    <AppIcon
       v-if="!isTranslatingThis && !isDoneCached && !isFailed"
-      class="text-[5.333vw] leading-none text-on-primary mr-1"
-      >Aあ</text
-    >
+      name="translate"
+      :size="5.333"
+      class="text-on-primary mr-1"
+    />
     <!-- 进度态：简易文字 + 百分比；fallback 期间附加「重试中…」微提示（ADR-0178 D1） -->
     <view v-else-if="isTranslatingThis" class="flex flex-col items-center">
       <text class="text-label-medium text-on-primary">{{ Math.round(progressFraction * 100) }}%</text>
       <text v-if="store.isRetryingHint" class="text-label-small text-on-primary opacity-80 mt-0.5">{{ t('novelTranslate.status.retrying') }}</text>
     </view>
     <!-- 完成态：✓ -->
-    <text
-      v-else-if="isDoneCached"
-      class="text-[5.333vw] leading-none text-on-primary mr-1"
-      >✓</text
-    >
-    <!-- 失败态：↻ -->
-    <text v-else class="text-[5.333vw] leading-none text-on-primary mr-1">↻</text>
+    <AppIcon v-else-if="isDoneCached" name="check" :size="5.333" class="text-on-primary mr-1" />
+    <!-- 失败态：重试图标 -->
+    <AppIcon v-else name="refresh" :size="5.333" class="text-on-primary mr-1" />
     <text class="text-label-large text-on-primary">{{ label }}</text>
   </view>
 </template>

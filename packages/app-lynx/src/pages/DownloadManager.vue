@@ -20,6 +20,7 @@ import {
   toggleId,
 } from '../utils/downloadsViewModel'
 import { DOWNLOAD_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { t } from '../i18n'
 
@@ -134,7 +135,10 @@ onMounted(() => {
         :accessibility-label="DOWNLOAD_A11Y_LABELS.back"
         @tap="goBack"
       >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+        <!-- 返回箭头：T12 收口——`‹`（U+2039）已登记为 iconMap 的 arrow_back
+             （ADR-0208 决策 3：凡在映射表内的一律算图标位），改走 <AppIcon>。
+             尺寸/size 由 AppIcon 自带 leading-none + 默认 6.4vw 承担（ADR-0206 决策 3 装饰性例外） -->
+        <AppIcon name="arrow_back" class="text-surface-on" />
       </view>
       <text
         class="flex-1 text-title-large font-medium text-surface-on"
@@ -151,7 +155,10 @@ onMounted(() => {
       v-if="tasks.length === 0"
       class="w-full flex-1 min-h-0 flex items-center justify-center"
     >
-      <EmptyState icon="↓" :title="t('downloads.empty.title')" :hint="t('downloads.empty.hint')" />
+      <!-- T12 未收口：EmptyState 的 icon prop 契约是「裸文本字形」（组件内以默认字体渲染
+           `text-[10.667vw]`，无字体族可切），换成 Material Symbols 私用区码点会渲染成空白 ——
+           需 EmptyState 侧新增走 AppIcon 的入口（不属本票可改范围）。台账条目暂留。 -->
+      <EmptyState icon="file_download" :title="t('downloads.empty.title')" :hint="t('downloads.empty.hint')" />
     </view>
 
     <template v-else>
@@ -213,11 +220,10 @@ onMounted(() => {
                   : 'bg-surface-container-lowest border-outline'
               "
             >
-              <text
-                v-if="selected.has(task.id)"
-                class="text-[3.2vw] leading-none text-primary-on"
-                >✓</text
-              >
+              <!-- T12/ADR-0208：✓ 裸字形 → Material Symbols `check`；选中态语义仍由外层行的
+                   taskA11y 无障碍标签 + bg-primary 边框/底色表达，图标只画形状不承载语义。
+                   :size=3.2vw = 原 text-[3.2vw]，保持勾选框内视觉尺寸不变 -->
+              <AppIcon v-if="selected.has(task.id)" name="check" :size="3.2" class="text-primary-on" />
             </view>
             <view class="flex-1 flex flex-col">
               <text class="text-body-medium text-surface-on">{{ task.fileName }}</text>
@@ -255,56 +261,75 @@ onMounted(() => {
           }}
         </text>
         <view class="flex flex-row gap-1">
+          <!-- MD3 disabled container = 「底色叠 on-surface 12%」。**必须作为独立覆盖层**：
+               若与 `bg-surface-container-lowest` 写在同一元素上，两者都是 `background-color`，
+               Tailwind 产物里后者声明更靠后 ⇒ 12% alpha 层被整条覆盖、静默不生效
+               （真机取色实证：期望 (205,208,213) 实测 (163,197,220)；依据见 ADR-0209 引擎约束）。 -->
           <view
-            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
-            :class="availability.start ? '' : 'opacity-40'"
+            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest relative"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="DOWNLOAD_A11Y_LABELS.start"
             @tap="runStart"
           >
-            <text class="text-label-medium text-surface-on">{{
+            <view
+              v-if="!availability.start"
+              class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+            />
+            <text class="relative text-label-medium text-surface-on">{{
               scoped ? t('downloads.startSelected') : t('downloads.startAll')
             }}</text>
           </view>
           <view
-            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
-            :class="availability.pause ? '' : 'opacity-40'"
+            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest relative"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="DOWNLOAD_A11Y_LABELS.pause"
             @tap="runPause"
           >
-            <text class="text-label-medium text-surface-on">{{
+            <view
+              v-if="!availability.pause"
+              class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+            />
+            <text class="relative text-label-medium text-surface-on">{{
               scoped ? t('downloads.pauseSelected') : t('downloads.pauseAll')
             }}</text>
           </view>
           <view
-            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
-            :class="availability.stop ? '' : 'opacity-40'"
+            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest relative"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="DOWNLOAD_A11Y_LABELS.stop"
             @tap="runStop"
           >
-            <text class="text-label-medium text-surface-on">{{
+            <view
+              v-if="!availability.stop"
+              class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+            />
+            <text class="relative text-label-medium text-surface-on">{{
               scoped ? t('downloads.stopSelected') : t('downloads.stopAll')
             }}</text>
           </view>
           <view
-            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
-            :class="availability.share ? '' : 'opacity-40'"
+            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest relative"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="DOWNLOAD_A11Y_LABELS.share"
             @tap="runShare"
           >
-            <text class="text-label-medium text-surface-on">{{ t('downloads.share') }}</text>
+            <view
+              v-if="!availability.share"
+              class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+            />
+            <text class="relative text-label-medium text-surface-on">{{ t('downloads.share') }}</text>
           </view>
           <view
-            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
-            :class="availability.delete ? '' : 'opacity-40'"
+            class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest relative"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="DOWNLOAD_A11Y_LABELS.remove"
             @tap="runDelete"
           >
-            <text class="text-label-medium text-error">{{
+            <view
+              v-if="!availability.delete"
+              class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+            />
+            <text class="relative text-label-medium text-error">{{
               scoped ? t('downloads.deleteSelected') : t('downloads.deleteAll')
             }}</text>
           </view>
@@ -321,7 +346,8 @@ onMounted(() => {
         style="left: 12.667vw; top: 70vw; width: 74.667vw"
       >
         <text class="text-headline-small font-medium text-surface-on">{{ t('downloads.deleteTitle') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-snug，行高由 text-body-medium 档位携带 -->
+        <text class="text-body-medium text-surface-on-variant mt-4">
           {{ t('downloads.deleteBody', { count: deleteTarget.length }) }}
         </text>
         <view class="flex flex-row flex-wrap justify-end mt-6 gap-2">

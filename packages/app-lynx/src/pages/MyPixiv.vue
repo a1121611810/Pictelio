@@ -178,7 +178,7 @@ onMounted(fetchFirstPage)
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="◎" :title="t('mypixiv.empty.title')" :hint="t('mypixiv.empty.hint')" />
+      <EmptyState icon="person" :title="t('mypixiv.empty.title')" :hint="t('mypixiv.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="fetchFirstPage" @back-to-top="refreshEpoch++">

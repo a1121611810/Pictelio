@@ -20,6 +20,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import TagPressChip from '../components/TagPressChip.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
@@ -341,7 +342,10 @@ onMounted(async () => {
         <SkeletonImage v-if="slideSrcs[0]" :src="slideSrcs[0]" :height="detailImageHeight" />
       </view>
       <view class="p-4 bg-surface-container-lowest">
-        <text class="text-headline-small font-bold text-surface-on">{{ illust.title }}</text>
+        <!-- T07 档位清理：原为 700 字重。作品标题是内容文本，headline-small 官方
+             regular(400)、emphasized 500；此前它比顶部 PageTopBar 屏标题（title-large + 500）
+             更重，层级倒置 → 500。 -->
+        <text class="text-headline-small font-regular text-surface-on">{{ illust.title }}</text>
         <view class="flex flex-row items-center mt-2">
           <!-- 作者行命中区只含头像 + 名字（#542）：整行可点会让心形附近的坐标偏移
                静默跳转作者页（自动化假绿路径）；收窄后偏移落空处 = 响亮失败 -->
@@ -394,39 +398,50 @@ onMounted(async () => {
             enable-long-press
             @long-press="openBookmarkPanel"
           />
-          <!-- 保存（spec download-manager §8）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
-               ADR-0112 教训）；静态图直接入队，ugoira 取元数据后按全局格式入队 -->
+          <!-- 保存（spec download-manager §8）：↓ → Material Symbols file_download（ADR-0208 决策 3）。
+               连带收益：原 U+2193 纯文本符号是为规避 Lynx 原生 emoji 化而选的替代（ADR-0112 教训），
+               子集字体 glyph 不走 emoji 呈现路径，该 workaround 的必要性随之消失。
+               静态图直接入队，ugoira 取元数据后按全局格式入队。
+               语义由同行 label 文案 + 「保存」动作本身承担，图标不重复标注。 -->
           <view class="ml-4 flex flex-row items-center" @tap="onSaveEntry">
-            <text class="text-[5.6vw] leading-none text-outline">↓</text>
+            <AppIcon name="file_download" :size="5.6" class="text-outline" />
             <text class="text-label-medium text-outline ml-1">{{ t('illustDetail.save.action') }}</text>
           </view>
-          <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
+          <!-- 评论入口（issue #164）：💬 → Material Symbols chat_bubble（ADR-0208 决策 3），
+               同样消除 emoji 呈现路径依赖；字段缺失时不显示 -->
           <view
             v-if="illust.total_comments !== undefined"
             class="ml-4 flex flex-row items-center"
             @tap="showComments = true"
           >
-            <text class="text-[6.4vw] leading-none">💬</text>
+            <AppIcon name="chat_bubble" :size="6.4" />
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
           </view>
           <!-- 稍后看（WatchLater，ADR-0191 D5）：toggle + 已加入态高亮（text-tertiary，
                沿用动作行激活态范式）；@tap.stop 防冒泡误触（TagPressChip 同款）；
-               快照从已有 illust 构造（零新增请求） -->
+               快照从已有 illust 构造（零新增请求）。
+               T12/ADR-0208 决策 3：`LATER_ICON` 是**图标名**（IconName），不是字形——
+               必须经 <AppIcon> 查 iconMap 取码点。裸 `<text>{{ LATER_ICON }}</text>` 会
+               把字符串 "schedule" 当正文渲染出来（vue-tsc 抓不到：IconName ⊂ string），
+               属禁静默降级形态。尺寸仍为缺省 6.4vw（= 原 text-[6.4vw]，视觉不变）。 -->
           <view class="ml-4 flex flex-row items-center" @tap.stop="toggleWatchLater">
-            <text class="text-[6.4vw] leading-none" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ LATER_ICON }}</text>
+            <AppIcon :name="LATER_ICON" :class="laterAdded ? 'text-tertiary' : 'text-outline'" />
             <text class="text-label-medium ml-1" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ laterAdded ? t('later.action.added') : t('later.action.add') }}</text>
           </view>
           <!-- 标签近邻（ADR-0197 D14 / #767 T2）：作品级入口，作用于当前作品而非某一页
                （标签是作品级的，多图作品不引入「当前页」概念）。动作行第 5 项。
                先把源作品塞进共享 store 再跳转，结果页据此免去重复拉取详情；
-               符号用 ◇（U+25C7）纯文本字形，沿用 ↓ 的 ADR-0112 教训（规避 emoji 字形）。 -->
+               ◇ → Material Symbols notifications（ADR-0208 决策 3；原注释「沿用 ↓ 的 ADR-0112
+               教训」针对的是 emoji 呈现路径，子集字体 glyph 不经该路径）。
+               无障碍名称仍在 tap 目标上：:accessibility-label="ILLUST_DETAIL_A11Y_LABELS.tagNeighborsEntry"，
+               图标不重复标注（ADR-0208 决策 4）。 -->
           <view
             class="ml-4 flex flex-row items-center"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ILLUST_DETAIL_A11Y_LABELS.tagNeighborsEntry"
             @tap.stop="openTagNeighbors"
           >
-            <text class="text-[5.6vw] leading-none text-outline">◇</text>
+            <AppIcon name="notifications" :size="5.6" class="text-outline" />
             <text class="text-label-medium text-outline ml-1">{{ t('tagNeighbors.entry') }}</text>
           </view>
         </view>

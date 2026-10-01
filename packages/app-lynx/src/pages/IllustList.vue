@@ -7,6 +7,7 @@ import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import type { IconName } from '../utils/iconMap'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useRelatedInjectionStore } from '../stores/relatedInjection'
@@ -85,19 +86,21 @@ const endOfFeed = ref(false)
 /** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
 const settled = ref(false)
 
-/** 空态文案：按当前子 tab 取图标 / 标题 / 副文案（避免模板内重复三元）；t 在 computed 内调用，随 locale 响应 */
+/** 空态文案：按当前子 tab 取图标 / 标题 / 副文案（避免模板内重复三元）；t 在 computed 内调用，随 locale 响应
+ *  `satisfies` 而非 `: IconName` 标注：保留 title/hint 的具体 string 推断（下游仍按字符串用），
+ *  同时让 icon 字段被收窄到 IconName——将来新增分支时写错图标名在编译期即报错（ADR-0208 决策 3） */
 const emptyMeta = computed(() =>
-  mode.value === 'follow'
+  (mode.value === 'follow'
     ? {
-        icon: '♡',
+        icon: 'favorite_border',
         title: t('illustList.empty.follow.title'),
         hint: t('illustList.empty.follow.hint'),
       }
     : {
-        icon: '✦',
+        icon: 'explore',
         title: t('illustList.empty.recommend.title'),
         hint: t('illustList.empty.recommend.hint'),
-      },
+      }) satisfies { icon: IconName; title: string; hint: string },
 )
 
 /** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */

@@ -41,7 +41,7 @@ function removeTag(name: string): void {
 
     <!-- 空态 -->
     <view v-if="tags.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="◇" :title="t('muteTags.empty.title')" :hint="t('muteTags.empty.hint')" />
+      <EmptyState icon="notifications" :title="t('muteTags.empty.title')" :hint="t('muteTags.empty.hint')" />
     </view>
 
     <!-- 列表态：本地集合（量级小）不做虚拟化，纵列平铺于 scroll-view -->

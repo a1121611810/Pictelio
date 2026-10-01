@@ -37,6 +37,7 @@ import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { t } from '../i18n'
 
 const settings = useSettingsStore()
@@ -273,7 +274,10 @@ onUnmounted(() => {
         class="w-[17.067vw] h-[17.067vw] rounded-full"
       />
       <view class="flex-1 flex flex-col ml-3.5">
-        <text class="text-title-large font-bold text-surface-on">{{ detail.user.name }}</text>
+        <!-- T07 档位清理：原为 700 字重。用户名为身份文本，title-large 官方 regular(400)、
+             emphasized 500；头像 + @account 已表达身份，全站 title-large 标题统一 500
+             （PageTopBar / Recommended / Watchlist / NetworkCheck …）→ 对齐 500。 -->
+        <text class="text-title-large font-regular text-surface-on">{{ detail.user.name }}</text>
         <text class="text-body-small text-outline mt-1">@{{ detail.user.account }}</text>
         <view class="flex flex-row mt-1.5">
           <view class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowing">
@@ -304,7 +308,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
-      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
+      <EmptyState icon="grid_view" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 插画 waterfall -->
@@ -375,7 +379,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
-      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
+      <EmptyState icon="grid_view" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 小说列表 -->
@@ -409,9 +413,17 @@ onUnmounted(() => {
                       <text class="text-label-medium text-outline mr-4">{{
                         t('userHome.charCount', { count: item.text_length })
                       }}</text>
-                      <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
-                        ♥ {{ item.total_bookmarks }}
-                      </text>
+                      <!-- 收藏数：♥ → star_outline（ADR-0208 决策 3）。计数文本即语义，
+                           图标纯装饰不重复标注（ADR-0208 决策 4）。 -->
+                      <view
+                        v-if="item.total_bookmarks > 0"
+                        class="flex flex-row items-center mr-4"
+                      >
+                        <AppIcon name="star_outline" :size="3.2" class="text-outline" />
+                        <text class="text-label-medium text-outline ml-0.5">{{
+                          item.total_bookmarks
+                        }}</text>
+                      </view>
                     </view>
                   </view>
         

@@ -68,10 +68,19 @@ describe('Me 页 WebDAV 区块（spec §7）', () => {
   it('spec §7 字段齐全（服务器/用户名/密码/目录/备份密码/自动备份/上次备份/四动作）', () => {
     expect(meVue).toContain("t('me.webdav.title')")
     expect(meVue).toContain('dav.example.com') // 服务器地址示例（非文案，保留静态 placeholder）
-    expect(meVue).toContain(`:placeholder="t('me.webdav.usernamePlaceholder')"`)
-    expect(meVue).toContain(`:placeholder="t('me.webdav.passwordPlaceholder')"`)
-    expect(meVue).toContain(`:placeholder="t('me.webdav.dirPlaceholder')"`)
-    expect(meVue).toContain(`:placeholder="t('me.webdav.backupPasswordPlaceholder')"`)
+    // ⚠️ placeholder 的**写法**本轮变更（ADR-0209 真机实证）：有浮动 label 的 input，
+    // placeholder 必须随浮动状态条件化（静止态传空串），否则静止态 label 与 placeholder
+    // 同框渲染成「用户名 / 用户名」双行。字段齐全性只看 key 是否仍被消费，故断言 key 本身。
+    for (const key of [
+      'me.webdav.usernamePlaceholder',
+      'me.webdav.passwordPlaceholder',
+      'me.webdav.dirPlaceholder',
+      'me.webdav.backupPasswordPlaceholder',
+    ]) {
+      expect(meVue, `字段 ${key} 应仍被消费`).toContain(`t('${key}')`)
+    }
+    // 条件化形态的硬约束（防止将来改回裸绑定）：静止态必须传空串
+    expect(meVue).toMatch(/:placeholder="isPlaceholderShown\('[a-zA-Z]+'\) \? .* : ''"/)
     expect(meVue).toContain("t('me.webdav.autoBackup')")
     expect(meVue).toContain("t('me.webdav.lastBackup'")
     // 连接测试/立即备份按钮复用既有 action.* key（zh 值逐字一致）

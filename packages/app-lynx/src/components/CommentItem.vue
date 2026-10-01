@@ -80,7 +80,7 @@ const isMine = computed(() => useAuthStore().currentUser?.id === props.comment.u
       </view>
 
       <!-- 评论正文 -->
-      <text class="text-body-medium text-surface-on mt-1.5 leading-[1.4]">{{ comment.comment }}</text>
+      <text class="text-body-medium text-surface-on mt-1.5">{{ comment.comment }}</text>
 
       <!-- 操作行：回复 / 展开楼层（has_replies 时）/ 删除（本人时，删除中置灰） -->
       <view class="flex flex-row items-center gap-5 mt-2">

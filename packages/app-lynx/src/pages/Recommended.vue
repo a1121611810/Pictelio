@@ -13,6 +13,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'recommended' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
+
 import { navigate } from '../router'
 import { openNovel } from '../utils/novelNavigation'
 import { loadRecommended, loadNext } from '../api/illust'
@@ -260,16 +261,27 @@ onActivated(() => {
         :on-reach-end="onReachEnd"
       >
         <template #slide="{ item }">
-          <view class="w-full h-full relative flex flex-col bg-surface-container-lowest" @tap="onSlideTap(item)">
+          <view
+            class="w-full h-full relative flex flex-col bg-surface-container-lowest p-3"
+            @tap="onSlideTap(item)"
+          >
             <!-- 封面图（ADR-0118 宽满高按比例：fit/ratio 经 deriveCoverDisplay 推导，超高图回退 aspectFill；
                  三态骨架/图片/失败+重试仍由 CoverImage 承载）
                  [真机修复] scrim 不再内嵌于 slide：<text> 在真机 LynxView 的「非首 flex-row 子元素」内不渲染，
-                 抽到页面级遮罩（下方），slide 只承载图片。 -->
-            <RecommendedCover
-              :src="coverSrc(item.data)"
-              :fit="coverDisplayOf(item).fit"
-              :ratio="coverDisplayOf(item).ratio"
-            />
+                 抽到页面级遮罩（下方），slide 只承载图片。
+                 [MD3 差距 #19 / T16 #864 视觉回归] 封面由「满幅出血直角」改为卡片形态：外层 p-3(12dp) 留白 + 内层
+                 rounded(--md-shape-medium) 裁切。原先 absolute inset-0 满幅无圆角，与 M3 card
+                 语义相悖；本仓已把 --md-shape-medium 注册为 borderRadius 的 DEFAULT 档，
+                 此处用档位名而非字面量。裁切靠内层 view 的 overflow-hidden + 圆角（Lynx 原生
+                 按 border-radius 裁剪子元素），CoverImage 根元素自身的 overflow-hidden 不足以
+                 产生圆角。底部门票级 scrim 遮罩仍覆盖卡片下缘，视觉上与留白区连成一片。 -->
+            <view class="relative flex-1 overflow-hidden rounded-[var(--md-shape-medium)]">
+              <RecommendedCover
+                :src="coverSrc(item.data)"
+                :fit="coverDisplayOf(item).fit"
+                :ratio="coverDisplayOf(item).ratio"
+              />
+            </view>
           </view>
         </template>
       </CarouselSwiper>
@@ -291,7 +303,7 @@ onActivated(() => {
         <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" @tag-long-press="onTagLongPress" />
         <text
           v-if="currentItem"
-          class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]"
+          class="text-title-large font-semibold text-white [max-line:2]"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="currentItem.data.title"
           >{{ currentItem.data.title }}</text

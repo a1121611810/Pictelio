@@ -80,7 +80,7 @@ function retry(): void {
       :accessibility-label="NOTIFICATIONS_A11Y_LABELS.openItem"
       @tap="openChild(child)"
     >
-      <text class="text-body-small text-surface-on leading-snug [max-line:2]">{{ rowText(child) || t('notifications.noContent') }}</text>
+      <text class="text-body-small text-surface-on [max-line:2]">{{ rowText(child) || t('notifications.noContent') }}</text>
       <text class="text-label-small text-outline mt-1">{{ formatRelativeTime(child.created_datetime) }}</text>
     </view>
     <!-- 子列表分页区块（普通 view，非 list-item footer——本组件内嵌 item 内）：

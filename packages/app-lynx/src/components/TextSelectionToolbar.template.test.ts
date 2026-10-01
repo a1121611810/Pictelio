@@ -1,8 +1,9 @@
 // 选中操作菜单视图的源级守卫（spec docs/specs/app-lynx-novel-text-selection.md §ID 4 / §Testing Decisions）。
-// oracle：① 视觉选定 = 原型方案 E + 图标 I1（浅色 M3 浮层 + **view 绘制的线性图标**，禁回退 emoji/字形）；
+// oracle：① 视觉选定 = 原型方案 E + 图标 I1（浅色 M3 浮层 + 图标在上文字在下，禁回退 emoji/字形）；
 // ② 尺寸来自 selectionToolbarGeometry 常量（「量=画」同源，避免定位与渲染漂移）；
 // ③ 可见性由 `view.visible && view.style` 双条件守卫（页面忘写 v-if 也不出幽灵层）；
-// ④ 不铺全屏层（ADR-0123 命中测试）；a11y label/element 成对（ADR-0061）。
+// ④ 不铺全屏层（ADR-0123 命中测试）；a11y label/element 成对（ADR-0061）；
+// ⑤ 「复制」图标位必须经 <AppIcon name="content_copy">（ADR-0208 决策 5：手绘矩形已删）。
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -35,7 +36,29 @@ describe('TextSelectionToolbar · 视觉与契约', () => {
     expect(code).toContain("@tap.stop=\"emit('action'") // 条目级
   })
 
-  it('图标用 view 绘制（border/rotate），禁 emoji 或字形回退', () => {
+  it('「复制」图标走 <AppIcon name="content_copy">，手绘矩形已删（ADR-0208 决策 5）', () => {
+    // 逐字锁死整个标签：name（码点查表的键）、:size（16sp=4.2667vw，与手绘版
+    // 4.9vw 盒内 ≈3.2vw 墨迹视觉等价）、class（承接原 border-on-surface 描边色）、
+    // v-if（仍按 item.key 分派，两分支相邻 ⇒ v-else 保持"非 copy 即搜索"）。
+    // 任一项被改写（例如尺寸漂成默认 6.4vw、或回退成手绘 <view>）都会转红。
+    expect(
+      code.match(/<AppIcon\s+v-if="item\.key === 'copy'"[^>]*>/)?.[0],
+      "copy 分支必须是 <AppIcon name=\"content_copy\">；ADR-0208 决策 5 要求「有对应字形 ⇒ 直接替换，删掉手绘代码」",
+    ).toBe(`<AppIcon v-if="item.key === 'copy'" name="content_copy" :size="4.2667" class="text-on-surface" />`)
+    expect(code).toContain("import AppIcon from './AppIcon.vue'")
+    // 反向：手绘「复制」的两个绝对定位矩形（ADR 决策 5 点名的缺陷形态）不得复建。
+    // 逐字比对偏移量而非「不匹配某个类名」——类名可换写法，缺陷形态（copy 分支是
+    // 绝对定位描边矩形）换不掉。
+    expect(code, 'copy 分支仍是手绘描边矩形 ⇒ ADR-0208 决策 5 未落地').not.toContain(
+      `v-if="item.key === 'copy'" class="relative`,
+    )
+    expect(code).not.toContain('left-[1.5vw]')
+    expect(code).not.toContain('top-[1.5vw]')
+  })
+
+  it('「搜索」图标仍是 view 绘制（border/rotate），禁 emoji 或字形回退', () => {
+    // ADR-0208 决策 5 的手绘替换范围只写了「复制」，搜索项本轮不动：它没有登记字形，
+    // 替换要连带登记 iconMap + 重跑子集字体。禁 emoji/字形回退的纪律对两个分支都成立。
     expect(code).toContain('border-solid border-on-surface')
     expect(code).toContain('rotate-45')
     expect(src).not.toMatch(/[📋🔍✂↗]/u)

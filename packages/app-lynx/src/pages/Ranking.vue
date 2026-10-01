@@ -32,6 +32,7 @@ import FeedListFooter from '../components/FeedListFooter.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { t } from '../i18n'
 
 /** pixiv 网页端「浏览设置」（开启「显示 R-18 作品」） */
@@ -187,7 +188,9 @@ onUnmounted(() => feed.dispose())
       </view>
     </view>
 
-    <!-- 日期回看行（无日历：仅箭头步进） -->
+    <!-- 日期回看行（无日历：仅箭头步进）。T12 收口：`‹ ›` 均已登记为 iconMap 的
+         arrow_back / arrow_forward（ADR-0208 决策 3：凡在映射表内的一律算图标位），改走 <AppIcon>。
+         无障碍名称仍在各自 tap 目标上：prevDayAria / nextDayAria（ADR-0208 决策 4）。 -->
     <view class="flex flex-row items-center justify-center gap-2 px-4 py-2">
       <view
         class="w-[10.667vw] h-[10.667vw] flex items-center justify-center active:opacity-60"
@@ -195,7 +198,7 @@ onUnmounted(() => feed.dispose())
         :accessibility-label="t('ranking.prevDayAria')"
         @tap="shiftDay(-1)"
       >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+        <AppIcon name="arrow_back" class="text-surface-on" />
       </view>
       <view class="flex flex-row items-center gap-2">
         <text class="text-body-small text-surface-on-variant">{{ dateText }}</text>
@@ -211,7 +214,7 @@ onUnmounted(() => feed.dispose())
         :accessibility-label="t('ranking.nextDayAria')"
         @tap="!isToday && shiftDay(1)"
       >
-        <text class="text-[6.4vw] leading-none text-surface-on">›</text>
+        <AppIcon name="arrow_forward" class="text-surface-on" />
       </view>
     </view>
 
@@ -262,7 +265,7 @@ onUnmounted(() => feed.dispose())
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="▲" :title="t('ranking.page.empty')" :hint="t('ranking.page.emptyHint')" />
+      <EmptyState icon="leaderboard" :title="t('ranking.page.empty')" :hint="t('ranking.page.emptyHint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -311,7 +314,13 @@ onUnmounted(() => feed.dispose())
             <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ row.item.title }}</text>
             <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ row.item.user.name }}</text>
           </view>
-          <text class="text-label-medium text-outline ml-2">★{{ row.item.total_bookmarks }}</text>
+          <!-- 收藏数：★ → star_outline（ADR-0208 决策 3）。⚠️ star 与 star_outline 在官方
+               codepoints 文件里同映射 f09a（本子集字体钉在 FILL=0，只登记 outline 形态），
+               故此处不可换码点表示「已收藏」——数值本身即语义，无需区分字形。 -->
+          <view class="flex flex-row items-center ml-2">
+            <AppIcon name="star_outline" :size="3.2" class="text-outline" />
+            <text class="text-label-medium text-outline ml-0.5">{{ row.item.total_bookmarks }}</text>
+          </view>
         </view>
       </list-item>
       <list-item

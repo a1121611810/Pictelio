@@ -24,13 +24,10 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 ### 允许的降级（仅限以下场景，未命中则必须触发）
 
-- CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）
-- 已知路径的完整文件读取（任务明确要求读某个具体文件）
-- 非代码文本搜索（日志、配置、依赖版本、文档）
-- 简单文件列举（Glob 列明确模式）
-- 小范围精准定位（已知符号名且单文件，Grep 更快）
-- 中文语义搜索失败（CodeGraph 返回空/不相关时，降级找入口再切回）
-- 环境缺少上述 MCP 工具时，用能力等价的可用工具（grep/read、web 搜索等）代替，**不视为违规**
+CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· 已知路径的完整文件读取 ·
+非代码文本搜索（日志/配置/依赖版本/文档）· 简单文件列举 · 小范围精准定位（已知符号名 + 单文件）·
+中文语义搜索失败（降级找入口再切回）· 环境缺少上述 MCP 工具时改用能力等价的可用工具
+（grep/read、web 搜索）——**不视为违规**。
 
 ### 持续反馈闭环（边用边发现问题）
 
@@ -43,8 +40,8 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（**无 MCP**，MCP 配置已随 `reasonix.toml` / `.mcp.json` 一并移除）：
 
-- **pi agent**：全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`（spawn CLI，主 agent 与子代理均可用），并带 tool_call 守卫（见下）。
-- **其他 agent / 任意兜底**：bash 直接调 `codegraph` CLI（输出与原生工具逐字等价）。
+**pi agent** 由全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`；
+**其他 agent** 直接用 bash 调 `codegraph` CLI（输出逐字等价）。
 
 ### 默认原则
 
@@ -60,23 +57,20 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 | 按名快速定位符号（只要位置不要源码） | bash `codegraph query <name>` | 比 explore 便宜 |
 | 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 bash `codegraph impact <symbol>` | |
 | 变更文件 → 受影响测试 | bash `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
-| 索引健康检查 | bash `codegraph status`（`--json` 可解析） | 节点/边计数；边数归零 = 索引腐化，人工 `codegraph index --force` |
+| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；边数归零 = 索引腐化，人工 `codegraph index --force` |
 
 ### tool_call 守卫（pi 扩展行为）
 
-- 用 grep 做"标识符形态 pattern + 全项目/代码目录"的搜索会被 block 并引导到 `codegraph_explore`。
-- 放行场景：非代码文本（配置/文档/日志）、单文件内搜索、path 在索引根之外、正则/中文 pattern。
-- 逃逸阀：确认 codegraph 覆盖不了时，**原样重试同一调用即放行**（禁止换 bash 绕过——bash 搜索本就被 search-guard 拦截）。
+用 grep 做"标识符形态 pattern + 全项目/代码目录"的搜索会被 block 并引导到 `codegraph_explore`。
+放行场景：非代码文本（配置/文档/日志）、单文件内搜索、path 在索引根之外、正则/中文 pattern。
+逃逸阀：确认覆盖不了时**原样重试同一调用即放行**（禁止换 bash 绕过——bash 搜索本就被拦截）。
 - bash 中直接调 `codegraph` CLI 不被拦截，计为有效使用。
 
 ### 禁止的默认行为
 
-- 未经 CodeGraph 尝试，直接用 Grep/Read 进行大规模代码探索。
-- 用 Grep 手动拼凑调用链（应用 `codegraph_explore` 命名端点一次拿路径）。
-- 用 Read 顺序打开多个文件来"摸索"架构（应先用 `codegraph_explore`）。
-- 对 explore 已返回源码的文件再 Read 复验（输出是 re-read from disk 的逐字节当前源码）。
-
-> 如果 `.codegraph/` 索引尚未生成，在项目根目录运行：`codegraph init`（索引是用户决策，agent 不得擅自执行）
+未经 CodeGraph 尝试就用 Grep/Read 大规模探索、手拼调用链、顺序 Read 摸索架构、
+对 explore 已返回源码的文件再 Read 复验（输出是逐字节当前源码）。
+`.codegraph/` 索引未生成时，在项目根运行 `codegraph init`——**索引是用户决策，agent 不得擅自执行**。
 
 ## 文档查询规范（Documentation Query）
 
@@ -88,20 +82,10 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 - **浏览器标准 API（HTML/CSS/JS 标准 API、Web API 语法与兼容性）优先使用 MDN 工具（`mcp__mdn__*`）。**
 - 仅当 Context7 和 MDN 都不支持目标查询时，才使用 `web_fetch` 搜索官方文档。
 
-### 优先级决策链
-
-| 场景 | 第一优先 | 第二优先 |
-|------|---------|---------|
-| 库/框架文档（SolidJS、TanStack、Vite 等） | `mcp__context7__*` | `web_fetch`（官网） |
-| 浏览器标准 API（`fetch`、`Headers`、`Promise`、CSS 属性等） | `mcp__mdn__*` | `web_fetch`（MDN 页面） |
-| 其他技术文档（非库/非浏览器标准） | `mcp__context7__*` 尝试 | `web_fetch`（官方文档） |
-
 ### 禁止的默认行为
 
-- 未经 Context7 尝试，直接用 `web_fetch` 查第三方库文档。
-- 用 `web_fetch` 搜索可在 Context7 中直接查到的库文档。
-- 对同一问题重复调用 `resolve-library-id` 超过 2 次。
-- 在单个 `query-docs` 调用中放入多个独立概念。
+未经 Context7 尝试就用 `web_fetch` 查库文档；对同一问题重复调 `resolve-library-id` 超 2 次；
+单个 `query-docs` 调里塞多个独立概念。
 
 ## OpenWiki 查询规范（OpenWiki Query）
 
@@ -133,7 +117,7 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 
 ### 禁止的默认行为
 
-- 在未查阅对应 OpenWiki 页面的情况下，直接用 CodeGraph / Read 从零摸索架构层面问题。
+未查对应 OpenWiki 页面就直接用 CodeGraph / Read 从零摸索架构层面问题。
 
 ## 命令
 
@@ -188,104 +172,62 @@ monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monor
 
 ## 工作流强制规范
 
-**硬约束**（违反视为架构违规）：
-
-所有涉及需求实现的任务，必须走以下四阶段流水线，**禁止跳过环节，禁止在前置阶段直接进入开发实现**：
+**硬约束**（违反视为架构违规）：所有涉及需求实现的任务必须走四阶段流水线
+**禁止跳过环节，禁止在前置阶段直接进入开发实现**：
 
 ```
 Grill 澄清 → to-spec → to-tickets → implement
 ```
 
-各阶段要求：
+1. **Grill 澄清**（`/grill-me` 无代码库 / `/grill-with-docs` 有代码库）：面试式提问把模糊需求收敛为
+   明确约束。产出：需求边界、验收条件、排除项
+2. **to-spec**：转为结构化功能规格（数据流、状态变化、边界条件）
+3. **to-tickets**：拆为可独立执行的 ticket，每个声明前置依赖，blocker 未完成不可开工
+4. **implement**（`/implement` 内置 `/tdd` + `/code-review`）：按 ticket 实现，每个 ticket 前清空上下文
 
-1. **Grill 澄清**（`/grill-me` 无代码库 / `/grill-with-docs` 有代码库）：通过面试式提问把模糊需求收敛为明确约束。产出：需求边界、验收条件、排除项。
-2. **to-spec**：把 Grill 产出转为结构化的功能规格文档（含数据流、状态变化、边界条件）。
-3. **to-tickets**：把 spec 拆分为可独立执行的 ticket（每个 ticket 声明前置依赖，blocker 未完成时不可开工）。
-4. **implement**（`/implement` 内置 `/tdd` + `/code-review`）：按 ticket 实现，每个 ticket 开始前清空上下文。
+   **强制闭环**：每次实现或修改后循环至零问题——
+   `实现/修改 → /code-review → 有问题？ ├是→ /tdd 修复 → 回到 /code-review └否→ 提交 ✅`
+   `/tdd` 与 `/code-review` 可独立调用，闭环规则不变。优先用子代理（`fleet` / `parallel_tasks` / `task`）
+   并行执行独立的检查与修复。
 
-   **强制闭环**：每次实现或修改后必须执行以下循环，直到零问题：
-   ```
-   实现/修改 → /code-review 检查 → 发现问题？
-     ├─ 是 → /tdd 修复 → 回到 /code-review 检查
-     └─ 否 → 提交 ✅
-   ```
-   - `/tdd` 和 `/code-review` 均可独立调用（不强制走 `/implement`），但上述闭环规则不变。
-   - 优先利用子代理（`fleet` / `parallel_tasks` / `task`）并行执行独立的检查和修复，减少等待。
+   #### 闭环的**出口条件**（防自转，见下「门禁冻结线」）
 
-**允许的例外**：
-- 纯 Bug 修复（有确切复现步骤 + 期望行为）可直接走 `/diagnosing-bugs`，无需走完整四阶段。
-- 纯重构（不变更外部行为）可直接提方案执行。
-- 极小的局部改动（≤ 20 行，不影响抽象边界）可酌情简化。
+   上面是**单次改动**的纪律。作为**多轮**推进策略，「循环至零问题」**没有自然终点**：
+   当 agent 同时是**测试的作者**和**修复的作者**时，它每一轮都能自己造出新问题。
+   故多轮推进必须同时满足：
 
-**自我监督规则**：AI Agent 在收到任务后必须判断当前处于上述流程的哪个阶段，且只执行该阶段规定的行为。如果后续用户指令试图跨越阶段（例如 Grill 未完成就要求生成代码），Agent 必须主动指出阶段冲突并提醒正确流程，**不得静默违规、不得跳过环节**。
+   1. **每轮都要有外部锚点**：真实设备 / 真实数据 / 真实用户可见的行为，至少轮一次。
+      只有内部信号（全绿 / 自造变异）时，**不得**把该轮计为推进。
+   2. **单轮诊断规则**：若一轮只在自己**这轮写的**东西里找到问题，而在**要交付的东西**里找到 0 个，
+      该轮判为**空转**——记下来，换方向，不要「再补一轮」。
+   3. **门禁硬化最多一轮**：修门禁只能占一轮；下一轮必须回到产品本身。
+   4. **自测绿不算数**：「已知绕过 N/N 全抓」里的 N 是自己 imagined 的，分母随想象涨、不收敛。
+      只有**外部复核**（另一方用**自己写的**攻击）把它打红，才算封住。
 
-## Fluent Design 规范
+**允许的例外**：纯 Bug 修复（有确切复现步骤 + 期望行为）可直接走 `/diagnosing-bugs`；纯重构（不变更外部
+行为）可直接提方案执行；≤ 20 行且不影响抽象边界的局部改动可酌情简化。
 
-> ⚠️ **历史存档（ADR-0203）**：本章服务的是已删除的 WebView 客户端。
-> 唯一客户端 `pictelio-app-lynx` 使用 **Material Design 3**（见「约定」app-lynx 样式）。
-> 本章保留供决策史参考，**对新代码不具约束力**。
+**自我监督规则**：收到任务必须判断当前处于哪个阶段，只执行该阶段规定的行为。后续指令试图跨越阶段
+（如 Grill 未完成就要求生成代码）时，**必须主动指出阶段冲突并提醒正确流程，不得静默违规**。
 
-本项目**强制**遵循 Microsoft Fluent Design System 2。以下规则无例外。
+## Fluent Design 规范（历史存档，非现行约束）
 
-### 设计令牌
+> ⚠️ **本章原为 Fluent Design 2 规范，服务的是已随 [ADR-0203](./docs/adr/ADR-0203-webview-client-source-removal.md)
+> 整包删除的 WebView 客户端，对 app-lynx 新代码无约束力。** 完整原文与**逐条适用性判定**见
+> [`glossary-fluent-design-chapter-archive.md`](docs/adr/glossary-fluent-design-chapter-archive.md)，
+> 术语见 [`glossary-webview-client-removal.md`](docs/adr/glossary-webview-client-removal.md)。
+> 拆出是因为它与现行约束无关却占用指令字节预算（运行时按 32 KiB 截断）。
 
-- 颜色、间距、圆角、阴影、字体大小**必须**使用 `src/styles/tokens.css` 或 UnoCSS preflights 中定义的 CSS 变量
-- **禁止**硬编码具体值（`#xxx`、`rgb()`、`px`/`rem` 字面量）
-- 视觉令牌（颜色、间距、圆角、阴影）：在 `src/styles/tokens.css` 的 `:root` 中声明后使用
-- 排版令牌（`--fontSizeBase*`）：在 `uno.config.ts` 的 `preflights` 中以流体 `clamp(rem + vw)` 定义，构建期零转换
-- 确需新增令牌时，来源必须是 [Fluent 2 官方设计令牌](https://fluent2.microsoft.design/design-tokens)
-- UnoCSS shortcuts 统一在 `uno.config.ts` 中定义
-- `@fluentui/web-components` 的 `setTheme()` 在 `main.tsx` 中根据 `<html>` 的 `dark` class 实时同步亮/暗主题
+**判读规则**：**仍成立** = 纪律与设计系统无关，MD3 下同样有效（改用 `--md-*` 口径）；
+**存档条款** = 只对 Fluent 2 成立，不再执行；**已失效** = 载体随 WebView 客户端一并消失。
+原章的「必须 / 禁止 / 只允许」是当时的原文口吻，**不是现行约束**。
 
-### 动画与动效
+**移交后仍然有效的东西**：只有**纪律**，没有**数值**。具体哪些条款在 MD3 下仍成立、哪些只对
+Fluent 成立、哪些已失效，逐条判定见归档文档；其中在 MD3 下**仍成立**的两条纪律已并入
+「约定 → app-lynx 的 MD3 约定」：**禁硬编码令牌值**、**禁写 `:focus` / `:focus-visible` 变体**（真机实测不匹配，见「有意偏离」第 5 条）。
 
-**缓动曲线（只允许以下 4 种）：**
-
-| 曲线                          | 用途                 |
-| ----------------------------- | -------------------- |
-| `cubic-bezier(0,0,0,1)`       | exit / decelerate    |
-| `cubic-bezier(0.33,0,0.67,1)` | standard             |
-| `cubic-bezier(0.33,0,0,1)`    | enter / accelerate   |
-| `linear`                      | 仅限 loading spinner |
-
-- **禁止** `ease`、`ease-in`、`ease-out`、`ease-in-out`
-
-**动画时长（只允许以下 5 种）：**
-
-| 时长  | 名称   | 场景                          |
-| ----- | ------ | ----------------------------- |
-| 100ms | micro  | 微交互（ripple、checkbox）    |
-| 150ms | fast   | 小过渡（tooltip、hover 反馈） |
-| 200ms | normal | 常规过渡（页面元素进出）      |
-| 300ms | gentle | 柔缓过渡（弹窗、面板）        |
-| 500ms | slow   | 大幅过渡（页面切换、展开）    |
-
-- 页面过渡统一使用 `PageTransition.tsx`
-- 组件内动效优先使用 Fluent motion tokens（`--durationNormal`、`--curveEasyEase` 等，定义在 `src/styles/tokens.css`）
-
-### 交互状态
-
-- 每个可交互元素必须覆盖以下三种状态：
-  - **hover**：视觉反馈（颜色变化或轻微提升）
-  - **active**（pressed）：`scale(0.98)` 或 Fluent pressed 颜色加深
-  - **focus-visible**：`outline` + `outline-offset`，**禁止**裸 `:focus` 样式
-- 触控目标最小 **40×40px**（移动端优先）
-
-### 禁止清单
-
-| 禁止                                      | 必须使用                                             |
-| ----------------------------------------- | ---------------------------------------------------- |
-| 硬编码颜色值（`#xxx`、`rgb()`）           | `var(--colorXxx)`                                    |
-| 硬编码圆角值（`8px`、`0.5rem`）           | `var(--borderRadiusXxx)`                             |
-| 硬编码阴影值                              | `var(--elevationN)`                                  |
-| 非 Fluent 缓动曲线                        | Fluent 标准曲线（见上表）                            |
-| 非标准动画时长                            | Fluent duration（见上表）                            |
-| 自定义字体大小（`15px`、`1.2rem`）        | `var(--fontSizeBaseXxx)` 或 `var(--fontSizeHeroXxx)` |
-| 裸 `:focus` 伪类                          | `:focus-visible`                                     |
-| `[color:var(--colorXxx)]` 形式            | `text-[var(--colorXxx)]`                             |
-| `[background-color:var(--colorXxx)]` 形式 | `bg-[var(--colorXxx)]`                               |
-| `duration-200` / `duration-300` 等        | `duration-[var(--durationNormal)]` 等                |
-| `bg-black` / `text-white` 硬编码          | 使用 overlay token（`--colorOverlay*`）              |
+> 两者都不适用 = 该决策**尚未记录**——补 ADR，不要就地自造规则。
+> 存档章与 MD3 节冲突时，**以「app-lynx 的 MD3 约定」那一节为准**。
 
 ## 约定
 
@@ -298,23 +240,65 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`
 - **Node**：22.22.2+（ADR-0080），pnpm 11.9.0（`devEngines` 强制校验）
 
+### app-lynx 的 MD3 约定
+
+本节是 app-lynx **唯一现行**的设计约束。**逐档数值、项目落点、证据坐标**查
+[`glossary-md3-alignment.md`](docs/adr/glossary-md3-alignment.md)（引用前先查它）。
+
+- **数值来源（唯一基准）**：MD3 数值以 material-web 生成令牌源文件
+  `tokens/versions/v0_192/_md-sys-{shape,motion,state,typescale}.scss` 为准。`m3.material.io` 是 JS 渲染、
+  **抓不到正文**，只作图示参考；冲突时**以令牌文件为准，不以记忆或二手转述为准**（→ ADR-0205 决策 1）
+- **role 命名法**：颜色用**角色名**（`primary` / `surface-container-*` / `outline` / `on-surface` …）而非颜色名
+  —— MD3 与 MD2/Fluent 的根本分野即在此。单一事实源 = `tokens.css` 的 `--md-*`；
+  Tailwind `colors` 只放 `var(--md-*)` 引用，**不含字面量**
+- **禁硬编码**：颜色/间距/圆角/阴影/字号一律走令牌。窄例外仅 `src/errorPrototype/ErrorPagePreview.vue`
+  ——**不在 `router.ts` 中**、仅 dev web entry 引用的原型页，px 硬编码是**有意保留**；
+  「禁硬编码」条款**不覆盖该文件**，已登记白名单，**它不是范例**
+- **单位换算**：375 设计稿下 `1sp = 2rpx`、`1dp = 0.2667vw`（权威见 `glossary-lynx-units.md`）。
+  间距/字号/圆角随屏宽缩放是**刻意取舍**、比例关系不变，**不是缺陷**（→ ADR-0207 决策 3）
+- **形状消费**：圆角档位已在 `borderRadius` 注册并**全部指向 `--md-shape-*` 令牌**（`xs`→extra-small …
+  `xl`→extra-large、`full`），新代码用档位名；存量 `rounded-[var(--md-shape-*)]` 是**只读写法**，不必迁移。
+  ⚠️ 裸方向类 `rounded-t` 取 `DEFAULT`（medium 12dp，**非** extra-small）
+- **字号档位**：优先语义档位（`text-body-medium` …）不用旧别名（旧别名有**有意塌陷**：`base/lg/xl` 同值）。
+  15 档语义档位已在 `fontSize` 落地**四元组**（size + line-height + tracking），weight 由 `fontWeight`
+  档位承载（`regular`/`medium`）——**行高已由档位决定，正文不要再手写 `leading-*`**（ADR-0206 决策 1/3）
+- **存量兼容层**：`--color*`（22 条）/ `--borderRadius*` / `--elevation2|4` 与旧字号别名只读，
+  值全指向同一批 M3 令牌；**新增代码不得再写旧名**
+- **状态层**：MD3 交互反馈是 **alpha 叠加层**（hover .08 / focus .12 / pressed .12 / dragged .16），
+  四态已注册为**顶层** utility（`bg-layer-hover-*` …）。⚠️ 嵌套在 `state` 下会产出 `bg-state-layer-*`
+  ——与既有 `bg-layer-*` **不同名**，写错层级就是死类名、**静默无样式**。预计算实色仅作兜底。
+  `focus` / `focus-visible` 引擎不匹配（实证见下表第 5 条），禁写这两类变体
+- **动效**：缓动只允许 `--motion-*` 四条、时长走 `--duration*`；`easing-legacy` 的
+  `cubic-bezier(0.4,0,0.2,1)` 是 MD2 遗留，**禁用**。`standard` 与 `emphasized` 同为 `(0.2,0,0,1)`
+  是**官方事实**，不是笔误
+
+**有意偏离 MD3（封闭清单，5 条）**：经 ADR-0205 决策 4 拍板**不做整改**，留痕以免每次 review 都被当成新 bug 重提。
+
+| # | 偏离内容 | 理由摘要 | 依据 |
+|---|---|---|---|
+| 1 | 动态色 / 壁纸取色**不做**，保留 7 套构建期静态色板 | 有**品牌色**（logo 蓝），跟随壁纸会丢品牌识别；真做需宿主新增取色能力 + 原生模块；Android 12+ 动态色本就可选 | ADR-0205 决策 4 |
+| 2 | 搜索框保持 42px 全圆角药丸，**不改** MD3 filled 56dp | 药丸搜索框是移动端业界惯例，差异是**场景差异**不是规范错误；改 56dp 观感变钝且与 chip 体系不协调 | ADR-0205 决策 4；`SearchSheet.vue` |
+| 3 | 二级 tab 保持 48px，**不加大**到 56px | 已满足 WCAG 2.2 SC 2.5.8 AA 与 Android 48dp 建议值；chip/tab 不承担主要导航目标的尺寸外扩期望 | ADR-0205 决策 4；`SubTabBar.vue` |
+| 4 | `hover` 在纯触屏判定为「**不适用**」 | 纯触屏无 hover 语义（覆盖数为 0 不是差距） | ADR-0205 决策 4 |
+| 5 | `focus` / `focus-visible` 判定为「**不适用**」，不写这两类变体 | **真机实证**：同批探针里阳性对照 `:active` 生效，而这两类无任何变化 ⇒ 引擎不匹配；且纯触屏无键盘/D-pad 触发源。写出来即死类名、**静默无样式**（同 `bg-state-layer-*` 陷阱）。无障碍改由 `accessibility-element` + TalkBack 平台焦点环承担。证据与判读表见 ADR-0207 决策 5 | ADR-0207 决策 5 |
+
+> **该清单是封闭的**：不在表内的差距**默认按「要修」处理**。重开某条须新开 ADR 推翻 ADR-0205 决策 4。
+
+**配套 ADR**：[0205](docs/adr/ADR-0205-md3-baseline-and-scope.md) 基线与范围 · [0206](docs/adr/ADR-0206-typography-type-scale.md) 排版 · [0207](docs/adr/ADR-0207-shape-and-state-layer-guardrails.md) 形状与状态层 · [0208](docs/adr/ADR-0208-material-symbols-icons.md) 图标 · 事实底座 [`差距分析`](docs/research/material-design-3-gap-analysis-2026-09.md)
 ## 测试
 
 - **框架**：Vitest 5.0.1（`vp test`）
 - **位置**：客户端 `packages/app-lynx/{src,tests}/**`；宿主 `packages/android-host/tests/{unit,android-e2e}/**`；编写约定详版 = `docs/testing/conventions.md`（本节为摘要）
-- **E2E 编排**：android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`。**agent-browser 套件已随 WebView 客户端删除，无替代**
+- **E2E 编排**：android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
 
 ### 门禁边界（#539 拍板，2026-09-15）
 
 - **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
-- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须保持关闭**：`vp` 默认
-  `run.cache = { scripts: false, tasks: true }`，即 package.json 的 script 默认**不缓存**。
-  给 `check:all` 加 `--cache` 后，7 个 `tsc` 任务实测 100% 命中（省 ~5s）；`test:all` 不加，
-  8 个 vitest 任务实测恒为 `cache disabled`。**这是刻意的**：测试门禁一旦缓存命中，
-  意味着**测试根本没跑、只重放日志**——绿灯是假的，正是本仓反复在消灭的那类假绿。
-  改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`：`run.tasks` 不能与
-  package.json 同名 script 共存（会报错），故无法用配置做「只缓存 check」，只能靠命令行作用域。
+- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须保持不缓存**：`vp` 的
+  `run.cache = { scripts: false, tasks: true }` 使 package.json 的 script 默认不缓存。
+  **测试门禁一旦缓存命中，意味着测试根本没跑、只重放日志——绿灯是假的**（本仓反复在消灭的假绿）。
+  改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`。
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
 ### 测试硬约束（违反视为架构违规；详版见 `docs/testing/conventions.md`，编号一一对应）
@@ -326,6 +310,21 @@ Grill 澄清 → to-spec → to-tickets → implement
 5. **E2E 覆盖原则**：可达路径有 E2E；外部状态用 `driver.mockFetch()` + `driver.spyOnWindowOpen()` 构造；evaluate 注入须单行
 6. **期望值出处可追溯（oracle 溯源）**：断言指向独立来源，禁自洽反推；执行 = code-review SKILL 双审计（依据 `docs/research/ai-generated-test-quality.md`）
 
+### 门禁冻结线（防「给回归创造就业」）
+
+门禁的价值是**防回归**，不是**显得严谨**。两者冲突时**以前者为准**。
+
+1. **规模线**：单个门禁文件超过其**被测对象**的 30% ⇒ 停止加码，先问「我是在防回归，还是在给回归创造就业」。
+   （实例：`tests/captureScriptInvariants.test.ts` 曾达被测脚本的 46%，且连续二十三轮只产出 1 个真实
+   产品缺陷、门禁自身缺陷 20+ 个 —— 见 `docs/research/md3-visual-regression-2026-09.md` §8.8。）
+2. **单轮诊断**：一轮只在「自己这轮写的」里找到问题、在「要交付的东西」里找到 0 个 ⇒ 该轮判为**空转**，换方向。
+3. **变异测试的分母不自选**：「已知绕过 N/N」里的 N 是自己 imagined 的，随想象涨、不收敛。
+   封住一条的唯一凭据是**外部复核**（另一方用**自己写的**攻击）把它打红；自测绿**不作为**证据。
+4. **Goodhart 警告**：一旦「门禁是否完美」变成目标，它就不再是目标。优先级恒为
+   **真实设备 / 真实数据 / 用户可见行为 > 门禁信号**。
+5. **假绿比没门禁更糟**：会骗人的门禁会被人信。故门禁的**已知失效面必须显式登记**（同上 §8.8），
+   不得只记它抓到了什么。
+
 ## 部署
 
 - **Website**：push 到 `main` 且改动 `packages/website/**` → GitHub Actions 部署 GitHub Pages（`.github/workflows/deploy.yml`）
@@ -335,24 +334,21 @@ Grill 澄清 → to-spec → to-tickets → implement
 ## 注意事项
 
 - **路由数据规则**：`@solidjs/router` 无 loader/Suspense，路由级数据由路由组件内获取（`useParams`/`useLocation` + `createEffect` + 手动 fetch 或 TanStack Query 按需查询），不阻塞渲染（遵循「先渲染后加载」硬约束）；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
-
 ## 任务完成前自检
 
 - **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）
 - **代码理解优先性**：涉及代码结构、调用链、影响范围分析时，是否优先使用了 CodeGraph？（工具选择见上方速查表）
-- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等）
+- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索）
 - **索引健康**：CodeGraph 返回异常时，是否运行 `codegraph status` 检查了节点/边计数（边数归零 = 腐化，提示用户重建）？
-- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN）
+- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循「文档查询规范」的优先级链？（优先 Context7 或 MDN）
 - **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
-- **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，**不得**本地执行 `pnpm openwiki:update`（依赖 CI 定时任务每日重生成），且**不得**手改 `openwiki/` 生成文件？
-- **IO 边界测试**：本次改动涉及的 fetch/存储/桥接解析函数，成功与失败路径是否都有单元测试？
-- **真实样例**：新增/修改的测试 mock 是否来自真实数据结构，而非手写自洽字段？
-- **静默降级**：本次改动是否有降级兜底路径（`??`、catch 默认值）？是否打了 warn 或显式暴露错误？
-- **Conventional Commits 规范**：提交的 commit message 是否符合 Conventional Commits 格式（`type(scope): description`）？commitlint 会强制校验。
+- **OpenWiki 同步**：改 `src/` / `packages/` 后**不得**本地跑 `pnpm openwiki:update`、**不得**手改 `openwiki/`
+- **测试纪律核对**：见「测试硬约束」第 1/2/3 条（IO 双路径、契约用真实样例、禁静默降级）——本次改动逐条自查
+- **Conventional Commits**：commit message 是否符合 `type(scope): description`？commitlint 强制校验。
 
 ## Notes
 
-- 项目必须符合 Microsoft Fluent Design 风格；目录名为 `pixivizer`，项目名/包名为 Pictelio
+- 目录名为 `pixivizer`，项目名/包名为 Pictelio；**设计系统 = Material Design 3**（非 Fluent，见「约定 → app-lynx 的 MD3 约定」）
 - 图片 CDN 走 `/pixiv-img/` 代理路径访问 `i.pximg.net`，非直连；**不要**在 HTML/CSS/JS 中硬编码 Pixiv CDN URL（`i.pximg.net`、`app-api.pixiv.net`）
 - `packages/app/` 整包已随 ADR-0203 删除（WebView 客户端的源码、构建配置、依赖与专属测试）。Android 侧桥接实为 `@pictelio/android-host/android/app/src/lynx/java/` 原生模块；`capacitor-storage_` / `CapacitorStorage` 是**存量用户数据格式**，一字不改（ADR-0050）
 - **Conventional Commits**：commit-msg hook 经 commitlint 强制；type ∈ feat / fix / docs / style / refactor / perf / test / build / ci / chore / revert

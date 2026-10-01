@@ -28,6 +28,7 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import AppIcon from '../components/AppIcon.vue'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
@@ -278,7 +279,7 @@ onUnmounted(() => {
     <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 插画空态：仅「已成功落定为空」才显示 -->
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
-      <EmptyState icon="♡" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
+      <EmptyState icon="favorite_border" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
     </view>
 
     <!-- 插画 waterfall -->
@@ -356,7 +357,7 @@ onUnmounted(() => {
     <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 小说空态：仅「已成功落定为空」才显示 -->
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
-      <EmptyState icon="♡" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
+      <EmptyState icon="favorite_border" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
     </view>
 
     <!-- 小说列表 -->
@@ -391,9 +392,17 @@ onUnmounted(() => {
                       <text class="text-label-medium text-outline mr-4">{{
                         t('bookmarks.charCount', { count: item.text_length })
                       }}</text>
-                      <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
-                        ♥ {{ item.total_bookmarks }}
-                      </text>
+                      <!-- 收藏数：♥ → star_outline（ADR-0208 决策 3）。计数文本本身即语义，
+                           图标是纯装饰不重复标注（ADR-0208 决策 4）。 -->
+                      <view
+                        v-if="item.total_bookmarks > 0"
+                        class="flex flex-row items-center mr-4"
+                      >
+                        <AppIcon name="star_outline" :size="3.2" class="text-outline" />
+                        <text class="text-label-medium text-outline ml-0.5">{{
+                          item.total_bookmarks
+                        }}</text>
+                      </view>
                     </view>
                   </view>
 

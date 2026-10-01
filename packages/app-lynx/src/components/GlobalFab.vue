@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { t } from '../i18n'
 import { useGlobalFabStore } from '../stores/globalFab'
+import { useReducedMotion } from '../composables/useReducedMotion'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import { screenHeightVw as deriveScreenHeightVw, type ViewportContentSize, type ViewportSystemInfo } from '../utils/viewportGeometry'
 import { subscribeViewportSize } from '../utils/viewportSizeBridge'
+import type { IconName } from '../utils/iconMap'
 import { GLOBAL_SEARCH_A11Y_LABEL } from '../primitives/createGlobalFab'
+import AppIcon from './AppIcon.vue'
 
 // ─── 放射导航薄渲染适配器（ADR-0120）───
 // 读 globalFab.view、调 globalFab.dispatch；双层环几何与动效在此适配器，
@@ -16,25 +19,15 @@ import { GLOBAL_SEARCH_A11Y_LABEL } from '../primitives/createGlobalFab'
 const fab = useGlobalFabStore()
 const { view } = storeToRefs(fab)
 
-/** reduced-motion：禁止飞出/stagger/旋转动画（Lynx 的 matchMedia 不可用时默认 false）。 */
-const reducedMotion = ref(false)
-let reducedMq: MediaQueryList | undefined
-function updateReducedMotion(): void {
-  reducedMotion.value = reducedMq?.matches ?? false
-}
-onMounted(() => {
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    reducedMq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    updateReducedMotion()
-    reducedMq.addEventListener?.('change', updateReducedMotion)
-  }
-})
-onUnmounted(() => reducedMq?.removeEventListener?.('change', updateReducedMotion))
+/** 减弱动效偏好（T03 #851）：复用统一能力 useReducedMotion，本组件不再自建 matchMedia。
+ *  降级规则见 composable 头注 R1（transition 置 none）/ R2（animation 置 none，含 infinite 循环）/ R3（stagger 归零）。 */
+const { reducedMotion, transitionStyle, animationStyle, staggerMs } = useReducedMotion()
 
-/** 内环/外环图标（Lynx 无图标库，unicode 约定）。 */
-const fabIcon = computed(() => {
+/** 内环/外环图标名：当前激活 tab 的图标（tab 事实源 = navTabs.ts NAV_TABS，
+ *  非 tab 路由无激活 tab，回退 home）。字形由 <AppIcon> 查 utils/iconMap 渲染。 */
+const fabIcon = computed<IconName>(() => {
   const active = view.value.outer.find((t) => t.name === view.value.active)
-  return active ? active.icon : '⌂'
+  return active ? active.icon : 'home'
 })
 
 // ── 几何（vw）：FAB 固定 right-4/bottom-4(4.267vw)，外/内环半径随屏宽缩放 ──
@@ -101,6 +94,9 @@ const scrimStyle = computed<Record<string, string>>(() => ({
   top: '0',
   width: '100vw',
   height: `${screenHeightVw()}vw`,
+  // 遮罩淡入走全局 .scrim-in 类（定义在 RefreshableList.vue 的 <style>）——R2 下整条关掉，
+  // 否则类里的 200ms 淡入会在偏好开启时照播（inline 覆盖，不动该类的定义方）。
+  ...(animationStyle.value ? { animation: animationStyle.value } : {}),
 }))
 
 /** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。
@@ -144,20 +140,24 @@ const innerPair = computed(() => {
 
 /** 环项样式：绝对定位 + 居中；弹出动画用 keyframes（v-if 挂载态 transition 不触发，ADR-0123），带 stagger。 */
 function ringStyle(x: number, y: number, i: number): Record<string, string> {
-  const delay = reducedMotion.value ? 0 : i * 30
+  // R2 关键帧整条关掉 + R3 stagger 延迟归零（错峰本身即「运动」）
+  const delay = staggerMs(i, 30)
   return {
     left: `${x}vw`,
     top: `${y}vw`,
     transform: 'translate(-50%,-50%)',
-    animation: reducedMotion.value
-      ? 'none'
-      : `fab-ring-in 300ms cubic-bezier(.05,.7,.1,1) ${delay}ms both`,
+    // 300ms = M3 medium2 → 时长令牌（#854 验收 3）；stagger 30ms/step 无 M3 官方值，保留字面量。
+    // 曲线走令牌，不再写 `cubic-bezier(.05,.7,.1,1)` 字面量 —— 那与 GlassCard 构成**同值双写**，
+    // 令牌一改这里就会静默漂移（值取自 material-web v0.192 `_md-sys-motion.scss` 的
+    // `'easing-emphasized-decelerate': cubic-bezier(0.05, 0.7, 0.1, 1)`）。
+    animation: animationStyle.value || `fab-ring-in var(--durationGentle) var(--motion-emphasized-decelerate) ${delay}ms both`,
   }
 }
 
-/** FAB 展开旋转 90°（ADR-0108 已验证 transform）；reduced-motion 下不旋转。 */
+/** FAB 展开旋转 90°（ADR-0108 已验证 transform）；R1 下过渡整条关掉、旋转瞬切。
+ *  200ms = M3 short4 → 时长令牌（#854 验收 3）；曲线同上，走令牌。 */
 const fabWrapStyle = computed<Record<string, string>>(() => ({
-  transition: reducedMotion.value ? 'none' : 'transform 200ms cubic-bezier(.05,.7,.1,1)',
+  transition: transitionStyle.value || 'transform var(--durationNormal) var(--motion-emphasized-decelerate)',
   transform: view.value.isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
 }))
 
@@ -172,10 +172,16 @@ function dispatchInner(item: { kind: 'search' | 'refresh' | 'back-to-top' | 'ext
   else void fab.dispatch({ type: 'extra', key: item.key })
 }
 
-/** 主 FAB 图标：menu 模式 = 当前 tab 图标（展开为 ✕ / busy 旋转）；search 模式 = 搜索按钮 🔍。 */
-const fabIconText = computed(() => {
-  if (view.value.mode === 'search') return '🔍'
-  return view.value.isOpen ? '✕' : fabIcon.value
+/** 主 FAB 图标名：menu 模式 = 当前 tab 图标（展开为 close / busy 旋转）；search 模式 = 搜索按钮 search。 */
+const fabIconName = computed<IconName>(() => {
+  if (view.value.mode === 'search') return 'search'
+  return view.value.isOpen ? 'close' : fabIcon.value
+})
+
+/** 主 FAB 图标类：busy 且未展开且非减弱动效时挂旋转动画类（配色固定 text-primary-on-container）。 */
+const fabIconClass = computed(() => {
+  const spin = view.value.isBusy && !view.value.isOpen && !reducedMotion.value
+  return spin ? 'text-primary-on-container fab-ring-spin' : 'text-primary-on-container'
 })
 
 /** 主 FAB 标注：search 模式 = 打开搜索；menu 模式 = 开/关菜单（GLOBAL_FAB_A11Y_LABELS）。 */
@@ -221,11 +227,11 @@ function onFabTap(): void {
         :accessibility-label="e.tab.a11yLabel"
         @tap="dispatchSelect(e.tab.name)"
       >
-        <text
-          class="leading-none"
+        <!-- 图标：24dp=6.4vw 走 AppIcon 缺省字号（AppIcon 自带 leading-none） -->
+        <AppIcon
+          :name="e.tab.icon"
           :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
-          style="font-size: 6.4vw"
-        >{{ e.tab.icon }}</text>
+        />
         <text
           class="leading-none mt-[1px]"
           :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
@@ -243,12 +249,12 @@ function onFabTap(): void {
         :accessibility-label="e.item.a11yLabel"
         @tap="dispatchInner(e.item)"
       >
-        <text class="leading-none text-primary-on-container" style="font-size: 6.4vw">{{ e.item.icon }}</text>
+        <AppIcon :name="e.item.icon" class="text-primary-on-container" />
       </view>
     </view>
 
     <!-- 主 FAB：menu 模式展开成 close、收起为当前 tab 图标（busy 时转圈/禁用）；
-         search 模式（ADR-0132 直达模式）FAB 本体即搜索按钮（🔍），点按 dispatch('search')，
+         search 模式（ADR-0132 直达模式）FAB 本体即搜索按钮（search 图标），点按 dispatch('search')，
          上移一档与 feed 分页 FAB 竖排堆叠；遮罩/环层 v-if="view.isOpen"（非 tab 路由恒 false，
          关闭态渲染树无全屏元素——ADR-0123 约束）。 -->
     <view
@@ -260,11 +266,7 @@ function onFabTap(): void {
       @tap="onFabTap"
     >
       <view :style="fabWrapStyle">
-        <text
-          class="leading-none text-primary-on-container"
-          :class="{ 'fab-ring-spin': view.isBusy && !view.isOpen }"
-          style="font-size: 6.4vw"
-        >{{ fabIconText }}</text>
+        <AppIcon :name="fabIconName" :class="fabIconClass" />
       </view>
     </view>
   </view>
@@ -284,6 +286,6 @@ function onFabTap(): void {
   to { transform: rotate(360deg); }
 }
 .fab-ring-spin {
-  animation: fab-ring-spin 1s linear infinite;
+  animation: fab-ring-spin var(--durationExtraLong4) linear infinite;
 }
 </style>

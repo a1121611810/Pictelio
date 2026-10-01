@@ -18,6 +18,8 @@ import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { useSettingsStore } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 import { THEME_COLOR_OPTIONS, DEFAULT_THEME_COLOR, isThemeColorId, themeColorClass } from '../src/utils/themeColor'
+import { ICON_CODEPOINTS } from '../src/utils/iconMap'
+import { NAV_TABS } from '../src/components/navTabs'
 import zhMisc from '../src/i18n/locales/zh-CN/misc'
 
 // vitest 5 硬约束：vi.mock 必须在模块顶层（嵌套定义直接报错）。
@@ -1379,6 +1381,26 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
   })
 })
 
+// ─── 底部导航 tab 图标名契约（ADR-0208 决策 3）───
+// 期望值来源：utils/iconMap.ts 码点表分组注释记录的旧字形对照（⌂ 推荐→home、✦ 插画→explore、
+// ✎ 小说→menu_book、◎ 我的→person），非从 navTabs.ts 现状反推——icon 名写错时
+// <AppIcon> 只能抛错/渲染错图标，本断言先于运行时拦下。
+describe('navTabs.ts 图标名契约（ADR-0208 决策 3）', () => {
+  const navBarVue = readFileSync(fileURLToPath(new URL('../src/components/NavigationBar.vue', import.meta.url)), 'utf8')
+
+  it('NAV_TABS 四 tab 的 icon 是 ICON_CODEPOINTS 已登记的 IconName，按 推荐/插画/小说/我的 顺序', () => {
+    expect(NAV_TABS.map((tab) => tab.icon)).toEqual(['home', 'explore', 'menu_book', 'person'])
+    for (const tab of NAV_TABS) {
+      expect(Object.keys(ICON_CODEPOINTS)).toContain(tab.icon)
+    }
+  })
+
+  it('NavigationBar 图标位经 <AppIcon :name="tab.icon"> 渲染，模板不再插值图标字形', () => {
+    expect(navBarVue).toContain(':name="tab.icon"')
+    expect(navBarVue).not.toMatch(/\{\{\s*tab\.icon\s*\}\}/)
+  })
+})
+
 // ─── 放射导航 FAB（ADR-0120）展开态几何与层叠（ADR-0121） ───
 // 几何/尺寸全部内联在 GlobalFab.vue 薄适配器（深模块 createGlobalFab 无几何）。
 // 本测试用「源码结构断言」锁定 M3 尺寸（B 方案 56dp 圆：1vw=3.75px ⇒ 56dp=14.93vw、
@@ -1386,6 +1408,8 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
 // 期望值来自 ADR-0121 决策表/图片换算，非从实现反推。
 describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
   const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
+  // 24dp 缺省字号的事实源：图标位统一经它渲染，本文件只钉「不覆盖 :size」（ADR-0208 决策 3）
+  const appIconVue = readFileSync(fileURLToPath(new URL('../src/components/AppIcon.vue', import.meta.url)), 'utf8')
 
   it('层叠序：scrim(z-10) < 菜单项(z-20) < 主 FAB(z-30)，同处 z-40 外层（ADR-0121/0123）', () => {
     // 菜单项（外环/内环）须显式置于遮罩之上，否则被半透明遮罩压住且点不到
@@ -1416,8 +1440,14 @@ describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
   it('外环导航项 56dp 圆 + 24dp 图标 + 12sp 文字（vw=375dp 基准）', () => {
     // 外环圆 14.93vw（=56dp）
     expect(globalFabVue).toContain('w-[14.93vw] h-[14.93vw]')
-    // 24dp 图标须出现在外环、内环、FAB 三处（=6.4vw ×3），防止仅外环图标回退到 5.33vw
-    expect(globalFabVue.match(/font-size: 6\.4vw/g)?.length).toBe(3)
+    // 24dp 图标（6.4vw）现由 <AppIcon> 缺省字号承担（ADR-0208 决策 3：所有图标位经统一组件）。
+    // 外环/内环/主 FAB 三个图标位共 3 个 <AppIcon>，
+    // 且任一都不得覆盖 :size——覆盖即脱离 24dp 口径（防止外环单点回退到别的字号）。
+    // 只数模板区（<script> 注释里提到组件名不算图标位）。
+    const fabTemplate = globalFabVue.slice(globalFabVue.indexOf('<template>'))
+    expect(fabTemplate.match(/<AppIcon[\s]/g)?.length).toBe(3)
+    expect(fabTemplate).not.toMatch(/<AppIcon[^>]*:size=/)
+    expect(appIconVue).toMatch(/size:\s*6\.4/) // 24dp 缺省字号的事实源
     expect(globalFabVue).toContain('font-size: 3.2vw') // 12sp 文字
   })
 
@@ -1438,8 +1468,9 @@ describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
 describe('GlobalFab.vue search 模式渲染标记（ADR-0131）', () => {
   const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
 
-  it('search 模式主 FAB：🔍 图标 + 点按 dispatch("search") + a11y 标注', () => {
-    expect(globalFabVue).toContain("if (view.value.mode === 'search') return '🔍'")
+  it('search 模式主 FAB：search 图标（iconMap 码点表条目名）+ 点按 dispatch("search") + a11y 标注', () => {
+    // ADR-0208 决策 3：图标位取 ICON_CODEPOINTS 的键，字形由 AppIcon 查表渲染
+    expect(globalFabVue).toContain("if (view.value.mode === 'search') return 'search'")
     expect(globalFabVue).toContain("fab.dispatch({ type: 'search' })")
     expect(globalFabVue).toContain(':accessibility-label="fabA11yLabel"')
     expect(globalFabVue).toContain('GLOBAL_SEARCH_A11Y_LABEL')
@@ -1625,9 +1656,15 @@ describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
     expect(refreshableListSource).toContain('v-if="menu.isOpen && props.fab !== false"')
     expect(refreshableListSource).toContain('FAB_MENU_A11Y_LABELS.refreshList')
     expect(refreshableListSource).toContain('FAB_MENU_A11Y_LABELS.backToTop')
-    expect(refreshableListSource).toContain('↻')
-    expect(refreshableListSource).toContain('↑')
-    expect(refreshableListSource).toContain('{{ menu.isOpen ? \'✕\' : \'↻\' }}')
+    // 图标位（ADR-0208 决策 3）：三项图标名取 ICON_CODEPOINTS 键，字形由 <AppIcon> 渲染。
+    // 名↔旧字形的对应来自 utils/iconMap.ts 码点表分组注释（↻ 刷新 / ↑ 回顶 / ✕ 关闭），
+    // 非从本组件现状反推——写错名字 <AppIcon> 只能抛错，本断言先于运行时拦下。
+    expect(refreshableListSource).toContain('<AppIcon name="refresh" :size="4.8"')
+    expect(refreshableListSource).toContain('<AppIcon name="arrow_upward" :size="4.8"')
+    expect(refreshableListSource).toContain("<AppIcon :name=\"menu.isOpen ? 'close' : 'refresh'\"")
+    for (const n of ['refresh', 'arrow_upward', 'close']) {
+      expect(Object.keys(ICON_CODEPOINTS)).toContain(n)
+    }
   })
 
   it('回顶通过 emit(\'back-to-top\') 与页面契约连接', () => {
@@ -1786,29 +1823,51 @@ it('M3 FAB menu 视觉：主 FAB 56dp + 展开面板 pill 项 + scrim + 从右�
   expect(refreshableListVue).toContain('z-30')
   expect(refreshableListVue).toContain('bg-[var(--md-scrim)]')
   expect(refreshableListVue).toContain('v-if="menu.isOpen && props.fab !== false"')
-  expect(refreshableListVue).toContain('menu.isOpen ? \'✕\' : \'↻\'')
+  // 主 FAB 图标位（ADR-0208 决策 3）：展开/收起在 AppIcon 的 name 上切换，不插值字形
+  expect(refreshableListVue).toContain('<AppIcon :name="menu.isOpen ? \'close\' : \'refresh\'"')
+  expect(refreshableListVue).not.toMatch(/\{\{\s*menu\.isOpen\s*\?/)
   expect(refreshableListVue).toContain('bg-[var(--md-scrim)]')
   expect(refreshableListVue).toContain('rounded-full')
   expect(refreshableListVue).toContain('@keyframes item-rise')
 })
 
 it('主 FAB 变身为 close button：图标切换绑定在原位 56dp FAB 上（M3 官方规格）', () => {
-  expect(refreshableListVue).toContain("{{ menu.isOpen ? '✕' : '↻' }}")
+  // ADR-0208 决策 3：close/refresh 切换经 <AppIcon :name>，字形由 ICON_CODEPOINTS 查表渲染
+  expect(refreshableListVue).toContain("<AppIcon :name=\"menu.isOpen ? 'close' : 'refresh'\"")
+  expect(Object.keys(ICON_CODEPOINTS)).toContain('close')
+  expect(Object.keys(ICON_CODEPOINTS)).toContain('refresh')
   // close button 与 FAB 同节点，尺寸不变
   expect(refreshableListVue.match(/w-\[14\.933vw\]/g)?.length).toBeGreaterThanOrEqual(1)
+  // 反向锁：图标位不得退回裸字形插值（默认字体渲染 PUA 码点会静默变空白）
+  expect(refreshableListVue).not.toMatch(/<text[^>]*>\s*\{\{[^}]*isOpen[^}]*\}\}/)
 })
 
 it('菜单项：刷新 + 回顶，label 与图标成对，a11y 注册表完整消费', () => {
   expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.refreshList')
   expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.backToTop')
   expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.toggleMenu')
-  expect(refreshableListVue).toContain('↻')
-  expect(refreshableListVue).toContain('↑')
+  // 菜单项图标位（ADR-0208 决策 3）：refresh ↔ arrow_upward，字形不再裸写。
+  // ⚠️ 这两条原先写作 toContain('↻') / toContain('↑')，只命中源码里的 HTML 注释
+  // （`<!-- 刷新项：图标 ↻ + label -->`）——渲染位早被改掉断言仍然绿，属假绿。
+  // 名↔字形对照来自 utils/iconMap.ts 码点表注释（↻ 刷新 / ↑ 回顶）。
+  expect(refreshableListVue).toContain('<AppIcon name="refresh" :size="4.8"')
+  expect(refreshableListVue).toContain('<AppIcon name="arrow_upward" :size="4.8"')
+  // 逐项配对：刷新项的 icon+label 必须在同一个 a11y 节点内（不靠两条独立 toContain 凑）
+  const refreshItem = refreshableListVue.match(
+    /FAB_MENU_A11Y_LABELS\.refreshList[\s\S]*?<\/view>/,
+  )?.[0]
+  const backTopItem = refreshableListVue.match(
+    /FAB_MENU_A11Y_LABELS\.backToTop[\s\S]*?<\/view>/,
+  )?.[0]
+  expect(refreshItem).toContain('<AppIcon name="refresh"')
+  expect(refreshItem).toContain("t('refreshableList.refresh')")
+  expect(backTopItem).toContain('<AppIcon name="arrow_upward"')
+  expect(backTopItem).toContain("t('refreshableList.backToTop')")
 })
 
 it('刷新中旋转动画：主 FAB 图标在非展开态时旋转（ADR-0108）', () => {
   expect(refreshableListVue).toContain('@keyframes fab-spin')
-  expect(refreshableListVue).toMatch(/animation: fab-spin 1s linear infinite/)
+  expect(refreshableListVue).toMatch(/animation: fab-spin var\(--durationExtraLong4\) linear infinite/)
   expect(refreshableListVue).toContain('refreshing && !menu.isOpen ? \'fab-spin\'')
   expect(refreshableListVue).toContain('opacity: 0.6')
 })
@@ -2051,9 +2110,23 @@ it('乐观化接缝：消费 useBookmarkMutation 状态机，change 延迟用 BO
   expect(bookmarkBtnVue).not.toContain('createBookmarkToggle(')
 })
 
-it('心形用 ♥\uFE0E（VS15 强制 text presentation，防 Lynx 原生 emoji 化导致 CSS 变色失效）', () => {
-  // oracle = 平台事实（ADR-0112 待验证项回写：裸 U+2665 在原生渲染为彩色 emoji 固有色 #fa242f）
-  expect(bookmarkBtnVue).toContain('♥\uFE0E')
+it('心形图标位经 <AppIcon name="favorite_border"> 渲染，模板零裸心形字形（emoji 化风险结构性消失）', () => {
+  // 原始立意仍在（ADR-0112 待验证项：裸 U+2665 在 Lynx 原生被解析为彩色 emoji 字形、
+  // 固有色 #fa242f，CSS color 完全失效，真机实测 2026-08-25）——原先的规避手段是给字形
+  // 加 U+FE0E 强制 text presentation。改走图标子集字体（ADR-0208 决策 1/3）后该缺陷同源
+  // 消失，U+FE0E 不再需要：断言改为「图标位走 AppIcon + 配色仍由 CSS class 承担」。
+  const iconSlot = bookmarkBtnVue.match(/<AppIcon[\s\S]*?\/>/g) ?? []
+  // favorite_border 是本按钮唯一图标位（取心形族而非 star：Material Symbols 的 star 语义
+  // 是评分/要点，非 Pixiv 收藏；期望值来自 utils/iconMap.ts 码点表注释「♡ 未收藏」）
+  expect(iconSlot.length).toBe(1)
+  expect(iconSlot[0]).toContain('name="favorite_border"')
+  expect(Object.keys(ICON_CODEPOINTS)).toContain('favorite_border')
+  // 配色仍由 CSS class 表达（已收/未收切色，不换字形——FILL=0 子集两者同码点）
+  expect(iconSlot[0]).toContain("bm.bookmarked.value ? 'text-tertiary-on' : 'text-inverse-on-surface'")
+  // 反向锁：模板区不得再出现裸心形字形（含带 VS15 的旧形态）
+  const tpl = bookmarkBtnVue.slice(bookmarkBtnVue.indexOf('<template>'))
+  expect(tpl).not.toMatch(/[♥♡]/u)
+  expect(bookmarkBtnVue).not.toContain('♥\uFE0E')
 })
 
 it('Bookmarks 页：取消收藏后隐藏集过滤 + 同 tick refreshEpoch++ 整树重建（spec D6）', () => {

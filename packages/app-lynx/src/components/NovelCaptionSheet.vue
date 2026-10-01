@@ -6,6 +6,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from './AppIcon.vue'
 import { t } from '../i18n'
 import { safeBottom } from '../utils/safeArea'
 
@@ -46,12 +47,17 @@ onBeforeUnmount(() => {
           :accessibility-label="t('novelIntro.closeA11y')"
           @tap="emit('close')"
         >
-          <text class="text-title-medium text-surface-on">✕</text>
+          <!-- T12/ADR-0208：✕ 裸字形 → Material Symbols `close`；无障碍名称仍由外层
+               可点击 view 承担（图标不承载语义，label 不删）。
+               :size=4.27vw = 原 text-title-medium（16sp = 32rpx = 16px @375），保持视觉尺寸不变 -->
+          <AppIcon name="close" :size="4.27" class="text-surface-on" />
         </view>
       </view>
       <!-- 显式高度滚动区（真机 LynxView 下 scroll-view 需有界高度） -->
       <scroll-view class="h-[100vw]" scroll-orientation="vertical">
-        <text class="text-body-medium text-surface-on-variant leading-[1.6]">{{ caption }}</text>
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-[1.6]，行高由 text-body-medium 档位携带
+             （body-large/medium/small = 24/20/16sp 行高，rpx = sp × 2） -->
+        <text class="text-body-medium text-surface-on-variant">{{ caption }}</text>
       </scroll-view>
     </view>
     <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区

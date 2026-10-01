@@ -22,15 +22,19 @@ function backToLogin() {
 <template>
   <view class="w-full h-full flex flex-col items-center justify-center bg-primary px-10">
     <!-- 品牌色满屏氛围 + 白色大标题（强终态：会话已死，请重来） -->
+    <!-- T07 档位清理：原为 700 字重。本行是 i18n **消息文案**（非字标），headline-small
+         官方字重 regular(400)、emphasized 变体 500；「强终态」由满屏 bg-primary 反色容器承担，
+         容器已在喊，无需文字再压 700。全站同档位标题（Watchlist / DownloadManager /
+         WatchlistPromptDialog / Me 的对话框标题）一律 500，此处对齐。 -->
     <text
-      class="text-headline-small font-bold text-primary-on text-center"
+      class="text-headline-small font-medium text-primary-on text-center"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.pageTitle"
     >
       {{ ERROR_A11Y_LABELS.pageTitle }}
     </text>
     <!-- 副文案：半透明白（presentError 分档文案，含 HTTP 状态码与 hint） -->
-    <text class="text-body-medium text-primary-on mt-4 text-center leading-relaxed" style="opacity: 0.8">
+    <text class="text-body-medium text-primary-on mt-4 text-center" style="opacity: 0.8">
       {{ presentError(fatalError, t('error.fallback.sessionExpired')) }}
     </text>
     <!-- M3 反色 filled 按钮：on-primary 底 + primary 字（全圆角 pill） -->

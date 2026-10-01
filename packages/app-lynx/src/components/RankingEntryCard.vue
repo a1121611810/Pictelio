@@ -13,6 +13,7 @@ import { proxyImageUrl, thumbUrl } from '../utils/imageUrl'
 import { createRankingFeed } from '../primitives/createRankingFeed'
 import { isEntryVisible, shouldResetDismissed } from '../primitives/rankingEntryState'
 import SkeletonImage from './SkeletonImage.vue'
+import AppIcon from './AppIcon.vue'
 import { t } from '../i18n'
 
 const props = defineProps<{ refreshEpoch?: number }>()
@@ -114,7 +115,7 @@ onUnmounted(() => feed.dispose())
         <text class="text-title-medium font-medium text-white mt-1.5 [max-line:1]">{{ hero?.title }}</text>
         <text class="text-body-small text-white opacity-80 [max-line:1]">{{ hero?.user.name }}</text>
       </view>
-      <!-- 右侧竖排 2/3 名 +「全部 ›」 -->
+      <!-- 右侧竖排 2/3 名 +「全部 + › 图标」 -->
       <view class="absolute right-2.5 bottom-3 flex flex-col gap-2">
         <view
           v-for="e in runners"
@@ -130,12 +131,13 @@ onUnmounted(() => feed.dispose())
           </view>
         </view>
         <view
-          class="w-[16vw] flex items-center justify-center"
+          class="w-[16vw] flex flex-row items-center justify-center"
           accessibility-element
           :accessibility-label="t('ranking.entry.viewAllAria')"
           @tap.stop="openAll"
         >
-          <text class="text-body-small text-white opacity-90">{{ t('ranking.entry.viewAll') }} ›</text>
+          <text class="text-body-small text-white opacity-90">{{ t('ranking.entry.viewAll') }}</text>
+          <AppIcon name="arrow_forward" :size="3.2" class="text-white opacity-90" />
         </view>
       </view>
       <!-- 收起（当次隐藏） -->
@@ -145,7 +147,9 @@ onUnmounted(() => feed.dispose())
         :accessibility-label="t('ranking.entry.collapseAria')"
         @tap.stop="dismissed = true"
       >
-        <text class="text-title-medium text-white">✕</text>
+        <!-- 收起（当次隐藏）。图标位经 AppIcon（ADR-0208 决策 3）：close，
+             字号 title-medium=32rpx=16sp=4.2667vw → :size="4.2667" -->
+        <AppIcon name="close" :size="4.2667" class="text-white" />
       </view>
     </view>
     <!-- 无数据：首载骨架（用户故事 24：入口无数据时显示骨架而非空白） -->

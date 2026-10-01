@@ -11,7 +11,8 @@
 // - 拖把顶栏点击 → emit('close')
 // - 返回键 → modalStack 通道自动调用 emit('close')
 //
-// ADR-0123 合规：scrim/面板/拖把都挂 @tap 句柄或 v-if 条件渲染——禁止 pointer-events-none
+// ADR-0123 合规：scrim/面板/拖把都挂 @tap 句柄或 v-if 条件渲染——禁止依赖 pointer-events-none
+// （它在 Lynx 下压根不产出规则：preset 的 corePlugins 白名单裁掉了 pointerEvents，写了等于没写）
 // 兜底（lynx 原生 hit-testing 不识别 pointer-events，全屏覆盖层不挂 @tap 会吞掉下面所有点击）。
 //
 // 代闸（generation gate）：seriesId 变化或重挂载时，loadInitial 自增 loadGeneration；旧

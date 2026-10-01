@@ -99,8 +99,8 @@ void run()
           <text class="text-title-small text-surface-on">
             <text :class="STATUS_CLASS[c.status]">[{{ t(STATUS_KEY[c.status]) }}] </text>{{ c.title }}<text v-if="c.latencyMs !== undefined"> · {{ c.latencyMs }}ms</text>
           </text>
-          <text class="text-body-small text-surface-on-variant leading-snug">{{ c.detail }}</text>
-          <text v-if="c.hint" class="text-body-small text-outline leading-snug">{{ c.hint }}</text>
+          <text class="text-body-small text-surface-on-variant">{{ c.detail }}</text>
+          <text v-if="c.hint" class="text-body-small text-outline">{{ c.hint }}</text>
         </view>
       </view>
 

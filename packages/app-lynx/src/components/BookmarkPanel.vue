@@ -16,7 +16,7 @@
 // 预填态、宿主 errorMsg 仅用于 footer 文案渲染。
 // a11y 标注直接用 i18n 文案键（不新增静态注册表：面板文案随 locale 变化，E2E 定位以
 // accessibility-element 暴露 + 文案锚定为准）。
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import type { RestrictType } from '../api/types'
 import { BOOKMARK_TAG_LIMIT } from '../utils/bookmarkTags'
@@ -92,12 +92,36 @@ interface LynxInputEvent {
   detail?: { value?: string; isComposing?: boolean }
 }
 
-/**
- * 输入事件：v-model 已先赋值（vue-lynx injectVModelEvent 保证顺序，SearchSheet 同约定）。
+// ─── M3 filled text field 聚焦态（ADR-0209 决策 2）───
+// 死的是 `:focus` 伪类（ADR-0207 决策 5），活的是 bindfocus/bindblur 事件（官方文档 Events 段，
+// Android/iOS/Harmony since 3.4）⇒ 指示条加粗转 primary 走事件驱动。
+// 竞态防护与 onInput 同源：blur 记录当时值，input 见值变了才把聚焦态抢回来。
+const focused = ref(false)
+let valueAtBlur = ''
+
+function onFocus(): void {
+  focused.value = true
+}
+
+function onBlur(): void {
+  valueAtBlur = input.value
+  focused.value = false
+}
+
+/** 指示条动态类：聚焦 2px + primary（静止态的 1px + on-surface-variant 走静态 class，
+ *  官方 active-indicator-color = on-surface-variant，见 ADR-0209 决策 1）。 */
+const inputCls = computed(() => (focused.value ? 'border-b-[2px] border-b-primary' : ''))
+
+/** 输入事件：v-model 已先赋值（vue-lynx injectVModelEvent 保证顺序，SearchSheet 同约定）。
  * spec D11：空格即提交当前 token（与服务端空格分隔语义一致）——输入值以空格结尾即提交，
  * 提交后输入清空（trim 吃掉尾空格）；IME 组合态（isComposing）不提交。
+ *
+ * 兼 M3 filled text field 的聚焦闸门（ADR-0209 决策 2）：失焦瞬间仍可能在途 input 事件，
+ * 无脑接受迟到的 blur 会把正在编辑的字段留在静止态（指示条退回 1px）。闸门取「失焦瞬间的值快照」——
+ * blur 之后只有值真的变了才认定仍在编辑；真离开时值不变 ⇒ 不留假的 2px primary 指示条。
  */
 function onInput(data: LynxInputEvent): void {
+  if (!focused.value && input.value !== valueAtBlur) focused.value = true
   if (data?.detail?.isComposing) return
   const value = data?.detail?.value ?? input.value
   if (value.endsWith(' ')) {
@@ -234,15 +258,21 @@ onBeforeUnmount(() => {
         <view class="mt-4">
           <text class="text-label-medium text-outline">{{ t('bookmarkPanel.newTagLabel') }}</text>
           <view class="flex flex-row items-center gap-2 mt-2">
-            <!-- placeholder-color 是 Lynx **平台属性**（非 CSS）：实测不解析 var()（FIX-5），
-                 颜色值以常量承载（lynxPlatformColors.ts 单点定义），禁止散写十六进制 -->
+            <!-- M3 filled text field（ADR-0209 决策 1）：42dp 药丸 → 56dp + 顶 4dp/底 0 + 底部 1px 指示条。
+                 placeholder-color 是 Lynx **平台属性**（非 CSS）：实测不解析 var()（FIX-5），
+                 颜色值以常量承载（lynxPlatformColors.ts 单点定义），禁止散写十六进制。
+                 label 不另起：上方 newTagLabel 已是常驻可见字段名，MD3 不用「常驻 label + 浮动 label」双份，
+                 二选一取常驻那份（ADR-0209 决策 3 要求的 label 浮动在本控件不成立，理由见交付汇报）。 -->
             <input
               v-model="input"
-              class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
+              class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-5"
+              :class="inputCls"
               :placeholder="t('bookmarkPanel.newTagPlaceholder')"
               :placeholder-color="INPUT_PLACEHOLDER_COLOR"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="t('bookmarkPanel.newTagLabel')"
+              @focus="onFocus"
+              @blur="onBlur"
               @input="onInput"
               @confirm="onInputConfirm"
             />
@@ -324,12 +354,24 @@ onBeforeUnmount(() => {
         </text>
         <view
           class="h-[12vw] rounded-[var(--md-shape-full)] flex items-center justify-center"
-          :class="canSave ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-high opacity-40'"
+          :class="canSave ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-high relative'"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="saveLabel"
           @tap="onSave"
         >
-          <text class="text-label-large font-medium" :class="canSave ? 'text-primary-on' : 'text-surface-on-variant'">
+          <!-- MD3 disabled container = 「底色叠 on-surface 12%」。**必须作为独立覆盖层**
+               （真机实证，见 ADR-0209 引擎约束 §disabled 叠加）：若与 `bg-surface-container-high`
+               写在**同一元素**上，两者都是 `background-color`，Tailwind 产物里
+               `bg-surface-container-high` 声明在后 ⇒ 12% alpha 层被整条覆盖、静默不生效。
+               拆成父子两层后 alpha 才真正与底色合成。 -->
+          <view
+            v-if="!canSave"
+            class="absolute inset-0 rounded-[var(--md-shape-full)] bg-state-disabled-container"
+          />
+          <text
+            class="relative text-label-large font-medium"
+            :class="canSave ? 'text-primary-on' : 'text-surface-on-variant'"
+          >
             {{ saving ? t('bookmarkPanel.saving') : saveLabel }}
           </text>
         </view>

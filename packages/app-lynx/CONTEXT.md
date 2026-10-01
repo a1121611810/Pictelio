@@ -47,7 +47,7 @@ AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明�
 跨上下文共享概念，判定条件与 app 侧一致（`type === 'ugoira'` / `page_count > 1`，独立判定、允许并存、动图在前）。详见 `packages/app/CONTEXT.md`。
 
 **类型徽章行（Type badge row）**：
-列表卡片上标识动图/多图的流内徽章行，位于图片下方、标题上方，仅在有标识时渲染。M3 assist-chip 形态：unicode 图标 + 文字（`▶ 动图` / `⧉ N 图`）、`bg-secondary-container`、`text-label-medium`、`md-shape-small` 圆角。图标沿用 NavigationBar 的 unicode 符号约定（Lynx 无图标库）。统一由公共组件 `IllustTypeBadgeRow` 渲染，各瀑布流页面接入。
+列表卡片上标识动图/多图的流内徽章行，位于图片下方、标题上方，仅在有标识时渲染。M3 assist-chip 形态：`<AppIcon>` 图标 + 纯文字（动图 / N 图）、`bg-secondary-container`、`text-label-medium`、`md-shape-small` 圆角。图标走 Material Symbols 子集字体（ADR-0208），**不再**用 unicode 符号 —— 符号会被平台渲成彩色 emoji，且不经统一图标门禁。统一由公共组件 `IllustTypeBadgeRow` 渲染，各瀑布流页面接入。
 _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异常，见「遮罩」词条）、各页面散写徽章
 
 **标签胶囊行（tag chip row）**：
@@ -644,6 +644,14 @@ _Avoid_: 把 happy-dom 单测当 Lynx 运行时行为的 oracle（「预览假�
 
 **源级守卫（source-level guard）**：
 针对平台事实/接线的**源码形态断言测试**（`*.template.test.ts` 惯例）：读源文件、剥注释、对代码本文做正/负向匹配。用于锁「框架 bug workaround 不被删」「平台危险 API 不回流」「接线不回退」这类**行为测试测不到的回归面**。断言必须语义级（不锁局部变量名），并注明 oracle 出处（ADR/spec/取证记录）。
+> **剥注释的例外（2026-09-30 六轮 review 补入）**：剥注释是**默认口径**；但当被测源文件的注释里
+> **故意**包含反例字面量时例外 —— 此时「记录缺陷的注释」与「残留的缺陷」**同形**，整体剥离恰好让
+> 两者分不开、守卫会误报。判据：源文件是否**主动写下**了「错误写法示例」。是则改为**逐行排除行首 `#` / `//` 的整行**
+> （**不做块级剥离** —— 与「保留注释行」不同，那两句原本自相矛盾），并在守卫文件头写明该例外。
+> 实证：`scripts/capture-md3-matrix.sh` 的注释里故意写着 `dbg_lazy "…$(cmd)"` 当反例，
+> 对应守卫是 `tests/captureScriptInvariants.test.ts` 的 ①（不剥注释、逐行排除注释行）。
+> 判定这条的**门禁**：被治理文件的文件头须**显式引用本例外**，否则等于没有约定。
+> 裸 `indexOf` 会被注释里**恰好同名**的字面量顶替 ⇒ 断言恒真。
 _Avoid_: 用它替代行为测试（两者互补：守卫锁形态，模拟器/真机闭环锁行为）
 
 **整树重建防御（epoch rebuild defense）**：

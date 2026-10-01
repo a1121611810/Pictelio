@@ -24,5 +24,12 @@
   "vueCompilerOptions": {
     "plugins": ["vue-lynx/types/volar-plugin"]
   },
-  "include": ["./**/*.ts", "./**/*.vue", "./**/*.d.ts"]
+  "//include": "composite 项目要求「被 import 的文件必须在 include 里」，否则 TS6307。src/components/PagePickerSheet.test.ts 依赖 tests/helpers/md3TailwindArtifact，而该 helper 又 import tailwind.config.ts ⇒ 依赖闭包要一路列到包根。这三段缺一不可。\n\n  记账（知情接受，勿「顺手收窄」）：`../tests/helpers/**/*.ts` 的通配会连带把 md3Contrast.test.ts 收进**生产类型门禁** —— `pnpm check` 即 `vue-tsc -p src/tsconfig.json`，实测 `--listFiles` 确实命中它（`packages/app-lynx/tests/helpers/md3Contrast.test.ts`）。后果是测试夹具写坏会让生产门禁转红。\n\n  为何不收窄成两个具名 helper：composite 闭包要求**逐文件显式列出**，收窄后将来新增 helper 一旦漏列就报 TS6307（构建直接挂），而「多类型检查一个测试文件」的代价只是多几十毫秒。方向选错的那一侧是硬失败，所以宁可冗余。\n\n  另记（code-review 发现，未修）：`tests/**` 下的门禁测试整体**不在任何 tsconfig project 内** —— 包根 tsconfig.json 是 solution-style（files: []），`tests/typographyFontWeight.test.ts` 等文件从不被 vue-tsc 检查。收窄 tests/ 的类型防线是独立票，改 include 有 TS6307 依赖闭包风险，不在本轮范围。",
+  "include": [
+    "./**/*.ts",
+    "./**/*.vue",
+    "./**/*.d.ts",
+    "../tests/helpers/**/*.ts",
+    "../tailwind.config.ts"
+  ]
 }

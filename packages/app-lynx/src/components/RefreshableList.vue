@@ -40,11 +40,13 @@
 //      时 @scroll 每帧 ~60Hz 派发（2026-09-02 真机实证，ADR-0135 滚动信号面）；
 //   ③ <list> 无 JS 可触发的滚动属性 → 回顶 = 重建回顶。
 //   ④ Lynx 无 transitionend → FAB menu 退出动画 v1 瞬撤（ADR-0111）。
-import { ref, onUnmounted } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { createFabMenuState, type FabMenuExtraItem } from '../primitives/createFabMenu'
 import { useScrollIndicator } from '../primitives/useScrollIndicator'
 import { t } from '../i18n'
 import { FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useReducedMotion } from '../composables/useReducedMotion'
+import AppIcon from './AppIcon.vue'
 import ScrollIndicator from './ScrollIndicator.vue'
 
 const props = defineProps<{
@@ -69,6 +71,21 @@ const indicator = useScrollIndicator()
 
 /** 刷新中：主 FAB 禁用态/旋转 + 防重入；与 menu.busy 同步 */
 const refreshing = ref(false)
+
+// ─── 减弱动效偏好（T03 / issue #851 验收 2）：本组件 5 处动画统一走 useReducedMotion ───
+// 资产清单：fab-spin（infinite 循环）+ scrim-in（遮罩淡入）+ item-rise-1/2/extra（菜单项浮出）。
+// 降级口径 = composable 的 R2：animation 整条置 `none`（**不是**放慢）——fab-spin 是无限循环，
+// 循环动画对前庭障碍影响最大，必须停；item-rise-* 虽是一次性，但其位移/缩放本身即「运动」，
+// 降时长无效（R3 同理），故连同 0/60/120ms 的 stagger 一起被 `none` 整条关掉。
+//
+// 为何用 inline 覆盖而不是「不挂类」：五个类名（fab-spin / scrim-in / item-rise-*）由本组件的
+// 全局 <style> 定义，其中 .scrim-in 还被 GlobalFab 复用（那边已在 scrimStyle 里用同一手法
+// inline 覆盖），保持单一手法；inline 优先级高于类，故偏好关闭时**完全不产生覆盖**，
+// 类里的原声明逐字保留。
+const { animationStyle } = useReducedMotion()
+const motionStyle = computed<Record<string, string>>(() => ({
+  ...(animationStyle.value ? { animation: animationStyle.value } : {}),
+}))
 
 async function onRefreshItemTap() {
   if (refreshing.value || menu.isBusy) return
@@ -154,10 +171,11 @@ onUnmounted(() => {
       :visible="indicator.visible.value"
     />
 
-    <!-- scrim：展开时覆盖列表，点空白收起 -->
+    <!-- scrim：展开时覆盖列表，点空白收起。R2 下 .scrim-in 的 200ms 淡入整条关掉 -->
     <view
       v-if="menu.isOpen && props.fab !== false"
       class="absolute inset-0 z-10 bg-[var(--md-scrim)] scrim-in"
+      :style="motionStyle"
       @tap="onCloseMenu"
     />
 
@@ -166,25 +184,27 @@ onUnmounted(() => {
       v-if="menu.isOpen && props.fab !== false"
       class="absolute z-20 right-4 bottom-[20.267vw] flex flex-col items-end gap-[1.067vw]"
     >
-      <!-- 刷新项：图标 ↻ + label -->
+      <!-- 刷新项：图标（AppIcon refresh）+ label -->
       <view
         class="menu-item item-rise-1 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+        :style="motionStyle"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.refreshList"
         @tap="onRefreshItemTap"
       >
-        <text class="text-[4.8vw] leading-none text-on-surface-variant">↻</text>
+        <AppIcon name="refresh" :size="4.8" class="text-on-surface-variant" />
         <text class="text-[3.733vw] leading-none text-on-surface">{{ t('refreshableList.refresh') }}</text>
       </view>
 
-      <!-- 回顶项：图标 ↑ + label -->
+      <!-- 回顶项：图标（AppIcon arrow_upward）+ label -->
       <view
         class="menu-item item-rise-2 flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+        :style="motionStyle"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="FAB_MENU_A11Y_LABELS.backToTop"
         @tap="onBackToTopItemTap"
       >
-        <text class="text-[4.8vw] leading-none text-on-surface-variant">↑</text>
+        <AppIcon name="arrow_upward" :size="4.8" class="text-on-surface-variant" />
         <text class="text-[3.733vw] leading-none text-on-surface">{{ t('refreshableList.backToTop') }}</text>
       </view>
 
@@ -195,18 +215,35 @@ onUnmounted(() => {
         <view
           v-if="item.visible()"
           class="menu-item item-rise-extra flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+          :style="motionStyle"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="item.accessibilityLabel"
           @tap="onExtraItemTap(item)"
         >
-          <text class="text-[4.8vw] leading-none text-on-surface-variant">{{ item.icon }}</text>
+          <!-- ⚠️ 这里**必须**是 <AppIcon>：FabMenuExtraItem.icon 的类型已从 string
+               收成 IconName，若仍用普通 <text> 插值，页面上传的图标名（如 'search'）
+               会被当**正文**渲染成字面量 "search" —— vue-tsc 抓不到（IconName 是
+               string 子类型），无报错、无崩溃，纯静默视觉损坏。同 LATER_ICON 家族。 -->
+          <AppIcon :name="item.icon" :size="4.8" class="text-on-surface-variant" />
           <text class="text-[3.733vw] leading-none text-on-surface">{{ item.label }}</text>
         </view>
       </template>
     </view>
 
     <!-- 主 FAB / close button（ADR-0111）：常态刷新 FAB，展开时变身为 close button
-         56dp、primary-container、原位不动；busy 时禁用态 opacity 0.6 -->
+         56dp、primary-container、原位不动；busy 时禁用态 opacity 0.6
+         ── 记账（0.6 为什么是字面量、为什么不接令牌）：
+         ① **对不上状态层档位**：tokens.css 的四态 alpha 是 hover .08 / focus .12 /
+            pressed .12 / dragged .16，禁用态是容器 .12 / 内容 .38，**没有 .6**。
+         ② **语义也两样**：状态层是「容器色之上叠一层交互反馈 alpha」；本行是
+            「连容器带图标一起压暗」的**非运动态** busy 指示 —— 承担
+            `useReducedMotion.ts:18`（R2）承诺的「关掉动画后 busy 态仍可见」，
+            属可感知性兜底，不是交互反馈。
+         ③ **不接令牌是刻意的**：MD3 禁用态按**角色**分档（容器 12% / 内容 38%），
+            单一 opacity 无从表达；改接 `--md-state-disabled-container` 或
+            `-on-surface` 任一条都是**观感变更 + 取舍臆断**，不是治理。
+         属 ADR-0111 存量写法，非本轮改动；改这里须连同 useReducedMotion 的 R2
+         承诺一起复核。 -->
     <view
       v-if="props.fab !== false"
       class="absolute z-30 bottom-4 right-4 w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:bg-layer-pressed-primary flex items-center justify-center shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
@@ -216,11 +253,10 @@ onUnmounted(() => {
       @tap="onFabTap"
     >
       <!-- 旋转承载元素 = 包裹 view（text 元素 transform 支持性弱，ADR-0108 决策 2）
-           仅在非展开态且刷新中时旋转；展开态图标为 ✕，不旋转 -->
-      <view :class="refreshing && !menu.isOpen ? 'fab-spin' : ''">
-        <text class="text-[6.4vw] leading-none text-primary-on-container">
-          {{ menu.isOpen ? '✕' : '↻' }}
-        </text>
+           仅在非展开态且刷新中时旋转；展开态图标为 AppIcon close，不旋转。
+           R2：fab-spin 是 infinite 循环，偏好开启时 motionStyle 整条置 animation:none -->
+      <view :class="refreshing && !menu.isOpen ? 'fab-spin' : ''" :style="motionStyle">
+        <AppIcon :name="menu.isOpen ? 'close' : 'refresh'" class="text-primary-on-container" />
       </view>
     </view>
   </view>
@@ -234,16 +270,18 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 .fab-spin {
-  animation: fab-spin 1s linear infinite;
+  /* 1000ms = M3 duration extra-long4。此前是字面量 `1s`，理由「令牌不存在」；
+   * 该令牌已在 tokens.css 补齐（官方值来源见该处注释）。 */
+  animation: fab-spin var(--durationExtraLong4) linear infinite;
 }
 
-/* scrim 淡入（ADR-0111）：展开动画 200ms */
+/* scrim 淡入（ADR-0111）：展开动画 200ms = M3 short4 → 时长令牌（#854 验收 3） */
 @keyframes scrim-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 .scrim-in {
-  animation: scrim-in 200ms var(--motion-emphasized-decelerate) both;
+  animation: scrim-in var(--durationNormal) var(--motion-emphasized-decelerate) both;
 }
 
 /* menu item 从 FAB top-trailing edge 浮出（ADR-0111） */
@@ -261,13 +299,14 @@ onUnmounted(() => {
   transform-origin: right bottom;
 }
 .item-rise-1 {
-  animation: item-rise 250ms var(--motion-emphasized-decelerate) 0ms both;
+  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 0ms both;
 }
 .item-rise-2 {
-  animation: item-rise 250ms var(--motion-emphasized-decelerate) 60ms both;
+  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 60ms both;
 }
-/* 扩展菜单项浮出动画（T4）：排在刷新/回顶之后，延迟 120ms */
+/* 扩展菜单项浮出动画（T4）：排在刷新/回顶之后，延迟 120ms（stagger 延迟无 M3 官方值，
+   按 #854 验收 3「stagger 延迟可留」保留字面量；R3 下由 motionStyle 整条置 none） */
 .item-rise-extra {
-  animation: item-rise 250ms var(--motion-emphasized-decelerate) 120ms both;
+  animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 120ms both;
 }
 </style>

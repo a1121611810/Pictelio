@@ -4,6 +4,7 @@ import type { NavTab } from '../components/navTabs'
 import type { FabMenuExtraItem, FabMenuState } from './createFabMenu'
 import { createFabMenuState } from './createFabMenu'
 import { FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
+import type { IconName } from '../utils/iconMap'
 import type { RouteState } from '../router'
 
 // ─── 放射导航深模块（ADR-0120）───
@@ -27,7 +28,9 @@ export interface PageFabActions {
 export interface FabInnerItem {
   key: string
   kind: 'search' | 'refresh' | 'back-to-top' | 'extra'
-  icon: string
+  /** 图标名（utils/iconMap.ts ICON_CODEPOINTS 的键，ADR-0208 决策 3；
+   *  组件经 <AppIcon :name> 渲染，字形不在本层出现） */
+  icon: IconName
   label: string
   a11yLabel: string
   visible: () => boolean
@@ -65,7 +68,7 @@ export const GLOBAL_SEARCH_A11Y_LABEL = GLOBAL_FAB_A11Y_LABELS.search
 const GLOBAL_SEARCH_INNER_ITEM: FabInnerItem = {
   key: 'search',
   kind: 'search',
-  icon: '🔍',
+  icon: 'search',
   label: '搜索',
   a11yLabel: GLOBAL_SEARCH_A11Y_LABEL,
   visible: () => true,
@@ -135,7 +138,7 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
       items.push({
         key: 'refresh',
         kind: 'refresh',
-        icon: '↻',
+        icon: 'refresh',
         label: '刷新',
         a11yLabel: FAB_MENU_A11Y_LABELS.refreshList,
         visible: () => true,
@@ -145,7 +148,7 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
       items.push({
         key: 'back-to-top',
         kind: 'back-to-top',
-        icon: '↑',
+        icon: 'arrow_upward',
         label: '回顶',
         a11yLabel: FAB_MENU_A11Y_LABELS.backToTop,
         visible: () => true,
@@ -156,6 +159,9 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
         items.push({
           key: extra.key,
           kind: 'extra',
+          // 透传页面注册的图标名。类型源在 FabMenuExtraItem.icon（= IconName），
+          // 故此处无需断言——传错名字在页面侧就编译期报错。
+          // 未知名字不会静默渲染空白——<AppIcon> 查表未命中即抛错（测试硬约束 3）。
           icon: extra.icon,
           label: extra.label,
           a11yLabel: extra.accessibilityLabel,

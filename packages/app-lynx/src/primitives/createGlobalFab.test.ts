@@ -12,7 +12,10 @@ import type { RouteState } from '../router'
 // 期望值来源（oracle 溯源）：
 //   - mode 派生表：ADR-0132 决策 2 + router.ts routes[]（4 tab / 内容页 / 登录·更新·错误页），
 //     非从实现反推；
-//   - 内环搜索项（kind 'search'、icon 🔍、label 搜索、固定首位）：ADR-0132 决策 2。
+//   - 内环搜索项（kind 'search'、icon 'search'、label 搜索、固定首位）：ADR-0132 决策 2；
+//   - 内环图标名（'search' / 'refresh' / 'arrow_upward'）：ADR-0208 决策 3 + iconMap.ts
+//     码点表分组注释记录的旧字形对照（🔍 全局搜索→search、↻ 刷新→refresh、↑ 回顶→arrow_upward），
+//     非从 createGlobalFab.ts 现状反推。
 
 /** 内容页路由名 = router.ts routes[] 排除 4 tab 与 login/update/error（ADR-0132 决策 2 边界） */
 const CONTENT_ROUTE_NAMES = [
@@ -141,6 +144,8 @@ describe('createGlobalFab — view 读模型', () => {
     const { fab } = setup()
     fab.usePage('recommended', { refresh: vi.fn(), backToTop: vi.fn() })
     expect(fab.view.value.inner.map((i) => i.kind)).toEqual(['search', 'refresh', 'back-to-top'])
+    // 图标名契约：↻ 刷新→refresh、↑ 回顶→arrow_upward（oracle 见文件头注释）
+    expect(fab.view.value.inner.map((i) => i.icon)).toEqual(['search', 'refresh', 'arrow_upward'])
 
     // 切到「我的」页（内环为全局搜索项 + 空动作）：navigate 会推进 routeState，激活页随之变为 me
     fab.usePage('me', {})
@@ -156,16 +161,18 @@ describe('createGlobalFab — 内环全局搜索项（ADR-0132 决策 2）', () 
     expect(searchItem).toMatchObject({
       key: 'search',
       kind: 'search',
-      icon: '🔍',
+      icon: 'search',
       label: '搜索',
       a11yLabel: '搜索',
     })
     expect(searchItem.visible()).toBe(true)
     expect(fab.view.value.inner.filter((i) => i.kind === 'search')).toHaveLength(1)
     // 页面动作项顺延（刷新/回顶/extras 均排在搜索项之后）
-    fab.usePage('recommended', actions({ extras: [{ key: 'prev', icon: '‹', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap: vi.fn() }] }))
+    fab.usePage('recommended', actions({ extras: [{ key: 'prev', icon: 'arrow_back', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap: vi.fn() }] }))
     expect(fab.view.value.inner[0].kind).toBe('search')
     expect(fab.view.value.inner.slice(1).map((i) => i.kind)).toEqual(['refresh', 'back-to-top', 'extra'])
+    // extras 的图标名原样透传（渲染层才查表，本层不二次映射——ADR-0208 决策 3）
+    expect(fab.view.value.inner[3].icon).toBe('arrow_back')
   })
 })
 
@@ -254,7 +261,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
   it('extra：调用页面 extras 对应 onTap；异步接管 busy 维度', async () => {
     let release!: () => void
     const onTap = vi.fn(() => new Promise<void>((r) => { release = r }))
-    const extras: FabMenuExtraItem[] = [{ key: 'prev', icon: '‹', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap }]
+    const extras: FabMenuExtraItem[] = [{ key: 'prev', icon: 'arrow_back', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap }]
     const { fab } = setup()
     fab.usePage('recommended', { extras })
     const p = fab.dispatch({ type: 'extra', key: 'prev' })

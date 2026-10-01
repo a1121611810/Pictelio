@@ -48,7 +48,10 @@ const changelogLines = () =>
       <!-- 版本信息 -->
       <view class="mt-[8vw] flex flex-col items-center">
         <text class="text-body-medium text-outline">{{ t('update.newVersion') }}</text>
-        <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ update.updateResult?.latestVersion }}</text>
+        <!-- T07 档位清理：原为 700 字重。headline-medium 官方字重为 regular(400)，
+             MD3 emphasized 变体为 500；版本号已是本块最大字号（大于两侧 body-small / outline），
+             焦点由字号承担，700 属冗余强调且不在该档位字重刻度内 → 500。 -->
+        <text class="text-headline-medium font-regular text-surface-on mt-2">v{{ update.updateResult?.latestVersion }}</text>
         <text class="text-body-small text-outline mt-2">{{ t('update.currentVersion', { version: appVersion }) }}</text>
       </view>
 
@@ -59,7 +62,7 @@ const changelogLines = () =>
           <text
             v-for="(line, i) in changelogLines()"
             :key="i"
-            class="text-body-small text-surface-on-variant leading-snug"
+            class="text-body-small text-surface-on-variant"
             >{{ line }}</text
           >
         </view>

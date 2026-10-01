@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
@@ -14,6 +14,7 @@ import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
 import { initSafeArea, safeBottom, safeTop } from './utils/safeArea'
+import { useReducedMotion } from './composables/useReducedMotion'
 
 const searchSheet = useSearchSheetStore()
 // 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
@@ -63,6 +64,38 @@ onMounted(() => {
   // 订阅后拉初值；Root padding-top/bottom 让系统栏区域染 surface 色（边到边基底）
   initSafeArea()
 })
+
+// ─── 减弱动效偏好（T03 / issue #851 验收 2「当前未处理的 3 个含动画组件全部接入」的第三家）───
+// 本文件持有**全仓唯一的骨架屏 shimmer 动画**（下方 <style> 的 .shimmer），
+// 而 .shimmer 是全局类、被 SkeletonCard / CoverImage / SkeletonNovel / CarouselSkeleton /
+// 各列表页与弹层等 15+ 处消费（它们只写 class="shimmer …"，元素上没有可判定的共同钩子），
+// 因此降级总闸只能落在**根 <page>**（全树唯一的公共祖先）。
+//
+// 为何走 CSS 变量而不是「根 page 挂降级类 + `.降级类 .shimmer { animation: none }`」：
+// 根 <page> 的 :class 绑定被 T2 接线契约**逐字**锁定（tests/unit.test.ts:659 与
+// tests/unit/utils/appearanceClasses.test.ts:312 断言 `:class="appearanceClasses(settings.themeColor, settings.resolvedDark)"`），
+// 改成数组/拼接会同时打红他人 lane 的门禁；:style 是根元素上唯一没被断言锁定的通道
+// （safeAreaJavaContract.test.ts 只断言 paddingTop: safeTop / paddingBottom: safeBottom 两个子串，仍满足）。
+//
+// 失败方向刻意选「fail-open」：变量未定义时 `.shimmer` 的 var() 回退到原声明
+// （见 <style>），即门闸若在真机不生效也只是维持现状（骨架屏仍有 shimmer），
+// 而不会让全站骨架屏集体失去动效。
+// 「变量未定义」如今的真实含义 = tokens.css 没定义/没命中本变量（令牌表未加载）；
+// 偏好关闭的常态路径**不再**靠回退：默认周期由 tokens.css 的 `--shimmer-motion` 给出
+// （= --durationExtraLong4 1000ms，与同为无限转圈的 .fab-spin 同款），
+// 回退实参退化为「令牌表没来时的最后一道兜底」。
+const { animationStyle } = useReducedMotion()
+
+/** 骨架屏动画闸门变量名：与下方 <style> 的 `animation: var(--shimmer-motion, …)` 逐字配对（单测锁） */
+const SHIMMER_MOTION_VAR = '--shimmer-motion'
+
+/** 根 <page> 内联样式：系统栏安全区内边距 + 骨架屏动画闸门（偏好开启 = animation: none）。 */
+const rootStyle = computed<Record<string, string>>(() => ({
+  paddingTop: safeTop.value + 'px',
+  paddingBottom: safeBottom.value + 'px',
+  // R2 关键帧降级：整条 animation 声明置 none（覆盖 infinite 循环），不是「放慢」
+  ...(animationStyle.value ? { [SHIMMER_MOTION_VAR]: animationStyle.value } : {}),
+}))
 </script>
 
 <template>
@@ -72,7 +105,7 @@ onMounted(() => {
   <page
     class="Root"
     :class="appearanceClasses(settings.themeColor, settings.resolvedDark)"
-    :style="{ paddingTop: safeTop + 'px', paddingBottom: safeBottom + 'px' }"
+    :style="rootStyle"
   >
     <!-- [lynx:fix] 模板必须 PascalCase <RouterView>（kebab-case <router-view> 被
          vue-lynx 编译器当原生标签 → 空渲染/编译报错；ADR-0138 决策 8）。
@@ -129,6 +162,10 @@ onMounted(() => {
 
 <style>
 @import './styles/tokens.css';
+/* 图标字体：base64 内联的 @font-face（scripts/generate-icon-subset.py 生成，勿手改）。
+   必须内联而非 url('./xxx.ttf')——Lynx 的 @font-face url() 只吃远程地址与 base64，
+   打包器改写出的 webpack:/// 路径原生端不解析 ⇒ 全站图标豆腐块 ⊠（真机实证）。 */
+@import './styles/icon-font.css';
 
 .Root {
   width: 100%;
@@ -150,6 +187,34 @@ onMounted(() => {
     background-position: -200% 0;
   }
 }
+/* 骨架屏动画闸门（--shimmer-motion）：根 <page> 在「减弱动效」偏好开启时经内联 :style 注入
+   none（useReducedMotion 的 R2 = 整条 animation 置 none，含 infinite 循环），本树内所有
+   .shimmer 随之停摆。变量名与 App.vue 脚本内 SHIMMER_MOTION_VAR 配对（单测锁一致性）。
+
+   默认值现由 tokens.css 的 `--shimmer-motion` 给出，且必须是**整条 animation 简写**而非
+   纯时长（简写只给时长会丢掉 animation-name ⇒ 取 none ⇒ 不播），周期 = --durationExtraLong4
+   1000ms。下方回退实参里的 `1.5s` 因此**只在令牌表缺席时**生效，是门闸的 fail-open 兜底。
+   1000ms 与 1.5s 周期不一致是**有登记的已知偏差**（motionDurationTokens.template.test.ts 的
+   LITERAL_EXCEPTIONS）：回退实参被 src/shimmerGate.test.ts:61 与 useReducedMotion.test.ts:450
+   逐字锁死（裸 var() 或换周期都要先改那两处门禁），而「骨架屏该多快」是产品决策，
+   不该由一次令牌化顺手改掉。
+
+   ⚠️ 「变量未定义时回退到原声明」这句以前是**推断**，本轮 code-review 指出它可能是假的：
+   若 Lynx 支持 `var()` 却不支持回退实参，变量未定义时整条 animation 会落入
+   invalid-at-computed-value-time ⇒ 取初始值 `none` ⇒ **全站 79 处骨架屏同时消失**；
+   而该变量只在偏好**开启**时注入 ⇒ 受害者是**所有**用户，不是只有减弱动效用户。
+
+   **真机实测已排除该风险**（2026-09-30，pictelio_ui / API 34 / 1080×2160）：
+   冷启动连拍 8 帧、间隔 260ms，限内容区裁掉状态栏时钟后逐像素比对
+   （阈值 |Δ|>6）：
+     骨架期  frame1↔2 47.84%   frame1↔4 43.27%   frame1↔5  5.15%   ← 在动
+     阴性对照 frame6↔7  0.00%（内容已加载完，静止）                    ← 探针能分辨「动/不动」
+   拍摄时偏好为关闭（`--shimmer-motion` **未定义**，当时令牌表尚未给出默认值），shimmer 照常播放
+   ⇒ Lynx 的 `animation` 简写**确实解析 `var()` 的回退实参**，上面那条推断不成立。
+   （该结论今天仍然承重：令牌表缺席时走的正是这条回退路径。）
+
+   注：frame1↔3 为 0.00%，是回退生效时的 1.5s 周期下采样点偶然同相位，不是「动画停了」——
+   同批的 47.84% / 43.27% 已证明它在动。 */
 .shimmer {
   background: linear-gradient(
     90deg,
@@ -158,6 +223,6 @@ onMounted(() => {
     var(--md-surface-container-high) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s linear infinite;
+  animation: var(--shimmer-motion, shimmer 1.5s linear infinite);
 }
 </style>

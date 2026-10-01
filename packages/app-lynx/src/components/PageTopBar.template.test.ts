@@ -11,10 +11,23 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { ICON_CODEPOINTS, type IconName } from '../utils/iconMap'
 
 const src = readFileSync(fileURLToPath(new URL('./PageTopBar.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与整行行注释（约束说明本身会提到被禁止的串，负向断言必须在代码本文上做） */
 const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+
+/** 模板里 <AppIcon> 用的图标名（静态 name="x" 与 :name="... ? 'a' : 'b'" 两形态） */
+function appIconNames(source: string): string[] {
+  const out: string[] = []
+  for (const m of source.matchAll(/<AppIcon\b[\s\S]*?\/>/g)) {
+    for (const s of m[0].matchAll(/(?<![:\w])name="([^"]+)"/g)) out.push(s[1]!)
+    for (const s of m[0].matchAll(/:name="([^"]+)"/g)) {
+      for (const q of s[1]!.matchAll(/'([a-z_]+)'/g)) out.push(q[1]!)
+    }
+  }
+  return out
+}
 
 describe('PageTopBar 公开接口（title + back + 可选 a11y/titleClass）', () => {
   it('props：title 必填；back / backA11yLabel / titleA11yLabel / titleClass 可选（spec D2）', () => {
@@ -59,10 +72,19 @@ describe('PageTopBar 变体 b（‹返回 + 标题 + 右动作）：存量类串
     expect(code).toMatch(/<view v-else class="py-1 pr-2" @tap="emit\('back'\)">/)
   })
 
-  it('‹ 字形：text-[6.4vw] leading-none text-surface-on（存量逐字）', () => {
-    expect(
-      code.includes('<text class="text-[6.4vw] leading-none text-surface-on">‹</text>'),
-    ).toBe(true)
+  it('返回键图标：‹ → <AppIcon name="arrow_back">（ADR-0208 决策 3），字号取 AppIcon 缺省 6.4vw = 存量 6.4vw，模板不再手写 text-[6.4vw] / leading-none', () => {
+    // a11y 分支 + 裸分支两处都经 AppIcon，字形/字号/配色三要素与存量逐项一致
+    expect(code.match(/<AppIcon name="arrow_back" class="text-surface-on" \/>/g)?.length).toBe(2)
+    expect(code).toMatch(/import AppIcon from '\.\/AppIcon\.vue'/)
+    // 负向：旧裸字形 <text>…‹</text> 与手写字号零残留
+    expect(code).not.toContain('text-[6.4vw]')
+    expect(code).not.toContain('‹</text>')
+  })
+
+  it('图标名是映射表登记项（oracle = utils/iconMap.ts 唯一事实源 / ADR-0208 决策 2）', () => {
+    for (const name of appIconNames(code)) {
+      expect(Object.keys(ICON_CODEPOINTS)).toContain(name as IconName)
+    }
   })
 
   it('标题基类恒为 flex-1 text-title-large font-medium text-surface-on，附加类经 :class 合并', () => {

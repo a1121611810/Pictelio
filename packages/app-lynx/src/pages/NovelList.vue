@@ -18,6 +18,7 @@ import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { t } from '../i18n'
@@ -216,7 +217,7 @@ onUnmounted(() => {
     <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState icon="✎" :title="emptyMeta.title" :hint="emptyMeta.hint" />
+      <EmptyState icon="menu_book" :title="emptyMeta.title" :hint="emptyMeta.hint" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
@@ -251,9 +252,17 @@ onUnmounted(() => {
               <text class="text-label-medium text-surface-on-variant mr-4">{{
                 t('novels.charCount', { count: item.text_length })
               }}</text>
-              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-surface-on-variant mr-4">
-                ♥ {{ item.total_bookmarks }}
-              </text>
+              <!-- 追更数：♥ → star_outline（ADR-0208 决策 3；与插画侧计数同字形）。
+                   计数文本即语义，图标纯装饰不重复标注（ADR-0208 决策 4）。 -->
+              <view
+                v-if="item.total_bookmarks > 0"
+                class="flex flex-row items-center mr-4"
+              >
+                <AppIcon name="star_outline" :size="3.2" class="text-surface-on-variant" />
+                <text class="text-label-medium text-surface-on-variant ml-0.5">{{
+                  item.total_bookmarks
+                }}</text>
+              </view>
             </view>
             <!-- 自适应标签行（ADR-0149）：装多少算多少 + 省略号截断 + 「+N」；
                  chip 点击 → 全局搜索，长按 → 静音（#732），+N/截断 chip → 进详情 -->

@@ -1,7 +1,7 @@
 // lynx 组件/工具域（en）——key 集合与源语言完全一致（satisfies 编译期强制）。
 // 译文按 docs/style-guides/ui-copy.md（Apple HIG 风格基线）执行：sentence case、
-// 动词 CTA、按钮无句号、避免客套词、术语表（bookmark/follow/sign in）；图标 unicode
-// （▶︎/⧉）非文案，随 zh 保留。
+// 动词 CTA、按钮无句号、避免客套词、术语表（bookmark/follow/sign in）。
+// 徽标符号不是文案：原 U+25B6+U+FE0E / U+29C9 已改由组件侧 <AppIcon> 渲染，字典只留文字（ADR-0208 决策 3）。
 import type { ZhMiscKey } from "../zh-CN/misc";
 
 const enMisc = {
@@ -42,8 +42,8 @@ const enMisc = {
   "aiOverlay.maskHint": "AI-generated content, masked by your settings",
 
   // ─── IllustTypeBadgeRow.vue ───
-  "illustTypeBadgeRow.ugoira": "▶︎ Ugoira",
-  "illustTypeBadgeRow.multiPages": "⧉ {{count}} images",
+  "illustTypeBadgeRow.ugoira": "Ugoira",
+  "illustTypeBadgeRow.multiPages": "{{count}} images",
 
   // ─── UgoiraViewer.vue ───
   "ugoiraViewer.noFrames": "No frames in this ugoira",
@@ -147,6 +147,20 @@ const enMisc = {
   "me.webdav.passwordPlaceholder": "Password (stored encrypted)",
   "me.webdav.dirPlaceholder": "Directory (default Pictelio/backup)",
   "me.webdav.backupPasswordPlaceholder": "Backup password (optional, encrypts the backup file)",
+  // ── Floating-label short forms (ADR-0209 decision 3) ──
+  // Kept separate from the *Placeholder keys on purpose: a placeholder may carry a
+  // parenthetical hint, but an MD3 filled-text-field label is the *field name* and sits
+  // on the same line as the input text once floated inside a 56dp container — a long
+  // phrase would collide with what the user typed. Supplementary wording stays in the
+  // placeholder. Never derive one from the other (ADR-0205 decision 1).
+  "me.webdav.urlLabel": "Server URL",
+  "me.webdav.passwordLabel": "Password",
+  "me.webdav.dirLabel": "Directory",
+  "me.webdav.backupPasswordLabel": "Backup password",
+  // Same reason: sharing a key with the placeholder makes both render twice
+  // when the field is focused but empty.
+  "me.webdav.usernameLabel": "Username",
+  "me.webdav.restorePromptLabel": "Backup password",
   "me.webdav.sensitiveExclusionHint": "Sensitive items (selected items are excluded from the backup)",
   "me.webdav.autoBackup": "Auto backup on launch",
   "me.webdav.lastBackup": "Last backup: {{value}}",

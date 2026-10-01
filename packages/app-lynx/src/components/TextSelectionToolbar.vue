@@ -7,6 +7,7 @@
 // 尺寸取自 selectionToolbarGeometry 的常量（「量=画」同源）；不铺全屏层（ADR-0123）。
 import { computed } from 'vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from './AppIcon.vue'
 import {
   TOOLBAR_ITEM_GAP_VW,
   TOOLBAR_ITEM_VW,
@@ -57,15 +58,20 @@ const itemStyle = computed<Record<string, string>>(() => ({
       :accessibility-label="item.label"
       @tap.stop="emit('action', item.key)"
     >
-      <!-- 线性图标（view 绘制：border + border-radius + rotate；spec 禁回退为 emoji/字形） -->
-      <view v-if="item.key === 'copy'" class="relative w-[4.9vw] h-[4.9vw]">
-        <view
-          class="absolute left-[1.5vw] top-[0.2vw] w-[2.8vw] h-[3.2vw] border-[0.28vw] border-solid border-on-surface rounded-[0.65vw]"
-        />
-        <view
-          class="absolute left-[0.2vw] top-[1.5vw] w-[2.8vw] h-[3.2vw] border-[0.28vw] border-solid border-on-surface rounded-[0.65vw] bg-surface-container-high"
-        />
-      </view>
+      <!-- 「复制」图标：<AppIcon name="content_copy">（ADR-0208 决策 5——Material Symbols
+           有对应字形，手绘矩形已删；保留手绘只会让「登记了字形却零消费」长期共存）。
+           :size=4.2667 = 16sp 标准图标尺寸（1sp=0.2667vw），全仓 AppIcon 调用同口径（裸数字 + vw）。
+           ⚠️ **不是与手绘版视觉等价**：手绘墨迹是 w-[2.8vw] × h-[3.2vw] 的描边矩形，
+           新字形是 4.2667vw 的 em 盒（Material Symbols 在 24 网格上内容约占 20/24
+           ⇒ 墨迹 ≈3.56vw），线度量级差 1.4–1.5×，实际是**变大**。
+           这里选 16sp 是因为它是 MD3 标准图标尺寸，不是因为「看起来一样」。
+           条目盒恒为 TOOLBAR_ITEM_VW（几何常量，12.2vw），故换图标不动布局。
+           配色承接原来的 border-on-surface——手绘矩形里的
+           bg-surface-container-high 只是为了「挖空」下层描边的衬底，不是配色选择。 -->
+      <AppIcon v-if="item.key === 'copy'" name="content_copy" :size="4.2667" class="text-on-surface" />
+      <!-- 「搜索」图标：仍是 view 绘制（border + rotate）。ADR-0208 决策 5 的手绘替换范围
+           只写了「复制」，本轮不扩到搜索项——它没有登记字形，替换要连带登记
+           iconMap + 重跑子集字体，属另一次改动。 -->
       <view v-else class="relative w-[4.9vw] h-[4.9vw]">
         <view
           class="absolute left-[0.2vw] top-[0.2vw] w-[2.8vw] h-[2.8vw] border-[0.28vw] border-solid border-on-surface rounded-full"

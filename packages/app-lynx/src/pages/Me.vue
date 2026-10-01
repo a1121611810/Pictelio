@@ -14,6 +14,7 @@ import type { UgoiraExtractMode } from '../api/ugoira'
 import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from '../components/AppIcon.vue'
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
@@ -159,6 +160,71 @@ function onWebdavFieldInput(kind: 'url' | 'username' | 'dir', data: { detail?: {
   if (kind === 'url') settings.setWebdavUrl(value)
   else if (kind === 'username') settings.setWebdavUsername(value)
   else settings.setWebdavDir(value)
+}
+
+// ─── MD3 filled text field 状态（ADR-0209 决策 1/2；本文件 7 处 <input> 同构改造）───
+// 官方规格回源（ADR-0209 决策 1，勿凭记忆改）：容器 56dp、顶 4dp / 底 0dp 圆角、
+// 底部指示条未聚焦 1px on-surface-variant → 聚焦 2px primary、
+// label 静止 body-large + on-surface-variant → 浮动态 body-small + primary。
+//
+// label 浮动用 bindfocus / bindblur **事件**驱动，不依赖 `:focus` 伪类：
+// ADR-0207 决策 5 已真机实证该伪类在 Lynx 引擎不匹配（阳性对照 `:active` 生效而
+// 这两类无任何变化），而 Lynx `<input>` 官方支持 bindfocus / bindblur
+// （Android / iOS / Harmony，since 3.4；本项目 Lynx SDK 4.0.1 满足）。
+// 来源：https://lynxjs.org/3.6/api/elements/built-in/input 的 Events 段。
+//
+// 竞态防护（AGENTS.md 硬约束 3）：blur 与 input 会竞态（失焦瞬间仍有按键在途）。
+// 因此浮动态**不存派生布尔**，而是每次由 (focus, value) 两个活数据源现算——
+// input 与 blur 无论谁先到都收敛到同一表达式，不存在「旧值覆盖新值」的窗口。
+// 同理 focus 用**按字段 id 分槽**的记录而非单一共享布尔：A 的 blur 晚于 B 的 focus
+// 到达时不会误清 B 的聚焦态（单布尔的经典反模式）。
+//
+// ⚠️ @lynx-js/types 未在本仓落地 ⇒ vue-tsc 对 Lynx 元素属性零校验，写错属性名不会
+// 报错、只会在真机静默失效（ADR-0209 决策 2 前提风险）。合规由单测 + 真机承担。
+const fieldFocus = ref<Record<string, boolean>>({})
+
+/** 记录某字段的聚焦态（@focus → true / @blur → false） */
+function setFieldFocus(id: string, focused: boolean): void {
+  fieldFocus.value[id] = focused
+}
+
+/** 官方语义：label 浮动态 = 聚焦中 或 值非空（见上方竞态防护说明） */
+function isFieldFloating(id: string, value: string): boolean {
+  return fieldFocus.value[id] === true || value !== ''
+}
+
+/* 底部指示条分两层承载，**刻意不用互斥类对**（历史实现 fieldIndicatorClass 已删）：
+ *  ① 未聚焦 1px + on-surface-variant 写在 input 的**静态** class（官方 active-indicator-color，
+ *     不是 outline-variant —— 后者是 outlined 变体的色，见 ADR-0209 决策 1）；
+ *  ② 聚焦 2px + primary 是 input 之后的**独立 <view>** 覆盖（见各字段下的 h-[2px] bg-primary）。
+ * 换成互斥类对（同一个 CSS 属性上叠 border-b-[1px] 与 border-b-[2px]）会让胜负取决于
+ * Tailwind 产物里的**声明顺序** —— 实测 `.border-b-primary` 排在
+ * `.border-b-surface-on-variant` **之前**，颜色侧会静默停在未聚焦色。
+ * 这与 AGENTS.md 点名的「写错层级 = 死类名 / 静默无样式」是同一族陷阱。
+ * 覆盖元素的 2px 叠在 1px 之上，视觉即「指示条加粗转主色」。 */
+
+/** placeholder 可见性（真机实证修）：**聚焦中**才显示 placeholder。
+ *  静止态由 label 承担文案；有值但未聚焦时 label 已浮到顶部、内容即输入值，
+ *  再叠一层 placeholder 会得到「目录 / 目录（默认 Pictelio/backup）」双行
+ *  （2026-10-01 emulator-5554 实测）。故判据是**聚焦**（`isFieldFloating` 含「有值」
+ *  那一支，语义上不对——placeholder 的职责是「提示可输入什么」，值已存在时提示无意义）。 */
+function isPlaceholderShown(id: string): boolean {
+  return fieldFocus.value[id] === true
+}
+
+/** label 视觉：静止 body-large + on-surface-variant → 浮动态 body-small + primary */
+function fieldLabelClass(id: string, value: string): string {
+  return isFieldFloating(id, value) ? 'text-body-small text-primary' : 'text-body-large text-surface-on-variant'
+}
+
+/** label 行程：静止垂直居中于 56dp 容器 / 浮动态贴顶 */
+function fieldLabelWrapClass(id: string, value: string): string {
+  return isFieldFloating(id, value) ? 'pt-[1.067vw]' : 'h-[14.933vw]'
+}
+
+/** 输入文字避让：浮动态留顶部 padding（不被 label 压住）/ 静止时垂直居中不留白 */
+function fieldInputPadClass(id: string, value: string): string {
+  return isFieldFloating(id, value) ? 'pt-[5.333vw]' : ''
 }
 
 /** M3：敏感项排除勾选切换（持久化，spec §7） */
@@ -510,7 +576,11 @@ function pickAppearanceMode(mode: DarkModeId) {
             "
           />
           <view class="ml-4 flex flex-col">
-            <text class="text-headline-small font-bold text-surface-on">{{ auth.currentUser.name }}</text>
+            <!-- T07 档位清理：原为 700 字重。账号名属身份文本，headline-small 官方
+                 regular(400)、emphasized 500；身份已由左侧 17vw 头像 + 下方 @account 承担，
+                 且同屏另一标题（:492 title-large）本就是 500，留 700 会让同一屏出现两套
+                 字重口径。判为**非**必须 700 的强强调（不同于价格/警示数字）→ 500。 -->
+            <text class="text-headline-small font-regular text-surface-on">{{ auth.currentUser.name }}</text>
             <text class="text-body-small text-surface-on-variant mt-1">@{{ auth.currentUser.account }}</text>
           </view>
         </view>
@@ -521,7 +591,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openBookmarks"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.bookmarks') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <!-- 追更列表入口（issue #225 / spec §US7）：账户组第二行 -->
         <view
@@ -531,7 +601,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openWatchlist"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.watchlist') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <!-- 稍后看入口（ADR-0191 D5 / #753 T4）：账户组第三行，行尾条目计数徽标（数据源同 store；
              徽标为装饰性，语义由行级 accessibility-label 承载——通知未读圆点同款约定） -->
@@ -546,7 +616,7 @@ function pickAppearanceMode(mode: DarkModeId) {
             <view class="min-w-[5.333vw] h-[5.333vw] px-[1.6vw] rounded-[var(--md-shape-full)] bg-secondary-container flex items-center justify-center mr-2">
               <text class="text-label-small text-secondary-on-container">{{ watchLaterStore.count }}</text>
             </view>
-            <text class="text-title-medium text-surface-on-variant">›</text>
+            <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
           </view>
         </view>
         <!-- 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）；双向好P友关系列表，
@@ -558,7 +628,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openMyPixiv"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.mypixiv') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5"
@@ -567,7 +637,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openDownloads"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.downloads') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <!-- 网络自检入口（spec docs/specs/network-self-check.md / #445） -->
         <view
@@ -577,7 +647,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openNetworkCheck"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.networkCheck') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <!-- 通知中心入口（ADR-0188 D7 / #728）：行尾未读圆点（M3 error 语义色，纯 CSS） -->
         <view
@@ -591,7 +661,7 @@ function pickAppearanceMode(mode: DarkModeId) {
             <!-- 未读圆点（装饰性：状态语义由行级 accessibility-label 承载，不加独立标注——
                  unit.test.ts 钉死 Me 页 element/label 与 ME_A11Y_LABELS 注册表严格配平） -->
             <view v-if="notificationStore.unreadCount > 0" class="w-[2.667vw] h-[2.667vw] rounded-full bg-error mr-2" />
-            <text class="text-title-medium text-surface-on-variant">›</text>
+            <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
           </view>
         </view>
       </GlassCard>
@@ -713,6 +783,9 @@ function pickAppearanceMode(mode: DarkModeId) {
         <text class="text-label-medium text-surface-on-variant mb-2">{{ t('me.appearance.mode') }}</text>
         <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统（spec §4.4：分解写法，副作用走 pickAppearanceMode；mb-4 随 class 透传落在容器根） -->
         <M3SegmentedButton class="mb-4" :model-value="darkMode" :options="appearanceOptions" @update:modelValue="pickAppearanceMode" />
+        <!-- 色板行：7 个色块的选中态 ✓ 裸字形统一换 Material Symbols `check`（T12/ADR-0208），
+             :size=2.93vw = 原 text-label-small（11sp = 22rpx = 11px @375），视觉尺寸不变；
+             「已选中」语义仍由色块的 accessibility-label + border/bg 表达，图标只画形状不承载语义 -->
         <view class="flex flex-row items-start justify-between">
           <view class="flex flex-col items-center gap-1">
             <!-- 天蓝（默认） -->
@@ -724,7 +797,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('sky')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'sky'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'sky'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorSky') }}</text>
@@ -739,7 +812,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('violet')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'violet'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'violet'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorViolet') }}</text>
@@ -754,7 +827,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('pink')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'pink'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'pink'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorPink') }}</text>
@@ -769,7 +842,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('green')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'green'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'green'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorGreen') }}</text>
@@ -784,7 +857,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('orange')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'orange'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'orange'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorOrange') }}</text>
@@ -799,7 +872,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('teal')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'teal'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'teal'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorTeal') }}</text>
@@ -814,7 +887,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               @tap="settings.setThemeColor('bili')"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <text v-if="themeColor === 'bili'" class="text-primary-on text-label-small">✓</text>
+                <AppIcon v-if="themeColor === 'bili'" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorBili') }}</text>
@@ -942,7 +1015,7 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openMuteTags"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.content.muteTags') }}</text>
-          <text class="text-title-medium text-surface-on-variant">›</text>
+          <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
       </view>
 
@@ -952,7 +1025,8 @@ function pickAppearanceMode(mode: DarkModeId) {
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.ugoira.hint') }}</text>
         <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container（range 档二次确认仍走 pickUgoiraMode） -->
         <M3SegmentedButton :model-value="ugoiraMode" :options="ugoiraModeOptions" @update:modelValue="pickUgoiraMode" />
-        <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-snug，行高由 text-label-medium 档位携带（16sp） -->
+        <text class="text-label-medium text-surface-on-variant mt-2">
           {{ t('me.ugoira.rangeHint') }}
         </text>
       </view>
@@ -1031,15 +1105,30 @@ function pickAppearanceMode(mode: DarkModeId) {
           <text class="text-title-medium text-surface-on">{{ t('me.download.templateLabel') }}</text>
           <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.download.templateHint') }}</text>
           <!-- lynx input（默认普通文本键盘）：v-model 先于 @input（vue-lynx 保证，WebDAV 输入同款）；
-               @input 逐键持久化 + 预览回显，@confirm 键盘确认后回写净化值（trim/截断可见） -->
-          <input
-            v-model="templateInput"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-2"
-            :placeholder="t('me.download.templatePlaceholder')"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
-            @input="commitTemplate(false)"
-            @confirm="commitTemplate(true)"
+               @input 逐键持久化 + 预览回显，@confirm 键盘确认后回写净化值（trim/截断可见）
+               MD3 filled text field（ADR-0209）：label 复用本区块既有的 me.download.templateLabel
+               文案（该 key 已在同一区块上方渲染为小标题，浮动态下二者同源不冲突）。
+               @focus/@blur 驱动 label 浮动（ADR-0209 决策 2：:focus 伪类在 Lynx 引擎不匹配）。 -->
+          <view class="relative self-stretch mt-2">
+            <input
+              v-model="templateInput"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('template', templateInput)"
+              :placeholder="t('me.download.templatePlaceholder')"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('template', true)"
+              @blur="setFieldFocus('template', false)"
+              @input="commitTemplate(false)"
+              @confirm="commitTemplate(true)"
+            />
+          <view
+            v-if="fieldFocus['template'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
+          <!-- 无浮动 label：本区块上方已有常驻字段名 me.download.templateLabel，
+                 同屏出现两份「模板名」即 ADR-0209 决策 6 禁止的重复（该决策以「重复本身」
+                 为由豁免 BookmarkPanel，反向量同样约束此处）。仅保留聚焦态指示条。 -->
+          </view>
           <view class="flex flex-row items-center justify-between mt-2">
             <text class="text-label-medium text-surface-on-variant flex-1">{{ t('me.download.templatePreview', { value: templatePreview }) }}</text>
             <view
@@ -1244,14 +1333,31 @@ function pickAppearanceMode(mode: DarkModeId) {
         </view>
 
         <template v-if="settings.webdavEnabled">
-          <!-- M1：v-model 直改 ref 不落盘——@input 追加调用 setter 持久化（vue-lynx 保证 v-model 先于 @input） -->
-          <input
-            v-model="settings.webdavUrl"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            placeholder="https://dav.example.com/remote.php/dav/files/me/"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
-            @input="onWebdavFieldInput('url', $event)"
+          <!-- M1：v-model 直改 ref 不落盘——@input 追加调用 setter 持久化（v-model 先赋值，setter 幂等）
+               MD3 filled text field（ADR-0209）：底部指示条 + label 浮动。
+               label 用专门的 *Label 短 key（i18n 后续补入 zh-CN/en），不复用 *Placeholder：
+               后者可带括号补充说明，浮到 56dp 容器顶部后会与输入文字挤在一行（ADR-0209 决策 3）。 -->
+          <view class="relative self-stretch mt-3">
+            <input
+              v-model="settings.webdavUrl"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('webdavUrl', settings.webdavUrl)"
+              :placeholder="isPlaceholderShown('webdavUrl') ? 'https://dav.example.com/remote.php/dav/files/me/' : ''"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('webdavUrl', true)"
+              @blur="setFieldFocus('webdavUrl', false)"
+              @input="onWebdavFieldInput('url', $event)"
+            />
+          <view
+            v-if="fieldFocus['webdavUrl'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
+          <text
+              class="absolute left-4 flex items-center"
+              :class="[fieldLabelWrapClass('webdavUrl', settings.webdavUrl), fieldLabelClass('webdavUrl', settings.webdavUrl)]"
+              >{{ t('me.webdav.urlLabel') }}</text
+            >
+          </view>
           <!-- M4：非 HTTPS 警告（spec §7） -->
           <text
             v-if="settings.webdavUrl !== '' && !settings.webdavUrl.startsWith('https://')"
@@ -1259,35 +1365,100 @@ function pickAppearanceMode(mode: DarkModeId) {
           >
             {{ t('me.webdav.httpsWarning') }}
           </text>
-          <input
-            v-model="settings.webdavUsername"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            :placeholder="t('me.webdav.usernamePlaceholder')"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
-            @input="onWebdavFieldInput('username', $event)"
+          <view class="relative self-stretch mt-3">
+            <input
+              v-model="settings.webdavUsername"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('webdavUsername', settings.webdavUsername)"
+              :placeholder="isPlaceholderShown('webdavUsername') ? t('me.webdav.usernamePlaceholder') : ''"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('webdavUsername', true)"
+              @blur="setFieldFocus('webdavUsername', false)"
+              @input="onWebdavFieldInput('username', $event)"
+            />
+          <view
+            v-if="fieldFocus['webdavUsername'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
+          <text
+              class="absolute left-4 flex items-center"
+              :class="[
+                fieldLabelWrapClass('webdavUsername', settings.webdavUsername),
+                fieldLabelClass('webdavUsername', settings.webdavUsername),
+              ]"
+              >{{ t('me.webdav.usernameLabel') }}</text
+            >
+          </view>
           <!-- B1：密码输入框不可逆显（spec §7） -->
-          <input
-            v-model="webdavLoginPassword"
-            type="password"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            :placeholder="t('me.webdav.passwordPlaceholder')"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+          <view class="relative self-stretch mt-3">
+            <input
+              v-model="webdavLoginPassword"
+              type="password"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('webdavPassword', webdavLoginPassword)"
+              :placeholder="isPlaceholderShown('webdavPassword') ? t('me.webdav.passwordPlaceholder') : ''"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('webdavPassword', true)"
+              @blur="setFieldFocus('webdavPassword', false)"
+            />
+          <view
+            v-if="fieldFocus['webdavPassword'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
-          <input
-            v-model="settings.webdavDir"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            :placeholder="t('me.webdav.dirPlaceholder')"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
-            @input="onWebdavFieldInput('dir', $event)"
+          <text
+              class="absolute left-4 flex items-center"
+              :class="[
+                fieldLabelWrapClass('webdavPassword', webdavLoginPassword),
+                fieldLabelClass('webdavPassword', webdavLoginPassword),
+              ]"
+              >{{ t('me.webdav.passwordLabel') }}</text
+            >
+          </view>
+          <view class="relative self-stretch mt-3">
+            <input
+              v-model="settings.webdavDir"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('webdavDir', settings.webdavDir)"
+              :placeholder="isPlaceholderShown('webdavDir') ? t('me.webdav.dirPlaceholder') : ''"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('webdavDir', true)"
+              @blur="setFieldFocus('webdavDir', false)"
+              @input="onWebdavFieldInput('dir', $event)"
+            />
+          <view
+            v-if="fieldFocus['webdavDir'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
-          <input
-            v-model="webdavBackupPassword"
-            type="password"
-            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            :placeholder="t('me.webdav.backupPasswordPlaceholder')"
-            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+          <text
+              class="absolute left-4 flex items-center"
+              :class="[fieldLabelWrapClass('webdavDir', settings.webdavDir), fieldLabelClass('webdavDir', settings.webdavDir)]"
+              >{{ t('me.webdav.dirLabel') }}</text
+            >
+          </view>
+          <view class="relative self-stretch mt-3">
+            <input
+              v-model="webdavBackupPassword"
+              type="password"
+              class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+              :class="fieldInputPadClass('webdavBackupPassword', webdavBackupPassword)"
+              :placeholder="isPlaceholderShown('webdavBackupPassword') ? t('me.webdav.backupPasswordPlaceholder') : ''"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              @focus="setFieldFocus('webdavBackupPassword', true)"
+              @blur="setFieldFocus('webdavBackupPassword', false)"
+            />
+          <view
+            v-if="fieldFocus['webdavBackupPassword'] === true"
+            class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
           />
+          <text
+              class="absolute left-4 flex items-center"
+              :class="[
+                fieldLabelWrapClass('webdavBackupPassword', webdavBackupPassword),
+                fieldLabelClass('webdavBackupPassword', webdavBackupPassword),
+              ]"
+              >{{ t('me.webdav.backupPasswordLabel') }}</text
+            >
+          </view>
           <!-- M3：敏感项排除（spec §7；账号级敏感键勾选后不进备份文件） -->
           <view
             v-if="webdavSensitiveKeys.length > 0"
@@ -1395,16 +1566,33 @@ function pickAppearanceMode(mode: DarkModeId) {
                 {{ file.name }}{{ file.encrypted ? t('me.webdav.encryptedBadge') : '' }}
               </text>
             </view>
-            <!-- S7：加密档且无已保存备份密码 → 本次输入 -->
+            <!-- S7：加密档且无已保存备份密码 → 本次输入（MD3 filled text field，ADR-0209） -->
             <view v-if="webdavNeedsPassword && webdavSelected" class="mt-2">
               <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.encryptedPrompt') }}</text>
-              <input
-                v-model="webdavPromptPassword"
-                type="password"
-                class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-2"
-                :placeholder="t('me.webdav.restorePromptPlaceholder')"
-                :placeholder-color="INPUT_PLACEHOLDER_COLOR"
-              />
+              <view class="relative self-stretch mt-2">
+                <input
+                  v-model="webdavPromptPassword"
+                  type="password"
+                  class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
+                  :class="fieldInputPadClass('webdavPromptPassword', webdavPromptPassword)"
+                  :placeholder="isPlaceholderShown('webdavPromptPassword') ? t('me.webdav.restorePromptPlaceholder') : ''"
+                  :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+                  @focus="setFieldFocus('webdavPromptPassword', true)"
+                  @blur="setFieldFocus('webdavPromptPassword', false)"
+                />
+              <view
+                v-if="fieldFocus['webdavPromptPassword'] === true"
+              class="absolute left-0 right-0 bottom-0 h-[2px] bg-primary"
+            />
+                <text
+                  class="absolute left-4 flex items-center"
+                  :class="[
+                    fieldLabelWrapClass('webdavPromptPassword', webdavPromptPassword),
+                    fieldLabelClass('webdavPromptPassword', webdavPromptPassword),
+                  ]"
+                  >{{ t('me.webdav.restorePromptLabel') }}</text
+                >
+              </view>
               <view
                 class="h-[10.667vw] bg-primary rounded-[var(--md-shape-full)] flex items-center justify-center mt-2"
                 :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -1459,8 +1647,9 @@ function pickAppearanceMode(mode: DarkModeId) {
     <!-- M3 Dialog（二次确认，选择 Range 时）：fixed 全屏 scrim 遮罩 + 居中卡片 + 标题/内容/操作区 -->
     <view v-if="ugoiraConfirm" class="fixed inset-0 bg-scrim z-50 flex items-center justify-center">
       <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
-        <text class="text-headline-small font-medium text-surface-on">{{ t('me.ugoira.confirmTitle') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
+        <text class="text-headline-small font-regular text-surface-on">{{ t('me.ugoira.confirmTitle') }}</text>
+        <!-- T10/ADR-0206 决策 3：删掉自选 leading-snug，行高由 text-body-medium 档位携带（20sp） -->
+        <text class="text-body-medium text-surface-on-variant mt-4">
           {{ t('me.ugoira.confirmBody') }}
         </text>
         <view class="flex flex-row justify-end mt-6 gap-2">

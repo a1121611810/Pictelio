@@ -236,7 +236,9 @@ describe('TagNeighbors 纪律（app-lynx 样式约定：Tailwind/M3 令牌、零
     expect(template).not.toContain('absolute')
   })
 
-  it('无裸 :focus（统一 :focus-visible）+ 触控目标 ≥40px（10.667vw 高度键）', () => {
+  // ADR-0207 决策 5 真机实证：`:focus` 与 `:focus-visible` **都**不写（引擎不匹配，
+  // 写出来只是死类名）。用例名原写「统一 :focus-visible」，与该结论反向，会误导后人。
+  it('无裸 :focus / :focus-visible（ADR-0207 决策 5）+ 触控目标 ≥40px（10.667vw 高度键）', () => {
     expect(src).not.toMatch(/(^|[^-]):focus\b/)
     expect(template).toContain('h-[10.667vw]')
   })

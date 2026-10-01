@@ -2,10 +2,12 @@
 // ─── M3 底部导航（NavigationBar，Material Design 3） ───
 // 形态：80dp 高 + surface-container 背景；active 项图标置于 64×32dp
 // secondary-container 胶囊指示器内（on-secondary-container 色），非 active
-// 用 on-surface-variant；label 12sp。图标用 unicode 文本符号（Lynx 无 icon 库）。
+// 用 on-surface-variant；label 12sp。图标经 <AppIcon> 渲染（icon 名由 navTabs.ts 给，
+// 字形查 utils/iconMap.ts，ADR-0208 决策 3）。
 // 顶层页（推荐/插画/小说/我的）接入；点击 navigate 到对应路由。
 import { t } from '../i18n'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from './AppIcon.vue'
 import type { NavTab } from './navTabs'
 
 const props = defineProps<{
@@ -35,10 +37,11 @@ const emit = defineEmits<{
         class="w-[17.067vw] h-[8.533vw] rounded-full flex items-center justify-center"
         :class="activeName === tab.name ? 'bg-secondary-container' : ''"
       >
-        <text
-          class="text-[6.4vw] leading-none"
+        <!-- 图标：24dp=6.4vw 走 AppIcon 缺省字号（AppIcon 自带 leading-none） -->
+        <AppIcon
+          :name="tab.icon"
           :class="activeName === tab.name ? 'text-secondary-on-container' : 'text-surface-on-variant'"
-        >{{ tab.icon }}</text>
+        />
       </view>
       <!-- label：12sp≈24rpx，active on-surface / 非 active on-surface-variant -->
       <text

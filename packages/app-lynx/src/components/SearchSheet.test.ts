@@ -285,11 +285,17 @@ describe('SearchSheet AI 三态行遮罩（ADR-0155：mask 行内遮罩 / only �
 })
 
 describe('SearchSheet 筛选折叠区（#474/#477：SearchSheet 内折叠筛选区，默认折叠）', () => {
-  it('开关：激活数徽标 + a11y 标签 + 字符 chevron', () => {
+  it('开关：激活数徽标 + a11y 标签 + chevron 图标（⌄/⌃ → AppIcon expand_more / expand_less，ADR-0208 决策 3）', () => {
     expect(source).toContain('v-if="filterOpen"')
     expect(source).toContain("filterOpen = !filterOpen")
     expect(source).toContain('SEARCH_A11Y_LABELS.filterToggle')
     expect(source).toContain('{{ activeFilterCount }}')
+    // chevron 渲染位：图标名 + 与存量 text-label-medium 同口径字号（24rpx = 12sp = 3.2vw）
+    expect(source).toContain(":name=\"filterOpen ? 'expand_less' : 'expand_more'\"")
+    expect(source).toContain(':size="3.2"')
+    expect(source).toMatch(/import AppIcon from '\.\/AppIcon\.vue'/)
+    // 负向：旧裸字符 ternary 零残留
+    expect(source).not.toContain("filterOpen ? '⌃' : '⌄'")
   })
 
   it('维度齐全：期间预设/收藏数七档/比例/分辨率/AI 覆盖 + 清除全部（仅激活时）', () => {

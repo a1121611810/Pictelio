@@ -35,6 +35,12 @@ packages/website/task-*-report.md
 packages/android-host/android/app/*.keystore
 packages/android-host/android/app/*.jks
 packages/android-host/android/app/release/
+# ⚠️ 同步进来的客户端构建产物（scripts/sync-android-assets.mjs 把 dist/ 拷到这里供
+# Gradle 打包）：main.lynx.bundle + static/font/<name>.<hash>.ttf。**不是源码**——
+# git 历史从未跟踪过它，每次 build:android-host 都会重新生成。
+# 之前没规则的后果：`git add -A` 会把它连同 .DS_Store 一起吸进暂存区。
+# 字体文件名带内容哈希，同一份产物在两次构建间就可能不同名 ⇒ 天然不适合入库。
+packages/android-host/android/app/src/main/assets/
 # packages/app/* 的细粒度忽略规则已随 T10 删包（#842）移除——目录不再存在，规则恒不命中。
 # 本机磁盘若仍有该包的构建垃圾，用一条通用规则兜底防误提交：
 packages/app/
@@ -60,5 +66,13 @@ packages/app/ios/
 
 # Gradle 用户缓存（GRADLE_USER_HOME 约定在仓库根，见 scripts/release 流程）
 /android/
+# 宿主包的本地 Gradle 状态与 wrapper 分发缓存。
+# ⚠️ 此前未忽略：`git status` 会把 `.gradle/wrapper/dists/**` 与 `.gradle/.tmp/*` 全量列出
+#（实测一次 `git status --untracked-files=all` 有上千条缓存噪声），
+# 既拖慢每次状态查询，也诱导人用 `git add -A` —— 那会把 Gradle 缓存吸进提交。
+packages/android-host/.gradle/
+packages/app-lynx/.gradle/
+packages/app-lynx/node_modules/.gradle/
+packages/app-lynx/node_modules/.cache/
 packages/app/bench-results/
 packages/app/tests/agent-browser/.token-state.json

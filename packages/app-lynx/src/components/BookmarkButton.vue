@@ -22,6 +22,19 @@
 // remount（:key），否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
 // targetKind 与 mutation 注入互斥：注入路径的端点语义随注入实例，props.targetKind 被忽略（warn）。
 // 宿主矩阵契约测试：BookmarkButton.host-matrix.test.ts。
+//
+// disabled（#865）：输入闸门，**响应式**（刻意不进 init-only 集合——它不进状态机构造，
+// 每次交互读一次；masked 由作品数据 + 设置 store 派生，运行中会变，冻结即失效）。
+// 拦截落在本组件的输入边界，共三条通道，一并关：
+//   1. tap 入口短路（不出网 / 不翻转 / 不 emit change）；
+//   2. 长按通道不注册计时（否则置灰页面仍能长按弹出可写收藏的面板）；
+//   3. burst 不播（否则「按了有动画却没写入」——state-layer 反馈与写入必须同生共死）。
+// **注入路径同样生效**：闸门在本组件手势面而非状态机上。自建与注入共用同一段守卫，
+// 故详情页（IllustDetail 注入页面级 mutation）传 disabled 一样拦得住；反之注入实例本身
+// 不被冻结——面板 saveWith 是宿主的独立入口，不经本组件手势，不在本 prop 管辖范围内
+// （要把闸门下沉到共享状态机会波及面板路径，属越界改动）。
+// 视觉置灰由宿主负责（NovelIntro 的 wrap 已挂 opacity-50），组件内不再叠一层避免双重变暗。
+// 拦截靠处理器守卫而非 CSS：pointer-events 在 Lynx 是死类名（preset 白名单裁掉 pointerEvents）。
 import { onBeforeUnmount, ref } from 'vue'
 import {
   BOOKMARK_ANIMATION_MS,
@@ -29,6 +42,8 @@ import {
   type UseBookmarkMutationReturn,
 } from '../composables/useBookmarkMutation'
 import { useLongPress, type TouchLikeEvent } from '../composables/useLongPress'
+import { useReducedMotion } from '../composables/useReducedMotion'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
   illustId: number
@@ -42,6 +57,10 @@ const props = defineProps<{
   enableLongPress?: boolean
   /** 收藏目标类型（spec #585 / 票 #587）：默认插画；小说介绍页传 'novel'（端点分派） */
   targetKind?: 'illust' | 'novel'
+  /** 禁用态（#865：宿主屏蔽态，如 NovelIntro 的 masked = R-18/R-18G/AI 屏蔽）。
+   *  行为层拦截：tap / 长按 / 动效反馈三条通道全关，不出网、不翻转状态机、不 emit change。
+   *  响应式（非 init-only，见文件头注）；视觉置灰由宿主负责，本组件不叠 opacity。 */
+  disabled?: boolean
 }>()
 
 // change 事件：动画播完后上抛（动画完成态，ADR-0112 决策 4；供收藏列表等宿主移除已取消收藏的项）
@@ -75,6 +94,12 @@ const bm =
 // 长按通道（enableLongPress = false 时 handler 直接返回，不注册计时）
 const longPress = useLongPress({ onTrigger: () => emit('longPress') })
 
+// 减弱动效偏好（T03 #851）：复用统一能力，规则见 composable 头注。
+// 本组件 4 条动效（bookmark-pop-add/remove + bookmark-ring-out/in）全走 R2/R3：
+// 偏好开启时 spring pop 与 state-layer 环**不发生**——只降时长无效（缩放/位移是前庭反应主因），
+// 且色板/心形字形的终态切换保留，收藏结果仍然可读。
+const { reducedMotion } = useReducedMotion()
+
 /** 主心 pop 重播代（:key 重挂载触发动画重播） */
 const animSeq = ref(0)
 /** tap 时刻的目标态快照：pop 动画类绑定快照而非实时态——
@@ -92,6 +117,9 @@ let nextRingId = 1
 function startBurst(target: boolean) {
   lastTarget.value = target
   animSeq.value++
+  // R3 弹性动效不生成：偏好开启时环节点一条都不建（建了也只是 350ms 后自毁的空节点），
+  // 清理计时随之跳过——主心 pop 类在模板侧同样按 reducedMotion 门控。
+  if (reducedMotion.value) return
   const id = nextRingId++
   rings.value.push({ id, mode: target ? 'out' : 'in' })
   // 无 animationend（ADR-0111）：固定时长后清理环节点（仅节点清理，不驱动动画帧）
@@ -101,6 +129,8 @@ function startBurst(target: boolean) {
 }
 
 function onTap() {
+  // disabled 闸门置最前（#865）：拦截在入口，不依赖任何 CSS；三条通道（tap/长按/动效）同源于此
+  if (props.disabled) return
   // 长按已开面板：同一次手势的 tap 必须被吞掉（不额外走快速收藏，spec D3 双轨互斥）
   if (longPress.consumeLongPress()) return
   if (bm.busy.value) return
@@ -109,15 +139,20 @@ function onTap() {
   void bm.toggle()
 }
 
+// 触摸三件套：disabled 优先于 enableLongPress —— 屏蔽态连计时都不注册，
+// 否则按住 500ms 仍会 emit longPress 打开可写收藏的面板（与 tap 闸门同一条 #865 契约）
 function onTouchStart(e: TouchLikeEvent): void {
+  if (props.disabled) return
   if (!props.enableLongPress) return
   longPress.onTouchStart(e)
 }
 function onTouchMove(e: TouchLikeEvent): void {
+  if (props.disabled) return
   if (!props.enableLongPress) return
   longPress.onTouchMove(e)
 }
 function onTouchEnd(): void {
+  if (props.disabled) return
   if (!props.enableLongPress) return
   longPress.onTouchEnd()
 }
@@ -158,14 +193,24 @@ defineExpose({ playBurst })
           :class="r.mode === 'out' ? 'bookmark-ring-out' : 'bookmark-ring-in'"
         />
       </view>
-      <!-- 主心（transform 承载用 view 不用 text，ADR-0108 决策 2；:key 重挂载重播 pop） -->
-      <view :key="animSeq" :class="animSeq > 0 ? (lastTarget ? 'bookmark-pop-add' : 'bookmark-pop-remove') : ''">
-        <!-- ♥\uFE0E：U+FE0E 强制 text presentation——裸 U+2665 在 Lynx 原生被解析为彩色 emoji
-             字形（固有色 #fa242f），CSS color 完全失效（心形恒红，真机实测 2026-08-25，ADR-0112） -->
-        <text
-          class="text-[6.4vw] leading-none"
+      <!-- 主心（transform 承载用 view 不用 text，ADR-0108 决策 2；:key 重挂载重播 pop）。
+           减弱动效下不挂 pop 类（R2/R3：缩放 spring 整条不发生，:key 重挂载保留不产生副作用）。 -->
+      <view
+        :key="animSeq"
+        :class="animSeq > 0 && !reducedMotion ? (lastTarget ? 'bookmark-pop-add' : 'bookmark-pop-remove') : ''"
+      >
+        <!-- 图标位经 AppIcon（ADR-0208 决策 3）：name="favorite_border"。
+             选型理由：本按钮语义 =「收藏」，取心形族（heart / favorite）而非 star——
+             Material Symbols 的 star 语义是「评分 / 要点 / 已加入列表」，与 Pixiv 收藏非同一语义。
+             原字形带 U+FE0E 强制 text presentation（裸 U+2665 在 Lynx 原生被解析为彩色 emoji
+             字形、固有色 #fa242f，CSS color 完全失效，真机实测 2026-08-25，ADR-0112）；
+             改走图标字体后该 emoji 解析缺陷同源消失，U+FE0E 不再需要。
+             收藏/未收藏不换字形：FILL=0 子集里 favorite 与 favorite_border 同码点（ADR-0208 决策 1），
+             状态由配色（text-tertiary-on / text-inverse-on-surface）表达。 -->
+        <AppIcon
+          name="favorite_border"
           :class="bm.bookmarked.value ? 'text-tertiary-on' : 'text-inverse-on-surface'"
-        >♥︎</text>
+        />
       </view>
     </view>
     <text

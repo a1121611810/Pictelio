@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import { ICON_CODEPOINTS } from "../utils/iconMap"
 
 const src = readFileSync(fileURLToPath(new URL("./Ranking.vue", import.meta.url)), "utf8")
 const app = readFileSync(fileURLToPath(new URL("../App.vue", import.meta.url)), "utf8")
@@ -44,11 +45,19 @@ describe("Ranking.vue 维度/日期控件（#518）", () => {
     expect(src).toContain("selectMode(m.id)")
   })
 
-  it("日期行：‹/文本/今日/›；无日历（Lynx input 不支持日期，spec §6.3）", () => {
+  it("日期行：方向箭头走 AppIcon(arrow_back/arrow_forward) + 今日 badge；无日历（Lynx input 不支持日期，spec §6.3）", () => {
     expect(src).toContain("shiftDay(-1)")
     expect(src).toContain("shiftDay(1)")
     expect(src).toContain("ranking.dateLong")
     expect(src).not.toContain('type="date"')
+    // T12 收口：两端箭头不再是默认字体的 ‹ / › 字形，改走 Material Symbols 子集。
+    // 期望值出处 = iconMap 方向组（ADR-0208 决策 2：该表同时是运行时查码点与门禁 oracle 的唯一事实源），
+    // 非从 Ranking.vue 自身反推。
+    expect(ICON_CODEPOINTS.arrow_back).toBeDefined()
+    expect(ICON_CODEPOINTS.arrow_forward).toBeDefined()
+    expect(src).toContain(`<AppIcon name="arrow_back"`)
+    expect(src).toContain(`<AppIcon name="arrow_forward"`)
+    expect(src).not.toMatch(/<text[^>]*>\s*[‹›]\s*<\/text>/)
   })
 
   it("今日时后一天禁用（isTodayDate 纯函数判定）", () => {

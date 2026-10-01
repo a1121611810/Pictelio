@@ -20,6 +20,7 @@
 //
 // 平台事实：返回键 @tap 绑在 view 上——text 根级 @tap 原生无效（ADR-0055 家族）。
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import AppIcon from './AppIcon.vue'
 
 defineProps<{
   /** 已解析标题文案（调用方经 i18n 传入，组件零文案） */
@@ -49,10 +50,10 @@ const emit = defineEmits<{ (e: 'back'): void }>()
       :accessibility-label="backA11yLabel"
       @tap="emit('back')"
     >
-      <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+      <AppIcon name="arrow_back" class="text-surface-on" />
     </view>
     <view v-else class="py-1 pr-2" @tap="emit('back')">
-      <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+      <AppIcon name="arrow_back" class="text-surface-on" />
     </view>
     <text
       v-if="titleA11yLabel"
