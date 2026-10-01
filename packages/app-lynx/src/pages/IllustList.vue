@@ -323,7 +323,17 @@ onUnmounted(() => {
           <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
         <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
-        <view v-else class="relative" :id="heroTransition.sourceId(item.id)" @tap.stop="onImageTap(item)">
+        <!-- ⚠️ 必须给本 view 显式宽度：瀑布流 <list> 里 `w-full` 的祖先解析基准是
+             **list 的内容盒（约 1010px）**，不是本 list-item 所在列的宽（48.4vw ≈ 522px）。
+             不写宽度时 hero 测到的起点矩形是整行宽 ⇒ 覆盖层从两倍宽的区域「胀」出来，
+             起点根本不是用户点的那张卡（实测 x[0,1011] vs 卡片 ≈522px，#898）。
+             宽度与内部 SkeletonImage 的 height="48.4vw" 保持同源，写一次即两处一致。 -->
+        <view
+          v-else
+          class="relative w-[48.4vw]"
+          :id="heroTransition.sourceId(item.id)"
+          @tap.stop="onImageTap(item)"
+        >
           <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
         </view>
         <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
