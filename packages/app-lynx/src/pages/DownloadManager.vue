@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { goBack } from '../router'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useModalStack } from '../stores/modalStack'
+import { artworkTitle } from '../utils/artworkTitle'
 import { proxyImageUrl } from '../utils/imageUrl'
 import type { DeleteMode } from '../utils/downloadQueueCore'
 import {
@@ -204,7 +205,7 @@ onMounted(() => {
             />
             <view class="flex-1 flex flex-col ml-3">
               <text class="text-title-medium font-medium text-surface-on">{{
-                group.title
+                artworkTitle(group.title)
               }}</text>
               <text class="text-label-medium text-surface-on-variant mt-0.5">{{
                 groupKindLabel(group.kind, group.tasks.length)

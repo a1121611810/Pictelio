@@ -21,6 +21,7 @@ import { toNovelId, toSeriesId } from '../api/id'
 import type { PixivNovel } from '../api/types'
 import type { NovelExportFormat } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
+import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { stripNovelCaptionHtml } from '../utils/novelCaption'
@@ -364,7 +365,7 @@ const WatchlistAction = defineComponent({
             :class="aiBadge || novel.series ? 'mt-2' : ''"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="novel.title"
-          >{{ novel.title }}</text>
+          >{{ artworkTitle(novel.title) }}</text>
 
           <!-- 作者行（票 #577：可点 → 用户主页） -->
           <text

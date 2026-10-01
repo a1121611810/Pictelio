@@ -11,6 +11,10 @@ const zhMisc = {
   "navTabs.novels": "小说",
   "navTabs.me": "我的",
 
+  // ─── 作品标题归一化（utils/artworkTitle.ts；#893）───
+  //     Pixiv 对无标题作品返回未本地化的字面串 "no title"，渲染前换成词典占位。
+  "artworkTitle.untitled": "无标题",
+
   // ─── CoverImage.vue（封面三态失败占位） ───
   "coverImage.loadFailed": "图片加载失败",
   "coverImage.retry": "重试",

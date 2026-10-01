@@ -24,6 +24,7 @@ import {
 } from '../stores/tagNeighbor'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import type { TagNeighborSource } from '../primitives/collectTagNeighbors'
+import { artworkTitle } from '../utils/artworkTitle'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { TAG_NEIGHBORS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import PageTopBar from '../components/PageTopBar.vue'
@@ -245,7 +246,7 @@ function onDismissBroadening(): void {
                 >
                 <text class="text-label-medium text-surface-on-variant ml-2">{{ sourceLabel(row.source) }}</text>
               </view>
-              <text class="text-body-medium text-surface-on mt-1.5 [max-line:1]">{{ row.title }}</text>
+              <text class="text-body-medium text-surface-on mt-1.5 [max-line:1]">{{ artworkTitle(row.title) }}</text>
               <!-- 可解释性三元组的第三项（spec user story 7：共同标签双值） -->
               <text class="text-label-medium text-surface-on-variant mt-1">{{
                 t('tagNeighbors.commonTags', { common: row.common, total: row.total })

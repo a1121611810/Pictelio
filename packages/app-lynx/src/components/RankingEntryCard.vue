@@ -9,6 +9,7 @@ import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { DEFAULT_RANK_MODE } from '@pictelio/ranking-core'
 import type { PixivIllust } from '../api/types'
 import { navigate } from '../router'
+import { artworkTitle } from '../utils/artworkTitle'
 import { proxyImageUrl, thumbUrl } from '../utils/imageUrl'
 import { createRankingFeed } from '../primitives/createRankingFeed'
 import { isEntryVisible, shouldResetDismissed } from '../primitives/rankingEntryState'
@@ -129,7 +130,7 @@ onUnmounted(() => feed.dispose())
           </view>
           <text class="text-body-small text-inverse-on-surface">{{ t('ranking.mode.daily') }} · {{ t('ranking.today') }}</text>
         </view>
-        <text class="text-title-medium font-medium text-inverse-on-surface mt-1.5 [max-line:1]">{{ hero?.title }}</text>
+        <text class="text-title-medium font-medium text-inverse-on-surface mt-1.5 [max-line:1]">{{ artworkTitle(hero?.title) }}</text>
         <text class="text-body-small text-inverse-on-surface [max-line:1]">{{ hero?.user.name }}</text>
       </view>
       <!-- 右侧竖排 2/3 名 +「全部 + › 图标」 -->
@@ -139,7 +140,7 @@ onUnmounted(() => feed.dispose())
           :key="e.illust.id"
           class="relative w-[16vw] h-[16vw] rounded-[var(--md-shape-medium)] overflow-hidden"
           accessibility-element
-          :accessibility-label="t('ranking.entry.itemAria', { rank: e.rank, title: e.illust.title })"
+          :accessibility-label="t('ranking.entry.itemAria', { rank: e.rank, title: artworkTitle(e.illust.title) })"
           @tap.stop="openDetail(e.illust.id)"
         >
           <SkeletonImage :src="thumbUrl(e.illust.image_urls)" height="16vw" lazy-load />

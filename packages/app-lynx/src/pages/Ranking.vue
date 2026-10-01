@@ -17,6 +17,7 @@ import {
   type RankingQuery,
 } from '@pictelio/ranking-core'
 import type { PixivIllust } from '../api/types'
+import { artworkTitle } from '../utils/artworkTitle'
 import { thumbUrl } from '../utils/imageUrl'
 import { openExternalUrl } from '../utils/nativeUrl'
 import { createRankingFeed } from '../primitives/createRankingFeed'
@@ -333,7 +334,7 @@ onUnmounted(() => feed.dispose())
             <SkeletonImage v-else :src="thumbUrl(row.item.image_urls)" height="14vw" lazy-load />
           </view>
           <view class="flex flex-col ml-3 flex-1">
-            <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ row.item.title }}</text>
+            <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ artworkTitle(row.item.title) }}</text>
             <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ row.item.user.name }}</text>
           </view>
           <!-- 收藏数：★ → star_outline（ADR-0208 决策 3）。⚠️ star 与 star_outline 在官方

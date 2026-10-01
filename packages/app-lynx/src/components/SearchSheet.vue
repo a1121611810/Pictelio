@@ -18,6 +18,7 @@
 // （docs/research/global-search-patterns.md §4.2）。
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { t, type I18nKey } from '../i18n'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
@@ -716,7 +717,7 @@ onBeforeUnmount(() => {
                     <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]">{{ rowMaskHint(row) }}</text>
                   </template>
                   <template v-else>
-                    <text class="text-body-medium text-surface-on [max-line:1]" style="word-break: break-all">{{ row.entity.title }}</text>
+                    <text class="text-body-medium text-surface-on [max-line:1]" style="word-break: break-all">{{ artworkTitle(row.entity.title) }}</text>
                     <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]" style="word-break: break-all">{{ row.entity.user.name }} · {{ rowSub(row) }}</text>
                   </template>
                 </view>

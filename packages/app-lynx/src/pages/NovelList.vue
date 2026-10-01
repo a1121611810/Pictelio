@@ -2,6 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'novels' })
 import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
@@ -247,7 +248,7 @@ onUnmounted(() => {
         <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
           <view class="flex-1 flex flex-col">
-            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ artworkTitle(item.title) }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
               <text class="text-label-medium text-surface-on-variant mr-4">{{

@@ -11,6 +11,10 @@ const enMisc = {
   "navTabs.novels": "Novels",
   "navTabs.me": "Me",
 
+  // ─── 作品标题归一化（utils/artworkTitle.ts；#893）───
+  //     Pixiv 对无标题作品返回未本地化的字面串 "no title"，渲染前换成词典占位。
+  "artworkTitle.untitled": "Untitled",
+
   // ─── CoverImage.vue ───
   "coverImage.loadFailed": "Image failed to load",
   "coverImage.retry": "Retry",

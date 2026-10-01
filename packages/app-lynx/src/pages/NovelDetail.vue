@@ -9,6 +9,7 @@ import { toNovelId, toSeriesId } from '../api/id'
 import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
+import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import AppIcon from '../components/AppIcon.vue'
@@ -423,7 +424,7 @@ function onWatchlistCancel(): void {
         <!-- T07 档位清理：原为 700 字重。作品标题是内容文本，title-large 官方 regular(400)、
              emphasized 500；此前它比同页「屏标题」（PageTopBar 屏标题 title-large + 500，:398）
              还重，层级是倒的 → 500。受限小说分支（下方）同一判定。 -->
-        <text class="text-title-large font-regular text-surface-on">{{ novel?.title }}</text>
+        <text class="text-title-large font-regular text-surface-on">{{ artworkTitle(novel?.title) }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <!-- 评论入口（issue #164）：T12/ADR-0208 💬 → Material Symbols `chat_bubble`（缺省 6.4vw = 原
              text-[6.4vw]，尺寸不变）。⚠️ 本入口改造前**就没有** accessibility-label（存量如此），
@@ -519,7 +520,7 @@ function onWatchlistCancel(): void {
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <!-- 头部精简同 meta 卡（票 #589）；受限遮罩/追更询问行为不变 -->
         <!-- T07 档位清理：同上（与 meta 卡同一判定：内容标题 → 500，不压过屏标题） -->
-        <text class="text-title-large font-regular text-surface-on">{{ novel?.title }}</text>
+        <text class="text-title-large font-regular text-surface-on">{{ artworkTitle(novel?.title) }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <!-- 评论入口（与 meta 卡一致） -->
         <view

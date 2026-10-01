@@ -6,6 +6,7 @@ import { computed, ref, onMounted, onUnmounted, onActivated } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
+import { artworkTitle } from '../utils/artworkTitle'
 import { thumbUrl } from '../utils/imageUrl'
 import type { IconName } from '../utils/iconMap'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
@@ -314,7 +315,7 @@ onUnmounted(() => {
         </view>
         <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
         <IllustTypeBadgeRow :illust="item" />
-        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ artworkTitle(item.title) }}</text>
         <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
           <BookmarkButton

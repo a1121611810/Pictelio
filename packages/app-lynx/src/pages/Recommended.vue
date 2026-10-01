@@ -15,6 +15,7 @@ defineOptions({ name: 'recommended' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 
 import { navigate } from '../router'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { loadRecommended, loadNext } from '../api/illust'
 import { loadRecommendedNovels, loadNovelNext } from '../api/novel'
@@ -321,7 +322,7 @@ onActivated(() => {
             class="text-title-large font-semibold text-inverse-on-surface [max-line:2]"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="currentItem.data.title"
-            >{{ currentItem.data.title }}</text
+            >{{ artworkTitle(currentItem.data.title) }}</text
           >
           <!-- [#891] 原 text-white/85：white 是字面量，`/85` **确实**能产出规则，但
                「在不可预测底图上把字调淡」本身就是对比度隐患（作者行实测 2.17 → 1.96）。

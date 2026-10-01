@@ -3,6 +3,7 @@
 defineOptions({ name: 'watchlist' })
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { goBack } from '../router'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { useModalStack } from '../stores/modalStack'
 import {
@@ -254,7 +255,7 @@ onUnmounted(() => {
               :src="proxyImageUrl(item.url)"
             />
             <view class="flex-1 flex flex-col ml-3">
-              <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+              <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ artworkTitle(item.title) }}</text>
               <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
               <view class="flex flex-row mt-1.5">
                 <text class="text-label-medium text-surface-on-variant mr-4">{{ t('watchlist.chapterCount', { count: item.published_content_count }) }}</text>

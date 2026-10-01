@@ -3,6 +3,7 @@
 defineOptions({ name: 'watchLater' })
 import { goBack, navigate } from '../router'
 import { ref } from 'vue'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { useWatchLaterStore, type WatchLaterItem } from '../stores/watchLaterStore'
 import { proxyImageUrl } from '../utils/imageUrl'
@@ -101,7 +102,7 @@ function openItem(item: WatchLaterItem): void {
               <view class="self-start px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container">
                 <text class="text-label-medium text-secondary-on-container">{{ item.kind === 'illust' ? t('later.badge.illust') : t('later.badge.novel') }}</text>
               </view>
-              <text class="text-title-medium font-medium text-surface-on [max-line:2] mt-1.5">{{ item.title }}</text>
+              <text class="text-title-medium font-medium text-surface-on [max-line:2] mt-1.5">{{ artworkTitle(item.title) }}</text>
               <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.userName }}</text>
             </view>
             <!-- 单条删除（spec US10）：触控高度 10.667vw = 40dp 等效；@tap.stop 防卡片导航误触 -->

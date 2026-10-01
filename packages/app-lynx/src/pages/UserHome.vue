@@ -5,6 +5,7 @@
 // 实例（切回已加载 tab 不重新请求，对齐原「按需加载一次」行为）。
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
+import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { getUserDetail } from '../api/user'
 import { loadUserIllusts, loadNext } from '../api/illust'
@@ -349,7 +350,7 @@ onUnmounted(() => {
           </view>
           <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
           <IllustTypeBadgeRow :illust="item" />
-          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ artworkTitle(item.title) }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton :illust-id="item.id" :initial-bookmarked="item.is_bookmarked" :bookmark-count="item.total_bookmarks" />
           </view>
@@ -409,7 +410,7 @@ onUnmounted(() => {
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
         <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
-                    <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+                    <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ artworkTitle(item.title) }}</text>
                     <view class="flex flex-row mt-1.5">
                       <text class="text-label-medium text-outline mr-4">{{
                         t('userHome.charCount', { count: item.text_length })

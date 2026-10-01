@@ -43,7 +43,10 @@ describe("正文页头部精简（spec #585 / 票 #589）", () => {
   });
 
   it("标题 + 作者 + 评论入口 + 导出入口保留（票 #578：评论两端都留、导出不动）", () => {
-    expect(source).toContain('{{ novel?.title }}');
+    // #893：标题经 utils/artworkTitle 归一化（Pixiv 对无标题作品返回未本地化的
+      // 字面串 "no title"，裸插值会把该串直接显示给用户）。此处顺带把「走归一化出口」
+      // 钉进判据，而不是只钉「标题行存在」。
+      expect(source).toContain('{{ artworkTitle(novel?.title) }}');
     expect(source).toContain('by {{ novel?.user.name }}');
     expect(source).toContain('@tap="showComments = true"');
     expect(source).toContain('@tap="exportOpen = true"');

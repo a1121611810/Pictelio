@@ -70,7 +70,9 @@ describe('WatchLater.vue 快照卡（行卡字段与交互，spec US5/US10/US6�
 
   it('标题 [max-line:2] + 作者名渲染', () => {
     expect(page).toMatch(/\[max-line:2\]/)
-    expect(page).toMatch(/\{\{ \w+\.title \}\}/)
+    // #893：标题经 utils/artworkTitle 归一化（Pixiv 对无标题作品返回未本地化的
+    // 字面串 "no title"）。此处顺带把「走归一化出口」钉进判据，而不只是钉「标题行存在」。
+    expect(page).toMatch(/\{\{\s*artworkTitle\(\w+\.title\)\s*\}\}/)
     expect(page).toMatch(/\{\{ \w+\.userName \}\}/)
   })
 

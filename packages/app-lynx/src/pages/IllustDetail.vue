@@ -6,6 +6,7 @@ import { toIllustId } from '../api/id'
 import { followUser, unfollowUser } from '../api/user'
 import { useAuthStore } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
+import { artworkTitle } from '../utils/artworkTitle'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
@@ -459,7 +460,7 @@ onMounted(async () => {
         <!-- T07 档位清理：原为 700 字重。作品标题是内容文本，headline-small 官方
              regular(400)、emphasized 500；此前它比顶部 PageTopBar 屏标题（title-large + 500）
              更重，层级倒置 → 500。 -->
-        <text class="text-headline-small font-regular text-surface-on">{{ illust.title }}</text>
+        <text class="text-headline-small font-regular text-surface-on">{{ artworkTitle(illust.title) }}</text>
         <view class="flex flex-row items-center mt-2">
           <!-- 作者行命中区只含头像 + 名字（#542）：整行可点会让心形附近的坐标偏移
                静默跳转作者页（自动化假绿路径）；收窄后偏移落空处 = 响亮失败 -->
