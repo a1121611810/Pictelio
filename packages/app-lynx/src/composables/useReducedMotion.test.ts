@@ -208,9 +208,25 @@ function useReducedMotionSpecifierFor(file: string): string {
   return rel.startsWith('.') ? rel : `./${rel}`
 }
 
-/** 该组件是否接上了统一能力（import 说明符按上式逐文件推导） */
+/** `composables/motion` 的说明符（ADR-0211 决策 1 的动效唯一入口） */
+function motionSpecifierFor(file: string): string {
+  const rel = relative(dirname(file), join(SRC_ROOT, 'composables', 'motion')).split(sep).join('/')
+  return rel.startsWith('.') ? rel : `./${rel}`
+}
+
+/** 该组件是否接上了统一能力。
+ *  **两条合法接入路径**（都是「不建第二份 matchMedia」，判定意图不变）：
+ *  ① 直接 import `useReducedMotion`；
+ *  ② import `composables/motion` 的 `useMotion()` —— 它**内部调用** useReducedMotion
+ *     并把 R1/R2/R3 判定透传成四类预设（ADR-0211 决策 1 + 决策 9）。
+ *     ⚠️ ② 不是「另一份实现」：见下方 `motion.ts 自己 import useReducedMotion` 那条断言 ——
+ *     委托链一旦断掉（motion.ts 不再依赖 useReducedMotion），当场转红，
+ *     所以放宽的是**接入形态**，不是「允许自建 matchMedia」。 */
 function isWired(c: { file: string; code: string }): boolean {
-  return c.code.includes(`from '${useReducedMotionSpecifierFor(c.file)}'`)
+  return (
+    c.code.includes(`from '${useReducedMotionSpecifierFor(c.file)}'`) ||
+    c.code.includes(`from '${motionSpecifierFor(c.file)}'`)
+  )
 }
 
 describe('组件接入面：src/ 全树（含 pages/ 与 src 根 App.vue）的含动画组件走统一能力（单一事实源）', () => {
@@ -252,6 +268,25 @@ describe('组件接入面：src/ 全树（含 pages/ 与 src 根 App.vue）的�
     // 曾存在的 RefreshableList.vue / App.vue 豁免名单已删除——豁免名单正是本票验收 2
     // 「只完成 1 个」长期不被发现的根因。
     expect(unwired, `未接入统一能力的含动画组件：${unwired.join(', ')}`).toEqual([])
+  })
+
+  it('间接接入路径的委托链仍然成立：motion.ts 自己 import useReducedMotion（否则 isWired 的放宽是 fail-open）', () => {
+    // isWired 现在接受「直接 import useReducedMotion」与「import motion 的 useMotion」两种形态。
+    // 第二种只有在 motion.ts **内部确实调用** useReducedMotion 时才等价于统一能力；
+    // 一旦有人把 motion.ts 改成自建 matchMedia，这条立即转红 —— 放宽的是接入形态，不是判定意图。
+    const motionCode = stripComments(readFileSync(join(SRC_ROOT, 'composables', 'motion.ts'), 'utf8'))
+    expect(motionCode).toContain("from './useReducedMotion'")
+    expect(motionCode).toContain('useReducedMotion(')
+    // 反向护栏：motion.ts 自己也不得出现第二份 matchMedia 实现
+    expect(motionCode).not.toMatch(/matchMedia\(/)
+    // 用到 useMotion 的组件确实不少于 1 个（否则这条断言在「没人走间接路径」时空转恒绿）
+    const viaMotion = animationComponents().filter((c) =>
+      c.code.includes(`from '${motionSpecifierFor(c.file)}'`),
+    )
+    expect(
+      viaMotion.length,
+      `走 motion.ts 间接接入的含动画组件：${viaMotion.map((c) => c.name).join(', ') || '（无）'}`,
+    ).toBeGreaterThanOrEqual(1)
   })
 
   it('已接入组件不得自建 matchMedia / 重抄媒体查询串（收敛为单一事实源）', () => {
@@ -333,11 +368,31 @@ describe('组件接入面：接入形态必须真的停掉动效（逐组件钉�
 
   it('M3Switch：整组 transition 类按偏好挂载（R1 = 时长归零 = 不挂）', () => {
     const code = stripComments(readFileSync(join(COMPONENTS_DIR, 'M3Switch.vue'), 'utf8'))
-    expect(code).toMatch(/:class="\[reducedMotion \? '' : TRACK_MOTION_CLASS, trackClass\(checked\)\]"/)
-    const motion = code.match(/const TRACK_MOTION_CLASS\s*=\s*\n?\s*'([^']+)'/)?.[1] ?? ''
-    expect(motion).toBe(
+    // ⚠️ 偏好标志名从 `reducedMotion`（直接 import useReducedMotion）改为 `reduced`
+    //   （ADR-0211 决策 1 的 useMotion 返回值，同一条 R1 链，见 isWired 的两条接入路径）。
+    //   判据守的是「轨道 transition 组受偏好门控」这件事，不是标志叫什么 ⇒ 认「挂在 TRACK_MOTION_CLASS 上」。
+    expect(code).toMatch(
+      /:class="\[reduced(?:Motion)? \? '' : TRACK_MOTION_CLASS, trackClass\(checked\)\]"/,
+    )
+    // ⚠️ 期望值出处 = ADR-0179 §背景记录的实跑提取清单：M3 switch spec v0.192 该控件自身的
+    //   动效令牌逐字为 `--durationNormal` + `--motion-standard`（spec §4 同款）。
+    // ⚠️ 断言对象是 **motion.ts 登记表里的值**，不是组件源码中的一行拷贝：ADR-0211 决策 1
+    //   要求组件只消费 `MOTION_CLASS`，字面量在事实源单点断言（此前组件内自持一份，
+    //   于是同一字面量在两处各抄一份，任一处漂移都不会被对方发现）。
+    const motionSrc = stripComments(
+      readFileSync(join(COMPONENTS_DIR, '..', 'composables', 'motion.ts'), 'utf8'),
+    )
+    const track = motionSrc.match(/switchTrack:\s*\n?\s*'([^']+)'/)?.[1] ?? ''
+    expect(track).not.toBe('')
+    expect(track).toBe(
       'transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]',
     )
+    expect(code).toContain('MOTION_CLASS.switchTrack')
+    // thumb 按压是**尺寸**变化（active:w-/active:h-）⇒ 必须 inline 过渡，且同样受偏好门控。
+    // 这条守的是「尺寸过渡没被误挂成 transition-colors」——后者 transition-property 不含 width/height，
+    // 是静默失效那一格（ADR-0211 决策 2 映射表末行）。
+    expect(code).toContain(':style="{ transition: thumbTransition }"')
+    expect(code).toMatch(/const thumbTransition = computed\(\(\) =>\s*\n?\s*reduced\.value \? 'none'/)
   })
 
   it('GlassCard：偏好开启时弹性总闸断开（跟手位移本身不发生，不只是回弹过渡）', () => {

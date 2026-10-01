@@ -21,6 +21,12 @@
 //    `1.5s` 既不算违规、也不进登记表 ⇒ 对这条路径判据恒真。⇒ 改为**只摘变量名**，
 //    回退内容留在声明里继续受判。旧口径在下方「反事实」用例里原样复刻作对照，
 //    证明新判据确实多抓了旧判据抓不到的东西（而不是「一律更红」）。
+//
+// ── 第二道门禁补的第三个盲区（类名位，见文件末尾新 describe）───
+// ③ 上面两道都只判 **`animation:` / `transition:` 声明里的时长槽**。类名位
+//    `duration-[var(--durationNormal)]` 既不在任何声明里、也不含裸数值
+//    （150ms / 0.15s / cubic-bezier(）⇒ 判据恒绿；而它正是决策 1「唯一入口」
+//    要禁的形态（档位由组件自己挑、登记表被绕过）。`M3Switch.vue` 的存活即由此而来。
 import { describe, expect, it, vi } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -659,5 +665,251 @@ describe('时长令牌化（#854 验收 3）：全仓生产 .vue 的 animation/t
     // var() 回退里的逗号不构成分段：`var(--x, 200ms)` 是一条声明里的一个时长，不是两段
     expect(scanDurations('Synthetic.vue', '.a { transition: color var(--x, 200ms); }').violations)
       .toHaveLength(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+// 第二道门禁：类名位的动效参数（ADR-0211 决策 1「动效唯一入口」）
+//
+// 补的是**第三个盲区**：本文件既有的两道判据都只看
+//   ① `animation:` / `transition:` **声明**里的时长槽（且红触发列表是裸数值）。
+// 而 `duration-[var(--durationNormal)]` 是**令牌引用形态**：
+//   - 不在任何声明里（模板 `class="…"` / 脚本侧 `const X = '…'`）；
+//   - 不含裸数值（`150ms` / `0.15s` / `cubic-bezier(` 一个都没有）⇒ 旧判据恒绿。
+// 它却正是决策 1 要禁的形态：**档位由组件自己挑，`motion.ts` 的登记表被整条绕过**
+// （值可能碰巧对，但「唯一入口」已名存实亡）。`M3Switch.vue` 的存活即由此而来。
+//
+// 口径边界（本判据**不越权**的三件事）：
+// - **只判类名位，不判 `<style>` 块里的 CSS 声明**。后者由本文件既有的时长槽判据
+//   按「必须是 tokens.css 令牌」判（`animation: item-rise var(--durationMedium1)` 是
+//   #854 已验收的合法形态）。故扫描前整段摘掉 `<style>…</style>`：两侧互不误判。
+// - **不判变体前缀之外的属性位**：`delay-` 在类名位是时序参数，同样收口
+//   （错峰延迟的**合法**出口是 `motion.ts` 的 `STAGGER_STEP_MS` + inline `:style`）。
+// - **motion.ts 天然在扫描面外**（它是 `.ts`）：登记表字面量必须住在那里（约束 ①），
+//   否则 Tailwind JIT 扫不到（类名不做运行时拼接）。故本门禁扫生产 `.vue`。
+//   ⚠️ **已登记的失效面**：`composables/*.ts` / `primitives/*.ts` 里若藏一份类串常量，
+//   本门禁兜不住（它们不在 `.vue` 扫描面内）。那属于「把 ADR-0211 决策 1 的入口
+//   搬到 .ts」的新决策，需要时另开门禁，不在本票范围内。
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 把一段文本按字符抹成空格但**保留换行** ⇒ 匹配下标可直接换算成行号（违反项要指得到人） */
+function blankKeepLines(m: string): string {
+  return m.replace(/[^\n]/g, ' ')
+}
+
+/** 类名位扫描面 = 去注释 + 去 `<style>` 块，**逐字符保留换行**。
+ *  与本文件既有 `stripComments` 同口径（同样只整行摘 `//`，避免 `//` 出现在字符串里
+ *  时误吞后文——那会让判据朝 fail-open 偏），额外多摘 `<style>` 块。 */
+function classSurface(src: string): string {
+  return src
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/g, blankKeepLines)
+    .replace(/<!--[\s\S]*?-->/g, blankKeepLines)
+    .replace(/\/\*[\s\S]*?\*\//g, blankKeepLines)
+    .replace(/^\s*\/\/[^\n]*$/gm, blankKeepLines)
+}
+
+/** 类串 token 总数下界（**抽取面下界**，防「抽取器塌陷 ⇒ 全称断言恒真」）。
+ *  为什么是「token 数」而不是「违规数」：违规数在修完之后必然是 0，拿它当下界等于
+ *  「必须永远有违规」，门禁会逼着人留一个违规。token 数只证明**扫描面真的被抽出来了**。
+ *  ⚠️ 计的是**候选面**（引号字符串的一切空白分词，含模板 class 与脚本侧字符串），
+ *    宁可多算不可漏算 —— 它的用途是**反塌陷**，不是语义精确。
+ *  实测（2026-10-01，76 个生产 .vue）：12,094 token。下界取实测的 1/4，
+ *    对「walk 只剩白名单 / 引号正则失效 / 扫描面塌成个位数」都足够灵敏，
+ *    又不会被正常重构误伤。 */
+const CLASS_TOKEN_TOTAL_FLOOR = 3_000
+/** 逐文件下界 = 「点名锚点」：点名的文件若被改名/移出扫描面，count 变 0 即转红。
+ *  这几条覆盖三种形态：模板 `class` 静态属性 / `:class` 绑定 / 脚本侧类串常量。
+ *  实测值：App.vue 31 / M3Switch.vue 48 / GlobalFab.vue 21 / RefreshableList.vue 11
+ *  （下界取实测的 1/2 ~ 2/3；RefreshableList 的 class 多在 `<style>` 块里被摘掉，故下界低）。 */
+const CLASS_TOKEN_FLOOR: Record<string, number> = {
+  'App.vue': 18,
+  'components/M3Switch.vue': 28,
+  'components/GlobalFab.vue': 12,
+  'components/RefreshableList.vue': 7,
+}
+
+/** 类名位的候选 token：引号字符串里的空白分词。
+ *  ⚠️ 为什么要连**脚本侧字符串**一起算：组件的类名位在本仓有两种写法 ——
+ *  模板 `class="…"` / `:class="[…]"` 与脚本侧 `const TRACK_MOTION_CLASS = '…'`。
+ *  `M3Switch.vue` 的违规正在**后一种**形态里 ⇒ 只扫模板属性位会整条漏掉它。 */
+function classTokens(surface: string): string[] {
+  const out: string[] = []
+  for (const m of surface.matchAll(/["'`]([^"'`]*)["'`]/g)) {
+    out.push(...m[1]!.split(/\s+/).filter(Boolean))
+  }
+  return out
+}
+
+/** 动效类名工具类的名字部分 + 方括号任意值；变体前缀（`active:` / `hover:` / `md:`）一并纳入。
+ *  ⚠️ 长的分支必须在前：`transition-duration-[…]` 要先于 `transition-[…]` 命中。 */
+const MOTION_UTIL_HEAD = /(?:[a-z-]+:)*(?:transition-duration|transition-delay|animate|transition|duration|ease|delay)-\[/g
+
+/** 无方括号的裸形态：类名位的裸时长（`duration-200` / `delay-60`）与裸时序函数
+ *  （`ease-linear` / `ease-in-out` …）。按决策 1，组件内连这些字面量形态也不该出现。 */
+const BARE_MOTION_UTIL =
+  /(?:^|[\s"'`(:])(?:[a-z-]+:)*(?:duration|delay)-(\d*\.?\d+)(?![\w-])|(?:^|[\s"'`(:])(?:[a-z-]+:)*ease-(in-out|linear|in|out)(?![\w-])/g
+
+/** 取 `[` 起的任意值原文（按括号深度，跨行安全）；未闭合返回 null */
+function arbitraryValue(src: string, open: number): { text: string; end: number } | null {
+  let depth = 0
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i]!
+    if (ch === '[') depth++
+    else if (ch === ']') {
+      depth--
+      if (depth === 0) return { text: src.slice(open + 1, i), end: i + 1 }
+    }
+  }
+  return null
+}
+
+/** 单个任意值的判读内核。⚠️ 顺序即口径：令牌引用排第一（它才是本轮要抓的形态），
+ *  裸时长 / 裸曲线排其后。返回 null = 合规。 */
+function judgeArbitraryMotionValue(value: string): string | null {
+  // Tailwind 任意值里空格写作 `_`（`animate-[spin_1s_linear_infinite]`）
+  const v = value.replace(/_/g, ' ')
+  if (/var\(\s*--/.test(v)) {
+    return '令牌引用形态：档位/曲线由组件自己挑，绕过 motion.ts 登记表（决策 1）'
+  }
+  if (/\d*\.?\d+(?:ms|s)\b/.test(v)) return '裸时长字面量'
+  if (/(?:cubic-bezier|steps)\(/.test(v)) return '裸曲线字面量'
+  if (/(?:^|\s)(?:linear|ease-in-out|ease-in|ease-out)(?:\s|$)/.test(v)) return '裸时序函数关键字'
+  return null
+}
+
+/** 类名位扫描：返回 `file:line | 命中的类 | 理由` 形态的违规列表（行号来自去注释后仍等长的扫描面） */
+function scanClassMotion(file: string, src: string): string[] {
+  const surface = classSurface(src)
+  const out: string[] = []
+  const lineAt = (index: number): number => surface.slice(0, index).split('\n').length
+
+  MOTION_UTIL_HEAD.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = MOTION_UTIL_HEAD.exec(surface)) !== null) {
+    const open = m.index + m[0].length - 1
+    const value = arbitraryValue(surface, open)
+    if (!value) {
+      // 未闭合：算违规（`duration-[var(--x)` 是坏写法，且放过它等于让正则可被截断绕过）
+      out.push(`${file}:${lineAt(m.index)} | ${m[0]} | 任意值未闭合`)
+      continue
+    }
+    const reason = judgeArbitraryMotionValue(value.text)
+    if (reason) out.push(`${file}:${lineAt(m.index)} | ${m[0]}${value.text}] | ${reason}`)
+    MOTION_UTIL_HEAD.lastIndex = Math.max(MOTION_UTIL_HEAD.lastIndex, value.end)
+  }
+
+  BARE_MOTION_UTIL.lastIndex = 0
+  while ((m = BARE_MOTION_UTIL.exec(surface)) !== null) {
+    out.push(`${file}:${lineAt(m.index)} | ${m[0].trim()} | 裸动效类名（决策 1：类名位禁时长/曲线字面量）`)
+  }
+  return out
+}
+
+describe('类名位动效参数（ADR-0211 决策 1）：.vue 不得自取时长/曲线（含令牌引用形态）', () => {
+  it('抽取面下界：类串 token 总量 + 逐文件锚点（防抽取器/walk 塌陷让全称断言恒真）', () => {
+    const counts: Record<string, number> = {}
+    let total = 0
+    for (const [file, src] of Object.entries(SOURCES)) {
+      const n = classTokens(classSurface(src)).length
+      counts[file] = n
+      total += n
+    }
+    expect(total, `全仓类串 token：${total} 个`).toBeGreaterThanOrEqual(CLASS_TOKEN_TOTAL_FLOOR)
+    for (const [file, bound] of Object.entries(CLASS_TOKEN_FLOOR)) {
+      expect(
+        counts[file] ?? 0,
+        `${file} 抽到的类串 token：${counts[file] ?? 0}（下界 ${bound}）——文件被改名或移出扫描面`,
+      ).toBeGreaterThanOrEqual(bound)
+    }
+    // 阴性对照：被排除的目录真的排除了（否则 errorPrototype 的 px 硬编码会污染判据）
+    expect(Object.keys(counts).some((f) => f.includes('errorPrototype/'))).toBe(false)
+  })
+
+  it('类名位零自取动效参数：令牌引用 / 裸时长 / 裸曲线一律不得出现在 .vue 类串里', () => {
+    const violations = Object.entries(SOURCES).flatMap(([f, src]) => scanClassMotion(f, src))
+    expect(
+      violations,
+      `类名位自取动效参数（应改为消费 motion.ts 的 MOTION_CLASS）：\n${violations.join('\n')}`,
+    ).toEqual([])
+  })
+
+  it('阳性对照：判据内核对已知违规串确实转红（令牌引用 / 裸时长 / 裸曲线 / 裸类名）', () => {
+    const judge = (s: string) => scanClassMotion('Synthetic.vue', `<template><view :class="${s}" /></template>`)
+    // ① 本轮修的正是这个形态：令牌引用在旧判据下**恒绿**（不含裸数值、不在任何声明里）
+    expect(
+      judge('transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]').join('|'),
+    ).toContain('duration-[var(--durationNormal)]')
+    // ② 三个前缀都要能抓（ADR-0211 复核判据 1 点名的三类）
+    for (const cls of [
+      'duration-[var(--durationNormal)]',
+      'ease-[var(--motion-standard)]',
+      'delay-[var(--shimmer-motion)]',
+    ]) {
+      expect(judge(cls).join('|'), `未抓：${cls}`).toContain(cls)
+    }
+    // ③ 变体前缀不构成豁免（`active:` / `hover:` 一视同仁）
+    expect(judge('active:duration-[var(--durationFast)]').join('|')).toContain(
+      'active:duration-[var(--durationFast)]',
+    )
+    // ④ 裸 animation 简写携带裸时长/曲线
+    expect(judge('animate-[spin_1s_linear_infinite]').join('|')).toContain('1s')
+    expect(judge('animate-[rise_cubic-bezier(0.05,0.7,0.1,1)]').join('|')).toContain('cubic-bezier')
+    expect(judge('duration-[200ms]').join('|')).toContain('200ms')
+    // ⑤ 无方括号的裸形态
+    expect(judge('duration-200').join('|')).toContain('duration-200')
+    expect(judge('ease-linear').join('|')).toContain('ease-linear')
+    // ⑥ 未闭合的任意值不放行（否则「截断正则」就是绕过口）
+    expect(judge('duration-[var(--x)').join('|')).toContain('未闭合')
+
+    // 阴性对照：干净输入零违规（证明上面抓的不是「class 属性」本身）
+    for (const clean of [
+      'bg-primary justify-end',
+      'transition-colors',
+      // 几何量不是动效参数：thumb 按压的尺寸变化走 inline :style（决策 2 表末行）
+      'active:w-[7.467vw] active:h-[7.467vw]',
+      'w-[13.867vw] h-[8.533vw] rounded-full',
+      // 非动效任意值不误判
+      'border-[0.533vw]',
+    ]) {
+      expect(judge(clean), `误判：${clean}`).toEqual([])
+    }
+  })
+
+  it('反事实：把违规形态塞回真实组件源码的副本 → 同一个判据当场点名（判据是活的，不是恒绿）', () => {
+    // 取**真实源码**而非合成串：证明这道判据在它实际要管的那个文件上是活的。
+    // 修复前的 M3Switch.vue 就是这个形态（`const TRACK_MOTION_CLASS = 'transition-colors
+    // duration-[var(--durationNormal)] ease-[var(--motion-standard)]'`），修复后源码里
+    // 已无该字面量 ⇒ 这里用副本把它放回去，必须转红。
+    const path = 'components/M3Switch.vue'
+    const clean = SOURCES[path]!
+    expect(clean, '真实源码当前必须已无令牌引用形态（否则上面那道全称断言已经红了）').not.toContain(
+      'duration-[var(--durationNormal)]',
+    )
+    const reseeded = clean.replace(
+      /const TRACK_MOTION_CLASS = MOTION_CLASS\.\w+/,
+      "const TRACK_MOTION_CLASS =\n  'transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]'",
+    )
+    expect(reseeded, '反事实没落到源码上（TRACK_MOTION_CLASS 形态已变？），本用例无效').not.toBe(clean)
+    const hits = scanClassMotion(path, reseeded)
+    expect(hits.join('|'), '违规必须归属到 M3Switch.vue 的具体行').toContain(`${path}:`)
+    expect(hits.join('|')).toContain('duration-[var(--durationNormal)]')
+    // 阴性对照：同一文件未改动的副本零违规（证明转红来自那一行、不是来自文件本身）
+    expect(scanClassMotion(path, clean)).toEqual([])
+  })
+
+  it('口径边界：`<style>` 块里的 CSS 声明不受本判据（归既有时长槽判据按令牌判）', () => {
+    // #854 已验收的合法形态：CSS 声明里用**令牌**填时长/曲线槽。
+    // 若本判据把 `<style>` 也扫进来，它会误红 ⇒ 这是「两侧不互相误判」的守门用例。
+    const legal = [
+      '<style>',
+      '.item-rise { animation: item-rise var(--durationMedium1) var(--motion-emphasized-decelerate) 60ms both; }',
+      '.scrim-in { animation: scrim-in var(--durationNormal); }',
+      '</style>',
+    ].join('\n')
+    expect(scanClassMotion('Synthetic.vue', legal), '<style> 块被本判据误判了').toEqual([])
+    // 阴性对照的对照面：同样内容搬进模板类名位就是违规（证明确实是 `<style>` 边界在起作用）
+    expect(
+      scanClassMotion('Synthetic.vue', '<template><view class="duration-[var(--durationNormal)]" /></template>'),
+    ).not.toEqual([])
   })
 })

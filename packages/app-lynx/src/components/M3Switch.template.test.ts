@@ -81,10 +81,14 @@ describe('M3Switch 内部实现（M3 spec v0.192 几何 + 颜色 + 动效）', (
     expect(code).toContain('border-[0.533vw]')
   })
 
-  it('过渡用 motion token（durationNormal + motion-standard）', () => {
-    expect(code).toContain('transition-colors')
-    expect(code).toContain('duration-[var(--durationNormal)]')
-    expect(code).toContain('ease-[var(--motion-standard)]')
+  it('过渡用 motion token（durationNormal + motion-standard），且经 motion.ts 登记表消费', () => {
+    // ADR-0211 决策 1「动效唯一入口」：组件内**不得**自写时长/曲线工具类。ADR-0179 抽取的
+    // switch 控件自身令牌（--durationNormal + --motion-standard）已收口进 MOTION_CLASS.switchTrack。
+    // 故此处断言的是「组件消费登记表」这一契约，字面量本身由 useReducedMotion.test.ts 对
+    // MOTION_CLASS 的值单点断言（同一字面量只抄一处，避免两处各抄一份后各自漂移）。
+    expect(code).toContain('MOTION_CLASS.switchTrack')
+    expect(code).not.toMatch(/duration-\[var\(--duration/)
+    expect(code).not.toMatch(/ease-\[var\(--motion-/)
   })
 })
 
