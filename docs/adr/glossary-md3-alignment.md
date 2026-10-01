@@ -4,6 +4,9 @@
 > 配套 ADR：[ADR-0205-md3-baseline-and-scope.md](./ADR-0205-md3-baseline-and-scope.md)（MD3 基线与范围）、[ADR-0206-typography-type-scale.md](./ADR-0206-typography-type-scale.md)（排版 type scale）、[ADR-0207-shape-and-state-layer-guardrails.md](./ADR-0207-shape-and-state-layer-guardrails.md)（形状与状态层护栏）、[ADR-0208-material-symbols-icons.md](./ADR-0208-material-symbols-icons.md)（图标集）。
 > 事实底座：`docs/research/material-design-3-gap-analysis-2026-09.md`（19 条差距 + 逐条证据）。本表「项目落点」列与该报告的**结论**一致；**坐标/计数以本表实测为准**（报告测于 MD3 整改之前）。
 > ⚠️ **本表正文（§1–§11）记录的是整改后的现状，不是差距分析结论。** 差距报告的每一条差距在 §12.2 都有对应的「整改前 → 现状」对照；§12.1 是**整改前快照**（含历史行号），只作留痕，勿当现状引用。
+> ⚠️ **§13 是 2026-10-01 新增的独立维度**，与 §1–§11 正交：§1–§11 记的是**令牌层**合规，
+> §13 记的是**消费层**覆盖率与 Lynx 样式栈能力边界。诊断结论是「令牌层 95% 合规、消费层接近零，
+> 用户感知的粗糙几乎全部来自消费层」——**只读 §1–§11 会得出「MD3 已全面落地」的错误印象**。
 > **证据坐标一律用稳定锚点**（令牌名 / 类名 / 文件 + 符号名），不写行号 —— 理由与来龙去脉见 §4.2 末的注。
 > 交叉引用（不重复定义）：单位与换算体系见 [./glossary-lynx-units.md](./glossary-lynx-units.md)（**权威**）；色板/主题色/暗色三态/漂移锁见 [./glossary-lynx-bili-theme.md](./glossary-lynx-bili-theme.md)。
 > 基线声明：AGENTS.md「Fluent Design 规范」章服务的是已删除的 WebView 客户端（ADR-0203），为历史存档，对 app-lynx 无约束力。
@@ -274,9 +277,15 @@ MD3 状态层的前提是「**把一层半透明色盖在已知底色上**」（
 | **Surface tint** | 表达层级的主要手段（等价于"用 primary 染色"） | ✅ 已定义并**已有一处真实消费**：登记为 `surface.tint` → `bg-surface-tint`，由 `PagePickerSheet.vue` 以 `bg-surface-tint opacity-[0.08]` 叠加消费（8% 口径对齐 hover 层），单测钉住「产物有规则 + 模板有真实 class + 低透明度合成生效」并挡住「把 tint 当 bg-primary 改名」的假消费。⚠️ 该消费**不承载 elevation 层级**（是状态层式叠加），层级仍靠 `surface-container-*` 底色 + box-shadow | `tailwind.config.ts` 的 `surface.tint`；`components/PagePickerSheet.vue` 的 `bg-surface-tint opacity-[0.08]` + `components/PagePickerSheet.test.ts`；令牌定义见 `tokens.css` 的 `--md-surface-tint` |
 | **Shadow 多层逗号分隔** | 标准 CSS 多层阴影 | tokens.css 已按多层写法定义；LynxView 对多层 `shadow-[var(--md-elevation-N)]` 的支持度**未真机验证**（多层取值本身与官方配方一致） | `tokens.css` 的 `--md-elevation-1/2/3`；差距报告 §5、§7.6 |
 | **替代表达（降级路径）** | M3 用 tint 表达层级 | 若多层 box-shadow 真机不生效，可用 `surface-container-*` 底色层级替代 | 差距报告 §5 处理建议 |
-| **消费侧实测分布** | — | ⚠️ **只用到 level 1/2/3**：生产 `.vue` 里 `--md-elevation-1` **53 处**、`--md-elevation-3` **10 处**、`--md-elevation-2` **5 处**；**level 0/4/5 各 0 处**（4/5 是外推档、无人消费正说明外推未被当作事实使用） | 实测口径：生产 `.vue`（剔除 `.test.`）全文 grep `md-elevation-[0-9]` |
+| **消费侧实测分布** | — | ⚠️ **只用到 level 1/2/3**：生产 `.vue` 里 `--md-elevation-1` **3 处**（ADR-0212 整改后；**整改前为 53**）、`--md-elevation-3` **10 处**、`--md-elevation-2` **5 处**；**level 0/4/5 各 0 处**（4/5 是外推档、无人消费正说明外推未被当作事实使用；level-0 的 0 处是 [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md) 决策 4.1 的**决策结果**——零阴影靠**删声明**达成，不写显式 0） | 实测口径：生产 `.vue`（剔除 `.test.`）全文 grep `md-elevation-[0-9]`；复算 `grep -rhoE 'md-elevation-[0-5]' --include='*.vue' packages/app-lynx/src \| sort \| uniq -c` → `3 / 5 / 10`（**2026-10-01 实测**） |
 
-组件形态的层级落点（稳定锚点，不引用行号）：`NavigationBar.vue` 的根 `view`（`h-[21.333vw] bg-surface-container`，用底色不用阴影）；`RefreshableList.vue` 的菜单项与 FAB（`shadow-[var(--md-elevation-2)]` + `active:shadow-[var(--md-elevation-1)]`）；`GlobalFab.vue` 的展开环 / 回顶环用 `--md-elevation-2`、主按钮用 `--md-elevation-3` 且 `active:shadow-[var(--md-elevation-1)]`；`GlassCard.vue` 的 `box-shadow: var(--md-elevation-1)`。
+组件形态的层级落点（稳定锚点，不引用行号）：`NavigationBar.vue` 的根 `view`（`h-[21.333vw] bg-surface-container`，用底色不用阴影）；`RefreshableList.vue` 的菜单项（静止档 `shadow-[var(--md-elevation-2)]`）与 FAB；`GlobalFab.vue` 的展开环 / 回顶环用 `--md-elevation-2`、主按钮用 `--md-elevation-3`。
+
+> ⚠️ **本段原有三处锚点已于 2026-10-01 作废**（票 #885 / [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md) 决策 3、决策 6），勿再按旧文本核对：
+> 原写 `RefreshableList.vue` 菜单项与 `GlobalFab.vue` 主按钮「`active:shadow-[var(--md-elevation-1)]` 做按压反馈」——
+> **实测 `active:shadow` 已在生产 `.vue` 中 0 命中**，现为 `active:bg-layer-pressed-*`（菜单项）与 `active:opacity-80`（FAB / 主按钮）；
+> 原写 `GlassCard.vue` 的 scoped `box-shadow: var(--md-elevation-1)`——**该声明已整条删除**（该文件现存 `box-shadow` 字样仅剩一条解释性注释）。
+> 静止档（`elevation-2` / `elevation-3`）不受影响，仍以上句为准。
 
 ## 7. 主题与动态色
 
@@ -414,7 +423,7 @@ MD3 状态层的前提是「**把一层半透明色盖在已知底色上**」（
 | `active:` 近似 | 「原生 LynxView 待真机验证」 | 顶层登记后**真正生效**（此前 `state` 嵌套产出 `bg-state-layer-*` 不同名，约 15 处静默失效） | §5.3 |
 | focus-visible | 「Lynx 支持度未验证」 | **ADR-0207 决策 5 已给真机实证**：引擎不匹配 ⇒ 刻意为 0，门禁规则 6 守红 | §5.3 / §9.2 |
 | disabled 消费 | 13 个文件 `opacity-40/50` + `pointer-events-none` | **13 个生产 `.vue`** 走 `opacity-40/50`（知情接受的存量债）；`pointer-events-none` 是**死类名**，不计入消费做法 | §5.3 / 核心术语表 |
-| Elevation | 三档，**无 level 0/4/5** | **六档 0–5 齐全**（`0: none` 为官方定义；**4/5 标「外推」，非官方一手表**）；消费只到 1/2/3（53/5/10 处），0/4/5 各 0 处 | §6 |
+| Elevation | 三档，**无 level 0/4/5**；消费 1/2/3 = **53/5/10 处** | **六档 0–5 齐全**（`0: none` 为官方定义；**4/5 标「外推」，非官方一手表**）；消费只到 1/2/3（**3/5/10 处**，ADR-0212 整改后，2026-10-01），0/4/5 各 0 处（level-0 的 0 处是**决策结果**：零阴影靠删声明，见 ADR-0212 决策 4.1） | §6 |
 | Surface tint | 「`.vue`/`.ts` 零引用」 | **1 处真实消费**（`PagePickerSheet.vue` 的 `bg-surface-tint opacity-[0.08]`，单测钉住非假消费）；⚠️ 不承载 elevation 层级 | §6 |
 | Material Symbols | 「全仓无该字体引用（grep 0）」 | **已引入**：base64 内联子集 + `iconMap.ts` + `AppIcon.vue`（26 个生产 `.vue`）；⚠️ 可变轴子集化时定死，「描边随状态」未实现 | §8 |
 | Unicode 字形 | 导航 `⌂ ✦ ✎ ◎`、关闭 `×`、`ActionButton` 传文本符号 | 基本退场（`navTabs.ts` 改图标名字符串，字形降为 `iconMap.ts` 注释里的历史对照）；⚠️ **残留 1 处**：`BottomSheet.vue` 默认关闭键仍写死 `×` | §8 |
@@ -444,8 +453,116 @@ MD3 状态层的前提是「**把一层半透明色盖在已知底色上**」（
 - 因此本表所有「与 material-web v0.192 逐条一致」的表述，其性质是**「已人工回源核对过的一手断言」**，不是「仓内可机器复算的等式」。取数纪律见 `AGENTS.md`「数值来源（唯一基准）」与本表 §2.1 注（需引用时先拉该文件核对，勿凭记忆填表）。
 - **残留缺口（知情接受）**：这些数值**没有 CI 机器防线**。`md3ConfigTokens.test.ts` 只能核对「`tokens.css` / `tailwind.config.ts` 里的值等不等于本仓抄下来的期望值」，抄错时它与实现同源同错。真正的回源复核仍是人工联网动作（§4.2 的 `duration-extra-long4` 就是这么核的，2026-09-30）。若日后要闭这个环，选项是「CI 里拉上游文件做差分」或「把四份 scss vendor 进仓并锁 commit」——属独立决策，不在本次范围。
 
+## 13. 界面连续性（UI continuity）— 2026-10-01 新增
+
+> **本章的由来**：§1–§11 记录的是**令牌层**的合规状态（颜色 / 排版 / 形状 / 动效 / 状态层 / 层级各自成表）。
+> 2026-10-01 的观感诊断发现：**令牌层 95% 合规，消费层覆盖率却接近零**——用户感知到的「粗糙」
+> 几乎全部来自**消费层**，而非令牌值本身。本章登记这条新维度，并定义描述它所需的术语。
+> 配套决策见 [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md)（能力边界）·
+> [ADR-0211](./ADR-0211-ui-continuity-motion-contract.md)（连续性契约）·
+> [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md)（色调层级）·
+> [ADR-0213](./ADR-0213-immersive-media-view.md)（沉浸模式）。
+
+### 13.1 核心判据：白名单 ≠ 不可用
+
+| 术语 | 定义 | 本项目落点 | 证据 |
+|---|---|---|---|
+| **死类名（dead class name）** | 工具类**构建期不产出任何 CSS**，写了看似生效、实际静默无样式。与「构建期报错」是两类不同的失败，**后者安全、前者危险** | 已确认死类名（**产物 0 条规则**）：`pointer-events-*` / `cursor-*` / `select-none` / `touch-none`。⛔ **反例一（白名单骗人）**：`transition-colors` / `duration-[…]` / `ease-[…]` 全部可用。⛔ **反例二（更隐蔽，2026-10-01 订正）**：`transform-*` / `scale-*` / `translate-*` / `rotate-*` **产出 CSS 但渲染为空**，见下格 | 门禁 `tests/lynxUnsupportedTailwindClasses.test.ts`（只守 `pointer-events-*`，**其余死类名无门禁**）；机制见 [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md) 路径 E |
+| **⚠️ 零命中 ≠ 不支持（JIT 假象）** | 产物里 grep 命中 0 条，有**两种**完全不同的成因，**产物本身区分不了** | ① **JIT 裁剪**：源码里没人写这个类，Tailwind 就不生成 ⇒ 0 命中；② **真不支持**：preset 裁掉该 plugin ⇒ 0 命中。**`transform-*` / `scale-*` 属第 ① 种**——用项目真实 config 跑一次 Tailwind JIT，19 个候选类里 15 个产出规则、仅 4 个真死。⚠️ 判据：**不能只看产物 0 命中就断言「不支持」，必须跑一次真实编译** | 判别方法：用项目 `tailwind.config.ts` 对候选类串跑一次 JIT，比对产出规则；`rotate-45` 在生产产物中有 4 处命中（`--tw-rz`），是该结论的独立佐证 |
+| **第三类失败：构建全绿、渲染为空** | 声明**能构建、也有 CSS 规则**，但计算值阶段失效 | `transform` 族产出的规则引用 9 个 `--tw-*` 变量，而 **preset 不发 base/preflight 层**（`preflight` 不在 `corePlugins` 内）+ `src` 里 0 处 `--tw-*` 定义 ⇒ 按 CSS 规范该声明在计算值阶段非法 ⇒ 渲染为 `transform: none`。**它能通过所有静态检查**（构建过、类型过、单测过），只有真机取色/截图看得见 | 产物侧佐证：`tw-rz` 命中 4 次（其自身定义），其余 8 个 `--tw-*` 各命中 3 次（**仅被引用、无定义**）；决策与探针方法见 ADR-0210 路径 E |
+| **corePlugins 白名单既不充分也不必要** | 57 项白名单只决定 Tailwind **内置** plugin；preset 可用**自定义 plugin** 把某族补回来（产物确实带 35 个 `plugins:`） | **真的死**（白名单正确）：`pointerEvents` / `cursor` / `select` / `touch`；**不是死**（白名单被绕过）：`transition*` 三族、`transform` / `rotate` / `scale` 族 | 复算白名单：`node -e "const s=require('fs').readFileSync('node_modules/@lynx-js/tailwind-preset/dist/lynx.js','utf8');console.log(s.match(/DEFAULT_CORE_PLUGINS\s*=\s*\[([\s\S]*?)\]/)[1].split(',').length)"`；机制见 [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md) |
+| **产物判据（唯一可信的可用性判据）** | 判定某工具类是否生效，**看构建产物的 CSS 查找表，不看配置、也不看注释** | 产物 `packages/app-lynx/dist/main.lynx.bundle` 内联 CSS 表；`transition-colors` → `.15s,.15s,.15s` + `background-color,border-color,color`，`duration-[var(--durationNormal)]` → `{{--durationNormal}}`，`ease-[var(--motion-standard)]` → `{{--motion-standard}}`，**三条全是真规则** | 复算：`grep -ao 'transition-colors.\{0,60\}' packages/app-lynx/dist/main.lynx.bundle`。⚠️ **只看出现次数不够**——bundle 里「CSS 规则」与「JS 里的类名字符串」同形，必须看类名**后面跟的是值（`…{0,60}` 内出现 `.2s` / `{{--token}}`）还是引号 / 逗号** |
+| **⚠️ 产物复算的第三个坑：产物是序列化 AST** | 用**纯文本 grep `.<类名>`** 查产物里某类有没有规则，**会得出反向的错误结论** | Lynx 把产物序列化成 AST，**类名以裸 token 存储、不带前导点** ⇒ `grep '\.rotate-45'` 在产物里 **0 命中**，看起来像「该类没产出规则」，而实际它**有**。本轮被此坑误导两次（一次在子代理、一次在人工复核） | 正确做法：grep **类名本身**（不带前导点）看其后是否跟值；或用项目真实 config 跑一次 Tailwind CLI 探针。**判别标志：若某类「产物 0 命中」但源码确实写了它，先怀疑是本坑，再怀疑不支持** |
+| **（上一格的）反面教材** | 否定性注释比肯定性注释更容易过期 | ✅ **已于 2026-10-01 订正**（票 #875）：`packages/app-lynx/src/components/ActionButton.vue` 文件头、`packages/app-lynx/tests/lynxUnsupportedTailwindClasses.test.ts` 的白名单快照说明——两处原写「同样被裁的还有 `transition`」，现已改为准确机制（transition 族被自定义 plugin 补回、可用；transform 族能产规则但变量未定义、渲染为空），并附「不在白名单 ⇒ 死类名不能当通用判据」的警示 | 遗留项：该测试文件 `expect()` 的**报错文案字符串**内仍列着 `transition`（属断言内字面量，按「不改断言」纪律保留）；机制见 [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md) |
+
+### 13.2 动效落地路径（五条，只有三条能走）
+
+| 路径 | 写法 | 可用 | 失败方式 |
+|---|---|---|---|
+| A | Tailwind `transition-colors` + `duration-[var(--durationX)]` + `ease-[var(--motionX)]` | ✅ | — |
+| B | inline `:style` 绑定 | ✅ | — |
+| C | `<style>` 块内 `@keyframes` + `animation`（`animation` 在白名单内） | ✅ | — |
+| D | `hover-class` 属性 | ❌ | **静默无反馈**（ADR-0207 决策 9 / #868 真机实证） |
+| E | `transform-*` / `scale-*` / `translate-*` / `rotate-*` 工具类 | ⚠️ **构建全绿、渲染为空** | **第三类失败**：规则能产出，但其引用的 9 个 `--tw-*` 变量**从未定义**（preset 不发 base 层）⇒ 计算值阶段非法 ⇒ 渲染为 `transform: none`。**能通过构建 / 类型 / 单测全部静态检查** |
+
+> **路径 E 的直接后果**：按压缩放 / 位移反馈**必须走路径 B**（inline `:style`）——不是「因为工具类被裁」
+> （那个理由是错的，见 §13.1「零命中 ≠ 不支持」），而是因为**走工具类会静默渲染为空**。
+> ⚠️ 已知存量疑点：`TextSelectionToolbar.vue` 的 `rotate-45` 抓手是这条的**在册候选**，
+> 待真机取证（见 [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md) 决策 5）。
+
+### 13.3 连续性与覆盖率的度量
+
+| 术语 | 定义 | 本项目落点（2026-10-01 实测） |
+|---|---|---|
+| **界面连续性（UI continuity）** | 非 MD3 概念，项目侧载体：**每一次可见状态变化都在时间维度上被表达** | 见下方覆盖率行 |
+| **动效契约（Motion contract）** | 项目侧唯一动效预设入口（入场 / 退场 / 按压 / 列表 stagger 四类），全部由 `--motion-*` + `--duration*` 驱动 | **待建**（决策见 ADR-0211） |
+| **瞬变（instant switch）** | **0ms** 状态切换。**「粗糙」的直接成因**——与颜色对不对无关 | 全部 `active:` 消费点均为瞬变（见下） |
+| **状态层过渡（state-layer transition）** | `active:` 状态层挂过渡，使其在档位时长内淡入 | **待建**（决策见 ADR-0211） |
+| **动效覆盖率** | 含任意动效（`transition-*` / `transition:` / `@keyframes` / `animation:`）的生产 `.vue` 占比 | **6 / 76 ≈ 7.9%**（transition 3 个、`@keyframes` 4 个） |
+| **弹层入场覆盖率** | 有入场动画的弹层占比 | **0 / 7** —— `BottomSheet` / `SearchSheet` / `SeriesSheet` / `CommentOverlay` / `BookmarkPanel` / `PagePickerSheet` / `WatchlistPromptDialog` 的 `@keyframes` 与 `transition` 计数**全部为 0** |
+| **页面转场覆盖率** | 有导航转场的路由占比 | **0** —— `src/router.ts` 是裸 `createRouter`，全部导航为整页硬替换 |
+
+**`active:` 消费点的口径归正**（实测 `grep -rhoE 'active:[a-z-]+' src --include='*.vue'`）：
+
+| 形态 | 处数 | 口径判定 |
+|---|---|---|
+| `active:bg-layer-*`（alpha 层） | **27** | ✅ **正路**（ADR-0207 决策 4：alpha 层是正路） |
+| `active:bg-state-pressed-*`（预计算实色） | **24** | ⚠️ **兜底路径**，按决策 4 属口径待归正（**不是死类名**——产物实测 29 条真规则） |
+| `active:opacity-*` | 7 | 合法 |
+| `active:shadow-*` | 5 | ⚠️ **心智污染**：用阴影表达**状态**，与「阴影表达**高度**」混用（见 §13.4）。✅ **已于 2026-10-01 清零**（票 #885，实测 0 命中）⇒ 本行的 5 是**诊断时快照** |
+| 其他（`active:w-` / `active:h-` / `active:bg-white`） | 3 | 合法 |
+| **合计** | **66 处 / 34 文件** | — |
+
+> ⚠️ **两个易混数字**：本表的 **66** 是 `active:` 全量；而 §5.2 记的「alpha 27 vs 实色 24」是**同一批数据的两种切分**
+> （27 + 24 = 51，加 `active:opacity-*` 7 + `active:shadow-*` 5 + 其他 3 = 66）。**两处数字自洽，可互相校验。**
+>
+> ⛔ **合计 66 已因一格失效而降为「诊断时快照」**：`active:shadow-*` 一行于 2026-10-01 由 5 变为 **0**（票 #885，
+> `grep -rhoE 'active:shadow' --include='*.vue' packages/app-lynx/src | wc -l` → `0`）⇒ 本表各行**须整表重测**后才能继续当现状引用。
+> **本轮只实测了 `active:shadow` 一格**，其余四格未复测 ⇒ **不臆造新合计**，新合计留待下一轮整表重测。
+
+### 13.4 色调层级与贴面元素
+
+| 术语 | 定义 | 本项目落点 |
+|---|---|---|
+| **色调层级（tonal elevation）** | MD3 官方口径：**层级主要由 surface tint / `surface-container-*` 明度分档表达，box-shadow 为辅** | 决策已在 ADR-0207 决策 7 拍板；令牌六档齐全，**消费侧零落地**（见 §6） |
+| **贴面元素（surface-lying element）** | 与 surface 近乎同色的平面容器（`surface-container-lowest/low`），MD3 下**应零阴影** | ✅ **已归零**（票 #882 骨架屏 9 声明点 + #883 贴面 34 处 + #884 / #885 其余）：实测 `elevation-1` 由 **53**（整改前）→ **3**（2026-10-01），余下 3 处为 `RestrictedNovelCard.vue` / `AiRestrictedNovelCard.vue` / `Recommended.vue`，按 ADR-0212 决策 1 属**合规消费**（非贴面），**不再追求归零**。⚠️ 初稿写的「→ **9**」是中途快照，**已作废**；权威值与逐处台账见 [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md) 决策 3 的实测标记行 |
+| **阴影语义分离** | 阴影**只表达高度**，不表达**状态** | ✅ **已清零**（2026-10-01，票 #885）：实测 `active:shadow` 在生产 `.vue` 中 **0 命中** —— `RefreshableList.vue` 菜单项改用 `active:bg-layer-pressed-*`，`RefreshableList.vue` 的 FAB 与 `GlobalFab.vue` 主按钮改用 `active:opacity-80`（决策见 [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md) 决策 6 与复核判据 2）。⚠️ 初稿写的「`RefreshableList.vue` / `GlobalFab.vue` 用 `active:shadow-elevation-1` 做按下反馈」为**整改前**状态 |
+
+### 13.5 沉浸模式
+
+| 术语 | 定义 | 本项目落点 |
+|---|---|---|
+| **沉浸模式（immersive mode）** | 全屏媒体 + 非内容元素可隐藏 + 系统栏可隐藏 | 决策见 ADR-0213 |
+| **chrome** | 非内容元素：顶栏 / 操作行 / 页面角标 | `IllustDetail.vue` 的 `PageTopBar` 与操作行容器 |
+| **（地基状态）** | 原生侧基础设施 | ✅ **已完备且已验证可用**：`EdgeToEdge.enable(this)`、insets 桥 `pictelioInsets`、`applySystemBarsHidden` + `setSystemBarsHidden`、`KEY_FULLSCREEN_MODE`、`settingsStore.setFullscreenMode()`、`Me.vue` 的 M3Switch 开关、`utils/safeAreaJavaContract.test.ts` 契约测试。真机实测**「全屏模式」开启后状态栏确实隐藏** ⇒ 沉浸模式**近乎零 Java 改动** |
+| **（详情页现状）** | `IllustDetail.vue` | 图片**已是满幅宽**（`w-full`）；图片区**零 `@tap`**（已有 `@tap` 全在子元素，操作行内混用 `@tap` 与 `@tap.stop`）⇒ 「点图隐藏 chrome」是纯前端接线 |
+
+### 13.6 真机动效取证的测量能力边界（2026-10-01 实测）
+
+> 这一节记录的是**取证方法本身的限制**。它不是 MD3 概念，也不是缺陷，
+> 但**任何按本仓做动效改造的人都必须先知道**，否则会得出「动效没生效」的错误结论。
+
+| 事项 | 实测值 | 判据 |
+|---|---|---|
+| **单帧 `adb exec-out screencap` 耗时** | **420ms** | 复算：`t0=$(date +%s%N); adb exec-out screencap -p >/dev/null; t1=$(date +%s%N); echo $(( (t1-t0)/1000000 ))`。⚠️ 这是**下限精度**——比它短的动效**在原理上无法用连拍判定** |
+| **连拍判定的有效时长** | > ~840ms | 8 帧连拍实测：第 2–8 帧**逐字节相同**（148454 B），第 1 帧不同（150353 B）⇒ tap 后 ~840ms 起画面完全静止 |
+| **⚠️ 「采样没看到中间态」≠「没有过渡」** | — | 本项目 MD3 时长档位是 **150–350ms**，**全部短于单帧采样耗时**。用连拍/低帧率视频去判定 200ms 过渡，**采样率不足**，阴性结果**无判别力**。这是本仓最容易犯的取证错误（与 §13.1「零命中 ≠ 不支持」同族：**测不出来 ≠ 不存在**） |
+| **可行取证法：长过渡探针** | ✅ **已验证可用（2026-10-01 真机通过）** | 把某个过渡时长令牌**临时**调大到远大于采样周期（本次 200ms → 2000ms），构建安装后连拍。**判据 = 收敛时刻是否与设定时长吻合**，而不是「有没有看到中间色」 |
+| **✅ 路径 A 真机结论（已回填）** | **通过** | 把 `--durationNormal` 临时改 2000ms，切换「显示 R-18 内容」开关，连拍 12 帧：**k1→k6 六帧连续不同并单调收敛，k6 之后 7 帧完全静止**；按 420ms 采样换算，收敛于 **≈2100ms**，与 2000ms 设定吻合。目视 k3 帧可见轨道呈 **OFF 浅灰 → ON 实心 primary 蓝之间的中间色**。⇒ **Tailwind `transition-colors` + `duration-[var(--durationNormal)]` 在 Lynx 真机上真实插值，`var()` 时长令牌真实解析** |
+| **录屏帧提取能力** | `adb shell screenrecord` → `read` 工具可读并返回采样帧 | ⚠️ 实测：8 秒视频只返回 **5 帧**（约 0.3s 一帧），3 秒视频只返回 **1 帧**。⇒ 录屏**可用于判读状态序列与时序异常**（如整页重排），**不适合做精细色值过渡判定** |
+| **像素取色脚本的陷阱** | 手写 PNG 解码器曾解出与肉眼矛盾的色值 | ⚠️ 本环境**无 ffmpeg**，且手写 PNG 解码易错（filter 重建）。判读颜色**优先直接看图**；必须取色时先用一个已知锚点（如 `--md-primary` = `rgb(26,111,168)`）**校准解码器**，校准不过就不要相信输出 |
+| **⚠️ 内容区不能逐点取值判定** | 「亮度 < 40 ⇒ 有缺陷」在含白色笔触的插画上**假报** | **用户图片是开放世界内容**：画里本来就有浅色像素。判据若隐含「浅色 = 漏出底色」假设，必然被内容本身骗过。**正确判据是结构边界**：扫描完整色带，看「内容 → 背景」的过渡处**有没有第三种色带**（无中间带 = 正常）。逐点取值判据只在**内容域已知且单一**（如「状态栏区 vs 页面区」两分）时成立。实测见 #896 |
+
+### 13.7 2026-10-01 真机观察到的既有缺陷（非本轮改造范围，登记备查）
+
+| 现象 | 实测证据 | 归属 |
+|---|---|---|
+| **全屏模式开关切换导致整页重排** | 状态栏显隐改变安全区内边距 ⇒ 页面内容整体位移（实测「通知」行从 y≈189 跳到 y≈257，约 68px） | 连续性相关，属 [ADR-0211](./ADR-0211-ui-continuity-motion-contract.md) 范围的连带发现 |
+| **FAB 压住内容行** | 至少 2 处可复现：`Me.vue` 的「全屏模式」行、「最大重试次数」行的最右 chip 被 `GlobalFab` 覆盖 | 布局缺陷，**不在** §13.1–§13.5 任何一条决策内 ⇒ 需单独立项 |
+| **原生系统栏基础设施已验证可用** | 「全屏模式」开关 ON ⇒ 状态栏消失；OFF ⇒ 状态栏恢复（两次 A/B 均实测确认） | ✅ 支撑 ADR-0213「近乎零 Java 改动」的结论 |
+
 ## 相关链接
 
 - 事实底座：`docs/research/material-design-3-gap-analysis-2026-09.md`
-- ADR：[ADR-0205](./ADR-0205-md3-baseline-and-scope.md) · [ADR-0206](./ADR-0206-typography-type-scale.md) · [ADR-0207](./ADR-0207-shape-and-state-layer-guardrails.md) · [ADR-0208](./ADR-0208-material-symbols-icons.md)
+- ADR：[ADR-0205](./ADR-0205-md3-baseline-and-scope.md) · [ADR-0206](./ADR-0206-typography-type-scale.md) · [ADR-0207](./ADR-0207-shape-and-state-layer-guardrails.md) · [ADR-0208](./ADR-0208-material-symbols-icons.md) · [ADR-0209](./ADR-0209-md3-filled-text-field-alignment.md) · [ADR-0210](./ADR-0210-lynx-style-stack-capability-boundary.md) · [ADR-0211](./ADR-0211-ui-continuity-motion-contract.md) · [ADR-0212](./ADR-0212-tonal-elevation-surface-over-shadow.md) · [ADR-0213](./ADR-0213-immersive-media-view.md)
 - 术语文档：[./glossary-lynx-units.md](./glossary-lynx-units.md)（单位与换算，权威） · [./glossary-lynx-bili-theme.md](./glossary-lynx-bili-theme.md)（色板/主题/暗色） · [./glossary-emulator-verification.md](./glossary-emulator-verification.md) · [./glossary-ui-cards.md](./glossary-ui-cards.md)（A2 卡片体系，Fluent 2 口径，仅存档参考）
