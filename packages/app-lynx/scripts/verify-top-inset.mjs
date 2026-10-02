@@ -25,15 +25,22 @@
 //   （需先安装，并停在一个**有 M3 顶栏、且顶栏底色为浅色 surface** 的页面）
 //
 //   ⚠️ 本脚本**不适用**于两类页面，对它们给不出有意义的结果：
-//     ① **无顶栏页** —— 窗内不存在「标题居中于 64dp 顶栏」这个几何事实可量，
-//        会报出一个无意义的偏差值。肉眼判定：页面顶部**没有**一条与背景异色的横向条。
+//     ① **无顶栏页**（含 B 变体首页：顶栏已取消、封面出血到 y=0）—— 窗内不存在
+//        「标题居中于 64dp 顶栏」这个几何事实可量。v3 起会**显式拒绝**而非报错
+//        （反推 inset ≤ 0 ⇒ 判据不可用，见 topInsetVerdict.mjs `inconclusive`）。
+//        ⚠️ 该形态与「顶栏在但让位完全失效」给出**同一个数**，本判据无法区分，
+//        所以拒绝时请看截图自己判。肉眼判定：页面顶部**没有**一条与背景异色的横向条。
 //     ② **顶栏区为深色底的页面**（如沉浸式出血到深色封面下）—— v1 在此恒真；
 //        v2 已加行内占比闸门把它变成**显式拒绝**（见 findTitleBandCenter 说明），
 //        但**拒绝 ≠ 通过**：此时应换页面测，不要绕过闸门。
+//
+//   ⚠️ 判定逻辑在 `scripts/topInsetVerdict.mjs`（无依赖纯函数），
+//      门禁在 `tests/topInsetVerdict.test.ts` —— 改判定请连门禁一起改。
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { classifyTopInsetVerdict, MIN_FLAT_SURFACE_UNIFORMITY } from './topInsetVerdict.mjs'
 
 /** 顶栏高度档位（vw）。必须与 tailwind.config.ts / 各页顶栏的 17.067vw 同源。
  *  抽成常量是为了让「期望值」这一步可审计：改档位时这里要一起改，且 review 会看见。 */
@@ -144,10 +151,26 @@ function luma([r, g, b]) {
  * 所以必须加**行内深色占比**闸门把「连续背景」与「稀疏文字」分开。
  *
  * 返回 null 表示「未找到可信文字带」——调用方须据此判红，**不得**当成通过。
+ *
+ * 同时返回**窗内行均匀度中位数**（medianUniformity）：每一行取「最常见颜色的占比」，
+ * 再取中位数。用来判「这个窗口里到底有没有一块平色 surface」。
+ *
+ * ⚠️ 为什么必须有它（实测数据，不是推演）：
+ *   搜索窗 [82, 246] 在**无顶栏页**上落在封面图里，深色头发的稀疏深色像素会被
+ *   当成「文字」（行内占比 6.3%，过不了 60% 连续背景闸门，却够得上「稀疏文字」）。
+ *   由此反推出的 inset 完全取决于**封面画的是谁**：同一张首页，实测出现过
+ *   −1.5 与 +9.5 两个值 ⇒ 纯噪声，却都被当成真实偏差报了出去。
+ *   只靠「反推值 ≤ 0」去拦是**从一个样本推的**，拦不住另一半。
+ *
+ *   均匀度把两族干净分开（emulator-5554 / 1080×2160 实测，窗 [82,246]）：
+ *     有 M3 顶栏的 7 页 + 首页之外的截图：窗内中位均匀度 = **1.000**（顶栏是平色 surface）
+ *     B 变体首页（无顶栏，封面出血）：            窗内中位均匀度 = **0.10 ~ 0.40**
+ *   空档极大，阈值取 0.75 落在空档正中。
  */
 function findTitleBandCenter(pngPath, insetPhysical, barPhysical) {
   const py = `
 import sys
+from collections import Counter
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('RGB')
 W, H = im.size
@@ -156,17 +179,24 @@ LO, HI, DARK, MINPX, MAXRATIO = int(sys.argv[2]), int(sys.argv[3]), ${DARK_LUMA_
 def luma(x, y):
     c = px[x, y]; return 0.299*c[0] + 0.587*c[1] + 0.114*c[2]
 xs = list(range(int(W*0.15), int(W*0.85), 3))
+uxs = list(range(0, W, 2))
 rows = []
 peak = 0.0
+unif = []
 for y in range(LO, min(HI, H)):
     dark = sum(1 for x in xs if luma(x, y) < DARK)
     ratio = dark / len(xs)
     if ratio > peak: peak = ratio
     if dark > MINPX and ratio <= MAXRATIO:   # 稀疏才可能是文字；连续必是背景
         rows.append(y)
+    # 行均匀度：量化到 8 级色阶（容忍抗锯齿与压缩噪点）后取众数占比
+    cnt = Counter((px[x, y][0]//8, px[x, y][1]//8, px[x, y][2]//8) for x in uxs)
+    unif.append(cnt.most_common(1)[0][1] / len(uxs))
+unif.sort()
+median_unif = unif[len(unif)//2] if unif else 0.0
 if not rows:
     # 区分「窗内全亮（没有文字）」与「窗内全暗（背景被误当文字）」
-    print('BG' if peak > MAXRATIO else 'NONE')
+    print('BG' if peak > MAXRATIO else 'NONE', f"{median_unif:.3f}")
     sys.exit(0)
 start = rows[0]; end = start
 for y in rows[1:]:
@@ -174,17 +204,24 @@ for y in rows[1:]:
         end = y
     else:
         break
-print(f"{(start + end) / 2.0:.2f} {start} {end} {peak:.3f}")
+print(f"{(start + end) / 2.0:.2f} {start} {end} {peak:.3f} {median_unif:.3f}")
 `
   const out = execFileSync(
     'python3',
     ['-c', py, pngPath, String(insetPhysical + 10), String(Math.round(insetPhysical + barPhysical - 10))],
     { encoding: 'utf8' },
   ).trim()
-  if (out === 'NONE') return { kind: 'none' }
-  if (out === 'BG') return { kind: 'background' }
-  const [center, start, end, peak] = out.split(' ').map(Number)
-  return { kind: 'ok', center, band: `${start}–${end}`, peakRatio: peak }
+  const parts = out.split(' ')
+  if (parts[0] === 'NONE') return { kind: 'none', medianUniformity: Number(parts[1]) }
+  if (parts[0] === 'BG') return { kind: 'background', medianUniformity: Number(parts[1]) }
+  const [center, start, end, peak, medUnif] = parts.map(Number)
+  return {
+    kind: 'ok',
+    center,
+    band: `${start}–${end}`,
+    peakRatio: peak,
+    medianUniformity: medUnif,
+  }
 }
 
 const args = process.argv.slice(2)
@@ -235,37 +272,70 @@ console.log(`  标题文字带          = y ${band.band}（中心 ${band.center.
 
 // 反推 inset：标题中心 = 盒中心 = inset + 顶栏高/2；再减去字形盒固有偏置
 const impliedInset = band.center - barPhysical / 2 - TITLE_GLYPH_BIAS
-const delta = impliedInset - insetPhysical
 console.log(`\n换算`)
 console.log(`  盒中心 = 标题中心 - 字形偏置 = ${band.center.toFixed(1)} - ${TITLE_GLYPH_BIAS} = ${(band.center - TITLE_GLYPH_BIAS).toFixed(1)}`)
 console.log(`  反推应用 inset        = 盒中心 - 顶栏半高 = ${impliedInset.toFixed(1)} 物理 px  = ${(impliedInset / scale).toFixed(2)} 逻辑 px`)
 console.log(`  平台真值 inset        = ${insetPhysical} 物理 px  = ${(insetPhysical / scale).toFixed(2)} 逻辑 px`)
-console.log(`  偏差                  = ${delta >= 0 ? '+' : ''}${delta.toFixed(1)} 物理 px（容差 ±${TOLERANCE}）`)
 
-if (Math.abs(delta) > TOLERANCE) {
+// 判定逻辑在 scripts/topInsetVerdict.mjs（无依赖纯函数），与
+// tests/topInsetVerdict.test.ts 共用同一份 —— 像素探测跑不动单测，但「这个数
+// 该判成什么」必须可执行、可回归。
+const verdict = classifyTopInsetVerdict({
+  impliedInset,
+  insetPhysical,
+  tolerance: TOLERANCE,
+  medianUniformity: band.medianUniformity,
+})
+console.log(`  偏差                  = ${verdict.delta >= 0 ? '+' : ''}${verdict.delta.toFixed(1)} 物理 px（容差 ±${TOLERANCE}）`)
+
+if (verdict.branch === 'not-flat-surface') {
+  fail(
+    `搜索窗内**没有平色 surface**（窗内中位行均匀度 ${band.medianUniformity.toFixed(3)} < ${MIN_FLAT_SURFACE_UNIFORMITY}）—— 本页没有顶栏。\n` +
+      `  搜索窗 [${insetPhysical + 10}, ${Math.round(insetPhysical + barPhysical - 10)}] 物理 px 落在**封面图/插画**上，\n` +
+      `  深色头发、阴影的稀疏深色像素会被当成「文字」（行内占比仅 ${(band.peakRatio * 100).toFixed(1)}%，\n` +
+      `  过不了 60% 的连续背景闸门，却完全够得上「稀疏文字」）。\n` +
+      `  ⚠️ 此时反推出的 inset 完全取决于**画的是谁**：同一张 B 变体首页实测出现过\n` +
+      `     −1.5 与 +9.5 两个值 —— 纯噪声，却都会被当成真实偏差报出去。\n` +
+      `  ⇒ 换到**有 M3 顶栏且顶栏为浅色**的页面再测。本判据在此页不可用。\n` +
+      `     （真机实测：有顶栏 7 页窗内中位均匀度 = 1.000；首页 = 0.10~0.40）`,
+  )
+  process.exit(1)
+}
+
+if (verdict.kind === 'inconclusive') {
+  fail(
+    `判据在此样本上**给不出答案**（反推 inset = ${impliedInset.toFixed(1)} ≤ 0，物理上不可能）。\n` +
+      `  量到的「文字带」落在顶栏盒该在的位置**之上**，它不是顶栏标题。\n` +
+      `  ⚠️ 「本页没有顶栏」与「顶栏在但让位完全失效」在本判据下**给出同一个数**\n` +
+      `     （实测 −1.5 与 ≈ −3.5），不可区分 —— 此前这里一律报「让位没生效」，\n` +
+      `     于是**默认落地页**（B 变体首页，顶栏已取消、封面出血到 y=0）上\n` +
+      `     给出一个自信的错误诊断。\n` +
+      `  另一条常见成因：搜索窗 [${insetPhysical + 10}, ${Math.round(insetPhysical + barPhysical - 10)}] 落在**封面图**上，\n` +
+      `     深色头发/阴影的稀疏深色像素被当成了文字（行内占比仅 ${(band.peakRatio * 100).toFixed(1)}%，\n` +
+      `     过不了 60% 的连续背景闸门，却完全够得上「稀疏文字」）。\n` +
+      `  ⇒ 请看截图确认：顶栏在不在？在 ⇒ 让位完全失效（查该页 spacer / 路由 meta 是否 'self'）；\n` +
+      `     不在 ⇒ 本页不适用，换到**有 M3 顶栏且顶栏为浅色**的页面再测。`,
+  )
+  process.exit(1)
+}
+
+if (verdict.kind === 'fail') {
   // 实测/平台倍率：反推出的应用 inset 是平台真值的多少倍。
   // 1 = 一致；显著 <1 = 让位没生效；>1 的**整数倍** = 密度倍数错误（物理像素当逻辑像素用）。
-  //
-  // ⚠️ 判别顺序要紧：**先判「偏小」再判「整数倍」**。
-  //    反过来写时，spacer=0 的实测倍率约 0.10 会先命中「接近 0 倍」那个整数分支，
-  //    把根因误指成「物理像素未换算」—— 活设备上就是这样误报过的。
-  //    「偏小」与「密度错」是两类完全不同的缺陷，误指会把排查引向错误方向。
-  const approx = impliedInset / insetPhysical
-  const isNearZeroish = approx < 0.8
-  const isIntegerMultiple =
-    !isNearZeroish && Math.abs(approx - Math.round(approx)) < 0.15 && Math.round(approx) > 1
+  // 判别顺序（先「偏小」后「整数倍」）见 topInsetVerdict.mjs 内的注释。
+  const { approx, branch } = verdict
   fail(
-    `对拍失败：偏差 ${delta.toFixed(1)} 物理 px 超出容差。\n` +
+    `对拍失败：偏差 ${verdict.delta.toFixed(1)} 物理 px 超出容差。\n` +
       `  实测/平台 ≈ ${approx.toFixed(3)} 倍` +
-      (isNearZeroish
+      (branch === 'too-small'
         ? `  ⇐ 明显**偏小**：页面自让位但让位没生效 —— 根容器已不补偿、页面那侧也没补上` +
           `（检查该页是否有 spacer / 路由 meta 是否为 'self'）`
-        : isIntegerMultiple
+        : branch === 'density-multiple'
           ? `  ⇐ 接近 ${Math.round(approx)} 倍，疑似**物理像素未换算为逻辑像素**（历史缺陷形态）`
           : `  ⇐ 非整数倍且不偏小：形态不在已知两类内，需人工看图`) +
       `\n  ⚠️ 「有没有染色」这类判据在此仍会全绿 —— 只有幅值对拍能抓到。`,
   )
 } else {
-  console.log(`\n✅ 通过：应用顶部让位与平台真值一致（偏差 ${delta.toFixed(1)} 物理 px，在容差内）。`)
+  console.log(`\n✅ 通过：应用顶部让位与平台真值一致（偏差 ${verdict.delta.toFixed(1)} 物理 px，在容差内）。`)
   console.log(`   提示：跨页比较时请看「反推 inset」这一列 —— 各页极差应 ≲1px，那才是「视觉中性」的证据。`)
 }
