@@ -21,7 +21,6 @@
   "include": [
     // rspeedy 构建配置层
     "./lynx.config.ts",
-    "./rspeedy-plugin-livereload.ts",
     "./homeBleedHeaderFlag.ts",
     // 测试运行器配置层
     "./vitest.config.ts",

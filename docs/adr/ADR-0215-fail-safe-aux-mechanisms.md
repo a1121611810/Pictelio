@@ -109,7 +109,18 @@
      路径本身没抄错（rsbuild 默认 `dev.client.path` 就是它，rspeedy 的 dev 插件
      也把该 pathname 传给 `@lynx-js/webpack-dev-transport/client`）—— 是服务端不提供。
      ⇒ **spec §2「rspeedy dev server 已存在的 ws 通道」这个前提从未成立**，
-     验收条件 2 当初就没被执行过（**未修**，#919）。
+     验收条件 2 当初就没被执行过。
+
+  **结局：已撤下**（2026-10-02，维护者裁定按推荐执行）。删除
+  `rspeedy-plugin-livereload.ts` / `livereload-client.ts` /
+  `livereload-client.entry.ts` / `livereload-client.test.ts`，
+  摘掉 `lynx.config.ts` 的注册与 `tsconfig.node.json` 的 include 条目。
+  spec 全文保留为**案例**，状态头标注「已撤下」。
+
+  撤下理由（与本 ADR 决策 1 同源）：这条通道由 rspeedy / vue-lynx 把持，
+  **不是本仓的配置旋钮**；为一个 dev-only 便利功能去伸进它们内部、
+  或自建一条常驻连接，代价与收益不成比例。
+  **装饰性能力不值得让主链路为它承担一层无人守护的外部依赖。**
 
   前两层只是**必要前提**，修好它们并没有让功能跑起来 —— 这正是
   「注入成功 ⇒ 功能可用」这条推论会骗人的地方。

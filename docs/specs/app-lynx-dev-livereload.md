@@ -1,31 +1,34 @@
 # Spec: app-lynx dev livereload 插件
 
-> ⚠️⚠️ **状态：未交付 —— 本 spec 的核心前提从未成立。验收条件 2 从未被执行过。**
+> 🚫 **状态：已撤下（2026-10-02，维护者裁定）。功能未交付，代码已删除。**
 >
-> 2026-10-02 复查（issue [#919](https://github.com/a1121611810/Pictelio/issues/919)）实测：
+> 本 spec 记录了一个**从未工作过**的功能，以及它为什么能连续四层「静默失败」。
+> 保留全文作为案例，不作为实现依据。**任何引用本 spec 的代码都已移除**
+> （`rspeedy-plugin-livereload.ts` / `livereload-client.ts` /
+> `livereload-client.entry.ts` / `livereload-client.test.ts`）。
 >
-> | 检查 | 结果 |
-> |---|---|
-> | `curl http://127.0.0.1:3000/rsbuild-hmr` | **404** |
-> | 真实 WS 握手 `ws://127.0.0.1:3000/rsbuild-hmr` | **socket hang up (1006)** |
-> | `curl http://127.0.0.1:3000/main.web.bundle` | 200（dev server 本身活着） |
-> | 注入 `dev: { hmr: true, liveReload: true }` 后重测 | 仍 404 |
+> **撤下理由**：该功能依赖的传输通道由 rspeedy / vue-lynx 把持，不是本仓的配置旋钮；
+> 为一个 dev-only 便利功能去伸进它们内部（或自建常驻连接），代价与收益不成比例。
+> 详见 [issue #919](https://github.com/a1121611810/Pictelio/issues/919) 与
+> [ADR-0215](../adr/ADR-0215-fail-safe-aux-mechanisms.md) §证据。
 >
-> **§2 声称「rspeedy dev server 已存在的 ws 通道」在本仓当前版本
-> （rspeedy 0.13.6 / rsbuild 1.7.3）上根本不存在。**
-> 路径本身没抄错 —— rsbuild 默认 `dev.client.path = '/rsbuild-hmr'`，
-> 且 rspeedy 的 dev 插件正是把该 pathname 传给
-> `@lynx-js/webpack-dev-transport/client` —— 是服务端不提供。
+> **可复用的教训（四层静默 no-op，每层都无日志无报错、测试全绿）**：
+> 1. 插件解构了 rsbuild 根本不提供的 `isWeb` ⇒ `!isWeb` 恒真 ⇒ 插件恒早退，
+>    client 从未被注入（**已修过**，产物 0 处 → 6 处）；
+> 2. 注入的是裸 client 模块，但它导出 `init()` 却刻意不自动调用，
+>    而**注入方从没调过** ⇒ WebSocket 从不打开（**已修过**）；
+> 3. client 依赖的 `/rsbuild-hmr` 端点 404；
+> 4. 即便前三层都对，**该通道在当前 rspeedy（0.13.6 / rsbuild 1.7.3）上根本不存在**
+>    —— 真实 WS 握手 `socket hang up (1006)`，注入 `dev:{hmr:true,liveReload:true}`
+>    仍 404，而同端口 `/main.web.bundle` 返回 200。
 >
-> 共四层静默 no-op，逐层实测（前两层已修，后两层未修）：
-> 1. `isWeb` 恒 `undefined` ⇒ 插件恒早退，client 从未注入（已修，#912）
-> 2. 注入的是裸 client 模块，**从未调用 `init()`** ⇒ WS 从不打开（已修）
-> 3. client 依赖的 `/rsbuild-hmr` 端点 404（未修）
-> 4. 即便前三层都对，该通道**在本版本上不存在**（未修）
+> ⚠️ 本 spec 的 §2「rspeedy dev server **已存在的** ws 通道」**这个前提从未成立**，
+> 验收条件 2（保存后自动刷新）当初就没被执行过。
+> **读 spec 时要分清「设计意图」与「已验证事实」** —— 后者需要在当前依赖版本上重新取证。
 >
-> **下文原样保留，作为「当初为什么觉得它能工作」的记录。**
-> 任何引用本 spec 的代码（`lynx.config.ts` / `rspeedy-plugin-livereload.ts` /
-> `livereload-client.ts` / `livereload-client.test.ts`）都请连带读这段状态。
+> ⚠️ 另有一条方法论教训：判断「端点不存在」时，`curl` 拿到 **404** 不足以定论 ——
+> **很多服务器对 WS-only 路由的普通 GET 就返回 404**（curl 根本没完成 Upgrade 握手）。
+> 必须用真实 WebSocket 客户端握手才能判。我第一版就栽在这里。
 
 > 阶段：to-spec（Grill 已确认方案 D）
 > 范围：packages/app-lynx / rspeedy 插件 + lynx.config.ts 注册
