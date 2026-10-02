@@ -10,10 +10,15 @@
 // 这个假定此前**零防线**：
 // - `PageTopBar`（~11 页在用）的两个变体被 `PageTopBar.template.test.ts:69,117`
 //   钉住了 ✅
-// - 4 个自绘顶栏的页（`Me` / `NetworkCheck` / `PlatformCheck` / `UpdatePage`）
-//   只是**写了** `h-[17.067vw]`，没有任何门禁钉它 ❌
+// - **8 个自绘顶栏的页**只是**写了** `h-[17.067vw]`，没有任何门禁钉它们 ❌
 // - 脚本里那个 `17.067` 与页面里的 `17.067vw` 是**两个独立的字面量**，
 //   各自漂移时不会有任何东西变红 ❌
+//
+// ⚠️ 首版本文件只登记了 4 个自绘页，而实测是 **8 个** ——
+// `DownloadManager` / `NovelDetail` / `Recommended` / `Watchlist` 全在漏网里，
+// 而当时**门禁是绿的**。这就是「手工登记的清单」这种形态的固有代价：
+// 漏一个，门禁不会响，只会安静地少守一页。
+// ⇒ 现在的做法是**派生 + 登记双查**（见下面两条断言）。
 //
 // 形态与本仓反复吃过的「接缝无人验」同类（见 `tests/metricsParse.test.ts` 头注）：
 // A 有门禁、B 有门禁，**A 与 B 之间的等式没人验**。
@@ -25,11 +30,19 @@
 // `DownloadManager.vue` 10 处（进度条 / 列表格高）、`Bookmarks.vue` 的 `h-[48.4vw]`
 // 是网格单元高度。首版因此把正常页面判红，是**判据过宽**而非页面有问题。
 //
-// ⇒ 本文件**不做**全站枚举，只验下面 5 条**无歧义**的。
-// 全站顶栏几何一致性仍无机器防线；要补它需要的是「顶栏容器」的结构化识别
-// （如按组件名 / 特定类串组合），不是正则扫 `h-[Nvw]`。
+// ⇒ 本文件**不做**全站枚举，只验下面**无歧义**的。
+//
+// **覆盖边界（两道，都要读）**：
+// ① ✅ 抓得到：新增一个**按正确高度**画顶栏、却没登记进清单的自绘页
+//    （派生集合与登记清单不一致 ⇒ 报红并指名该页）。
+// ② ❌ 抓不到：新增一个**按别的高度**画顶栏的自绘页（例如 `h-[20vw]`）。
+//    「这个页画了顶栏」无法从正则可靠判定 —— 全站几何一致性仍无机器防线，
+//    要补它需要的是「顶栏容器」的结构化识别，不是扫 `h-[Nvw]`。
+//
+// 换句话说：这道门禁**保证已登记的那几页不会漂**，并**提醒新页别忘登记**；
+// 它**不保证**全站顶栏高度统一。
 import { describe, expect, it } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -43,10 +56,37 @@ const SCRIPT_BARE = readFileSync(SCRIPT, 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*(?:\/\/|\*).*$/gm, '')
 
-/** 4 个自绘顶栏的页（不经 PageTopBar）。新增此类页面时须同步登记。 */
-const CUSTOM_BAR_PAGES = ['Me.vue', 'NetworkCheck.vue', 'PlatformCheck.vue', 'UpdatePage.vue']
+/** 自绘顶栏的页（不经 PageTopBar）。新增此类页面时须同步登记。
+ *  ⚠️ 这份清单**本身就是一个漏网源**：首版只登记了 4 个，实测是 8 个，
+ *     而门禁当时是绿的。下面「派生集合与登记清单必须一致」那条断言就是为此存在的。 */
+const CUSTOM_BAR_PAGES = [
+  'DownloadManager.vue',
+  'Me.vue',
+  'NetworkCheck.vue',
+  'NovelDetail.vue',
+  'PlatformCheck.vue',
+  'Recommended.vue',
+  'UpdatePage.vue',
+  'Watchlist.vue',
+]
 
 const countIn = (src: string, re: RegExp): number => (src.match(re) ?? []).length
+
+/** **派生**出自绘顶栏页：声明了正确高度、且不经公共顶栏。
+ *  这不是「断言它等于 17.067」——那是同义反复；它的作用是**与登记清单比对**，
+ *  把「新增页忘了登记」从静默变成报红。 */
+function deriveCustomBarPages(): { derived: string[]; unreadable: string[] } {
+  const heightRe = new RegExp(`h-\\[\\s*${TOP_BAR_VW}vw\\s*\\]`)
+  const derived: string[] = []
+  const unreadable: string[] = []
+  for (const f of readdirSync(join(SRC, 'pages')).filter((x) => x.endsWith('.vue'))) {
+    const src = readFileSync(join(SRC, 'pages', f), 'utf8')
+    if (src.includes('<PageTopBar')) continue // 走公共顶栏，其高度已由该组件的门禁钉住
+    if (heightRe.test(src)) derived.push(f)
+    else if (/h-\\[\\s*[\\d.]+vw\\s*\\]/.test(src)) unreadable.push(f)
+  }
+  return { derived: derived.sort(), unreadable: unreadable.sort() }
+}
 
 describe('顶栏高度 = 17.067vw（探测器的 load-bearing 假定）', () => {
   it('探测器的硬编码常量与页面实际一致（跨文件等式）', () => {
@@ -89,10 +129,28 @@ describe('顶栏高度 = 17.067vw（探测器的 load-bearing 假定）', () => 
     ).toEqual([])
   })
 
+  it('派生集合与登记清单必须一致（漏登记 → 报红并指名该页）', () => {
+    // 首版把「手工登记的 4 个」当成完备，实际有 8 个自绘页，漏了 4 个而门禁全绿。
+    // 这条断言把那份清单从「信任」变成「核对」——漏登记会响。
+    const { derived } = deriveCustomBarPages()
+    expect(
+      [...derived].filter((f) => !CUSTOM_BAR_PAGES.includes(f)),
+      '这些页自绘了顶栏（声明了正确高度且不经 PageTopBar），但不在登记清单里：\n' +
+        `    ${derived.filter((f) => !CUSTOM_BAR_PAGES.includes(f)).join('\n    ')}\n` +
+        '  请把它们加进 CUSTOM_BAR_PAGES —— 否则它们的高度无人守护，\n' +
+        '  探测器按假定值反推 inset 时会给该页带一个系统偏差。',
+    ).toEqual([])
+    expect(
+      [...CUSTOM_BAR_PAGES].filter((f) => !derived.includes(f)),
+      '登记清单里有页已经不再自绘顶栏（改用 PageTopBar 了？）：\n' +
+        `    ${CUSTOM_BAR_PAGES.filter((f) => !derived.includes(f)).join('\n    ')}`,
+    ).toEqual([])
+  })
+
   it('登记的自绘页清单非空且与已知实现相符（防空转）', () => {
     // ArchUnit `failOnEmptyShould` 教训：清单被清空时，上一条会静默恒真。
-    expect(CUSTOM_BAR_PAGES.length).toBeGreaterThanOrEqual(4)
-    // 反向核对：这 4 页确实**不**用 PageTopBar，否则登记就错了
+    expect(CUSTOM_BAR_PAGES.length, '登记清单被清空 ⇒ 上面几条会静默恒真').toBeGreaterThanOrEqual(4)
+    // 反向核对：登记的页确实**不**用 PageTopBar，否则登记就错了
     for (const f of CUSTOM_BAR_PAGES) {
       const src = readFileSync(join(SRC, 'pages', f), 'utf8')
       expect(src.includes('<PageTopBar'), `${f} 其实用的是 PageTopBar，登记该改`).toBe(false)
