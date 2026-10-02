@@ -40,10 +40,23 @@ python 只有「连着真机跑一遍」这一条验证路径 —— 而本仓�
 - 只看 `cross_agree` 会漏掉「每行同色但逐行微变」的高细节图。
 
 """
+import struct
 import sys
+import zlib
 from collections import Counter
 
-from PIL import Image
+# ⚠️ 本脚本**只用标准库**，刻意不依赖 Pillow。
+# 首版用 `from PIL import Image`，本地全绿、CI 全红 —— GitHub runner 上没有 Pillow，
+# 而仓里**任何地方都没声明它**（`grep -rn -i pillow` 零命中）。即：
+# 「本地能跑」不等于「提交后能跑」，未声明的依赖会在干净环境里炸。
+#
+# 代价是要自己解 PNG（约 50 行 stdlib）。这是值得的：
+#   · 免掉一条 CI 依赖与一次网络安装；
+#   · 度量结果不再随 Pillow 版本/解码差异漂移；
+#   · 脚本在**任何**有 python3 的机器上可直接跑（含 CI、含评审者的本机）。
+#
+# 覆盖面：bit depth 8 + color type 2（RGB）/ 6（RGBA），逐行 filter 0-4。
+# 超出范围（16-bit、调色板、隔行）一律**显式报错退出**，不猜、不静默降级。
 
 DARK_LUMA_MAX = 128
 MIN_DARK_PX = 4
@@ -61,10 +74,77 @@ def _quant(c):
     return (c[0] // QUANT, c[1] // QUANT, c[2] // QUANT)
 
 
+def _paeth(a, b, c):
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    return b if pb <= pc else c
+
+
+def load_png_rgb(png_path):
+    """解 PNG 为 (width, height, bytearray RGB)。仅支持 bit depth 8 + color type 2/6。"""
+    with open(png_path, "rb") as f:
+        data = f.read()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"不是 PNG 文件：{png_path}")
+    pos, idat, w = 8, [], None
+    while pos + 8 <= len(data):
+        (length,) = struct.unpack(">I", data[pos : pos + 4])
+        ctype = data[pos + 4 : pos + 8]
+        body = data[pos + 8 : pos + 8 + length]
+        if ctype == b"IHDR":
+            w, h, depth, color, comp, filt, inter = struct.unpack(">IIBBBBB", body)
+            if depth != 8 or color not in (2, 6) or comp != 0 or filt != 0 or inter != 0:
+                raise SystemExit(
+                    f"只支持 bit depth 8 + color type 2/6、非隔行；实得 depth={depth} "
+                    f"color={color} interlace={inter}（{png_path}）"
+                )
+        elif ctype == b"IDAT":
+            idat.append(body)
+        elif ctype == b"IEND":
+            break
+        pos += 12 + length
+    if w is None:
+        raise SystemExit(f"PNG 缺 IHDR：{png_path}")
+    raw = zlib.decompress(b"".join(idat))
+    bpp = 3 if color == 2 else 4
+    stride = w * bpp
+    out = bytearray(w * h * 3)
+    prev = bytearray(stride)
+    p = 0
+    for y in range(h):
+        ft = raw[p]
+        p += 1
+        line = bytearray(raw[p : p + stride])
+        p += stride
+        if ft == 1:
+            for i in range(bpp, stride):
+                line[i] = (line[i] + line[i - bpp]) & 0xFF
+        elif ft == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif ft == 3:
+            for i in range(stride):
+                left = line[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + ((left + prev[i]) >> 1)) & 0xFF
+        elif ft == 4:
+            for i in range(stride):
+                left = line[i - bpp] if i >= bpp else 0
+                ul = prev[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + _paeth(left, prev[i], ul)) & 0xFF
+        elif ft != 0:
+            raise SystemExit(f"未知 filter 类型 {ft}")
+        row = y * w * 3
+        for x in range(w):
+            s = x * bpp
+            out[row + x * 3 : row + x * 3 + 3] = line[s : s + 3]
+        prev = line
+    return w, h, out
+
+
 def measure(png_path, lo, hi):
-    im = Image.open(png_path).convert("RGB")
-    w, h = im.size
-    px = im.load()
+    w, h, px = load_png_rgb(png_path)
     hi = min(hi, h)
     if hi <= lo:
         print(f"NONE 0.000 0.000")
@@ -77,15 +157,19 @@ def measure(png_path, lo, hi):
     peak = 0.0
     unifs = []
     row_modals = []
+    def _at(x, y):
+        o = (y * w + x) * 3
+        return (px[o], px[o + 1], px[o + 2])
+
     for y in range(lo, hi):
-        dark = sum(1 for x in xs_text if _luma(px[x, y]) < DARK_LUMA_MAX)
+        dark = sum(1 for x in xs_text if _luma(_at(x, y)) < DARK_LUMA_MAX)
         ratio = dark / len(xs_text)
         if ratio > peak:
             peak = ratio
         if dark > MIN_DARK_PX and ratio <= MAX_ROW_DARK_RATIO:
             # 稀疏才可能是文字；连续必是背景
             rows.append(y)
-        cnt = Counter(_quant(px[x, y]) for x in xs_unif)
+        cnt = Counter(_quant(_at(x, y)) for x in xs_unif)
         unifs.append(cnt.most_common(1)[0][1] / len(xs_unif))
         row_modals.append(cnt.most_common(1)[0][0])
 
