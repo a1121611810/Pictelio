@@ -35,11 +35,12 @@ declare global {
   const __BENCH_NAV__: boolean
   /**
    * 首页「沉浸悬浮顶栏」构建开关（#900 T2 / 票 #906，lynx.config.ts 从 PICTELIO_HOME_BLEED 注入）：
-   * true = 首页启用 B 变体（取消实体顶栏、封面出血到状态栏下）；false = 维持现状顶栏。
+   * true = 首页启用 B 变体（取消实体顶栏、封面出血到状态栏下）——**缺省**；
+   * false = 回退到旧的 64dp 顶栏（`PICTELIO_HOME_BLEED=0` 显式关掉时）。
    *
    * 同样**不用 __DEV__**（NODE_ENV=production 恒 false，debug APK 亦然）——
    * 否则本宏在 APK 上恒 false，就无法做真机验收，而真机是本变体唯一的可信介质。
-   * 缺省 false：未显式带 PICTELIO_HOME_BLEED=1 构建的 APK 行为与改动前逐像素一致。
+   * 缺省 true（产品裁定 2026-10-02）；逃生阀是显式 0，不是「漏传 env」。
    */
   const __HOME_BLEED_HEADER__: boolean
   /**

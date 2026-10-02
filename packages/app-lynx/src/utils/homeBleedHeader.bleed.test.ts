@@ -1,7 +1,7 @@
 // ─── B 变体 · bleed 路径的行为级测试（#906 / #907）───
 //
-// 配套 `vitest.bleed.config.ts`（把 `__HOME_BLEED_HEADER__` 翻成 true）。
-// 主配置下本文件**不执行** —— 那里宏为 false，bleed 分支是死代码，CI 覆盖不到。
+// 跑在**主配置**下（`__HOME_BLEED_HEADER__` = true = 生产缺省，票 #906 产品裁定 2026-10-02）。
+// 旧顶栏那条回退路径由 `homeHeaderMode.fallback.test.ts` 在 vitest.fallback.config.ts 下覆盖。
 //
 // ## 为什么 import 路由表，而不是读源码文本
 //
@@ -79,9 +79,9 @@ const { resolveTopInsetOwnership } = await import('./topInset')
 /** 平台真值推出的标称安全高度（逻辑 px）：dumpsys 72 物理 px ÷ density 3.0 */
 const NATIVE_INSET = 24
 
-describe('B 变体 · bleed 路径（宏 = true，本配置下真实执行该分支）', () => {
-  it('自检：本配置下宏确实为 true', () => {
-    // 若误用主配置跑本文件，这条立刻转红 —— 避免「覆盖是假的」静默通过。
+describe('B 变体 · 默认路径（宏 = true = 生产缺省，真实执行该分支）', () => {
+  it('自检：本配置下宏确实为 true（= 生产缺省）', () => {
+    // 若在 fallback 配置下被误跑，这条立刻转红 —— 避免「两条路径当同一条测」静默通过。
     expect(__HOME_BLEED_HEADER__).toBe(true)
   })
 
