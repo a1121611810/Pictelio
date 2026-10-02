@@ -365,6 +365,24 @@ export function staggerDelay(index: number, options: StaggerOptions = {}): numbe
 /** 列表项入场帧体名（与 RefreshableList 的 `@keyframes item-rise` 同名同体）。 */
 export const LIST_ITEM_ANIMATION = 'item-rise'
 
+/**
+ * ⚠️ **可见性契约（#913 / spec `fail-safe-aux-mechanisms` D1）**：
+ * 引用本预设的帧体，其 `from` 态**必须可见** —— 不得含 `opacity: 0`、
+ * `visibility: hidden`、`display: none` 之类会让元素「占位但不可见」的声明。
+ *
+ * **为什么是硬约束**（这不是风格偏好，是本仓已复现的静默失效）：
+ * 动画简写尾槽是 `fill-mode: both`，它在动画**开始前**与**结束后**都用帧体填充元素。
+ * ⇒ 只要动画**没播**（实测：冷挂载的静态兄弟节点上引擎不启动入场动画），
+ *   `from` 态就被**长期驻留**，元素占着位置却不可见：无日志、无报错、单测全绿。
+ * ⚠️ **单独把 `both` 改成 `none` 救不回**（真机实测，内容仍不出现）——
+ *   所以不能只治填充模式，必须让 `from` 态本身无害。
+ *
+ * **D1 的一句话形式**：动效可改变内容**如何**出现，不可改变内容**是否**出现。
+ * 代价（已接受并记录）：入场**失去淡入**，只保留位移+缩放的滑入。
+ * 由 `src/composables/entranceVisibility.test.ts` 钉住。
+ */
+export const LIST_ITEM_VISIBILITY_CONTRACT = 'from-visible' as const
+
 export interface ListItemOptions extends StaggerOptions {
   /** 时长档（缺省 `medium` 250ms，与既有 item-rise 同档） */
   duration?: MotionDurationKey
