@@ -119,6 +119,24 @@ GitHub Release 已发布完成。
   最省事的验真其实是**装到设备上看一眼**：`PICTELIO_HOME_BLEED=0` 构建后首页应出现
   64dp 实体顶栏，封面**不**再出血；缺省构建则相反。
 
+- **两种构建都已逐页实测**（emulator-5554 / 1080×2160，`verify-top-inset.mjs --page <路由>`，
+  平台真值 inset = 72 物理 px）：
+
+  | 路由 | 缺省构建（bleed） | 回退构建（=0） |
+  |------|------------------|----------------|
+  | carousel（首页） | **显式拒绝**：按路由声明判定为无顶栏 | **72.5**（偏差 +0.5）✅ |
+  | bookmarks | 72.0 | 72.0 ✅ |
+  | illust | 73.0 | 73.0 ✅ |
+  | me | 72.0 | 72.0 ✅ |
+  | later | 73.0 | 73.0 ✅ |
+  | novel | 72.5 | 72.5 ✅ |
+
+  ⇒ **回退阀是全站生效的**，不只是首页翻回去了。首页那一行是最有说服力的对照：
+  同一页在缺省构建下被**显式拒绝**（它按声明就没有顶栏），在回退构建下**测出真实顶栏并通过**。
+
+  > 这些数值是**让位幅值**的逐页绝对偏差，不是布局离散度 —— 后者是探测器标定噪声
+  > （顶栏高度全站按构造相同，见 `tests/topBarHeightContract.test.ts`）。
+
 - 极性的唯一事实源：`packages/app-lynx/homeBleedHeaderFlag.ts`，真值表见 `packages/app-lynx/tests/homeBleedHeaderFlag.test.ts`。
 
 ## 七、覆盖发布（`pnpm run release -o`）
