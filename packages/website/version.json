@@ -1,5 +1,5 @@
 {
-  "version": "6.4.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.4.0",
-  "changelog": "# Pictelio 更新日志\n\n## ⚡ 体验优化\n\n- **Lynx 引擎**：界面观感对齐 Material Design 3，视觉细节与系统更统一\n- WebView 渲染引擎与引擎切换能力已下线；打开应用直接使用 Lynx，此前选择过 WebView 的用户也会自动进入 Lynx"
+  "version": "6.5.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.5.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 引擎**：从缩略图点开作品后改为连续转场，大图起始位置与原缩略图一致\n- **Lynx 引擎**：列表进入改为逐项铺开，路由切换也加入前后方向差异的转场效果\n- **Lynx 引擎**：整体观感按 Material Design 3 节奏改造，统一动效规范、调整弹层进退场与色调层级，并加入沉浸模式\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：插画分类流顶部大图起始时矩形偏大，现按合适的展示宽度呈现\n- **Lynx 引擎**：悬浮操作按钮曾压在列表最后一行内容上，现在页面会为其留出占位区\n- **Lynx 引擎**：作品没有标题时不再露出 Pixiv 的内部哨兵字符串，改为显示本地化占位文案"
 }
