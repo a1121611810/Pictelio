@@ -29,6 +29,25 @@
 vw 值 = rpx 值 / 7.5
 ```
 
+## 跨边界数值：从原生拿到的数默认是物理像素（2026-10-02 补）
+
+⚠️ **本仓最易踩的一条单位陷阱**：Android 原生 API（`WindowInsetsCompat.getInsets()`、
+`View.getWidth()` 等）返回的是**物理像素**，而 Lynx 的 `px` 是**逻辑像素**（= dp）。
+直接 `+ 'px'` 拼进样式 ⇒ **按 density 倍放大**。
+
+- **换算**：`逻辑px = 物理px / SystemInfo.pixelRatio`（= density）；
+  物理像素要原样落地则用 **`ppx`** 单位（仅原生支持，web 不支持）。
+- **仓库惯例**：一律在**取数的那一层**换算，下游只管消费。本仓既有 5 处同款换算
+  （`viewportGeometry.ts` / `CarouselSwiper.vue` / `Recommended.vue` / `GlobalFab.vue`）
+  —— 它们的共同点都是**除以 `pixelRatio` 后再喂给 `px`**。
+- **实例（已修）**：ADR-0168 的 insets 管线漏了这道换算，导致状态栏 72 物理 px
+  被渲染成 216 物理 px，所有页面 header 上方凭空多 144px 空白，且**随设备而变**
+  （mdpi 恰好正确、density 3.0 错 3 倍）。修法 = `safeArea.ts` 成为唯一换算点。
+- **怎么自查**：`dumpsys` 拿平台真值，再与截图像素量出的实际值对拍，**比的是幅值不是有无**。
+  定性判据（「状态栏区域染了 surface 色」）在放大 N 倍后依然成立 ⇒ **测不出这类缺陷**。
+  干净的单元素对照：拿一个写死 `1px` 的边框（如 `border-b-[1px]`）量它占几个物理像素行，
+  直接读出该设备上 `1px` 的真实倍率。
+
 ## 单位可靠性矩阵（关键差异）
 
 | 单位 | web 预览（web-core） | 原生 LynxView（Android/iOS） |

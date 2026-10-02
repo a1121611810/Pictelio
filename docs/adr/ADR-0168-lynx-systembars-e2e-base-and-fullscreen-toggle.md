@@ -2,6 +2,7 @@
 
 - 状态: Accepted（2026-09-19，T4 验收通过：[docs/research/lynx-systembars-t4-acceptance.md](../research/lynx-systembars-t4-acceptance.md)——Android 9/14/16 三级别全矩阵绿；API 36 经断言式 CI 验收 workflow 补测，ALL PASS）。**部分修订（2026-09-21）**：spec §2 D4「状态栏图标深浅固定」已由 [ADR-0180](ADR-0180-lynx-dark-mode.md) D6 修订为随 `resolvedDark` 动态（lynx 暗色模式落地）。
 - 日期: 2026-09-19
+- **修订（2026-10-02）**：insets 管线的**单位边界**——原生 `WindowInsetsCompat.getInsets()` 返回物理像素，而 Lynx `px` 是逻辑像素（= dp），原实现漏换算导致**全部安全区补偿被放大 density 倍**（见「后果 · 已修缺陷」）。
 - 关联: wayfinder 地图 [#591](https://github.com/a1121611810/Pictelio/issues/591)（决策 [#595](https://github.com/a1121611810/Pictelio/issues/595)）；spec [docs/specs/lynx-systembars.md](../specs/lynx-systembars.md)；研究 [#592](https://github.com/a1121611810/Pictelio/issues/592)（平台事实）/ [#593](https://github.com/a1121611810/Pictelio/issues/593)（Lynx 能力）；基线 [#594](https://github.com/a1121611810/Pictelio/issues/594)；修订 ADR-0131（内容区契约，语义保持）；D4 被 [ADR-0180](ADR-0180-lynx-dark-mode.md) 修订
 
 ## 背景
@@ -29,3 +30,15 @@ D1-D7 全集见 spec §2（此处记结论与权衡要点）：
 - 正面：全版本（API 28→35+）单一代码路径与形态；系统栏区域染 surface 色；全屏模式诚实可用（全版本可切可逆）；JS 布局侧改动收敛为 Root padding + 弹层 spacer，几何消费方零改动。
 - 代价 / 风险：insets 管线是新增永久契约面（事件名/载荷/方法名由契约测试双向钉住）；`getSafeAreaInsets` 初值依赖「订阅后拉取」时序（JS 侧 initSafeArea 必须先订阅后拉，契约测试注释已锚）；Android ≤14 三键导航 nav bar 80% scrim 为 compat 缺省（D6，可一行关闭）；API 36 模拟器实证因镜像下载网络阻塞挂账（文档锚定已足，#594 报告 §三 有补做指引）。
 - 排除面：图片查看器 / IllustDetail 全 bleed 沉浸不入首批（spec D7）；webview 客户端系统栏策略另立 effort（其 Capacitor WebView 栈机制不同，且 Android 16 预测性返回默认开对其返回链路另有影响——见 #592 风险旗标，需独立验证）。
+
+### 已修缺陷：insets 单位边界（2026-10-02）
+
+**现象**：状态栏 72 物理 px，但所有页面 header 上方凭空多出 144px 空白（density 3.0 设备）；6 个底部弹层底部各多 144px 死白。web-core 预览正常。
+
+**根因**：`WindowInsetsCompat.getInsets()` 返回**物理像素**，而 Lynx 的 `px` 是**逻辑像素**（= Android dp，见 [glossary-lynx-units](glossary-lynx-units.md)）——两者差一个 `SystemInfo.pixelRatio`。ADR-0168 落地时两侧直接对接，**漏掉了这道换算**，补偿被放大 density 倍。mdpi（density 1.0）设备恰好正确，故跨设备表现不一致。
+
+**为什么 T4 验收没抓到**：验收矩阵只做定性核对（「状态栏区域染 surface 色」）——放大 3 倍后**仍然是染了 surface 色**，定性判据照样绿灯。**没有任何一处量过幅值**。
+
+**修法**：`safeArea.ts` 作为**唯一换算点**，对外一律暴露逻辑像素（`physical / pixelRatio`）；下游（Root padding + 6 个弹层 spacer）一行不改。**不改 Java**：`sInsetTop` 同时被 `updateContentArea()` 消费，而后者需要物理 px。
+
+**真机复验**（emulator-5554 / 1080×2160 / density 3.0 / 插画页）：header surface 带 400 → **256px**（= 72 + 184.3 TopAppBar）；页面根底边 1944 → **2088**（= 2160 − 72）；对照判据 `border-b-[1px]` 仍为 3 物理像素行（vw/px 语义未回归）。
