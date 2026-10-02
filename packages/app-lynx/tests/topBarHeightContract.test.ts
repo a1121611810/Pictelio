@@ -72,6 +72,14 @@ const CUSTOM_BAR_PAGES = [
 
 const countIn = (src: string, re: RegExp): number => (src.match(re) ?? []).length
 
+/**
+ * **已确认不是顶栏**的页：它们有 `h-[Nvw]` 声明，但不是顶栏高度。
+ * 这些正是失效面②「按别的高度画顶栏」那一族的入口 —— 派生时会被收进
+ * `unreadable`，若**从不断言**就等于算了不用（code-review 第 7 轮 Spec 轴查出）。
+ * 新页落进这一族时门禁会响，要求人工确认「它确实不是顶栏」或「它改用别的高度了」。
+ */
+const CONFIRMED_NOT_BAR_PAGES = ['ErrorPage.vue', 'Login.vue', 'NovelIntro.vue']
+
 /** **派生**出自绘顶栏页：声明了正确高度、且不经公共顶栏。
  *  这不是「断言它等于 17.067」——那是同义反复；它的作用是**与登记清单比对**，
  *  把「新增页忘了登记」从静默变成报红。 */
@@ -83,7 +91,10 @@ function deriveCustomBarPages(): { derived: string[]; unreadable: string[] } {
     const src = readFileSync(join(SRC, 'pages', f), 'utf8')
     if (src.includes('<PageTopBar')) continue // 走公共顶栏，其高度已由该组件的门禁钉住
     if (heightRe.test(src)) derived.push(f)
-    else if (/h-\\[\\s*[\\d.]+vw\\s*\\]/.test(src)) unreadable.push(f)
+    // ⚠️ 正则**字面量**里左方括号只写一层反斜杠。写两层匹配的是「反斜杠+左括号」，
+    // 恒不命中 ⇒ unreadable 永远是空 ⇒ 下面那条断言静默恒真。
+    // 首版就是这么错的，靠「删掉一个确认项却没转红」才暴露出来。
+    else if (/h-\[\s*[\d.]+vw\s*\]/.test(src)) unreadable.push(f)
   }
   return { derived: derived.sort(), unreadable: unreadable.sort() }
 }
@@ -109,7 +120,7 @@ describe('顶栏高度 = 17.067vw（探测器的 load-bearing 假定）', () => 
     expect(countIn(src, re), 'PageTopBar 的 back / 居中两个变体应各有一次高度声明').toBeGreaterThanOrEqual(2)
   })
 
-  it('4 个自绘顶栏页各自声明了 17.067vw（此前无任何门禁钉它们）', () => {
+  it('每个已登记的自绘顶栏页都声明了 17.067vw（此前无任何门禁钉它们）', () => {
     const bad: string[] = []
     for (const f of CUSTOM_BAR_PAGES) {
       const p = join(SRC, 'pages', f)
@@ -144,6 +155,21 @@ describe('顶栏高度 = 17.067vw（探测器的 load-bearing 假定）', () => 
       [...CUSTOM_BAR_PAGES].filter((f) => !derived.includes(f)),
       '登记清单里有页已经不再自绘顶栏（改用 PageTopBar 了？）：\n' +
         `    ${CUSTOM_BAR_PAGES.filter((f) => !derived.includes(f)).join('\n    ')}`,
+    ).toEqual([])
+  })
+
+  it('「有 vw 高度但不是顶栏」的页已逐个确认（新页落入此族 ⇒ 报红要求人工确认）', () => {
+    // 失效面②无法自动判定「这个页到底画没画顶栏」，但可以做到：
+    // **新页**若落进这一族就响一次，请人确认一次。
+    // 这不覆盖「新页用 20vw 画顶栏且被人确认过」的情形 —— 那种情况靠人守，
+    // 门禁只保证它**不会静默**进入这个集合。
+    const { unreadable } = deriveCustomBarPages()
+    expect(
+      [...unreadable].filter((f) => !CONFIRMED_NOT_BAR_PAGES.includes(f)),
+      '这些页有 vw 高度声明、又不经 PageTopBar，且不在「已确认不是顶栏」名单里：\n' +
+        `    ${unreadable.filter((f) => !CONFIRMED_NOT_BAR_PAGES.includes(f)).join('\n    ')}\n` +
+        '  请确认它**确实不是顶栏**（加进 CONFIRMED_NOT_BAR_PAGES），\n' +
+        '  或它画了顶栏但高度与全站不一致（那是缺陷，需按 D5 修）。',
     ).toEqual([])
   })
 

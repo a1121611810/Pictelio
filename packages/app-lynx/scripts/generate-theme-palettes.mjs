@@ -276,8 +276,12 @@ function readScheme(scheme) {
     //   烘焙后本 token 内**不含任何 var()**，该平台假设不复存在。
     //   与 --md-scroll-indicator / --md-scrim-overlay 同款（那两者都是扁平 rgba、无嵌套 var）——
     //   这也正是选择烘焙而非嵌套的直接理由。
-    // 实测（emulator-5554 / 亮色 sky）：加本遮罩后最坏对比度 12.03:1（无遮罩 1.09:1）。
-    // ⚠️ 深色主题下未实测（#906 风险 ⑤ 挂账）。
+    // 实测（emulator-5554 / 亮色 sky）：无遮罩时最坏 **1.09:1**（近乎不可见）。
+    // 加遮罩后**已留样**的区间是 **5.83:1 … 16.67:1** —— 遮罩在带底约 55% 不透明，
+    // 封面像素仍会透上来 ⇒ 带内最坏对比度**随图而变**，没有单一固定值。
+    // （此前这里写的 12.03:1 是某一张封面的值，code-review 第 7 轮查出它无样本支撑。）
+    // 暗色主题已实测 **13.05:1**（#906 风险⑤ 关闭）。
+    // 复现：`node scripts/verify-statusbar-contrast.mjs --page recommended`
     '--md-statusbar-scrim': `linear-gradient(to bottom, ${get(md.surface())} 0%, rgba(0, 0, 0, 0) 100%)`,
     '--md-on-surface': get(md.onSurface()),
     '--md-surface-variant': get(md.surfaceVariant()),
