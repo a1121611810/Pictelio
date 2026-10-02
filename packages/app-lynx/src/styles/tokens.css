@@ -30,6 +30,10 @@ page,
 
   /* ── M3 表面 / 容器 ── */
   --md-surface: #f8faff;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #f8faff 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #191c20;
   --md-surface-variant: #dde3ea;
   --md-on-surface-variant: #41474e;
@@ -276,6 +280,10 @@ page,
   --md-tertiary-container: #ffd9e3;
   --md-on-tertiary-container: #31101d;
   --md-surface: #fdf7ff;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #fdf7ff 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #1d1b20;
   --md-surface-variant: #e7e0eb;
   --md-on-surface-variant: #49454e;
@@ -348,6 +356,10 @@ page,
   --md-tertiary-container: #ffdcc2;
   --md-on-tertiary-container: #2e1500;
   --md-surface: #fff8f8;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #fff8f8 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #22191c;
   --md-surface-variant: #f2dde2;
   --md-on-surface-variant: #514347;
@@ -420,6 +432,10 @@ page,
   --md-tertiary-container: #bcebf0;
   --md-on-tertiary-container: #002023;
   --md-surface: #f7fbf1;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #f7fbf1 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #191d17;
   --md-surface-variant: #dee5d8;
   --md-on-surface-variant: #424940;
@@ -492,6 +508,10 @@ page,
   --md-tertiary-container: #dbe8b5;
   --md-on-tertiary-container: #151f01;
   --md-surface: #fff8f4;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #fff8f4 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #211a14;
   --md-surface-variant: #f2dfd0;
   --md-on-surface-variant: #50453a;
@@ -564,6 +584,10 @@ page,
   --md-tertiary-container: #d5e3ff;
   --md-on-tertiary-container: #071c36;
   --md-surface: #f4fbfa;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #f4fbfa 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #161d1d;
   --md-surface-variant: #dae4e5;
   --md-on-surface-variant: #3f4949;
@@ -637,6 +661,10 @@ page,
   --md-tertiary-container: #dff6fd;
   --md-on-tertiary-container: #001627;
   --md-surface: #ffffff;
+  /* 出血页状态栏兜底遮罩（#906 / ADR-0214）：见 tokens.css 内该令牌定义处；
+     本色板为**手调**（生成器只产出暗色 7 套，亮色沿用 ADR-0152 既有色板）。
+     起点色烘焙为本色板 surface 字面量、**不用 var()** —— 理由与暗色侧同款，见生成器。 */
+  --md-statusbar-scrim: linear-gradient(to bottom, #ffffff 0%, rgba(0, 0, 0, 0) 100%);
   --md-on-surface: #18191c;
   --md-surface-variant: #f1f2f3;
   --md-on-surface-variant: #61666d;
@@ -751,6 +779,7 @@ page,
   --md-surface-tint: #9bcbfa;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #101418 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -841,6 +870,7 @@ page,
   --md-surface-tint: #cfbdfe;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #141218 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -931,6 +961,7 @@ page,
   --md-surface-tint: #ffb0c9;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #191113 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -1021,6 +1052,7 @@ page,
   --md-surface-tint: #a1d399;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #10140f 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -1111,6 +1143,7 @@ page,
   --md-surface-tint: #fcb974;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #19120c 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -1201,6 +1234,7 @@ page,
   --md-surface-tint: #80d4d8;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #0e1415 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;
@@ -1291,6 +1325,7 @@ page,
   --md-surface-tint: #ffb1c5;
   --md-scrim: rgba(0, 0, 0, 0.5);
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-statusbar-scrim: linear-gradient(to bottom, #191113 0%, rgba(0, 0, 0, 0) 100%);
   --md-shape-extra-small: 1.067vw;
   --md-shape-small: 2.133vw;
   --md-shape-medium: 3.2vw;

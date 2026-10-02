@@ -93,7 +93,7 @@ export const routes: RouteRecordRaw[] = [
   // ⚠️ 绝不能是 'root'：该模式已随根容器补偿一起删除，含义退化成「完全不让位」，
   //    顶栏会整体上移顶进状态栏，而编译/测试/门禁全绿。
   // ⚠️ meta 与模板必须同源于本宏（模板见 Recommended.vue 的 HOME_BLEED 分支）。
-  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },
   { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true, topInset: 'self' } },
   { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true, topInset: 'self' } },

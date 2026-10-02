@@ -33,13 +33,25 @@ import CarouselSkeleton from '../components/CarouselSkeleton.vue'
 import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
-import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { A11Y_ELEMENT_ENABLED, ME_A11Y_LABELS } from '../utils/accessibility'
+import AppIcon from '../components/AppIcon.vue'
+import { safeTop } from '../utils/safeArea'
 import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useReducedMotion } from '../composables/useReducedMotion'
 import { t } from '../i18n'
 
 const isRestricted = useSettingsStore().isRestricted
 
+/**
+ * B 变体开关的**本地别名**（票 #906）。
+ *
+ * 为什么不能直接在模板里写 `__HOME_BLEED_HEADER__`：它是 rspeedy 注入的编译期全局 const，
+ * `<script setup>` 能读到，但 **vue-lynx 模板编译器不解析全局标识符** —— 模板里直接写会得到
+ * "Property '__HOME_BLEED_HEADER__' does not exist"，且**不报错、渲染为空**。
+ * 经 setup 绑定暴露后模板才拿得到。
+ */
+const HOME_BLEED = __HOME_BLEED_HEADER__
 
 // 自让位 spacer 高度（票 #907）。B 变体开启时 meta 为 'bleed' ⇒ 本值恒 0（不重复让位），
 // 关闭时 meta 为 'self' ⇒ 由本页承担顶部让位（根容器已不再兜底）。
@@ -122,7 +134,8 @@ function slideViewport(): { width: number; height: number } {
   if (typeof SystemInfo === 'undefined') return { width: 375, height: 667 } // web-core 兜底（iPhone 逻辑尺寸近似）
   const w = SystemInfo.pixelWidth / SystemInfo.pixelRatio
   const screenH = SystemInfo.pixelHeight ? SystemInfo.pixelHeight / SystemInfo.pixelRatio : w * 1.78
-  const bars = 0.17067 * w
+  // B 变体无实体顶栏 ⇒ 扣除项为 0；否则扣 64dp 顶栏（17.067vw）
+  const bars = HOME_BLEED ? 0 : 0.17067 * w
   return { width: w, height: Math.max(1, screenH - bars) }
 }
 const SLIDE_VIEWPORT = slideViewport()
@@ -233,6 +246,7 @@ onMounted(() => {
       refreshEpoch.value++
     },
   })
+  if (HOME_BLEED) showTitleChip()
   void refreshFeed()
 })
 
@@ -254,6 +268,7 @@ onActivated(() => {
     void refreshFeed()
   }
   // 从二级页返回时重放标题胶囊：否则「返回后顶部一片空」会被误读成渲染失败
+  if (HOME_BLEED) showTitleChip()
 })
 
 // ─── B 变体：标题胶囊（票 #906 / spec #900 T2）───
@@ -263,21 +278,93 @@ onActivated(() => {
 //    照抄会得到一个永不触发的机制。现改为「进场 → 淡出」，既给到定位提示又不长期占位。
 // 减弱动效偏好下走 R1：不挂过渡声明（transitionStyle 置 none），但仍按同一时长收起
 // —— 收起本身是**信息消失**，不是装饰动画，直接不消失会让顶部永久被遮挡。
+const TITLE_CHIP_HOLD_MS = 2000
+const titleChipVisible = ref(false)
+let titleChipTimer: ReturnType<typeof setTimeout> | undefined
+const { transitionStyle: chipTransition } = useReducedMotion()
+
+function showTitleChip(): void {
+  if (titleChipTimer) clearTimeout(titleChipTimer)
+  titleChipVisible.value = true
+  titleChipTimer = setTimeout(() => {
+    titleChipVisible.value = false
+  }, TITLE_CHIP_HOLD_MS)
+}
+
+onUnmounted(() => {
+  if (titleChipTimer) clearTimeout(titleChipTimer)
+})
+
+/** 悬浮通知入口：通知页目前只能从「我的」进入，顶栏补一个直达位。 */
+function openNotifications(): void {
+  void navigate('/notifications')
+}
 </script>
 
 <template>
   <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
   <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
-    <!-- 顶部安全区让位（#900 T1 / ADR-0214）：零内容 spacer + 显式 height，
-         数值由 composables/useTopInsetSpacer 统一裁决（理由全文见该 composable）。
-         ⚠️ **不要**改成给顶栏行加 paddingTop —— Lynx 的 border-box UA 默认会让 padding
-         吃掉内容高度，而 web-core 预览不复刻该默认（见 App.vue 转场包裹层注释）。
-         'bleed' 模式恒 0 高，属正确行为，不要特判。 -->
-    <view :style="{ height: topInsetSpacer + 'px' }" />
+    <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页）。
+         B 变体（票 #906）下整条取消：内容出血到状态栏下，顶部让位交给 meta 的 'bleed'。 -->
+    <template v-if="!HOME_BLEED">
+      <!-- 自让位 spacer（票 #907 收口后必需）：根容器已不再兜底顶部补偿，
+           meta 为 'self' 时让位责任完全落在本页。漏掉它 ⇒ 整条顶栏上移顶进状态栏，
+           而编译/测试/门禁全绿（只有真机肉眼可见）。 -->
+      <view :style="{ height: topInsetSpacer + 'px' }" />
+      <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
+        <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>
+      </view>
+    </template>
 
-    <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>
+    <!-- B 变体悬浮层（票 #906）：absolute 覆盖层，不占流内高度 ⇒ 静止态顶部零占用。
+         ① 通知按钮**必须有容器填充**（M3 对透明 app bar 的原话要求：容器透明时图标按钮要有底）；
+            真机无 backdrop-filter ⇒ 半透明实色是本仓可读性上限（浅色封面下对比度需实测）。
+         ② 只放通知，不放搜索 —— 搜索入口已在全局 FAB 内环（ADR-0132），再放一个是重复入口。
+         ③ 标题胶囊进场显示、2s 淡出（真机实测本页无纵向滚动，scroll 触发源不存在）。 -->
+    <view v-else class="absolute left-0 right-0 top-0 z-30">
+      <!-- ① 状态栏可读性兜底（票 #906 风险①/⑤，实测驱动）：
+           封面出血到 y=0 后，**系统状态栏图标的底色变成不可预测的封面像素**。
+           而原生侧 `isAppearanceLightStatusBarsFor(isDarkMode)` 把图标深浅**绑死在 app 主题**上
+           （它无法跟随内容），所以图标颜色是对的、底色却不可控。
+           实测（emulator-5554 / 亮色）：出血后状态栏区背景在 rgb(255,253,254) ~ rgb(41,7,8) 之间
+           浮动 ⇒ 深色图标对最暗处对比度 **1.09:1**（近乎不可见）；出血前恒为 rgb(248,250,255) ⇒ 16.37:1。
+           ⇒ 在顶部铺一层**跟随主题**的 surface 渐隐遮罩，把底色拉回图标被设计时面对的那种。
+           渐变而非实色：y=0 处足够实（保证对比度），到 ~2.2×inset 处完全消失（不毁沉浸感）。
+           ⚠️ 色值必须走令牌 var(--md-surface)（14 套色板 + 深色模式），不得写字面量。 -->
+      <view
+        class="absolute left-0 right-0 top-0"
+        :style="{
+          height: Math.round(safeTop * 2.2) + 'px',
+          background: 'var(--md-statusbar-scrim)',
+        }"
+      />
+      <view class="flex flex-row justify-end" :style="{ paddingTop: safeTop + 'px' }">
+        <view
+          class="w-[10.667vw] h-[10.667vw] rounded-full flex items-center justify-center"
+          style="background: var(--md-scrim)"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.notifications"
+          @tap="openNotifications"
+        >
+          <AppIcon name="notifications" class="text-white" />
+        </view>
+      </view>
+      <view class="px-3 mt-2">
+        <view
+          v-if="titleChipVisible"
+          class="self-start inline-flex flex-row items-center rounded-full px-4 h-8.5 max-w-[72vw]"
+          :style="{ background: 'var(--md-scrim)', transition: chipTransition }"
+        >
+          <!-- max-w + [max-line:1]：胶囊是**内容宽**，无上限时长标题（德语等）会横向撑出屏幕。
+               风险④（真机：长语言标题）就落在这两条上。 -->
+          <text
+            class="text-title-medium font-medium text-white [max-line:1]"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="t('recommended.title')"
+            >{{ t('recommended.title') }}</text
+          >
+        </view>
+      </view>
     </view>
 
     <!-- 首载沉浸骨架 / 整页错误（ADR-0118：渲染流为空即显骨架，不依赖 loading——冷启动请求前立即出现） -->
@@ -300,7 +387,8 @@ onActivated(() => {
       >
         <template #slide="{ item }">
           <view
-            class="w-full h-full relative flex flex-col bg-surface-container-lowest p-3"
+            class="w-full h-full relative flex flex-col bg-surface-container-lowest"
+            :class="HOME_BLEED ? 'pt-0 px-3 pb-3' : 'p-3'"
             @tap="onSlideTap(item)"
           >
             <!-- 封面图（ADR-0118 宽满高按比例：fit/ratio 经 deriveCoverDisplay 推导，超高图回退 aspectFill；

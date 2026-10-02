@@ -161,6 +161,7 @@ const ROLES = [
   '--md-surface-tint',
   '--md-scrim',
   '--md-scrim-overlay',
+  '--md-statusbar-scrim',
   '--md-shape-extra-small',
   '--md-shape-small',
   '--md-shape-medium',
@@ -265,6 +266,19 @@ function readScheme(scheme) {
     '--md-error-container': get(md.errorContainer()),
     '--md-on-error-container': get(md.onErrorContainer()),
     '--md-surface': get(md.surface()),
+    // 出血页状态栏兜底遮罩（#906 / ADR-0214）：首页封面出血到状态栏下后，系统状态栏图标的
+    // 底色变成**不可预测的封面像素**，而原生 isAppearanceLightStatusBarsFor(isDarkMode) 把图标
+    // 深浅**绑死在 app 主题上**（它无法跟随内容）⇒ 图标颜色对、底色不可控。实测最坏 1.09:1。
+    //
+    // ⚠️ 刻意把**本色板的 surface 烘焙成字面量**，而不是写 var(--md-surface)：
+    //   变量出现在 linear-gradient() 的实参内（B 型写法）在本仓 Lynx **未取证** —— 若引擎在
+    //   定义点求值而非使用点，14 个色板会一起取到基础块的浅 surface，且全部门禁仍绿。
+    //   烘焙后本 token 内**不含任何 var()**，该平台假设不复存在。
+    //   与 --md-scroll-indicator / --md-scrim-overlay 同款（那两者都是扁平 rgba、无嵌套 var）——
+    //   这也正是选择烘焙而非嵌套的直接理由。
+    // 实测（emulator-5554 / 亮色 sky）：加本遮罩后最坏对比度 12.03:1（无遮罩 1.09:1）。
+    // ⚠️ 深色主题下未实测（#906 风险 ⑤ 挂账）。
+    '--md-statusbar-scrim': `linear-gradient(to bottom, ${get(md.surface())} 0%, rgba(0, 0, 0, 0) 100%)`,
     '--md-on-surface': get(md.onSurface()),
     '--md-surface-variant': get(md.surfaceVariant()),
     '--md-on-surface-variant': get(md.onSurfaceVariant()),
