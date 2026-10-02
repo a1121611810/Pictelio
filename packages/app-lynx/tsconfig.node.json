@@ -12,7 +12,21 @@
     "lib": ["es2023"],
     "target": "es2022",
 
+    // 配置层显式以 .ts 扩展名 import 兄弟构建脚本（rspeedy 运行时即如此加载），
+    // 否则报 TS5097。前置条件是 noEmit —— 本项目已设，故开启无副作用。
+    "allowImportingTsExtensions": true,
+
     "noEmit": true,
   },
-  "include": ["./lynx.config.ts"],
+  "include": [
+    // rspeedy 构建配置层
+    "./lynx.config.ts",
+    "./rspeedy-plugin-livereload.ts",
+    "./homeBleedHeaderFlag.ts",
+    // 测试运行器配置层
+    "./vitest.config.ts",
+    "./vitest.fallback.config.ts",
+    // 样式构建配置层
+    "./tailwind.config.ts",
+  ],
 }
