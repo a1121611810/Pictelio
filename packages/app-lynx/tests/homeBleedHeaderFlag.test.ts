@@ -35,6 +35,33 @@ function stripComments(src: string): string {
 
 const CONFIG_BARE = stripComments(CONFIG_SRC)
 
+/** 取出 lynx.config.ts define 块里 `__HOME_BLEED_HEADER__` 那**一个条目**的源码。
+ *
+ *  取值窗口是整个条目（到下一个同级条目或块尾）而不是单行：oxfmt 会按 80 列折行，
+ *  `resolveHomeBleedHeaderFlag(...)` 完全可以落在下一行。首版用 `[^\n]*` 按行截断，
+ *  当场把自己的实现判红。
+ *
+ *  ⚠️ **已知失效面**（AGENTS.md「门禁冻结线」#5 要求显式登记，不得只记它抓到了什么）：
+ *   若 define 块的缩进被 oxfmt 改动、或同名 key 出现在别的缩进层级，正则失配 ⇒
+ *   `end` 为 -1 ⇒ 本函数退化为「返回从命中点到文件尾的整段文本」。
+ *   此时下面两条 `toContain` 断言会**恒真**（后面还有一大堆 import 与正文）。
+ *   缓解：调用方一律经 `expectDefineEntry()` 走，它带非空断言。
+ */
+function defineEntry(): string {
+  const i = CONFIG_BARE.indexOf('__HOME_BLEED_HEADER__:')
+  expect(i, 'lynx.config.ts 的 define 里找不到 __HOME_BLEED_HEADER__').toBeGreaterThan(-1)
+  const rest = CONFIG_BARE.slice(i)
+  const end = rest.slice(1).search(/\n\s{4,6}\w+:|\n\s{0,4}\},/)
+  const entry = end > 0 ? rest.slice(0, end + 1) : rest
+  // 非空断言：抽取器不得退化成整段文件尾（那会让下面两条断言恒真）
+  expect(
+    entry.length,
+    'define 条目抽取退化为文件尾 —— 正则已与 lynx.config.ts 的实际排版脱节，' +
+      '下面两条 toContain 断言会恒真。',
+  ).toBeLessThan(CONFIG_BARE.length / 4)
+  return entry
+}
+
 describe('resolveHomeBleedHeaderFlag 真值表', () => {
   // 缺省开启（产品裁定 2026-10-02）：漏传 env 必须落在**新顶栏**，
   // 而不是悄悄退回旧顶栏 —— 否则 CI/发布机少一个环境变量就换了套 UI。
@@ -89,17 +116,8 @@ describe('lynx.config.ts 必须经由该函数取极性（接线，不是文本�
     // 只锁**接线**：极性真值由上面的真值表用真实执行证明，这里只证明
     // 生产侧没有绕开它写回字面量。写成 `__HOME_BLEED_HEADER__: 'true'` 之类
     // 会让真值表与生产各活各的 —— 那正是本条门禁要拦的形状。
-    //
-    // 取值窗口是**整个 define 条目**（到下一个同级条目或块尾）而不是单行：
-    // oxfmt 会按 80 列折行，`resolveHomeBleedHeaderFlag(...)` 完全可以落在下一行。
-    // 首版用 `[^\n]*` 按行截断，当场把自己的实现判红。
-    const i = CONFIG_BARE.indexOf('__HOME_BLEED_HEADER__:')
-    expect(i, 'lynx.config.ts 的 define 里找不到 __HOME_BLEED_HEADER__').toBeGreaterThan(-1)
-    const rest = CONFIG_BARE.slice(i)
-    const end = rest.slice(1).search(/\n\s{4,6}\w+:|\n\s{0,4}\},/)
-    const entry = end > 0 ? rest.slice(0, end + 1) : rest
     expect(
-      entry,
+      defineEntry(),
       'lynx.config.ts 的 __HOME_BLEED_HEADER__ 没有走 resolveHomeBleedHeaderFlag(...)，\n' +
         "  于是 tests/homeBleedHeaderFlag.test.ts 的真值表与生产构建各活各的：\n" +
         '  极性在此处被翻反，CI 仍全绿，APK 静默交付旧顶栏。',
@@ -111,12 +129,8 @@ describe('lynx.config.ts 必须经由该函数取极性（接线，不是文本�
     // 把 `process.env[HOME_BLEED_ENV_KEY]` 拼错成 `PICTELIO_HOME_BLEED_OLD` 时，
     // 真值表照样全绿（它吃的是字面量）、接线断言也照样全绿（resolver 还在）——
     // 而回退阀已经死了。这条把「键名」也钉住。
-    const i = CONFIG_BARE.indexOf('__HOME_BLEED_HEADER__:')
-    const rest = CONFIG_BARE.slice(i)
-    const end = rest.slice(1).search(/\n\s{4,6}\w+:|\n\s{0,4}\},/)
-    const entry = end > 0 ? rest.slice(0, end + 1) : rest
     expect(
-      entry,
+      defineEntry(),
       'lynx.config.ts 没有用 HOME_BLEED_ENV_KEY 常量取环境变量。\n' +
         "  键名一旦在这里被写死或拼错，tests 的真值表与生产会各活各的：\n" +
         '  回退阀 `PICTELIO_HOME_BLEED=0` 会静默失效，文档与构建各说各话。',

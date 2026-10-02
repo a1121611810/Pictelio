@@ -92,8 +92,33 @@ GitHub Release 已发布完成。
 - **它不是运行时开关**：`PICTELIO_HOME_BLEED` 是**构建期**宏，在 rspeedy `define` 阶段被内联进 bundle。已发布的 APK **无法**在用户设备上回滚 —— 必须重新构建、重新发版。
 - **回退命令**：`PICTELIO_HOME_BLEED=0 pnpm build:android-host`（回退阀 = 显式 `=0`；缺省是**开启**，只有精确的 `0` 会关闭，`=false` / `=no` 都不关）。
 - **⚠️ 发布前必查**：`env | grep PICTELIO_HOME_BLEED`。本仓曾经历「缺省关闭」期，CI / 发布机 shell 里**可能残留 `PICTELIO_HOME_BLEED=0`** —— 它会静默让发布构建交付旧顶栏，且构建日志里没有任何提示。
-- **验真**：构建后确认产物真的翻回去了（不要只信构建成功）——
-  `grep -c 'topInset:\"self\"' packages/app-lynx/dist/main.web.bundle` 里首页那一处应为 `"self"`；或用 `packages/app-lynx/scripts/verify-top-inset.mjs` 取证。
+- **验真**：构建成功**不能**证明极性翻了（gradle 缓存会让「什么都没编译」也报 BUILD SUCCESSFUL）。查产物：
+
+  ```bash
+  # ⚠️ 用 main.**web**.bundle —— 它是同一次 rspeedy 构建的 dev 预览副产物，**可 grep**。
+  #    真正随 APK 发出的 assets 只有 main.**lynx**.bundle，而它是二进制
+  #    （JS 字节码 + 序列化元素树，见 docs/adr/glossary/lynx-pure-engine-analysis.md），
+  #    对它 grep 没有意义。两者由同一次构建产生，内联的 define 完全一致。
+  # ⚠️ 必须用 grep -oF 数**出现次数**：产物被压成极少几行，`grep -c` 数的是行数，
+  #    两种形态都会返回同一个数，毫无区分力（首版就写成那样，结果永远「通过」）。
+  # ⚠️ 反斜杠是**字面量**：产物里就是 topInset:\"self\"，单引号内的 \" 不是转义。
+  #    实测（逐字节核对 dist/main.web.bundle）：
+  #      含反斜杠的 'topInset:\"self\"' → 50 命中
+  #      不含反斜杠的 'topInset:"self"' →  0 命中
+  grep -oF 'topInset:\"bleed\"' packages/app-lynx/dist/main.web.bundle | wc -l
+  grep -oF 'topInset:\"self\"'  packages/app-lynx/dist/main.web.bundle | wc -l
+  ```
+
+  实测基准（emulator-5554 / 1080×2160）：
+
+  | 构建 | bleed | self | 顶部实测 |
+  |------|-------|------|----------|
+  | 缺省（不传 env） | **2** | 50 | 首页无顶栏、封面出血到 y=0；对拍脚本**显式拒绝**（本页不适用） |
+  | `PICTELIO_HOME_BLEED=0` | **0** | 52 | 首页 64dp 实体顶栏；反推 inset 72.5 vs 平台真值 72，**偏差 +0.5** |
+
+  最省事的验真其实是**装到设备上看一眼**：`PICTELIO_HOME_BLEED=0` 构建后首页应出现
+  64dp 实体顶栏，封面**不**再出血；缺省构建则相反。
+
 - 极性的唯一事实源：`packages/app-lynx/homeBleedHeaderFlag.ts`，真值表见 `packages/app-lynx/tests/homeBleedHeaderFlag.test.ts`。
 
 ## 七、覆盖发布（`pnpm run release -o`）

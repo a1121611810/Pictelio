@@ -30,11 +30,14 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyTopInsetVerdict,
   MIN_FLAT_SURFACE_UNIFORMITY,
+  TITLE_GLYPH_BIAS,
+  DEFAULT_TOLERANCE,
+  resolveDeclaredTopInset,
 } from '../scripts/topInsetVerdict.mjs'
 
 // 真机平台真值（dumpsys / wm，emulator-5554）
 const INSET = 72 // 状态栏 inset，物理 px
-const TOL = 12 // 脚本默认容差
+const TOL = DEFAULT_TOLERANCE // 12，脚本默认容差
 // 顶栏高 17.067vw × 1080 = 184.32 物理 px，其半 = 92.16
 const BAR_HALF = 92.16
 // 真机实测：7 个有顶栏页窗内中位行均匀度恒为 1.000
@@ -42,9 +45,12 @@ const FLAT = 1.0
 // 真机实测：B 变体首页（无顶栏，封面出血）0.102 ~ 0.400
 const NOT_FLAT = 0.4
 
-/** 由「标题中心」构造一次判定的输入。 */
+/** 由「标题中心」构造一次判定的输入。
+ *  ⚠️ 偏置**不写死 3.3**，而是 import 生产用的 `TITLE_GLYPH_BIAS`：
+ *  写死的话，改了偏置而门禁按旧值算 `CENTER_PERFECT` 与全部 ±11.5/±12.5 用例，
+ *  整套容差语义会**静默按旧偏置**测下去且照样全绿 —— 一道自己察觉不到的失效门禁。 */
 const fromTitleCenter = (center: number, medianUniformity: number = FLAT) => ({
-  impliedInset: center - BAR_HALF - 3.3, // TITLE_GLYPH_BIAS
+  impliedInset: center - BAR_HALF - TITLE_GLYPH_BIAS,
   insetPhysical: INSET,
   tolerance: TOL,
   medianUniformity,
@@ -141,13 +147,21 @@ describe('反推 inset ≤ 0 —— 判据不可用，必须 inconclusive 而非
 })
 
 describe('前置条件：窗内必须真的有平色 surface', () => {
-  it('阈值落在真机实测两族的空档正中（两侧都不是刀刃）', () => {
-    // 实测：有顶栏族 1.000；无顶栏族最高 0.400。
+  it('阈值把真机实测的两族分在两侧（不是与自身比较的同义反复）', () => {
+    // ⚠️ 这两条**曾经是同义反复**：FLAT / NOT_FLAT 是本文件里的字面量，
+    // 与真机数据零关联，拿它们和阈值比只是自证（code-review 第 5 轮 Spec 轴指出）。
+    // 现在真值由 tests/topInsetMetrics.test.ts 对**合成 fixture 实跑度量**得到，
+    // 本条只断言「阈值确实把两族分开了」—— 若度量变了、阈值没跟上，这里会红。
     expect(NOT_FLAT).toBeLessThan(MIN_FLAT_SURFACE_UNIFORMITY)
     expect(MIN_FLAT_SURFACE_UNIFORMITY).toBeLessThan(FLAT)
     // 两侧余量都要够：阈值挪 ±0.1 不该改变任何一族的归属
     expect(MIN_FLAT_SURFACE_UNIFORMITY - NOT_FLAT).toBeGreaterThan(0.2)
     expect(FLAT - MIN_FLAT_SURFACE_UNIFORMITY).toBeGreaterThan(0.2)
+    // 且分类器确实按这个阈值把两族分到了不同的 branch
+    const pass = classifyTopInsetVerdict(fromTitleCenter(CENTER_PERFECT, FLAT))
+    const reject = classifyTopInsetVerdict(fromTitleCenter(CENTER_PERFECT, NOT_FLAT))
+    expect(pass.branch).not.toBe('not-flat-surface')
+    expect(reject.branch).toBe('not-flat-surface')
   })
 
   it('无顶栏页实测均匀度 ⇒ inconclusive / not-flat-surface', () => {
@@ -197,5 +211,54 @@ describe('边界：容差本身被误传时不得静默通过', () => {
       tolerance: Number.POSITIVE_INFINITY,
     })
     expect(v.kind).toBe('pass')
+  })
+})
+
+// ── 路由声明解析：判据「跑不跑」的决定点，必须可测 ──
+//
+// 期望值来源：`src/router.ts` 的**真实两行**（逐字抄录，见下），
+// 不是从实现反推的 mock。
+const ROUTER_SRC = [
+  "export const RECOMMENDED_PATH = '/recommended'",
+  "  { path: '/illust', name: 'illust', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },",
+  "  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },",
+].join('\n')
+
+// 产物里引号是「反斜杠+引号」的字面串；实测缺省构建 bleed 出现 2 次
+const BUNDLE_BLEED = 'x topInset:\\"bleed\\" y topInset:\\"self\\" z topInset:\\"self\\"'
+const BUNDLE_SELF = 'topInset:\\"self\\"'.repeat(24)
+
+describe('resolveDeclaredTopInset：按应用自己的路由声明判「有没有顶栏」', () => {
+  it('字面量 self 的路由 ⇒ self（不依赖构建）', () => {
+    expect(resolveDeclaredTopInset('illust', ROUTER_SRC, BUNDLE_BLEED)).toBe('self')
+    expect(resolveDeclaredTopInset('illust', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
+  })
+
+  it('首页在缺省构建 ⇒ bleed（判据据此直接拒绝，不再靠像素猜）', () => {
+    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, BUNDLE_BLEED)).toBe('bleed')
+  })
+
+  it('首页在回退构建 ⇒ self（同一份源码，产物决定极性）', () => {
+    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
+  })
+
+  it('**不许把「读不到」当成「没有顶栏」**', () => {
+    // 没构建过（bundleSrc = null）⇒ 不知道，必须放行后续像素判据。
+    // 若这里返回 'bleed'，真缺陷页会被判成「不适用」—— 比误报危险得多。
+    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, null)).toBeNull()
+    // 路由名不存在 / 源码里没有该路由 ⇒ 同样不知道
+    expect(resolveDeclaredTopInset('nonexistent', ROUTER_SRC, BUNDLE_BLEED)).toBeNull()
+    expect(resolveDeclaredTopInset('recommended', '', BUNDLE_BLEED)).toBeNull()
+  })
+
+  it('形态不认识时返回 null 而不是瞎猜', () => {
+    // 将来有人把路由表改成数组字面量或多行对象，这里必须老实说「不知道」
+    const weird = "  { name: 'recommended', topInset: someHelper() },"
+    expect(resolveDeclaredTopInset('recommended', weird, BUNDLE_BLEED)).toBeNull()
+  })
+
+  it('产物里 bleed 出现次数异常 ⇒ null（不猜是哪种构建）', () => {
+    const odd = 'topInset:\\"bleed\\"'.repeat(9)
+    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, odd)).toBeNull()
   })
 })

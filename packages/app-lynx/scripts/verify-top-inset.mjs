@@ -40,7 +40,13 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { classifyTopInsetVerdict, MIN_FLAT_SURFACE_UNIFORMITY } from './topInsetVerdict.mjs'
+import { fileURLToPath } from 'node:url'
+import {
+  classifyTopInsetVerdict,
+  resolveDeclaredTopInset,
+  TITLE_GLYPH_BIAS,
+  DEFAULT_TOLERANCE,
+} from './topInsetVerdict.mjs'
 
 /** 顶栏高度档位（vw）。必须与 tailwind.config.ts / 各页顶栏的 17.067vw 同源。
  *  抽成常量是为了让「期望值」这一步可审计：改档位时这里要一起改，且 review 会看见。 */
@@ -66,11 +72,12 @@ const TOP_BAR_VW = 17.067
  * 于是把卡片边距算进了 inset（实测偏 +34.7 px，误报 FAIL）。
  * ⇒ 判据依赖页面结构就不是好判据。标题文字带是**所有有顶栏的页面共有**的元素，
  * 与页面下方长什么样无关。
+ *
+ * ⚠️ 上面这段推导的**结论**（`TITLE_GLYPH_BIAS = 3.3` 与 `DEFAULT_TOLERANCE = 12`）
+ *    已迁到 `scripts/topInsetVerdict.mjs`：测试要 import 同一份常量，
+ *    否则改了偏置而门禁仍按旧值测，就是一道**静默失效**的门禁。
+ *    本文件不再重复定义，避免两份真值。
  */
-const TITLE_GLYPH_BIAS = 3.3
-
-/** 容差 = 固有偏置 + 余量。见上。真实缺陷量级 ≫ 此值。 */
-const DEFAULT_TOLERANCE = 12
 
 /** 标题文字视为「深色」的亮度上限（on-surface 在 surface 上远低于此） */
 const DARK_LUMA_MAX = 128
@@ -168,59 +175,37 @@ function luma([r, g, b]) {
  *   空档极大，阈值取 0.75 落在空档正中。
  */
 function findTitleBandCenter(pngPath, insetPhysical, barPhysical) {
-  const py = `
-import sys
-from collections import Counter
-from PIL import Image
-im = Image.open(sys.argv[1]).convert('RGB')
-W, H = im.size
-px = im.load()
-LO, HI, DARK, MINPX, MAXRATIO = int(sys.argv[2]), int(sys.argv[3]), ${DARK_LUMA_MAX}, ${MIN_DARK_PX}, ${MAX_ROW_DARK_RATIO}
-def luma(x, y):
-    c = px[x, y]; return 0.299*c[0] + 0.587*c[1] + 0.114*c[2]
-xs = list(range(int(W*0.15), int(W*0.85), 3))
-uxs = list(range(0, W, 2))
-rows = []
-peak = 0.0
-unif = []
-for y in range(LO, min(HI, H)):
-    dark = sum(1 for x in xs if luma(x, y) < DARK)
-    ratio = dark / len(xs)
-    if ratio > peak: peak = ratio
-    if dark > MINPX and ratio <= MAXRATIO:   # 稀疏才可能是文字；连续必是背景
-        rows.append(y)
-    # 行均匀度：量化到 8 级色阶（容忍抗锯齿与压缩噪点）后取众数占比
-    cnt = Counter((px[x, y][0]//8, px[x, y][1]//8, px[x, y][2]//8) for x in uxs)
-    unif.append(cnt.most_common(1)[0][1] / len(uxs))
-unif.sort()
-median_unif = unif[len(unif)//2] if unif else 0.0
-if not rows:
-    # 区分「窗内全亮（没有文字）」与「窗内全暗（背景被误当文字）」
-    print('BG' if peak > MAXRATIO else 'NONE', f"{median_unif:.3f}")
-    sys.exit(0)
-start = rows[0]; end = start
-for y in rows[1:]:
-    if y - end <= 6:
-        end = y
-    else:
-        break
-print(f"{(start + end) / 2.0:.2f} {start} {end} {peak:.3f} {median_unif:.3f}")
-`
+  const lo = insetPhysical + 10
+  const hi = Math.round(insetPhysical + barPhysical - 10)
+  // 度量在独立脚本里（scripts/top_inset_metrics.py）而不是内嵌字符串：
+  // 内嵌版只有「连着真机跑一遍」这一条验证路径，而「它现在是对的」与
+  // 「它对所有输入都对」完全同形。合成 fixture 由 tests/topInsetMetrics.test.ts 提供。
   const out = execFileSync(
     'python3',
-    ['-c', py, pngPath, String(insetPhysical + 10), String(Math.round(insetPhysical + barPhysical - 10))],
+    [fileURLToPath(new URL('./top_inset_metrics.py', import.meta.url)), pngPath, String(lo), String(hi)],
     { encoding: 'utf8' },
   ).trim()
-  const parts = out.split(' ')
-  if (parts[0] === 'NONE') return { kind: 'none', medianUniformity: Number(parts[1]) }
-  if (parts[0] === 'BG') return { kind: 'background', medianUniformity: Number(parts[1]) }
-  const [center, start, end, peak, medUnif] = parts.map(Number)
+  const p = out.split(' ')
+  const tail = { medianUniformity: Number(p[1]), crossRowAgreement: Number(p[2]) }
+  if (p[0] === 'NONE') return { kind: 'none', ...tail }
+  if (p[0] === 'BG') return { kind: 'background', ...tail }
+  const [, center, start, end, peak] = p.map(Number)
   return {
     kind: 'ok',
     center,
     band: `${start}–${end}`,
     peakRatio: peak,
-    medianUniformity: medUnif,
+    medianUniformity: tail.medianUniformity,
+    crossRowAgreement: tail.crossRowAgreement,
+  }
+}
+
+/** 读文件，失败返回 null（= 不知道，绝不当成「没有顶栏」）。 */
+function tryRead(p) {
+  try {
+    return readFileSync(p, 'utf8')
+  } catch {
+    return null
   }
 }
 
@@ -248,6 +233,33 @@ console.log(`  顶栏高 ${TOP_BAR_VW}vw      = ${barPhysical.toFixed(2)} 物理
 const png = screenshot()
 console.log(`\n实测`)
 console.log(`  截图                = ${png}`)
+
+// ── 前置条件 ⓪：按**应用自己的路由声明**判定，不从像素猜 ──
+//
+// 为什么放在像素度量**之前**：无顶栏页的判定本质是「有没有顶栏」，而像素只能猜。
+// 首页封面可以是任意内容 —— 浅色低细节插画的逐行均匀度能到 1.000，
+// 与浅色顶栏在颜色统计上同形（见 topInsetVerdict.mjs 登记的残留失效面）。
+// 而 `src/router.ts` 里**已经写着**这条路由的让位归属：bleed 就是没有顶栏。
+// 那是规格级事实，比任何像素启发式都可靠，而且是免费的。
+const pageIdx = args.indexOf('--page')
+const PAGE = pageIdx === -1 ? 'recommended' : args[pageIdx + 1]
+const pageTopInset = resolveDeclaredTopInset(
+  PAGE,
+  tryRead(fileURLToPath(new URL('../src/router.ts', import.meta.url))) ?? '',
+  tryRead(fileURLToPath(new URL('../dist/main.web.bundle', import.meta.url))),
+)
+if (pageTopInset === 'bleed') {
+  fail(
+    `被测路由 \`${PAGE}\` 在当前构建下的让位归属是 **bleed**（**无顶栏**），本判据不适用。\n` +
+      `  依据 src/router.ts 里该路由自己的 meta.topInset 声明 —— 那是应用自己的规格，\n` +
+      `  比任何像素启发式都可靠：bleed 就是「两侧都不让位」，不存在「标题居中于顶栏」可量。\n` +
+      `  ⇒ 请停到**有 M3 顶栏**的页面再测，并带上 --page <路由名>，例如：\n` +
+      `     node scripts/verify-top-inset.mjs --page bookmarks\n` +
+      `  ⇒ 若你就是想测首页：bleed 归属下首页**本来就不该有顶栏**，本脚本测不出东西。`,
+  )
+  process.exit(1)
+}
+
 const band = findTitleBandCenter(png, insetPhysical, barPhysical)
 if (!band || band.kind === 'background') {
   fail(
@@ -290,14 +302,15 @@ console.log(`  偏差                  = ${verdict.delta >= 0 ? '+' : ''}${verdi
 
 if (verdict.branch === 'not-flat-surface') {
   fail(
-    `搜索窗内**没有平色 surface**（窗内中位行均匀度 ${band.medianUniformity.toFixed(3)} < ${MIN_FLAT_SURFACE_UNIFORMITY}）—— 本页没有顶栏。\n` +
-      `  搜索窗 [${insetPhysical + 10}, ${Math.round(insetPhysical + barPhysical - 10)}] 物理 px 落在**封面图/插画**上，\n` +
-      `  深色头发、阴影的稀疏深色像素会被当成「文字」（行内占比仅 ${(band.peakRatio * 100).toFixed(1)}%，\n` +
-      `  过不了 60% 的连续背景闸门，却完全够得上「稀疏文字」）。\n` +
-      `  ⚠️ 此时反推出的 inset 完全取决于**画的是谁**：同一张 B 变体首页实测出现过\n` +
-      `     −1.5 与 +9.5 两个值 —— 纯噪声，却都会被当成真实偏差报出去。\n` +
-      `  ⇒ 换到**有 M3 顶栏且顶栏为浅色**的页面再测。本判据在此页不可用。\n` +
-      `     （真机实测：有顶栏 7 页窗内中位均匀度 = 1.000；首页 = 0.10~0.40）`,
+    `搜索窗内**不是平色 surface**（逐行中位均匀度 ${band.medianUniformity?.toFixed(3)} / 跨行一致 ${band.crossRowAgreement?.toFixed(3)}）—— 本判据不适用。\n` +
+      `  搜索窗 [${insetPhysical + 10}, ${Math.round(insetPhysical + barPhysical - 10)}] 物理 px 内没有一块\n` +
+      `  「各行同色且整行同色」的平色区域，因此**不存在「标题居中于顶栏」这个几何事实**。\n` +
+      `  最常见成因：① 本页**没有顶栏**（B 变体首页，封面出血到 y=0）；② 封面图落在窗内\n` +
+      `     （照片、噪点、纵向渐变——渐变每行横向同色，逐行均匀度会饱和到 1.000，靠跨行一致才拦得住）。\n` +
+      `  ⇒ 换到**有 M3 顶栏且顶栏为浅色**的页面再测。\n` +
+      `  ⚠️ 已知残留：整屏浅纯色底与浅色顶栏在颜色统计上同形，本判据拦不住 ——\n` +
+      `     报 FAIL 时请看一眼截图，确认标题真的在那儿。\n` +
+      `     （真机实测：有顶栏 7 页 unif=1.000 / agree=1.000；bleed 首页 0.117 / 0.817）`,
   )
   process.exit(1)
 }
