@@ -36,7 +36,10 @@ flowchart LR
   end
   subgraph JS app-lynx
     D --> H[safeArea signals<br>safeTop/safeBottom]
-    H --> I[App.vue Root<br>padding-top/bottom]
+    H --> I[App.vue Root<br>padding-bottom]
+    H --> J[topInset<br>各页顶部 spacer]
+    %% ⚠️ 2026-10-02 修订（ADR-0214）：原图只有「Root padding-top/bottom」一条顶部通路，
+    %%    顶部让位下沉到各页后数据流图缺了这条分支，与同文件 :66 的契约表自相矛盾。
     H --> J[弹层家族<br>padding-bottom]
     B -.getViewportSize 契约不变.-> K[GlobalFab/弹层几何<br>零改动]
   end
@@ -63,7 +66,7 @@ flowchart LR
 | 元素 | 位置 | 语义与不变量 |
 |------|------|-------------|
 | safeArea signals | 新 `src/utils/safeArea.ts`：`safeTop()`/`safeBottom()`（module-level ref）+ `initSafeArea()`（App.vue onMounted 调用） | `addListener('pictelioInsets', ...)` 后**立即拉取** `NativeModules.PictelioApp.getSafeAreaInsets` 初值（订阅后拉，spec D2 修订）；事件更新；emitter/NativeModules 不可用（web-core 预览）→ 恒 0 + 一次性 warn（router:317 先例） |
-| Root 适配 | `App.vue` 根 `<page>`：`:style="{ paddingTop: safeTop()+'px', paddingBottom: safeBottom()+'px' }"` | 系统栏区域染 Root surface 色 = 「着色」效果的正确实现；列表/内容天然不被遮挡 |
+| Root 适配 | `App.vue` 根 `<page>`：`:style="{ paddingBottom: safeBottom()+'px' }"`。⚠️ **2026-10-02 修订**（ADR-0214）：原写作 `paddingTop: safeTop()+'px', paddingBottom: safeBottom()+'px'`。**顶部让位已下沉到各页**（`utils/topInset.ts` 的 `resolveTopInsetOwnership` + 各页零内容 spacer，25 条路由逐条声明 `meta.topInset`）；**底部仍在根容器**，且 6 个底部弹层继续各自消费 `safeBottom` | 系统栏区域染 Root surface 色 = 「着色」效果的正确实现（染色来自 Root 背景，与顶部让位归属无关）；列表/内容天然不被遮挡 |
 | 弹层底部 | 弹层家族根容器补 `padding-bottom: safeBottom`：SearchSheet、CommentOverlay、NovelExportSheet、NovelCaptionSheet、PagePickerSheet、WatchlistPromptDialog、BookmarkPanel（top-[20vh]+h-[80vh] 与贴底等价）；WatchlistPromptDialog 居中不触底，实际不消费（契约测试钉住偏离）。实现为面板末尾 spacer `<view :style="{ height: safeBottom + 'px' }" />`（规避 vw/padding 类覆盖语义） | absolute `bottom-0` 定位不受父 padding 影响，需各自消费；复用同一 composable |
 | 全屏开关状态 | `settingsStore`：`_fullscreenMode` ref + `setFullscreenMode(enabled)`（写 prefs 键 + 非静默 catch warn + 原生模式下调 `NativeModules.PictelioApp.setSystemBarsHidden`）；`loadSettings()` 恢复（损坏值 warn 维持默认，既有模式） | dev/web-core 无 NativeModules → 仅写键，catch 静默跳过原生调用（console.debug 可见） |
 | 设置 UI | `Me.vue` 设置卡新增行（复用 `autoFallbackEngine` 行式样：标题 + M3 switch）+ i18n key（`me.client.fullscreenMode` 标题/副文案，双语言，跟随 Me 页既有命名空间） | 开关即时生效（走原生调用），无需重启 |
@@ -114,7 +117,7 @@ flowchart LR
 | 票 | 内容 | 依赖 |
 |----|------|------|
 | T1 Java 骨架 | D1/D2/D3/D4：e2e + insets listener + contentSize 迁移 + getSafeAreaInsets/事件 + setSystemBarsHidden + 冷启动读键（含 Java 单测） | — |
-| T2 JS 适配 | safeArea store + Root padding + 弹层家族 + 契约测试（含 JS 单测 + 预览回归） | T1（事件/载荷契约） |
+| T2 JS 适配 | safeArea store + 根容器 padding-bottom（顶部已下沉到各页 spacer，见 ADR-0214）+ 弹层家族 + 契约测试（含 JS 单测 + 预览回归） | T1（事件/载荷契约） |
 | T3 全屏开关 | settingsStore + Me.vue 行 + i18n keys + 原生调用接线 | T1 |
 | T4 验收矩阵 | §6 模拟器验收 + 截图对比 + ADR-0168 落盘（docs-before-commit） | T1-T3 |
 

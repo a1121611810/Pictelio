@@ -27,7 +27,7 @@ v0.192 范围内做深）。其中**决策 3 的返回可达性**与**决策 7 �
 | 4 | 持久化开关已存在：仅 `"true"` 判真，缺失/损坏一律 false | 同上 `isFullscreenModeRequested(Context)`、`KEY_FULLSCREEN_MODE`、`SYSTEMBARS_PREFS` |
 | 5 | 冷启动/重建重设已在 `onCreate` 尾部完成，且注释自述依据「**新 Window 默认全显**」 | 同上 `onCreate` 尾的 `if (statusBarHidden) applySystemBarsHidden(this, true);` |
 | 6 | insets 已桥接为全局事件，值变化才发 | 同上 `onWindowInsetsChanged` / `sendInsetsEvent` / `EVENT_INSETS` |
-| 7 | **根容器已按 insets 上色**：系统栏隐藏后根 padding 归零 = 内容真正边到边 | `packages/app-lynx/src/App.vue` 的 `paddingTop: safeTop.value + 'px'` / `paddingBottom: safeBottom.value + 'px'`（`initSafeArea()` 于 `onMounted` 订阅 `pictelioInsets`） |
+| 7 | **根容器已按 insets 上色**：系统栏隐藏后让位归零 = 内容真正边到边。⚠️ **2026-10-02 修订**（ADR-0214）：原锚点写作根容器的 `paddingTop` + `paddingBottom`，其中 **`paddingTop` 已删除** —— 顶部让位改为逐页归属（`utils/topInset.ts` + 各页零内容 spacer）。**行为结论不变**（隐藏系统栏时顶部让位确归零），变的是归属点 | `packages/app-lynx/src/App.vue` 的 `paddingBottom: safeBottom.value + 'px'`（底部未动）；**顶部**改为 `packages/app-lynx/src/utils/topInset.ts` 的 `resolveTopInsetOwnership` + 各页 spacer（`initSafeArea()` 仍于 `onMounted` 订阅 `pictelioInsets`）。修订依据见 ADR-0214 |
 | 8 | JS 通道已通（含失败回滚内存态 + 禁静默 warn） | `packages/app-lynx/src/stores/settingsStore.ts` 的 `setFullscreenMode`；`packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java` 的 `setSystemBarsHidden(boolean, Callback)`；类型声明 `packages/app-lynx/src/rspeedy-env.d.ts` |
 | 9 | 设置页开关已存在 | `packages/app-lynx/src/pages/Me.vue` 的 `toggleFullscreenMode` + `ME_A11Y_LABELS.fullscreenMode` |
 | 10 | 跨端契约已被源级测试钉住 | `packages/app-lynx/src/utils/safeAreaJavaContract.test.ts` 的 describe「系统栏 JS↔Java 契约锚点」 |
@@ -75,7 +75,7 @@ v0.192 范围内做深）。其中**决策 3 的返回可达性**与**决策 7 �
 ### 三、沉浸机制的第二根支柱：insets 事件本身
 
 隐藏系统栏**不只**隐藏栏：`sendInsetsEvent` 会把新值推给 JS，`safeTop`/`safeBottom` 归零，
-`App.vue` 根容器的上下 padding 随之归零 ⇒ 内容**真正**边到边。所以「沉浸」是两件事的合取：
+顶部与底部的让位随之归零 ⇒ 内容**真正**边到边。⚠️ **2026-10-02 修订**（ADR-0214）：本句原写作「`App.vue` 根容器的**上下** padding 随之归零」——顶部让位已从根容器下沉到各页（`utils/topInset.ts` + 零内容 spacer），**底部仍在根容器**。此处所描述的「隐藏系统栏 ⇒ 让位归零 ⇒ 边到边」这一**行为**依然成立，仅承载它的机制已变。所以「沉浸」是两件事的合取：
 **应用内 chrome 显隐**（前端）+ **系统栏 + 根安全区归零**（原生 + insets 管线）。只做前者
 仍是「贴边但不沉浸」。
 
