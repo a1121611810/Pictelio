@@ -64,7 +64,11 @@
 - 帧体的 `from` 态**不得**包含会让元素「占位但不可见」的属性组合。当前 `item-rise` 的 `from { opacity: 0; … }` 是嫌疑点。
 - 验收条件（形态无关）：**把动效整条摘掉，每个页面的内容必须完全可见**。这条比任何具体实现都重要。
 - 该修复**优先于**保持错峰视觉一致性；两者冲突时牺牲视觉。错峰观感是否退化须在真机记录。
-- 适用范围：`listItemStyle` 的**全部**消费方（8 个文件），而非只修 Me 页那 10 处。
+- 适用范围：`listItemStyle` 的**全部**消费方，而非只修 Me 页那 10 处绑定。
+  口径（`grep -rln ':style="listItemStyle(' src/` = 8 个文件）：**7 个消费页**
+  `DownloadManager` / `IllustDetail` / `Me` / `MuteTags` / `NetworkCheck` /
+  `PlatformCheck` / `UpdatePage` + 定义方 `RefreshableList.vue`；
+  第 8 个是 `composables/motion.ts` 自身，属误命中。
 - 冷挂载 vs patch 插入的区别要保留在文档里：`v-for` 动态行（patch 插入）正常，冷挂载的静态兄弟不正常——这是定位依据，不是豁免理由。
 
 ### D2 · 构建配置层的类型检查接入（#910）

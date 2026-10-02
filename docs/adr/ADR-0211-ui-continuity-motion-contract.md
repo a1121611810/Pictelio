@@ -594,8 +594,18 @@ transform、`M3Switch.vue:33` width+height、`RankingEntryCard.vue:164` opacity�
 
 ⚠️ **修复前是间歇性的**：同一次安装连开 4 次，命中过「设置区不可见」也命中过「可见」
 ⇒ 该 bug **不能用单次截图判定已复现/已修好**，必须重复采样。本票的 6/6 是重复采样结果。
-⚠️ 8 个消费页在修复后逐页截图（`me` / `netdiag` / `platform-check` / `update` / `illust` /
-`novel` / `bookmarks` / `later` / `mypixiv` / `following`）内容均完整可见。
+⚠️ **逐页取证的覆盖范围（此前这段把「消费方」和「顺手也截图的页」混为一谈了，已更正）**：
+
+- **真正的消费方 = 7 个页面**：`DownloadManager` / `IllustDetail` / `Me` / `MuteTags` /
+  `NetworkCheck` / `PlatformCheck` / `UpdatePage`，外加定义方 `RefreshableList.vue`
+  （`grep -rln ':style="listItemStyle(' src/` 共 8 个文件，其中 `composables/motion.ts`
+  是函数自身、属误命中）。
+- **本次实际逐页截图的**：`me` / `netdiag` / `platform-check` / `update`（消费方中**有
+  benchNav 短名**的 4 个），另加 `illust` / `novel` / `bookmarks` / `later` / `mypixiv` /
+  `following` 六个**非消费方**页作为对照。内容均完整可见。
+- **未取证**：`DownloadManager` / `MuteTags` / `IllustDetail` 三个消费页**没有对应的
+  benchNav 短名**，本轮无法逐页验证，只能由源级门禁覆盖。
+  ⇒ D1 的验收条件（消费方全覆盖）目前是 **4/7 有设备证据**，不是 8/8。
 ⚠️ **机理仍未定案**：本次只坐实了「`from` 态可见 ⇒ 内容恒可见」这一**结果**，
 未能证明引擎为何在冷挂载静态兄弟上不启动入场动画。登记为未解项。
 
