@@ -1,3 +1,6 @@
+// ⚠️ **本文件对应的功能未交付**：所依赖的 ws 通道在当前 rspeedy 版本上不存在，
+//    端到端实测不刷新。完整证据与四个选项见 docs/specs/app-lynx-dev-livereload.md
+//    的状态头 + issue #919。
 // livereload-client 单测（spec: docs/specs/app-lynx-dev-livereload.md）
 //
 // 覆盖：

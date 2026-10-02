@@ -102,11 +102,20 @@
      （**已修**，本次 `livereload-client.entry.ts`）。而 `livereload-client.test.ts`
      的每个用例都**显式调 `init()`**，所以门禁全绿 —— 它证明「函数能用」，
      而生产链路里**没有人用它**。
-  3. client 依赖的 `ws://<host>/rsbuild-hmr` 在 rspeedy dev server 上 **404**
-     —— rspeedy 配置 `hmr: false`，rsbuild 因此**根本不创建该 socket**
-     （同端口 `/rsbuild-dev-server` 返回 200，证明 dev server 本身活着）
-     ⇒ **传输层不存在，页面仍不刷新**（**未修**，#916）。
-     前两层只是**必要前提**，修好它们并没有让功能跑起来 —— 这正是
-     「注入成功 ⇒ 功能可用」这条推论会骗人的地方。
+  3. client 依赖的 `ws://<host>/rsbuild-hmr` 在 rspeedy dev server 上 **404**（**未修**，#919）
+  4. 即便前三层都对：该通道在当前版本（rspeedy 0.13.6 / rsbuild 1.7.3）上
+     **根本不存在** —— 真实 WS 握手得到 `socket hang up (1006)`，注入
+     `dev:{hmr:true,liveReload:true}` 仍 404（同端口 `/main.web.bundle` 返回 200）。
+     路径本身没抄错（rsbuild 默认 `dev.client.path` 就是它，rspeedy 的 dev 插件
+     也把该 pathname 传给 `@lynx-js/webpack-dev-transport/client`）—— 是服务端不提供。
+     ⇒ **spec §2「rspeedy dev server 已存在的 ws 通道」这个前提从未成立**，
+     验收条件 2 当初就没被执行过（**未修**，#919）。
+
+  前两层只是**必要前提**，修好它们并没有让功能跑起来 —— 这正是
+  「注入成功 ⇒ 功能可用」这条推论会骗人的地方。
+
+  ⚠️ 我第一版的证据也踩了同一类坑：用 `curl` 打 `/rsbuild-hmr` 拿到 404 就下结论，
+  而**很多服务器对 WS-only 路由的普通 GET 就返回 404**。补真实 WS 握手后结论才站得住。
+  同一条纪律的第二例。
 - 判据自身的三次假绿（源文本断言当覆盖 / 阈值从单个样本推 / 接缝字段序错位）见 #909 与对应 commit message。
 - 全站顶栏高度同源证据：`grep -rln "17.067vw" src/` 命中 13 个文件，值全相同；`PageTopBar.template.test.ts` 钉住两个变体。
