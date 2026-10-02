@@ -20,7 +20,7 @@
 // 现画则每次运行都从**同一份几何定义**重新生成，期望值与几何写在同一处。
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +28,7 @@ import {
   classifyTopInsetVerdict,
   MIN_FLAT_SURFACE_UNIFORMITY,
   MIN_CROSS_ROW_AGREEMENT,
+  KNOWN_BLIND_SPOTS,
 } from '../scripts/topInsetVerdict.mjs'
 import { Canvas, encodePng, W, H, type RGB } from './helpers/rasterCanvas'
 
@@ -161,35 +162,45 @@ describe('搜索窗度量必须把「有顶栏」与各类无顶栏样本分开'
     expect(m.cross_agree).toBeLessThan(MIN_CROSS_ROW_AGREEMENT)
   })
 
-  it('**已知残留失效面**：整屏浅纯色底拦不住，且必须被登记在案', () => {
-    // 这一族与浅色顶栏在**颜色统计上同形**（两个度量都是 1.000），
-    // 本判据原理上就区分不了。命中时会放行、随后给出自信的 `too-small`。
+  it('**已登记失效面**：整屏浅纯色底拦不住 —— 且必须一直与登记一致', () => {
+    // ## 这条门禁在守什么
     //
-    // AGENTS.md「门禁冻结线」#5：已知的失效面**必须显式登记**，不得只记它抓到了什么。
-    // ⇒ 这里把它钉成一条会红的断言：行为改了、而登记没同步时，门禁先响。
+    // AGENTS.md「门禁冻结线」#5：判据的**失效面**必须显式登记，不得只记它抓到了什么。
+    // 「整屏浅纯色底」这一族与浅色顶栏在**颜色统计上同形**，两个颜色维度对它都没有
+    // 判别力（实测都是 1.000）⇒ 命中时前置条件放行、随后给出自信的 `too-small`。
+    //
+    // 期望值**不写死**在这里，而是取自 `KNOWN_BLIND_SPOTS` 的登记 —— 于是本条比的是
+    // 「实测分类结果」与「登记声称的命中形态」**是否仍相等**：
+    //   ① 行为没变 ⇒ 绿（这一族仍是盲区，登记是准确的）；
+    //   ② 哪天有人让判据真能分开了 ⇒ 两者不等 ⇒ **本条先红**，并要求同步更新登记。
+    // 首版是反向的：断言只钉行为、登记另用子串在源码里找，于是「行为改好了」和
+    // 「登记被人改了个措辞」两种情况都没人管。
+    const spot = KNOWN_BLIND_SPOTS.find((s) => s.id === 'flat-fullscreen-light-cover')
+    expect(
+      spot,
+      'topInsetVerdict.mjs 的 KNOWN_BLIND_SPOTS 里没有 flat-fullscreen-light-cover —— ' +
+        '失效面登记被删了。门禁冻结线 #5 要求失效面显式留痕；若它已被真正修掉，' +
+        '请连同本测试一起改。',
+    ).toBeDefined()
+
     const m = measure(FILES.flatfull!)
+    // 前提仍成立：两个颜色维度对它都无判别力（这正是它成为盲区的原因，也是不加
+    // 第三个颜色信号的理由 —— 颜色维度上已经没有信号可用，见 ADR-0215 决策 3）
     expect(m.median_unif).toBeGreaterThanOrEqual(MIN_FLAT_SURFACE_UNIFORMITY)
     expect(m.cross_agree).toBeGreaterThanOrEqual(MIN_CROSS_ROW_AGREEMENT)
 
     const v = classifyTopInsetVerdict({
+      // 规范探针：前置条件放行 + 反推值像缺陷 ⇒ 若这一族被测不出来，必然落到 fail
       impliedInset: 5.5,
       insetPhysical: INSET,
       tolerance: 12,
       medianUniformity: m.median_unif,
       crossRowAgreement: m.cross_agree,
     })
-    expect(v.branch, '若这一族已能被拦下，残留失效面缩小了 —— 请同步更新登记文案').toBe('too-small')
-
-    // 登记必须在**代码**里，不只在聊天里：确认失效面仍写在模块文档里。
-    const src = readFileSync(
-      fileURLToPath(new URL('../scripts/topInsetVerdict.mjs', import.meta.url)),
-      'utf8',
-    )
     expect(
-      src.includes('整屏浅纯色底') && src.includes('残留失效面'),
-      'topInsetVerdict.mjs 里对「整屏浅纯色底」这一残留失效面的登记被删了。\n' +
-        '  门禁冻结线 #5 要求失效面显式留痕：若它已被真正修掉，请连同本测试一起改。',
-    ).toBe(true)
+      { kind: v.kind, branch: v.branch },
+      '若这一族已能被拦下，残留失效面**缩小**了 —— 请同步更新 KNOWN_BLIND_SPOTS 的登记文案',
+    ).toEqual(spot!.hits)
   })
 
   it('清理临时 fixture', () => {

@@ -27,12 +27,16 @@
 // 期望值来源：**真机实测**（emulator-5554 / 1080×2160 / density 480），
 // 坐标与数值都记在下面各条用例的注释里，可原样复采；不是从实现反推。
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import {
   classifyTopInsetVerdict,
   MIN_FLAT_SURFACE_UNIFORMITY,
   TITLE_GLYPH_BIAS,
   DEFAULT_TOLERANCE,
   resolveDeclaredTopInset,
+  KNOWN_BLIND_SPOTS,
+  blindSpotAdvisory,
 } from '../scripts/topInsetVerdict.mjs'
 
 // 真机平台真值（dumpsys / wm，emulator-5554）
@@ -265,5 +269,95 @@ describe('resolveDeclaredTopInset：按应用自己的路由声明判「有没�
   it('产物里 bleed 出现次数异常 ⇒ null（不猜是哪种构建）', () => {
     const odd = 'topInset:\\"bleed\\"'.repeat(9)
     expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, odd)).toBeNull()
+  })
+})
+
+// ── 已登记失效面（`KNOWN_BLIND_SPOTS`）：登记纪律的门禁 ──
+//
+// ## 为什么不查「源码里有没有那句话」
+//
+// 首版把登记做成 JSDoc 注释 + 一条 `src.includes('整屏浅纯色底')` 的断言。那是
+// **静默失效**的门禁：把「整屏浅纯色底」改写成「整屏纯色」，把「残留失效面」换成
+// 「已知限制」，子串一条都对不上就红 —— 于是大家学会了绕开它（把措辞调回能过的样子），
+// 而**判据本身变没变**没有任何人再看一眼。
+//
+// 这里换成三层，任一层变红都指向同一个问题「登记与现实脱节了」：
+//   ① **结构**：登记项的字段齐全且非空（`KNOWN_BLIND_SPOTS` 的字段契约）。
+//   ② **行为**：登记声称的命中形态，真能被分类器**算出来**（`hits` 不是空话）；
+//      反向的「失效面是否缩小」由 `tests/topInsetMetrics.test.ts` 对合成 fixture
+//      **实跑度量脚本**后比对 —— 两处互补，那边验「度量确实分不开」，这边验「登记属实」。
+//   ③ **接线**：脚本报 REJECT 的 fail 分支真的消费了这份登记。
+const REQUIRED_TEXT_FIELDS = ['id', 'name', 'undetectableBecause', 'operatorAction'] as const
+const SCRIPT_SRC = readFileSync(
+  fileURLToPath(new URL('../scripts/verify-top-inset.mjs', import.meta.url)),
+  'utf8',
+)
+
+/** 规范探针：前置条件放行（该族的两个度量都饱和）+ 反推值像缺陷。
+ *  与 `topInsetMetrics.test.ts` 用的是同一组参数，跨文件保持一致。 */
+const blindSpotProbe = () =>
+  classifyTopInsetVerdict({
+    impliedInset: 5.5,
+    insetPhysical: INSET,
+    tolerance: TOL,
+    medianUniformity: 1.0,
+    crossRowAgreement: 1.0,
+  })
+
+describe('已登记失效面：登记在代码里，且每条都带可执行指令', () => {
+  it('登记项字段齐全（删掉 / 改名 / 清空任一字段都会红）', () => {
+    expect(KNOWN_BLIND_SPOTS.length, '一条失效面都没登记？').toBeGreaterThan(0)
+    for (const spot of KNOWN_BLIND_SPOTS) {
+      for (const f of REQUIRED_TEXT_FIELDS) {
+        expect(typeof spot[f], `登记项缺字段 ${f}（或不是字符串）`).toBe('string')
+        expect(spot[f].trim().length, `登记项的 ${f} 是空的 —— 空登记等于没登记`).toBeGreaterThan(0)
+      }
+      // hits.branch 是「失效面是否缩小」的比对基准，不能省
+      expect(typeof spot.hits?.branch, 'hits.branch 缺失：失效面缩小时将无从比对').toBe('string')
+    }
+  })
+
+  it('登记声称的命中形态真能被算出来（`hits` 不是一句空话）', () => {
+    for (const spot of KNOWN_BLIND_SPOTS) {
+      const v = blindSpotProbe()
+      expect(
+        { kind: v.kind, branch: v.branch },
+        `登记项 ${spot.id} 声称命中时是 ${JSON.stringify(spot.hits)}，` +
+          `但按规范探针实测分类器给出的是上面这个 —— 两者对不上，登记已失真。`,
+      ).toEqual(spot.hits)
+    }
+  })
+
+  it('告警文案点名该族，并给出「看截图」的可执行指令', () => {
+    for (const spot of KNOWN_BLIND_SPOTS) {
+      const text = blindSpotAdvisory(blindSpotProbe())
+      expect(text, `登记项 ${spot.id} 没生成告警文案`).not.toBe('')
+      // ⚠️ 断言的是**告警的实际输出**，不是源码里有没有那句话：
+      //   登记改名 / 改措辞时，这里和脚本报出来的东西**同步**变化，不会各说各话。
+      expect(text, '告警没有点名该族（operator 靠族名对截图）').toContain(spot.name)
+      expect(text).toContain(spot.id)
+      expect(text, '告警没有带上可执行指令').toContain(spot.operatorAction)
+      expect(
+        spot.operatorAction,
+        'operatorAction 必须可执行：得让人去核对画面，而不是只描述现象',
+      ).toMatch(/截图/)
+    }
+  })
+
+  it('非 fail 判定不得刷告警（否则真缺陷也会被淹没在失效面噪音里）', () => {
+    expect(blindSpotAdvisory({ kind: 'pass' })).toBe('')
+    expect(blindSpotAdvisory({ kind: 'inconclusive', branch: 'nonpositive-inset' })).toBe('')
+    expect(blindSpotAdvisory({ kind: 'inconclusive', branch: 'not-flat-surface' })).toBe('')
+  })
+
+  it('脚本报 REJECT 的 fail 分支真的消费了这份登记（否则登记只活在代码里没人看得到）', () => {
+    const at = SCRIPT_SRC.indexOf("if (verdict.kind === 'fail')")
+    expect(at, "verify-top-inset.mjs 里找不到 verdict.kind === 'fail' 分支").toBeGreaterThan(-1)
+    expect(
+      /blindSpotAdvisory\(\s*verdict\s*\)/.test(SCRIPT_SRC.slice(at)),
+      'fail 分支的 REJECT 文案没有插入 blindSpotAdvisory(verdict) —— ' +
+        '这一族的危害正落在操作者身上（脚本报自信的 FAIL，人照着去查让位），' +
+        '登记不接进文案就等于没登记。',
+    ).toBe(true)
   })
 })

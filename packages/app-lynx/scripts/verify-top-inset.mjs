@@ -49,6 +49,7 @@ import {
   parseMetricsOutput,
   TITLE_GLYPH_BIAS,
   DEFAULT_TOLERANCE,
+  blindSpotAdvisory,
 } from './topInsetVerdict.mjs'
 
 /** 顶栏高度档位（vw）。必须与 tailwind.config.ts / 各页顶栏的 17.067vw 同源。
@@ -361,6 +362,10 @@ if (verdict.kind === 'fail') {
   // 1 = 一致；显著 <1 = 让位没生效；>1 的**整数倍** = 密度倍数错误（物理像素当逻辑像素用）。
   // 判别顺序（先「偏小」后「整数倍」）见 topInsetVerdict.mjs 内的注释。
   const { approx, branch } = verdict
+  // ⚠️ 已登记的失效面住在**数据**里（topInsetVerdict.mjs 的 `KNOWN_BLIND_SPOTS`，
+  //   门禁逐字段断言 + 对合成 fixture 实测），本脚本只负责把它**交给操作者**：
+  //   这一族的危害正落在人身上 —— 报一个自信的 FAIL，人照着去查让位。
+  const advisory = blindSpotAdvisory(verdict)
   fail(
     `对拍失败：偏差 ${verdict.delta.toFixed(1)} 物理 px 超出容差。\n` +
       `  实测/平台 ≈ ${approx.toFixed(3)} 倍` +
@@ -370,7 +375,8 @@ if (verdict.kind === 'fail') {
         : branch === 'density-multiple'
           ? `  ⇐ 接近 ${Math.round(approx)} 倍，疑似**物理像素未换算为逻辑像素**（历史缺陷形态）`
           : `  ⇐ 非整数倍且不偏小：形态不在已知两类内，需人工看图`) +
-      `\n  ⚠️ 「有没有染色」这类判据在此仍会全绿 —— 只有幅值对拍能抓到。`,
+      `\n  ⚠️ 「有没有染色」这类判据在此仍会全绿 —— 只有幅值对拍能抓到。` +
+      (advisory ? `\n${advisory}` : ''),
   )
 } else {
   console.log(`\n✅ 通过：应用顶部让位与平台真值一致（偏差 ${verdict.delta.toFixed(1)} 物理 px，在容差内）。`)
