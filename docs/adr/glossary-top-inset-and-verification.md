@@ -18,7 +18,7 @@
 | **让位归属 vs 让位实现** | 归属 = 路由 `meta.topInset` 的**声明**；实现 = 页面里那个真正撑开高度的 spacer。**两者必须成对存在** | 跨端契约测试断言「声明了就必须有实现」，缺任一方向都指名具体路由 | `utils/safeAreaJavaContract.test.ts` |
 | **spacer（零内容让位块）** | 一个**不渲染任何内容**、只为占位的元素。刻意不用父容器 padding：Lynx 的 border-box UA 默认会让 padding 吃掉内容高度，而 web-core 预览不复刻该默认 | `useTopInsetSpacer()` 返回的 `ComputedRef<number>` 被绑成 spacer 高度；底部不动，6 个底部弹层继续各自消费 `safeBottom` | `useTopInsetSpacer.ts`；`App.vue` 的 `rootStyle` |
 | **首页沉浸悬浮顶栏（B 变体）** | 首页取消 64dp 实体顶栏，封面出血到屏幕顶端；右上角通知铃铛（暗底圆钮）；底部标题胶囊进场后 2s 淡出；状态栏加遮罩 | `Recommended.vue` 的 `HOME_BLEED` 分支 + `showTitleChip()` | `Recommended.vue`；ADR-0214 §后果 |
-| **状态栏遮罩（statusbar scrim）** | 覆盖在状态栏区域的一层半透明底，解决「白色系统字压在浅色封面上不可读」。实测把对比度从 **1.09:1**（远低于 AA 4.5）提到 **12.03:1** | `--md-statusbar-scrim`，**14 套色板各烘一份字面量、零 `var()`** | `tokens.css`；`Recommended.vue` 的遮罩层；ADR-0214 §后果 |
+| **状态栏遮罩（statusbar scrim）** | 覆盖在状态栏区域的一层半透明底（`to bottom`，本色板 `surface` 渐隐到透明，高 `safeTop × 2.2`），解决「系统状态栏字压在浅色封面上不可读」。遮罩在状态栏带底约 55% 不透明，**封面像素仍会透上来** ⇒ 带内最坏对比度**随图而变**。实测区间 **5.83:1 … 17.10:1**（原引用的 `12.03:1` 是其中某一张封面的值；无遮罩时最坏 `1.09:1`） | `--md-statusbar-scrim`，**14 套色板各烘一份字面量、零 `var()`**；量它的脚本 `verify-statusbar-contrast.mjs` | `tokens.css`；`Recommended.vue` 的遮罩层；ADR-0214 §后果与 §对比度的复现手段 |
 | **烘焙字面量（baked literal）** | 把本可用 CSS 变量表达的色值**直接写死**进样式。用于消除「未取证的平台行为」——`linear-gradient(…, var(--md-surface) …)` 依赖 Lynx 引擎对「变量出现在 CSS 函数实参内」的支持，该行为真机可用但机制未明 | 14 块遮罩各自烘焙本色板 surface；曾有两条「修法」（集中定义 / 逐块写同名变量）都**没消除**该假定，最后才真正消掉 | `tokens.css`；门禁 `tests/immersiveScrimContrast.test.ts` |
 | **回退阀（escape hatch）** | `PICTELIO_HOME_BLEED=0` —— 唯一的关闭方式，回到旧的 64dp 实体顶栏。**刻意用 `!== '0'` 而非 `=== '1'`**：默认值该由「关掉需要显式动作」表达 | `homeBleedHeaderFlag.ts` 的 `resolveHomeBleedHeaderFlag()`；`lynx.config.ts` 的 `source.define` | `homeBleedHeaderFlag.ts`；`docs/release-checklist.md` §六之二 |
 | **构建期宏（build-time macro）** | rspeedy `define` 阶段内联进 bundle 的常量，**运行期不可改**。`__HOME_BLEED_HEADER__` 属此类 ⇒ 已发布的 APK **无法**在设备上回滚，必须重新构建重新发版 | `lynx.config.ts` 定义；读点两处：`router.ts`（模块顶层）、`Recommended.vue` | `lynx.config.ts`；`rspeedy-env.d.ts` |
@@ -31,6 +31,8 @@
 | 术语 | 含义 | 本项目落点 | 证据 |
 |---|---|---|---|
 | **幅值对拍（amplitude cross-check）** | 用「标题文字带中心」反推应用实际让位量，与 `dumpsys` 平台真值比对。**量的是绝对偏差，不是跨页离散度** | `scripts/verify-top-inset.mjs`；真机 16/17 路由全部在 ±12 物理 px 内 | `verify-top-inset.mjs`；#909 |
+| **对比度对拍（contrast cross-check）** | 与幅值判据**同构但不同题**：读同一批平台真值、各取各的截图、同出三态，但一个量**几何**（让位多少 px）、一个量**颜色**（看不看得清）。「有遮罩」不等于「看得清」，两者不可互相替代 | `scripts/verify-statusbar-contrast.mjs`（驱动）+ `status_bar_contrast_metrics.py`（取样）+ `statusBarContrastVerdict.mjs`（判定纯函数）；采样窗 = `dumpsys` 状态栏带的**正中竖带**内缩 4px | `verify-statusbar-contrast.mjs`；ADR-0214 §对比度的复现手段；#909 |
+| **最坏一端（worst end）** | 带内同时量**最暗**与**最亮**两个底色，判定取**两端之更差者**。极性由原生契约决定（暗图标 or 浅图标），落到哪一端不由脚本选 ⇒ 报最小值才是诚实口径 | `classifyStatusBarContrast` 的 `worst` / `branch`；门禁断言「两端不等时 worst === min(...)」 | `statusBarContrastVerdict.mjs`；`tests/statusBarContrast.test.ts` |
 | **判据三层** | 判定「本页适不适用、让位对不对」的三道闸门，**顺序即代价**：① 路由声明（规格级，最可靠）② 平色 surface 两个度量 ③ 反推 inset 非负 | `topInsetVerdict.mjs` 的 `resolveDeclaredTopInset` → `classifyTopInsetVerdict` | `topInsetVerdict.mjs`；ADR-0214 §后果 |
 | **REJECT / FAIL / PASS** | 三种判定，**互不等价**。REJECT = **本判据在此样本上给不出答案**（既不是通过也不是缺陷）；FAIL = 偏差超容差且样本适用；PASS = 在容差内。**REJECT ≠ 通过** | `verify-top-inset.mjs` 的三条退出路径 | `verify-top-inset.mjs` |
 | **已登记的失效面** | 判据**原理上**区分不了的那一族输入。AGENTS.md「门禁冻结线」#5 要求**显式登记**（「不得只记它抓到了什么」），且登记要在**代码里**并有会红的断言 | 「整屏浅纯色底」与浅色顶栏在颜色统计上同形，三层都拦不住 | `topInsetVerdict.mjs` 的 `MIN_*` 常量注释；门禁 `tests/topInsetMetrics.test.ts` |
