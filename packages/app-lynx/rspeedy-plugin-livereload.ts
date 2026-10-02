@@ -29,10 +29,16 @@ export const pluginLivereload = (): RsbuildPlugin => ({
       const isWeb = envName === 'web' || envName.startsWith('web-')
       if (!isDev || !isWeb) return
 
-      // 在 entry 前注入 live-reload client（路径相对于 src/）
+      // 在 entry 前注入 live-reload client 的**入口模块**（路径相对于 src/）。
+      //
+      // ⚠️ 必须是 `.entry` 而不是裸 `livereload-client`：后者导出 `init()` 但
+      // 刻意不在模块加载时自动连接（避免 happy-dom 下崩），而**只 import 不调用
+      // 等于什么都没做** —— WebSocket 从不开、页面不刷新，而
+      // `livereload-client.test.ts` 每个用例都显式调 `init()` 所以门禁全绿。
+      // 这是本插件的第二层静默 no-op（第一层是 `isWeb` 恒 undefined，票 #912）。
       const entries = chain.entryPoints.values()
       for (const entry of entries) {
-        entry.prepend({ import: './src/livereload-client' })
+        entry.prepend({ import: './src/livereload-client.entry' })
       }
     })
   },

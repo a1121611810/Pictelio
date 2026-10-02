@@ -9,6 +9,8 @@
 // 6. { type: 'warnings' } / { type: 'errors' } 不触发 reload
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 // mock WebSocket
 class MockWebSocket {
@@ -148,5 +150,43 @@ describe('livereload-client', () => {
     ws.simulateMessage(JSON.stringify({ type: 'errors' }))
     vi.advanceTimersByTime(500)
     expect(mockReload).not.toHaveBeenCalled()
+  })
+})
+
+
+// ── 接线门禁（票 #912 第二层）──
+//
+// 上面每条用例都**显式调 `init()`**，所以它们证明的是「函数能用」。
+// 但生产链路是「插件 import 某个模块」——**有没有人调用 `init()` 是另一回事**，
+// 而这件事曾经没人验：插件只 `prepend` 了裸 client 模块，于是 WebSocket 从未打开，
+// 页面保存后不自动刷新，而上面全套测试照样全绿。
+//
+// 这组断言盯的是**接线**，不是函数行为。
+describe('live-reload client 的生产接线', () => {
+  const PLUGIN = readFileSync(
+    fileURLToPath(new URL('../rspeedy-plugin-livereload.ts', import.meta.url)),
+    'utf8',
+  )
+  const ENTRY = readFileSync(
+    fileURLToPath(new URL('./livereload-client.entry.ts', import.meta.url)),
+    'utf8',
+  )
+
+  it('插件注入的是 .entry 入口，不是裸 client', () => {
+    const injected = PLUGIN.match(/entry\.prepend\(\{ import: '([^']+)' \}\)/)?.[1]
+    expect(injected, '插件里找不到 entry.prepend 的注入路径').toBeTruthy()
+    expect(
+      injected,
+      `插件注入的是 \`${injected}\` —— 裸 client 模块只导出 init()、不自动连接，\n` +
+        '  只 import 不调用 ⇒ WebSocket 从不开、页面不刷新，而 client 的单测全绿。',
+    ).toMatch(/livereload-client\.entry$/)
+  })
+
+  it('入口模块确实调用了 init()（不是又一个只导出的模块）', () => {
+    const calls = ENTRY.replace(/\/\/.*$/gm, '').match(/\binit\(\s*\)/g) ?? []
+    expect(
+      calls.length,
+      '入口模块没有顶层调用 init() —— 注入它等于什么都没注入。',
+    ).toBeGreaterThanOrEqual(1)
   })
 })

@@ -95,5 +95,18 @@
 
 - 缺陷清单与真机复现：#908（根因 + 跨页对照）、#909（各项实测表与勘误）、#910（基线 7 个类型错误、后续 commit 增到 9 个 + 逐条命令）。
 - Pillow 事件：CI run 36991015462，`top_inset_metrics.py` 在 GitHub runner 上 10+ 次 `Command failed`；修复提交 `c403aa42`。
+- **live-reload 的三层静默 no-op**（本 ADR 总纲的教科书案例，逐层实测）：
+  1. `isWeb` 恒 `undefined` ⇒ 插件恒早退 ⇒ client 从未被注入（**已修**，#912 / `e5f769f5`）。
+     实测：修复前 web 产物里 client **0 处**，修复后 **6 处**。
+  2. 插件 `prepend` 了裸 client 模块，但**从未调用它的 `init()`** ⇒ WebSocket 从不打开
+     （**已修**，本次 `livereload-client.entry.ts`）。而 `livereload-client.test.ts`
+     的每个用例都**显式调 `init()`**，所以门禁全绿 —— 它证明「函数能用」，
+     而生产链路里**没有人用它**。
+  3. client 依赖的 `ws://<host>/rsbuild-hmr` 在 rspeedy dev server 上 **404**
+     —— rspeedy 配置 `hmr: false`，rsbuild 因此**根本不创建该 socket**
+     （同端口 `/rsbuild-dev-server` 返回 200，证明 dev server 本身活着）
+     ⇒ **传输层不存在，页面仍不刷新**（**未修**，#916）。
+     前两层只是**必要前提**，修好它们并没有让功能跑起来 —— 这正是
+     「注入成功 ⇒ 功能可用」这条推论会骗人的地方。
 - 判据自身的三次假绿（源文本断言当覆盖 / 阈值从单个样本推 / 接缝字段序错位）见 #909 与对应 commit message。
 - 全站顶栏高度同源证据：`grep -rln "17.067vw" src/` 命中 13 个文件，值全相同；`PageTopBar.template.test.ts` 钉住两个变体。
