@@ -1,5 +1,5 @@
 {
-  "version": "6.5.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.5.1",
-  "changelog": "# Pictelio 更新日志\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：此前状态栏、刘海与底部手势条处的留白被多算了一倍，画面可用区域偏小；现已按屏幕真实安全区显示"
+  "version": "6.6.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.6.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 首页**：顶栏默认改为沉浸式悬浮样式，封面图片可以延伸到顶栏背后\n\n## ⚡ 体验优化\n\n- **Lynx 引擎**：图片解码耗时大幅下降，部分封面从约 19 秒缩短到约 0.55 秒，首屏与翻页加载明显更快\n\n## 🐛 问题修复\n\n- **Lynx 首页**：入场动画此前缺少可见的起始状态，进入时过渡不完整；现已可以正常看到完整动画"
 }
