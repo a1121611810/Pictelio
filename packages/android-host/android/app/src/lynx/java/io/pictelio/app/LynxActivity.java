@@ -534,6 +534,10 @@ public class LynxActivity extends AppCompatActivity {
                             case "later" -> new String[]{"pictelioBenchNavLater"};
                             // 好P友列表页直达（ADR-0193 D5 / #754）：模拟器验收通道
                             case "mypixiv" -> new String[]{"pictelioBenchNavMyPixiv"};
+                            // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle，
+                            // 此前无 benchNav 短名 ⇒ D1 设备取证只有 4/7（见 ADR-0211）。
+                            case "downloads" -> new String[]{"pictelioBenchNavDownloads"};
+                            case "mute-tags" -> new String[]{"pictelioBenchNavMuteTags"};
                             // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };

@@ -439,6 +439,11 @@ function registerBenchNavHandler(): void {
     pictelioBenchNavLater: '/later',
     // 好P友列表页直达（ADR-0193 D5 / #754 T7）：benchNav 打开 /mypixiv 验证列表渲染/空态
     pictelioBenchNavMyPixiv: '/mypixiv',
+    // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle 却没有 benchNav 短名，
+    // 导致 D1 的设备取证只有 4/7（见 ADR-0211「逐页取证的覆盖范围」）。
+    // 补上短名后，那三页也可逐页验证。
+    pictelioBenchNavDownloads: '/downloads',
+    pictelioBenchNavMuteTags: '/mute-tags',
     // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
     pictelioBenchNavUpdate: '/update',
     pictelioBenchNavError: '/error',

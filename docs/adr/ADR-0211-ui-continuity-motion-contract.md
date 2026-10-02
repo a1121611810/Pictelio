@@ -603,9 +603,20 @@ transform、`M3Switch.vue:33` width+height、`RankingEntryCard.vue:164` opacity�
 - **本次实际逐页截图的**：`me` / `netdiag` / `platform-check` / `update`（消费方中**有
   benchNav 短名**的 4 个），另加 `illust` / `novel` / `bookmarks` / `later` / `mypixiv` /
   `following` 六个**非消费方**页作为对照。内容均完整可见。
-- **未取证**：`DownloadManager` / `MuteTags` / `IllustDetail` 三个消费页**没有对应的
-  benchNav 短名**，本轮无法逐页验证，只能由源级门禁覆盖。
-  ⇒ D1 的验收条件（消费方全覆盖）目前是 **4/7 有设备证据**，不是 8/8。
+- **原先未取证的 3 页已补齐**（为它们新增了 benchNav 短名，Java + JS 两侧，
+  `tests/benchnav-parity.test.ts` 18 条自动守住两侧一致性）：
+
+  | 路由 | 全屏边缘密度 | 判读 |
+  | --- | --- | --- |
+  | `downloads`（下载管理） | 6733 | 内容完整 ✅ |
+  | `illust-detail`（作品详情，走 `benchNavIllustId` 载荷通道） | 14002 | 内容完整 ✅ |
+  | `mute-tags`（静音标签） | 1089 | **合法空态**「暂无静音标签 / 长按作品标签即可静音」+ 顶栏返回箭头 —— 密度低是页面本身空，非内容被藏 ✅ |
+
+⇒ **D1 的验收条件（消费方全覆盖）现为 7/7 有设备证据。**
+
+  ⚠️ 教训：上一版把「4/7」当成结论记下来时，**没问那 3 页为什么没证据**。
+  真因是**它们没有 benchNav 短名**——一个可补的通道缺口，不是不可验证。
+  「未取证」与「不可验证」是两件事，前者要先查是不是自己造成的。
 ⚠️ **机理仍未定案**：本次只坐实了「`from` 态可见 ⇒ 内容恒可见」这一**结果**，
 未能证明引擎为何在冷挂载静态兄弟上不启动入场动画。登记为未解项。
 
