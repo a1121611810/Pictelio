@@ -21,7 +21,9 @@
 //   顶栏下边缘 y = 状态栏 inset（dumpsys，物理 px） + 顶栏高（17.067vw，vw 是视口宽的 1%）
 //
 // ## 用法与**适用范围**（务必先读）
-//   node packages/app-lynx/scripts/verify-top-inset.mjs [--tolerance 12]
+//   node packages/app-lynx/scripts/verify-top-inset.mjs [--page <路由名>] [--tolerance 12]
+//     --page  声明**当前停在哪个路由**（缺省 recommended）。它不做导航，只用于查该路由的
+//            让位归属声明；拼错不会报错而是退回缺省值，故建议显式传。
 //   （需先安装，并停在一个**有 M3 顶栏、且顶栏底色为浅色 surface** 的页面）
 //
 //   ⚠️ 本脚本**不适用**于两类页面，对它们给不出有意义的结果：
@@ -44,6 +46,7 @@ import { fileURLToPath } from 'node:url'
 import {
   classifyTopInsetVerdict,
   resolveDeclaredTopInset,
+  parseMetricsOutput,
   TITLE_GLYPH_BIAS,
   DEFAULT_TOLERANCE,
 } from './topInsetVerdict.mjs'
@@ -169,10 +172,12 @@ function luma([r, g, b]) {
  *   −1.5 与 +9.5 两个值 ⇒ 纯噪声，却都被当成真实偏差报了出去。
  *   只靠「反推值 ≤ 0」去拦是**从一个样本推的**，拦不住另一半。
  *
- *   均匀度把两族干净分开（emulator-5554 / 1080×2160 实测，窗 [82,246]）：
- *     有 M3 顶栏的 7 页 + 首页之外的截图：窗内中位均匀度 = **1.000**（顶栏是平色 surface）
- *     B 变体首页（无顶栏，封面出血）：            窗内中位均匀度 = **0.10 ~ 0.40**
- *   空档极大，阈值取 0.75 落在空档正中。
+ * ⚠️ 为什么有两个度量（实测，emulator-5554 / 窗 [82,246]）：
+ *   逐行**横向**均匀度对「平滑纵向渐变封面」恒为 1.000（每行横向本就同色），
+ *   而渐变封面在推荐流里很常见 ⇒ 单看它会漏一整族。跨行众数一致 ≥0.9 才拦得住。
+ *   完整实测表见 `scripts/top_inset_metrics.py` 的 docstring。
+ *   ⚠️ 两者都只是**第二/第三道防线**：首页有无顶栏由**路由声明**说了算
+ *   （见 `resolveDeclaredTopInset`）—— 像素度量随封面变化，不能当主判据。
  */
 function findTitleBandCenter(pngPath, insetPhysical, barPhysical) {
   const lo = insetPhysical + 10
@@ -185,22 +190,25 @@ function findTitleBandCenter(pngPath, insetPhysical, barPhysical) {
     [fileURLToPath(new URL('./top_inset_metrics.py', import.meta.url)), pngPath, String(lo), String(hi)],
     { encoding: 'utf8' },
   ).trim()
-  const p = out.split(' ')
-  const tail = { medianUniformity: Number(p[1]), crossRowAgreement: Number(p[2]) }
-  if (p[0] === 'NONE') return { kind: 'none', ...tail }
-  if (p[0] === 'BG') return { kind: 'background', ...tail }
-  const [, center, start, end, peak] = p.map(Number)
+  // 解析走 `parseMetricsOutput`（无依赖纯函数，与 tests/metricsParse.test.ts 共用）：
+  // 首版把字段序内联在此处，取成了 center/start ⇒ 两道平色闸门被无条件旁路，
+  // 而全量 3568 条测试照样全绿。详见该函数的头注。
+  const r = parseMetricsOutput(out)
+  if (r.kind === 'malformed') {
+    fail(`度量脚本输出无法解析：\`${out}\`\n  这通常意味着 python 侧契约变了而解析器没跟上 ——\n` +
+      `  此时脚本**不会**判红也不会判绿，而是直接停下。`)
+  }
+  if (r.kind === 'none' || r.kind === 'background') return r
   return {
     kind: 'ok',
-    center,
-    band: `${start}–${end}`,
-    peakRatio: peak,
-    medianUniformity: tail.medianUniformity,
-    crossRowAgreement: tail.crossRowAgreement,
+    center: r.center,
+    band: `${r.start}–${r.end}`,
+    peakRatio: r.peak,
+    medianUniformity: r.medianUniformity,
+    crossRowAgreement: r.crossRowAgreement,
   }
 }
 
-/** 读文件，失败返回 null（= 不知道，绝不当成「没有顶栏」）。 */
 function tryRead(p) {
   try {
     return readFileSync(p, 'utf8')
@@ -210,6 +218,19 @@ function tryRead(p) {
 }
 
 const args = process.argv.slice(2)
+// 未知参数**直接拒绝**，不静默忽略：拼错 `--pages` / `--page=x` 若被忽略，
+// 会退回缺省 `recommended`，在 `PICTELIO_HOME_BLEED=0` 构建下就**静默跳过**
+// 「本页有无顶栏」这道前置条件 —— 而那道闸门正是本脚本防误诊的关键。
+const KNOWN = new Set(['--page', '--tolerance'])
+for (let i = 0; i < args.length; i++) {
+  const a = args[i]
+  if (!a.startsWith('--')) continue
+  if (!KNOWN.has(a)) {
+    fail(`未知参数 \`${a}\`。本脚本只接受：${[...KNOWN].join(' / ')}。\n` +
+      `  静默忽略拼错的参数会让 --page 退回缺省值，在回退构建下直接跳过前置条件闸门。`)
+  }
+  if (args[i + 1] === undefined) fail(`参数 \`${a}\` 缺值。`)
+}
 const tolIdx = args.indexOf('--tolerance')
 const TOLERANCE = tolIdx === -1 ? DEFAULT_TOLERANCE : Number(args[tolIdx + 1])
 
@@ -297,6 +318,9 @@ const verdict = classifyTopInsetVerdict({
   insetPhysical,
   tolerance: TOLERANCE,
   medianUniformity: band.medianUniformity,
+  // ⚠️ 两个度量都要传：ADR-0214 §后果第 2 层写的是「unif ≥ 0.75 **且** agree ≥ 0.9」。
+  //    漏传第二个 ⇒ 整条跨行判据被 `undefined !== undefined` 短路跳过。
+  crossRowAgreement: band.crossRowAgreement,
 })
 console.log(`  偏差                  = ${verdict.delta >= 0 ? '+' : ''}${verdict.delta.toFixed(1)} 物理 px（容差 ±${TOLERANCE}）`)
 

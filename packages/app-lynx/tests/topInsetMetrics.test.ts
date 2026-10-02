@@ -29,89 +29,36 @@ import {
   MIN_FLAT_SURFACE_UNIFORMITY,
   MIN_CROSS_ROW_AGREEMENT,
 } from '../scripts/topInsetVerdict.mjs'
+import { Canvas, encodePng, W, H, type RGB } from './helpers/rasterCanvas'
 
 const METRICS = fileURLToPath(new URL('../scripts/top_inset_metrics.py', import.meta.url))
 
 // ── 几何（与 verify-top-inset.mjs 同源：emulator-5554 / 1080×2160）──
-const W = 1080
-const H = 2160
+// 画布 W/H 取自共享 helper（真机同尺寸），不在此重复定义。
 const INSET = 72
 const BAR = (17.067 / 100) * W // 184.32 物理 px
 const LO = INSET + 10 // 82
 const HI = Math.round(INSET + BAR - 10) // 246
 
-/** 画一张 1080×2160 的测试图；`shade(x, y) -> (r,g,b)` 决定每个像素。 */
-function draw(name: string, shade: (x: number, y: number) => [number, number, number]): string {
-  // PNG 由内联 zlib 写出，避免为一个 fixture 引入图像库依赖。
-  const raw = Buffer.alloc((W * 3 + 1) * H)
-  let o = 0
-  for (let y = 0; y < H; y++) {
-    raw[o++] = 0 // filter: none
-    for (let x = 0; x < W; x++) {
-      const [r, g, b] = shade(x, y)
-      raw[o++] = r
-      raw[o++] = g
-      raw[o++] = b
-    }
-  }
+/** 用**共享**画布 helper 画一张 1080×2160 的图；`shade(x, y)` 决定每个像素。
+ *
+ *  ⚠️ 必须用 `tests/helpers/rasterCanvas.ts`，**不能**自己再写一份 PNG 编码器：
+ *  该文件头明文写着「两个脚本门禁共用」，理由是「两份编码器一旦对 zlib/filter 的
+ *  假设不同，同一张合成图会得到两个解码结果，症状是『判据时灵时不灵』」。
+ *  首版就是自写了一份（手写 CRC32 查表 + `python3` 子进程跑 zlib）——既重复，
+ *  又比共享实现弱（原生 `node:zlib` 的 `crc32`/`deflateSync`）。code-review 第 6 轮抓出。
+ *  尺寸也用共享常量：判据阈值按**屏宽/屏高比例**标定，换尺寸就不是在验同一套判据。
+ */
+function draw(name: string, shade: (x: number, y: number) => RGB): string {
+  const c = new Canvas([255, 255, 255])
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) c.set(x, y, shade(x, y))
   const dir = mkdtempSync(join(tmpdir(), 'topinset-metrics-'))
   const file = join(dir, `${name}.png`)
-  // ⚠️ 必须 Buffer.concat，**不能**用 `+` 拼：`Buffer + Buffer` 会先各自
-  // toString() 再按 UTF-8 拼接 ⇒ 每一个 ≥0x80 的字节都变成 U+FFFD（ef bf bd）。
-  // 症状是文件存在、大小接近，但 PIL 报 UnidentifiedImageError ——
-  // 首版就这么写，排查绕了一圈才定位到「字节被 UTF-8 吃掉了」。
-  writeFileSync(
-    file,
-    Buffer.concat([
-      PNG_SIG,
-      pngChunk('IHDR', ihdr(W, H)),
-      pngChunk('IDAT', zlibStore(raw)),
-      pngChunk('IEND', Buffer.alloc(0)),
-    ]),
-  )
+  writeFileSync(file, encodePng(c.px))
   return file
 }
 
 type Case = { file: string; median_unif: number; cross_agree: number }
-
-// ── 极简 PNG 编码（只用到 filter:none 的真彩图）──
-const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-function ihdr(w: number, h: number): Buffer {
-  const b = Buffer.alloc(13)
-  b.writeUInt32BE(w, 0)
-  b.writeUInt32BE(h, 4)
-  b[8] = 8 // bit depth
-  b[9] = 2 // color type: truecolor
-  return b
-}
-function pngChunk(type: string, data: Buffer): Buffer {
-  const len = Buffer.alloc(4)
-  len.writeUInt32BE(data.length, 0)
-  const td = Buffer.concat([Buffer.from(type, 'ascii'), data])
-  const crc = Buffer.alloc(4)
-  crc.writeUInt32BE(crc32(td) >>> 0, 0)
-  return Buffer.concat([len, td, crc])
-}
-let CRC_TABLE: number[] | null = null
-function crc32(buf: Buffer): number {
-  if (!CRC_TABLE) {
-    CRC_TABLE = []
-    for (let n = 0; n < 256; n++) {
-      let c = n
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-      CRC_TABLE[n] = c >>> 0
-    }
-  }
-  let c = 0xffffffff
-  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff]! ^ (c >>> 8)
-  return (c ^ 0xffffffff) >>> 0
-}
-function zlibStore(raw: Buffer): Buffer {
-  return execFileSync('python3', [
-    '-c',
-    'import sys,zlib;sys.stdout.buffer.write(zlib.compress(sys.stdin.buffer.read(),9))',
-  ], { input: raw, maxBuffer: 1 << 28 })
-}
 
 function measure(file: string): Case {
   const out = execFileSync('python3', [METRICS, file, String(LO), String(HI)], {
@@ -122,7 +69,7 @@ function measure(file: string): Case {
 }
 
 // ── 五个样本类别（几何与期望写在同一处，不可能对不上）──
-const SURFACE: [number, number, number] = [248, 250, 255] // M3 light surface
+const SURFACE: RGB = [248, 250, 255] // M3 light surface
 
 const flatTopBar = () =>
   draw('flat-topbar', (_x, y) => (y >= LO && y < HI ? SURFACE : [255, 255, 255]))

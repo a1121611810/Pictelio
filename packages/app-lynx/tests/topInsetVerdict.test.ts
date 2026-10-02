@@ -147,11 +147,16 @@ describe('反推 inset ≤ 0 —— 判据不可用，必须 inconclusive 而非
 })
 
 describe('前置条件：窗内必须真的有平色 surface', () => {
-  it('阈值把真机实测的两族分在两侧（不是与自身比较的同义反复）', () => {
-    // ⚠️ 这两条**曾经是同义反复**：FLAT / NOT_FLAT 是本文件里的字面量，
-    // 与真机数据零关联，拿它们和阈值比只是自证（code-review 第 5 轮 Spec 轴指出）。
-    // 现在真值由 tests/topInsetMetrics.test.ts 对**合成 fixture 实跑度量**得到，
-    // 本条只断言「阈值确实把两族分开了」—— 若度量变了、阈值没跟上，这里会红。
+  it('阈值把两族分在两侧，且两侧都有余量', () => {
+    // ⚠️ 本条**只**锁「阈值在两个已知值之间，且离两端都有余量」。
+    // 它**不**证明 FLAT / NOT_FLAT 是真机/合成的实测值 —— 它们是本文件里的字面量。
+    // （首版注释写「若度量变了、阈值没跟上，这里会红」——**那是假话**：本文件与
+    //  度量脚本之间没有任何引用关系，改了 `top_inset_metrics.py` 或 fixture
+    //  这里照样绿。code-review 第 6 轮 Standards 轴抓出。留着比删掉更坏。）
+    //
+    // 真正把「阈值对不对」钉在实测数据上的门禁在 **tests/topInsetMetrics.test.ts**：
+    // 它对合成 fixture **实跑** `scripts/top_inset_metrics.py`，断言每一族落在
+    // 阈值的哪一侧。两处是互补的：那边验「度量确实分得开」，这边验「阈值落在空档里」。
     expect(NOT_FLAT).toBeLessThan(MIN_FLAT_SURFACE_UNIFORMITY)
     expect(MIN_FLAT_SURFACE_UNIFORMITY).toBeLessThan(FLAT)
     // 两侧余量都要够：阈值挪 ±0.1 不该改变任何一族的归属

@@ -189,3 +189,45 @@ export function resolveDeclaredTopInset(routeName, routerSrc, bundleSrc) {
   if (bleed <= 2) return 'bleed' // 实测：缺省构建恒为 2
   return null // 形态不认识，别猜
 }
+
+/**
+ * 解析 `scripts/top_inset_metrics.py` 的单行输出。
+ *
+ * ## 为什么单独抽出来
+ *
+ * 它是 **Python 度量 ↔ JS 判定之间的接缝**，而这道接缝曾整段零测试覆盖：
+ * 解析内联在 `verify-top-inset.mjs` 里，三个测试文件分别验 Python 输出、验分类器，
+ * **没有任何一条把两者接起来**。后果（code-review 第 6 轮 Spec 轴实测）：
+ * `OK` 分支按 `p[1]/p[2]` 取度量，而 python 的 `OK` 行是
+ * `OK <center> <start> <end> <peak> <median_unif> <cross_agree>` —— 取到的是
+ * **center(167.5) 与 start(139)**，两个都远大于阈值 ⇒ **两道平色闸门被无条件旁路**，
+ * 而全量 3568 条测试照样全绿。commit 自称「堵住渐变封面漏网」，脚本路径上并未达成。
+ *
+ * `NONE` / `BG` 两行恰好只有 3 个字段（`kind median_unif cross_agree`），
+ * 所以那两条分支当时是对的 —— **唯独 `OK` 错，而 `OK` 是唯一进入分类器的分支。**
+ *
+ * 抽成纯函数后，`tests/metricsParse.test.ts` 用**真实 python 输出**逐 kind 钉住字段序。
+ *
+ * @param {string} out python 的单行 stdout
+ * @returns {{kind: 'ok', center: number, start: number, end: number, peak: number,
+ *            medianUniformity: number, crossRowAgreement: number}
+ *          | {kind: 'none'|'background', medianUniformity: number, crossRowAgreement: number}
+ *          | {kind: 'malformed', raw: string}}
+ */
+export function parseMetricsOutput(out) {
+  const p = String(out).trim().split(/\s+/)
+  if (p[0] === 'NONE' || p[0] === 'BG') {
+    return {
+      kind: p[0] === 'NONE' ? 'none' : 'background',
+      medianUniformity: Number(p[1]),
+      crossRowAgreement: Number(p[2]),
+    }
+  }
+  if (p[0] === 'OK') {
+    // ⚠️ 字段序：OK <center> <start> <end> <peak> <median_unif> <cross_agree>
+    //    两个度量在**最后两位**，不是前两位。写错会让闸门拿到 center/start 而恒真。
+    const [center, start, end, peak, medianUniformity, crossRowAgreement] = p.slice(1).map(Number)
+    return { kind: 'ok', center, start, end, peak, medianUniformity, crossRowAgreement }
+  }
+  return { kind: 'malformed', raw: String(out) }
+}
