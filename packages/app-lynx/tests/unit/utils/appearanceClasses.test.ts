@@ -85,7 +85,9 @@ function extractThemeableRoles(css: string): string[] {
   // - --md-scroll-indicator：**显式排除**（非缺值）——取值由 outline 派生（rgba(...) 形态，
   //   不进 hex 角色集），亮色各主题沿用基础 page block 的值；暗色各主题必须自重定义
   //   （亮色灰叠暗面上对比度漂移），该覆盖由下方「--md-scroll-indicator 定义点」用例钉住。
-  const derivedFromThemeable = new Set(['--md-scroll-indicator'])
+  const derivedFromThemeable = new Set([
+    '--md-scroll-indicator',
+  ])
   const roles = new Set<string>()
   for (const m of block.matchAll(/(--md-[a-z0-9-]+)\s*:/g)) {
     const name = m[1]!

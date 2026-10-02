@@ -53,6 +53,7 @@ import {
 } from '../utils/webdavCredentials'
 import { t, locale } from '../i18n'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { useMotion } from '../composables/motion'
 
 /** 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 transition-colors 工具类——`background-color` 在其 transition-property 覆盖内（已验证）。
@@ -70,6 +71,11 @@ const { pressColor } = useMotion()
  *  ⇒ 账户组保持原样，其余分组卡片走统一出口；这是本仓已登记的同类取舍
  *  （与 M3Switch 收口同一原则：不为观感改动破坏已验证的交互面）。 */
 const { listItemStyle } = useMotion()
+
+// 顶部安全区让位高度（**逻辑 px**；safeArea.ts 已完成物理→逻辑换算，此处不得再乘除 density）。
+// 数值来源唯一：utils/topInset.ts 按当前路由 meta 裁决，公共入口 = composables/useTopInsetSpacer。
+// 'bleed'（内容铺到状态栏底下）下恒 0 ⇒ 模板里的 spacer 是 0 高，正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 
 
 const auth = useAuthStore()
@@ -569,6 +575,15 @@ function pickAppearanceMode(mode: DarkModeId) {
   <!-- [lynx:fix] 设置页滚动（issue #90）：header 固定在滚动容器外（与 Bookmarks/Recommended 同模式），
        内容由 scroll-view 承接溢出，web-core 与 native LynxView 行为一致 -->
   <view class="w-full h-full flex flex-col bg-surface">
+    <!-- 顶部安全区让位（#900 T1 / ADR-0194 跳过清单页）：本页顶栏**自补偿**让位，高度取
+         utils/topInset.ts 的 barSpacerHeight（self 模式 = 状态栏安全区；bleed = 0）。
+         为什么是零内容 spacer 而不是给下面那行加 paddingTop：Lynx 的 border-box UA 默认会让
+         padding 吃掉内容高度（顶栏矮一截），web-core 预览却不复刻该默认 ⇒ 两端观感分叉
+         （App.vue 转场包裹层 pb-18 已登记过这个坑）。底部弹层家族（SearchSheet 等 6 个）用同款写法。
+         spacer 保持透明：状态栏染色仍由根容器 surface 背景承担。
+         为什么本页保留手写顶栏（不迁 PageTopBar）：PageTopBar 化需语义改本页既有测试
+         （a11y 注册表源级锁），与「既有页面测试零语义修改」硬门禁冲突。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头；pageTitle 标注保留（E2E 锚点） -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
       <text

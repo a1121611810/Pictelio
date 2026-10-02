@@ -34,10 +34,16 @@ import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { t } from '../i18n'
 
 const isRestricted = useSettingsStore().isRestricted
+
+
+// 自让位 spacer 高度（票 #907）。B 变体开启时 meta 为 'bleed' ⇒ 本值恒 0（不重复让位），
+// 关闭时 meta 为 'self' ⇒ 由本页承担顶部让位（根容器已不再兜底）。
+const topInsetSpacer = useTopInsetSpacer()
 
 // ─── 时间合并 feed（插画 + 小说，ADR-0115） ───
 // sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
@@ -106,7 +112,10 @@ function sync() {
 }
 
 // ─── 封面比例显示（ADR-0118 / spec §2.1、§3.2）：可视区尺寸由 SystemInfo 派生 ───
-// 可视区 = 屏幕逻辑尺寸 - TopAppBar(17.067vw)（vw 折算为 px；底部导航已由全局放射 FAB 取代，不再预留）。
+// 可视区 = 屏幕逻辑尺寸 - 顶栏高（vw 折算为 px；底部导航已由全局放射 FAB 取代，不再预留）。
+// ⚠️ 票 #906（B 变体，HOME_BLEED=true）：首页取消实体顶栏、封面直接铺到状态栏下
+//    ⇒ 顶栏扣除项归零。**漏改这里的后果**：仍按 64dp 扣 → 可视区算小 64dp → 封面比例整体
+//    偏移，且**每张图都错却不自证**（只是"看起来略满"）。与 meta 的 'bleed' 必须同步。
 // pixelHeight 缺失时按 16:9 宽高比估算（防御；低估可用高度 → 略偏向 aspectFill 回退，安全侧）。
 declare const SystemInfo: { pixelWidth: number; pixelHeight?: number; pixelRatio: number }
 function slideViewport(): { width: number; height: number } {
@@ -244,12 +253,28 @@ onActivated(() => {
   if (feed.items().length === 0 && !feed.loading() && useAuthStore().isLoggedIn) {
     void refreshFeed()
   }
+  // 从二级页返回时重放标题胶囊：否则「返回后顶部一片空」会被误读成渲染失败
 })
+
+// ─── B 变体：标题胶囊（票 #906 / spec #900 T2）───
+// 静止态顶部零占用；进场显示一次，2s 后淡出。
+// ⚠️ 为什么不是「滚动后出现」：**真机实测推荐页没有纵向滚动**（内容高度 = 视口高度，
+//    封面按可视区铺满），唯一的「滚动」是横向轮播翻页。原先设想的 scroll 触发源不存在，
+//    照抄会得到一个永不触发的机制。现改为「进场 → 淡出」，既给到定位提示又不长期占位。
+// 减弱动效偏好下走 R1：不挂过渡声明（transitionStyle 置 none），但仍按同一时长收起
+// —— 收起本身是**信息消失**，不是装饰动画，直接不消失会让顶部永久被遮挡。
 </script>
 
 <template>
   <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
   <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
+    <!-- 顶部安全区让位（#900 T1 / ADR-0214）：零内容 spacer + 显式 height，
+         数值由 composables/useTopInsetSpacer 统一裁决（理由全文见该 composable）。
+         ⚠️ **不要**改成给顶栏行加 paddingTop —— Lynx 的 border-box UA 默认会让 padding
+         吃掉内容高度，而 web-core 预览不复刻该默认（见 App.vue 转场包裹层注释）。
+         'bleed' 模式恒 0 高，属正确行为，不要特判。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
+
     <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
       <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>

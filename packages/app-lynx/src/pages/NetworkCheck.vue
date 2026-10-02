@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import { evaluate, formatReport, type DiagInput, type DiagReport, type DiagStatus } from '@pictelio/net-diagnostics'
 import { collectNetDiagInput } from '../utils/netDiagnostics'
 import { writeClipboardText } from '../utils/lynxClipboard'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { copyOutcome } from '../primitives/copyOutcome'
 import { useAuthStore } from '../stores/authStore'
 import { goBack } from '../router'
@@ -79,6 +80,11 @@ async function copyReport() {
 }
 
 void run()
+
+// ─── 顶部安全区让位（#900 T1，数值唯一来源 utils/topInset.ts）───
+// 公共入口 = composables/useTopInsetSpacer（11 个页面共用一处，避免"改规则漏 N 处"）。
+// 'bleed' 时恒 0 ⇒ spacer 渲染为 0 高，属正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 </script>
 
 <!--
@@ -87,6 +93,12 @@ void run()
 -->
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
+    <!-- 顶部安全区让位（#900 T1）：零内容 spacer + 显式 height，数值由 composables/useTopInsetSpacer
+         统一裁决（理由全文见该 composable）。⚠️ **不要**改成给顶栏行加 paddingTop —— Lynx 的
+         border-box UA 默认会让 padding 吃掉内容高度，而 web-core 预览不复刻该默认（App.vue
+         转场包裹层 pb-18 已登记此坑）。'bleed' 模式恒 0 高，属正确行为，不要特判。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
+
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack()">
         <text class="text-label-large text-primary pr-4">{{ t('networkCheck.back') }}</text>

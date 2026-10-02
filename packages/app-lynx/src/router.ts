@@ -15,6 +15,7 @@ import {
   type Router,
 } from 'vue-router'
 import { evaluateBackRoute, createBackGuardRegistry, runBackGuards, hasBackEntryIn, decideRequiresAuth, type BackGuard } from './routerCore'
+import type { TopInsetMode } from './utils/topInset'
 import { beginRouteTransition, decideRouteDirection, type RouteDirection } from './composables/routeTransition'
 import { isNativeMode, getNativeModules } from './api/client'
 import { useAuthStore } from './stores/authStore'
@@ -28,13 +29,24 @@ import { runStartupAutoBackup } from './services/backupWiring'
 export const RECOMMENDED_PATH = '/recommended'
 
 // route meta 类型（vue-router RouteMeta 增强）：requiresAuth（守卫鉴权）、
-// backBehavior（返回键行为，原路由声明的 backBehavior 迁入 meta——ADR-0138 决策 6）
+// backBehavior（返回键行为，原路由声明的 backBehavior 迁入 meta——ADR-0138 决策 6）、
+// topInset（顶部让位归属，#900 T1；**必填**，见下）
 declare module 'vue-router' {
   interface RouteMeta {
     /** 业务页标记：全局守卫鉴权拦截（ADR-0138 决策 4） */
     requiresAuth?: boolean
     /** 'exit' = 返回键直接退出应用（/update、/error） */
     backBehavior?: 'exit'
+    /**
+     * 顶部让位归属（#900 T1 / #901）。**必填**——刻意不提供默认值。
+     *
+     * 必填而非「缺省 = root」是刻意的：默认值会把「某个新页面忘了声明」变成静默兜底，
+     * 而本仓要求「谁漏了」**可枚举**。漏声明在 `vue-tsc`（pnpm check）这一层就转红，
+     * 不必等到真机上看出内容顶到了状态栏底下才发现。
+     *
+     * 取值语义见 utils/topInset.ts（封闭两值：self / bleed）。
+     */
+    topInset: TopInsetMode
   }
 }
 
@@ -74,44 +86,50 @@ import PlatformCheck from './pages/PlatformCheck.vue'
  * 登录页同样不标（未登录态入口）。
  */
 export const routes: RouteRecordRaw[] = [
-  { path: '/login', name: 'login', component: Login },
-  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true } },
-  { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true } },
-  { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true } },
-  { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true } },
-  { path: '/novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true } },
+  { path: '/login', name: 'login', component: Login, meta: { topInset: 'self' } },
+  // 顶部让位（票 #907 收口后）：**只有两种模式**。
+  //   · 开关开（B 变体）→ 'bleed'：取消实体顶栏、封面直接铺到状态栏下；
+  //   · 开关缺省        → 'self'：旧 64dp 顶栏 + 页面自带 spacer（= 改动前的观感）。
+  // ⚠️ 绝不能是 'root'：该模式已随根容器补偿一起删除，含义退化成「完全不让位」，
+  //    顶栏会整体上移顶进状态栏，而编译/测试/门禁全绿。
+  // ⚠️ meta 与模板必须同源于本宏（模板见 Recommended.vue 的 HOME_BLEED 分支）。
+  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true, topInset: 'self' } },
   // 小说介绍页（spec #585 / 票 #586）：三段式导航中间页；与 /novel/:id 平级共存，
   // 不做路由级重定向（benchNav / 测试深链依赖 /novel/:id 直达可达性）
-  { path: '/novel/:id/intro', name: 'novel-intro', component: NovelIntro, meta: { requiresAuth: true } },
-  { path: '/user/:id', name: 'user-home', component: UserHome, meta: { requiresAuth: true } },
-  { path: '/user/:id/following', name: 'user-following', component: FollowList, meta: { requiresAuth: true } },
-  { path: '/user/:id/followers', name: 'user-followers', component: FollowList, meta: { requiresAuth: true } },
-  { path: '/following', name: 'following', component: Following, meta: { requiresAuth: true } },
-  { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true } },
-  { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true } },
-  { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true } },
+  { path: '/novel/:id/intro', name: 'novel-intro', component: NovelIntro, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/user/:id', name: 'user-home', component: UserHome, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/user/:id/following', name: 'user-following', component: FollowList, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/user/:id/followers', name: 'user-followers', component: FollowList, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/following', name: 'following', component: Following, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true, topInset: 'self' } },
   // 稍后看列表页（ADR-0191 D5 / #753 T4）：本地快照全量渲染，requiresAuth（先例 = /watchlist）。
   // 术语红线（glossary 易混辨析 #1）：路由 /later + name watchLater，与追更 watchlist 物理隔离
-  { path: '/later', name: 'watchLater', component: WatchLater, meta: { requiresAuth: true } },
+  { path: '/later', name: 'watchLater', component: WatchLater, meta: { requiresAuth: true, topInset: 'self' } },
   // 通知中心（ADR-0188 D7 / #728）：次级业务页（非 NAV_TABS 外环 tab），Me 入口行进入
-  { path: '/notifications', name: 'notifications', component: Notifications, meta: { requiresAuth: true } },
+  { path: '/notifications', name: 'notifications', component: Notifications, meta: { requiresAuth: true, topInset: 'self' } },
   // 好P友列表页（ADR-0193 D2 / #754 T7）：次级业务页，Me 入口行进入；好P友是双向关系
   // （/v1/user/mypixiv），与 following/follower 单向关系不同族（术语表辨析 #5）
-  { path: '/mypixiv', name: 'mypixiv', component: MyPixiv, meta: { requiresAuth: true } },
+  { path: '/mypixiv', name: 'mypixiv', component: MyPixiv, meta: { requiresAuth: true, topInset: 'self' } },
   // 静音标签管理页（ADR-0187 D5 / #732）：次级业务页，Me 内容组入口行进入
-  { path: '/mute-tags', name: 'mute-tags', component: MuteTags, meta: { requiresAuth: true } },
+  { path: '/mute-tags', name: 'mute-tags', component: MuteTags, meta: { requiresAuth: true, topInset: 'self' } },
   // 标签近邻结果页（ADR-0197 D14 / #767 T2）：作品详情页动作行进入的次级业务页。
   // 作品级能力，故挂在 /illust/:id 之下（多图作品不引入「当前页」概念，标签是作品级的）。
-  { path: '/illust/:id/tag-neighbors', name: 'tag-neighbors', component: TagNeighbors, meta: { requiresAuth: true } },
-  { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true } },
-  { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true } },
-  { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
-  { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
+  { path: '/illust/:id/tag-neighbors', name: 'tag-neighbors', component: TagNeighbors, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true, topInset: 'self' } },
+  { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit', topInset: 'self' } },
+  { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit', topInset: 'self' } },
   // 登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）；不标 requiresAuth
-  { path: '/network-check', name: 'network-check', component: NetworkCheck },
+  { path: '/network-check', name: 'network-check', component: NetworkCheck, meta: { topInset: 'self' } },
   // 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：debug 页，
   // 不标 requiresAuth（避免登录耦合）、不进任何导航入口——仅 benchNav 深链可达
-  { path: '/platform-check', name: 'platform-check', component: PlatformCheck },
+  { path: '/platform-check', name: 'platform-check', component: PlatformCheck, meta: { topInset: 'self' } },
 ]
 
 export const router: Router = createRouter({
@@ -158,6 +176,15 @@ export interface RouteState {
   name: string
   path: string
   params: Record<string, string>
+  /**
+   * 顶部让位归属（#900 T1）。随导航落定，由路由表 meta.topInset 决定。
+   * 消费方是各页的让位 spacer（经 composables/useTopInsetSpacer，见 utils/topInset.ts）；
+   * 根容器**不再**据此压顶部内边距——那套补偿已随 'root' 模式一并删除。
+   * ⚠️ 缺声明会走 normalizeMode 的 'self' 回落并告警 —— RouteMeta.topInset 已设为
+   * **必填**，所以正常构建下拿不到 undefined；下方初值写 'self'（= 首帧推荐页的正常模式）
+   * 是为了让首帧（afterEach 尚未触发）有确定行为，不产生一次无谓告警。
+   */
+  topInset: TopInsetMode
 }
 
 /** 路由状态（兼容导出，原 _state ref）：以 router.currentRoute 为准 */
@@ -165,6 +192,7 @@ export const routeState = ref<RouteState>({
   name: 'recommended',
   path: RECOMMENDED_PATH,
   params: {},
+  topInset: 'self',
 })
 
 // currentRoute → routeState 同步（页面取 currentParams / FAB 取 name 均经此）
@@ -175,6 +203,10 @@ router.afterEach((to, _from, failure) => {
     name: typeof to.name === 'string' ? to.name : '',
     path: to.path,
     params: to.params as Record<string, string>,
+    // 顶部让位归属：随导航**同步**落定（与 name/params 同一批次写入）。
+    // 这点是刻意的 —— 若改为页面 setup 里注册，顶栏接手让位的那一帧根容器仍会压，
+    // 产生一次「内容整体跳一帧」的可见闪烁。路由表 meta 是静态声明，天然无此竞态。
+    topInset: to.meta.topInset,
   }
   commitRouteTransition(to.fullPath, failure)
 })

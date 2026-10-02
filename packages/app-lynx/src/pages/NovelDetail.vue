@@ -12,6 +12,7 @@ import type { PixivNovel } from '../api/types'
 import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import AppIcon from '../components/AppIcon.vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
@@ -36,6 +37,11 @@ import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'
 import TextSelectionToolbar from '../components/TextSelectionToolbar.vue'
 import { useTextSelection } from '../composables/useTextSelection'
+
+// 顶部安全区让位高度（**逻辑 px**；safeArea.ts 已完成物理→逻辑换算，此处不得再乘除 density）。
+// 数值来源唯一：utils/topInset.ts 按当前路由 meta 裁决，公共入口 = composables/useTopInsetSpacer。
+// 'bleed'（内容铺到状态栏底下）下恒 0 ⇒ 模板里的 spacer 是 0 高，正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
@@ -387,6 +393,14 @@ function onWatchlistCancel(): void {
     @tap="selection.onTapAway"
     @longpress="selection.notifyLongPress"
   >
+    <!-- 顶部安全区让位（#900 T1 / ADR-0194 跳过清单页）：本页顶栏**自补偿**让位，高度取
+         utils/topInset.ts 的 barSpacerHeight（self 模式 = 状态栏安全区；bleed = 0）。
+         为什么是零内容 spacer 而不是给下面那行加 paddingTop：Lynx 的 border-box UA 默认会让
+         padding 吃掉内容高度（顶栏矮一截），web-core 预览却不复刻该默认 ⇒ 两端观感分叉
+         （App.vue 转场包裹层 pb-18 已登记过这个坑）。底部弹层家族（SearchSheet 等 6 个）用同款写法。
+         spacer 保持透明：状态栏染色仍由根容器 surface 背景承担。
+         为什么本页保留手写顶栏（不迁 PageTopBar）：见下方 [T1 不迁移] 注释。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
     <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3）；
          [T1 不迁移] 返回守卫源级锁（unit.test.ts 断言本页含 @tap="requestBack"）——
          PageTopBar 化需语义改测试，与「既有页面测试零语义修改」硬门禁冲突，保留手写头 -->

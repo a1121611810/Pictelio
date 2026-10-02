@@ -38,10 +38,19 @@ describe('PageTopBar 公开接口（title + back + 可选 a11y/titleClass）', (
     expect(code).toMatch(/titleClass\?\s*:\s*string/)
   })
 
-  it('返回事件上抛：defineEmits back + emit(\'back\')；组件不 import router（goBack/requestBack 留调用方）', () => {
+  it('返回事件上抛：defineEmits back + emit(\'back\')', () => {
     expect(code).toMatch(/defineEmits<\{\s*\(e:\s*'back'\):\s*void\s*\}>/)
     expect(code).toContain("emit('back')")
-    expect(code).not.toContain("'../router'")
+  })
+
+  it('组件不做导航决策：对 ../router 的依赖**只允许**只读 routeState（goBack/requestBack 留调用方）', () => {
+    // #900 T1 起让位高度必须读当前路由的 meta.topInset 声明 ⇒ 需 import routeState，
+    // 故原「完全不 import '../router'」的写法已被契约取代。收窄的是**导入名单**，
+    // 导航禁令本身一条未松：组件仍不得触碰任何导航 API（goBack / requestBack / router.push …）。
+    const routerImports = [...code.matchAll(/import\s+\{([^}]*)\}\s+from\s+'\.\.\/router'/g)]
+    expect(routerImports).toHaveLength(1)
+    expect(routerImports[0]![1]!.trim()).toBe('routeState')
+    expect(code).not.toMatch(/\bgoBack\b|\brequestBack\b|\buseRouter\b|\brouter\.(push|replace|back)\b/)
   })
 
   it('组件零 i18n：不 import t、模板无 t( 调用（文案全部调用方注入，noDeadKeys 面不变）', () => {
@@ -115,6 +124,42 @@ describe('PageTopBar 变体 a（居中标题，一级页）：存量类串逐字
     expect(code).toMatch(
       /<view v-else class="flex flex-row items-center justify-center h-\[17\.067vw\] px-4 bg-surface">\s*<text class="text-title-large font-medium text-surface-on">\{\{ title \}\}<\/text>/,
     )
+  })
+})
+
+describe('PageTopBar 顶部安全区让位（#900 T1：顶栏自吸收 \'self\' 模式让位）', () => {
+  it('高度唯一来源 = resolveTopInsetOwnership(routeState.value.topInset, safeTop.value).barSpacerHeight', () => {
+    // oracle = utils/topInset.ts 的纯函数契约（非本组件自洽反推）；单位边界见 utils/safeArea.ts 文件头
+    expect(code).toMatch(/import\s+\{\s*safeTop\s*\}\s+from\s+'\.\.\/utils\/safeArea'/)
+    expect(code).toMatch(/import\s+\{\s*resolveTopInsetOwnership\s*\}\s+from\s+'\.\.\/utils\/topInset'/)
+    expect(code).toMatch(
+      /resolveTopInsetOwnership\(routeState\.value\.topInset,\s*safeTop\.value\)\.barSpacerHeight/,
+    )
+  })
+
+  it('spacer = 零内容独立 view + 行内 height，且排在顶栏行**之前**（与底部弹层家族同款范本）', () => {
+    expect(code).toMatch(/<view :style="\{ height: barSpacerHeight \+ 'px' \}" \/>/)
+    expect(code.indexOf(`:style="{ height: barSpacerHeight + 'px' }"`)).toBeLessThan(
+      code.indexOf('v-if="back"'),
+    )
+  })
+
+  it('spacer 透明：不带任何背景类（状态栏区域底色由页面根容器的 surface 背景透出）', () => {
+    expect(code).not.toMatch(/<view[^>]*class="[^"]*bg-[^"]*"[^>]*:style="\{ height: barSpacerHeight/)
+  })
+
+  it('让位不改顶栏行自身高度，也不靠 padding 让位（border-box UA 与 web-core 预览语义不一致）', () => {
+    // 两变体容器的类串逐字不变（h-[17.067vw] / px-4 / bg-surface 原样），且无 pt-* / 行内 padding
+    const barTags = [...code.matchAll(/<view v-(?:if="back"|else) class="[^"]*">/g)].map((m) => m[0])
+    expect(barTags).toHaveLength(2)
+    for (const tag of barTags) {
+      expect(tag).not.toMatch(/\bpt-/)
+      expect(tag).not.toMatch(/padding/i)
+    }
+  })
+
+  it('单根容器：spacer 与变体行同属一个纵向流（fragment 多根未验证，ADR-0123 已否决）', () => {
+    expect(code).toMatch(/<view class="w-full flex flex-col">/)
   })
 })
 

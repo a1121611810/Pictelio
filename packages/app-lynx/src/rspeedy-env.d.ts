@@ -34,6 +34,15 @@ declare global {
    */
   const __BENCH_NAV__: boolean
   /**
+   * 首页「沉浸悬浮顶栏」构建开关（#900 T2 / 票 #906，lynx.config.ts 从 PICTELIO_HOME_BLEED 注入）：
+   * true = 首页启用 B 变体（取消实体顶栏、封面出血到状态栏下）；false = 维持现状顶栏。
+   *
+   * 同样**不用 __DEV__**（NODE_ENV=production 恒 false，debug APK 亦然）——
+   * 否则本宏在 APK 上恒 false，就无法做真机验收，而真机是本变体唯一的可信介质。
+   * 缺省 false：未显式带 PICTELIO_HOME_BLEED=1 构建的 APK 行为与改动前逐像素一致。
+   */
+  const __HOME_BLEED_HEADER__: boolean
+  /**
    * 启动更新检查开关（lynx.config.ts 从 .env PICTELIO_DISABLE_UPDATE_CHECK 注入）：
    * true = 强制跳过启动更新检查（dev 调试，避免误进强制更新页）；false = 按原逻辑走。
    */

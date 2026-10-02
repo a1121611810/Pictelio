@@ -1,6 +1,8 @@
 // ─── 系统栏安全区 signals（spec docs/specs/lynx-systembars.md §4.2，D2）───
 // 原生 insets 管线的 JS 侧：订阅 pictelioInsets 事件 + 订阅后拉取初值。
-// 消费方：App.vue Root padding-top/bottom + 底部弹层 padding-bottom。
+// 消费方：① App.vue 根容器的 padding-bottom；② 6 个底部弹层各自的安全区 spacer；
+//          ③ 顶部让位经 composables/useTopInsetSpacer → 各页零内容 spacer（#900 T1）。
+//          ⚠️ 根容器**不再**消费 safeTop（ADR-0214 收口）。
 import { ref } from 'vue'
 
 // ─── ⚠️ 单位边界：本模块是**物理像素 → 逻辑像素的唯一换算点** ───

@@ -25,11 +25,11 @@ const CONTENT_ROUTE_NAMES = [
 ]
 
 function setup(initialName = 'recommended', opts: { openSearch?: () => void; hasOpenModal?: () => boolean } = {}) {
-  const routeState = ref<RouteState>({ name: initialName, path: `/${initialName}`, params: {} })
+  const routeState = ref<RouteState>({ name: initialName, path: `/${initialName}`, params: {}, topInset: 'self' })
   // 模拟真实 router：navigate 推进 routeState（这样选中其他 tab 后激活页随之切换）
   const navigate = vi.fn((path: string) => {
     const name = path.replace(/^\//, '')
-    routeState.value = { name, path, params: {} }
+    routeState.value = { name, path, params: {}, topInset: 'self' }
   })
   const fab = createGlobalFab({ routeState, navigate, navTabs: NAV_TABS, ...opts })
   return { fab, routeState, navigate }
@@ -47,7 +47,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
   it(`4 顶层 tab 路由 → menu（visible=true，active=tab 名）`, async () => {
     const { fab, routeState } = setup()
     for (const tab of NAV_TABS) {
-      routeState.value = { name: tab.name, path: tab.path, params: {} }
+      routeState.value = { name: tab.name, path: tab.path, params: {}, topInset: 'self' }
       await nextTick()
       expect(fab.view.value.mode).toBe('menu')
       expect(fab.view.value.visible).toBe(true)
@@ -58,7 +58,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
   it(`内容页（除 /login /update /error 外全部路由）→ search（visible=true，active=null）`, async () => {
     const { fab, routeState } = setup()
     for (const name of CONTENT_ROUTE_NAMES) {
-      routeState.value = { name, path: `/${name}`, params: {} }
+      routeState.value = { name, path: `/${name}`, params: {}, topInset: 'self' }
       await nextTick()
       expect(fab.view.value.mode).toBe('search')
       expect(fab.view.value.visible).toBe(true)
@@ -69,7 +69,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
   it('非内容页（login/update/error）→ hidden（visible=false）', async () => {
     const { fab, routeState } = setup()
     for (const name of ['login', 'update', 'error']) {
-      routeState.value = { name, path: `/${name}`, params: {} }
+      routeState.value = { name, path: `/${name}`, params: {}, topInset: 'self' }
       await nextTick()
       expect(fab.view.value.mode).toBe('hidden')
       expect(fab.view.value.visible).toBe(false)
@@ -79,7 +79,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
 
   it('未知/空路由名 → hidden（FAB 不渲染的兜底，不落入 search）', async () => {
     const { fab, routeState } = setup()
-    routeState.value = { name: '', path: '', params: {} }
+    routeState.value = { name: '', path: '', params: {}, topInset: 'self' }
     await nextTick()
     expect(fab.view.value.mode).toBe('hidden')
     expect(fab.view.value.visible).toBe(false)
@@ -91,14 +91,14 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
     const { fab, routeState } = setup('recommended', { hasOpenModal: () => true })
     // 覆盖 menu：4 tab 页
     for (const tab of NAV_TABS) {
-      routeState.value = { name: tab.name, path: tab.path, params: {} }
+      routeState.value = { name: tab.name, path: tab.path, params: {}, topInset: 'self' }
       await nextTick()
       expect(fab.view.value.mode).toBe('hidden')
       expect(fab.view.value.visible).toBe(false)
     }
     // 覆盖 search：内容页（含搜索弹层自身打开后的场景，弹层打开后 FAB 无需在场）
     for (const name of CONTENT_ROUTE_NAMES) {
-      routeState.value = { name, path: `/${name}`, params: {} }
+      routeState.value = { name, path: `/${name}`, params: {}, topInset: 'self' }
       await nextTick()
       expect(fab.view.value.mode).toBe('hidden')
       expect(fab.view.value.visible).toBe(false)
@@ -120,7 +120,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
 
   it('非 tab 路由下 FAB 应被强制收起（search 模式 isOpen 恒 false → 关闭态无遮罩/环层）', async () => {
     const { fab, routeState } = setup()
-    routeState.value = { name: 'illust-detail', path: '/illust/1', params: {} }
+    routeState.value = { name: 'illust-detail', path: '/illust/1', params: {}, topInset: 'self' }
     await nextTick()
     expect(fab.view.value.mode).toBe('search')
     fab.dispatch({ type: 'toggle' })
@@ -291,7 +291,7 @@ describe('createGlobalFab — dispatch search 命令（ADR-0132 决策 2）', ()
   it('search 模式（非 tab 内容页）下 dispatch("search") 同样触发 openSearch', async () => {
     const openSearch = vi.fn()
     const { fab, routeState } = setup('recommended', { openSearch })
-    routeState.value = { name: 'illust-detail', path: '/illust/1', params: {} }
+    routeState.value = { name: 'illust-detail', path: '/illust/1', params: {}, topInset: 'self' }
     await nextTick()
     expect(fab.view.value.mode).toBe('search')
     await fab.dispatch({ type: 'search' })

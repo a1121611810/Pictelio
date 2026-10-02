@@ -3,6 +3,7 @@
 defineOptions({ name: 'error' })
 import { navigate, resetHistory } from '../router'
 import { useAuthStore } from '../stores/authStore'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { fatalError, presentError } from '../utils/errorPresentation'
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
@@ -24,10 +25,24 @@ function backToLogin() {
   fatalError.value = null
   void navigate('/login', { replace: true })
 }
+
+// ─── 顶部安全区让位（#900 T1，数值唯一来源 utils/topInset.ts）───
+// 本页**没有顶栏**，让位由根容器的第一个子节点承担（见模板注释）。
+// 公共入口 = composables/useTopInsetSpacer（11 个页面共用一处，避免"改规则漏 N 处"）。
+// 'bleed' 时恒 0 ⇒ 渲染 0 高，属正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 </script>
 
 <template>
   <view class="w-full h-full flex flex-col items-center justify-center bg-primary px-10">
+    <!-- 顶部安全区让位（#900 T1）：零内容 spacer + 显式 height，高度由 utils/topInset.ts 裁决。
+         为什么是独立 spacer 而不是给根容器加 pt-*：Lynx 的 border-box UA 默认会让 padding 吃掉
+         内容高度，而 web-core 预览**不复刻**该默认 ⇒ padding 写法两种渲染器下不一致；spacer 同义。
+         根容器是 justify-center 列：spacer 计入居中组 ⇒ 内容起始 y = (屏高 − 24 − 内容) / 2 + 24
+         = (屏高 − 内容) / 2 + 12，与迁移前「根容器压 24 顶部 padding」逐像素等价，不产生观感位移。
+         透明不加背景色：状态栏染色由根容器 bg-primary 透上来。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
+
     <!-- 品牌色满屏氛围 + 白色大标题（强终态：会话已死，请重来） -->
     <!-- T07 档位清理：原为 700 字重。本行是 i18n **消息文案**（非字标），headline-small
          官方字重 regular(400)、emphasized 变体 500；「强终态」由满屏 bg-primary 反色容器承担，

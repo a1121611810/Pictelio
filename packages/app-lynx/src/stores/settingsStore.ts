@@ -1082,7 +1082,8 @@ export const useSettingsStore = defineStore("settings", () => {
   /**
    * 全屏模式开关（spec lynx-systembars D5）：写设备级键 + 原生运行时切换。
    * 原生模式下调 PictelioApp.setSystemBarsHidden 即时生效（insets 事件回流 →
-   * Root padding 重算）；dev/web-core 无 NativeModules → 仅写键（console.debug 可见，
+   * safeTop/safeBottom 响应式更新 → 根容器 padding-bottom 与各页顶部 spacer 同步重算）；
+   * dev/web-core 无 NativeModules → 仅写键（console.debug 可见，
    * 预览无系统栏概念）。冷启动由 LynxActivity.onCreate 读同键重设（重建自动恢复）。
    */
   function setFullscreenMode(enabled: boolean): void {

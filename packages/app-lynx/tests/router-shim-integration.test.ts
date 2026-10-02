@@ -130,8 +130,16 @@ describe('路由表完整性（spec D3）', () => {
     expect(nameOf('/platform-check')).toBe('platform-check')
     expect(mod.routes.find((r) => r.path === '/platform-check')?.meta?.requiresAuth).toBeUndefined()
     // P0-1：系统页是 cleared 语义下的目的页，不可被守卫自身拦截
-    expect(mod.routes.find((r) => r.path === '/update')?.meta).toEqual({ backBehavior: 'exit' })
-    expect(mod.routes.find((r) => r.path === '/error')?.meta).toEqual({ backBehavior: 'exit' })
+    //
+    // ⚠️ 这里刻意**不断言整个 meta 对象**（原为 toEqual({ backBehavior: 'exit' })）：
+    // meta 是持续增长的契约面（#900 T1 加了 topInset），深相等等于把「meta 恰好只有这一个字段」
+    // 写进契约 —— 下一个人加任何新字段都会在这里炸一条与本用例意图（P0-1 不可被拦截）
+    // 毫无关系的红灯。改为逐字段断言意图本身：带 exit、且**没有** requiresAuth。
+    for (const p of ['/update', '/error']) {
+      const meta = mod.routes.find((r) => r.path === p)?.meta
+      expect(meta?.backBehavior, `${p} 应声明 backBehavior exit`).toBe('exit')
+      expect(meta?.requiresAuth, `${p} 不得标 requiresAuth（P0-1）`).toBeUndefined()
+    }
     // 业务页 requiresAuth 标注
     expect(mod.routes.find((r) => r.path === '/recommended')?.meta?.requiresAuth).toBe(true)
     expect(mod.routes.find((r) => r.path === '/downloads')?.meta?.requiresAuth).toBe(true)

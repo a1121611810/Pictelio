@@ -23,6 +23,7 @@ import type { NovelExportFormat } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { stripNovelCaptionHtml } from '../utils/novelCaption'
 import { isNovelDownloaded } from '../utils/novelDownloadStatus'
@@ -304,10 +305,26 @@ const WatchlistAction = defineComponent({
     }
   },
 })
+
+// ─── 顶部安全区让位（#900 T1，数值唯一来源 utils/topInset.ts）───
+// 本页**没有顶栏**，让位由根容器的第一个子节点承担（见模板注释）。
+// 公共入口 = composables/useTopInsetSpacer（11 个页面共用一处，避免"改规则漏 N 处"）。
+// 'bleed' 时恒 0 ⇒ 渲染 0 高，属正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 </script>
 
 <template>
   <view class="w-full h-full relative bg-surface">
+    <!-- 顶部安全区让位（#900 T1）：零内容 spacer + 显式 height，高度由 utils/topInset.ts 裁决。
+         为什么是独立 spacer 而不是给根容器加 pt-*：Lynx 的 border-box UA 默认会让 padding 吃掉
+         内容高度，而 web-core 预览**不复刻**该默认 ⇒ padding 写法两种渲染器下不一致；spacer 同义
+         （PageTopBar / 底部弹层家族同款写法）。放在**根容器**而非底部 scrim 卡内：让位属于整页。
+         ⚠️ 本页根容器是 relative，内容三态全是 absolute inset-0（票 #583 D 案全屏封面）⇒ 封面
+         照旧铺到页面顶部并**盖在透明 spacer 之上**（后序兄弟层在上），状态栏区域因此看到封面而非
+         bg-surface。这是全屏封面 D 案的既有观感，spacer 不改它；spacer 的职责是把**文档流原点**
+         压到状态栏下方，与其它 'self' 页面同契约。透明不加背景色：不参与染色。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
+
     <!-- 加载态：全屏封面位骨架（shimmer 铺满；D 案页内不滚动，无内容区骨架） -->
     <view v-if="loading" class="absolute inset-0 shimmer" />
 

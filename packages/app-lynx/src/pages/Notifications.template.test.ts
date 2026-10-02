@@ -139,7 +139,13 @@ describe("通知渲染安全与代理约束（spec 边界 4/5）", () => {
 
 describe("路由与行交互（ADR-0188 D6/D7）", () => {
   it("router 注册 /notifications：requiresAuth（业务页守卫鉴权）", () => {
-    expect(router).toMatch(/path: '\/notifications', name: 'notifications', component: Notifications, meta: \{ requiresAuth: true \}/)
+    // 只断言本用例的**意图**（该路由已注册 + 标了 requiresAuth），不锁整个 meta 字面量：
+    // meta 是持续增长的契约面（#900 T1 起含 topInset），整串匹配会在下一个新字段上炸出
+    // 一条与本用例无关的红灯。
+    const line = router.split("\n").find((l) => l.includes("path: '/notifications'"))
+    expect(line, "router 中找不到 /notifications 路由行").toBeDefined()
+    expect(line).toContain("name: 'notifications'")
+    expect(line).toContain("requiresAuth: true")
   })
 
   it("行点击统一入口 openRow：组头展开、其余 target_url 解析（未知 scheme 静默忽略）", () => {

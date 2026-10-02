@@ -63,9 +63,11 @@ describe("MuteTags.vue 管理页（ADR-0187 D5 / #732）", () => {
 describe("路由与 Me 入口行（票面落点）", () => {
   it("router：/mute-tags 次级业务页 + requiresAuth（非 NAV_TABS 外环）", () => {
     expect(router).toContain("import MuteTags from './pages/MuteTags.vue'")
-    expect(router).toContain(
-      "{ path: '/mute-tags', name: 'mute-tags', component: MuteTags, meta: { requiresAuth: true } }",
-    )
+    // 同 Notifications：不锁整串 meta（#900 T1 起 meta 含 topInset），只断言本用例的意图。
+    const line = router.split("\n").find((l) => l.includes("path: '/mute-tags'"))
+    expect(line, "router 中找不到 /mute-tags 路由行").toBeDefined()
+    expect(line).toContain("name: 'mute-tags'")
+    expect(line).toContain("requiresAuth: true")
   })
 
   it("Me 内容组入口行：openMuteTags → /mute-tags，消费 i18n 键 me.content.muteTags", () => {

@@ -115,6 +115,11 @@ export default defineConfig({
       // debug APK 构建是 NODE_ENV=production，__DEV__ 恒 false 会误杀钩子；
       // 原生侧 BuildConfig.DEBUG 是 debug/release 的真实开关，双保险由它+本宏构成。
       __BENCH_NAV__: JSON.stringify(process.env.BENCH_NAV === '1'),
+      // 首页沉浸悬浮顶栏开关（#900 T2 / 票 #906）：同样**不用 __DEV__**——
+      // APK 构建恒为 NODE_ENV=production，用 __DEV__ 会让本宏在真机上恒 false，
+      // 而真机是本变体唯一可信的验收介质（web-core 预览不解析令牌、布局引擎也不同）。
+      // 缺省 false ⇒ 未显式构建的 APK 与改动前逐像素一致。
+      __HOME_BLEED_HEADER__: JSON.stringify(process.env.PICTELIO_HOME_BLEED === '1'),
     },
   },
   server: {

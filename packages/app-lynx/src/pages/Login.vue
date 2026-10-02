@@ -4,6 +4,7 @@ import { navigate, markSessionEstablished } from '../router'
 import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { presentError } from '../utils/errorPresentation'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
@@ -91,10 +92,21 @@ async function submit() {
     submitting.value = false
   }
 }
+
+// ─── 顶部安全区让位（#900 T1，数值唯一来源 utils/topInset.ts）───
+// 本页**没有顶栏**，所以「页面自补偿」由根容器的第一个子节点承担（见模板注释）。
+// 公共入口 = composables/useTopInsetSpacer（11 个页面共用一处，避免"改规则漏 N 处"）。
+// 'bleed' 时恒 0 ⇒ 渲染 0 高，属正确行为，不特判。
+const topInsetSpacer = useTopInsetSpacer()
 </script>
 
 <template>
   <view class="w-full h-full flex flex-col items-center bg-surface pt-[32vw]">
+    <!-- 顶部安全区让位（#900 T1）：零内容 spacer + 显式 height，数值由 composables/useTopInsetSpacer
+         统一裁决（理由全文见该 composable）。⚠️ **不要**改成给顶栏行加 paddingTop —— Lynx 的
+         border-box UA 默认会让 padding 吃掉内容高度，而 web-core 预览不复刻该默认（App.vue
+         转场包裹层 pb-18 已登记此坑）。'bleed' 模式恒 0 高，属正确行为，不要特判。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
     <view class="flex flex-col items-center mb-10">
       <!-- [T07 白名单 · 有意保留 700] 本元素是**产品字标**（品牌标记），不是 MD3 内容文本：
            headline-large 官方字重为 regular(400)，MD3 的「emphasized」变体也只到 500，

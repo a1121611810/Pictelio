@@ -13,7 +13,7 @@ import { appearanceClasses } from './utils/appearanceClasses'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
-import { initSafeArea, safeBottom, safeTop } from './utils/safeArea'
+import { initSafeArea, safeBottom } from './utils/safeArea'
 import { useReducedMotion } from './composables/useReducedMotion'
 import { useRouteTransition } from './composables/routeTransition'
 
@@ -62,7 +62,10 @@ onMounted(() => {
   // 直接打开强制更新页（无中间提示层）
   useUpdateStore().runStartupUpdateCheck()
   // 系统栏安全区（spec docs/specs/lynx-systembars.md §4.2）：订阅 pictelioInsets +
-  // 订阅后拉初值；Root padding-top/bottom 让系统栏区域染 surface 色（边到边基底）
+  // 订阅后拉初值。
+  // ⚠️ **顶部让位已不在本文件**（#900 T1 收口 / ADR-0214）：根容器现在只压 padding-bottom；
+  //    顶部由各页零内容 spacer 承担，唯一决策点 utils/topInset.ts。
+  //    系统栏区域的**染色**仍由 .Root 的 surface 背景承担（与让位归属无关）。
   initSafeArea()
 })
 
@@ -75,8 +78,14 @@ onMounted(() => {
 // 为何走 CSS 变量而不是「根 page 挂降级类 + `.降级类 .shimmer { animation: none }`」：
 // 根 <page> 的 :class 绑定被 T2 接线契约**逐字**锁定（tests/unit.test.ts:659 与
 // tests/unit/utils/appearanceClasses.test.ts:312 断言 `:class="appearanceClasses(settings.themeColor, settings.resolvedDark)"`），
-// 改成数组/拼接会同时打红他人 lane 的门禁；:style 是根元素上唯一没被断言锁定的通道
-// （safeAreaJavaContract.test.ts 只断言 paddingTop: safeTop / paddingBottom: safeBottom 两个子串，仍满足）。
+// 改成数组/拼接会同时打红他人 lane 的门禁；:style 是根元素上唯一没被断言锁定的通道。
+// ⚠️ 契约变更史（避免下一个人按旧注释把顶部补偿加回来）：
+//   · 原始：rootStyle 同时压 `paddingTop: safeTop` 与 `paddingBottom: safeBottom`；
+//   · #900 T1（#901）：顶部改为经 `utils/topInset.ts` 的 resolveTopInsetOwnership
+//     按路由声明归属取「root 模式下才非 0」的值；
+//   · #900 T1 收口（#907）：**顶部那一半整体删除** —— 25 条路由全是 'self'（页面自带
+//     spacer）或 'bleed'（首页刻意出血），根容器不再为顶部承担补偿。
+//   ⇒ 现契约 = **只断言「不含任何 safeTop 派生内边距」+「paddingBottom: safeBottom 仍在」**。
 //
 // 失败方向刻意选「fail-open」：变量未定义时 `.shimmer` 的 var() 回退到原声明
 // （见 <style>），即门闸若在真机不生效也只是维持现状（骨架屏仍有 shimmer），
@@ -90,9 +99,20 @@ const { animationStyle } = useReducedMotion()
 /** 骨架屏动画闸门变量名：与下方 <style> 的 `animation: var(--shimmer-motion, …)` 逐字配对（单测锁） */
 const SHIMMER_MOTION_VAR = '--shimmer-motion'
 
-/** 根 <page> 内联样式：系统栏安全区内边距 + 骨架屏动画闸门（偏好开启 = animation: none）。 */
+/** 根 <page> 内联样式：**只剩底部**安全区内边距 + 骨架屏动画闸门（偏好开启 = animation: none）。 */
+//
+// #900 T1 收口（票 #907）：顶部让位已从根容器**整体删除**。
+// 25 条路由（24 个页面组件 = 13 走公共顶栏 + 11 自持 spacer）全部显式声明归属，
+// 根容器不再为顶部承担任何补偿；首页按构建开关在 'self' / 'bleed' 间切换。
+//
+// ⚠️ 为什么顶部能删干净、底部不能：
+//   顶部让位的归属点唯一（顶栏 / 页面根），25 条路由都已在路由表逐条显式声明；
+//   底部则是**弹层**让位（6 个底部弹层各自消费 safeBottom），根容器的 paddingBottom
+//   是给「非弹层的页面内容」兜底的，两套并存不冲突 —— 删它要另开票，不在本票范围。
+//
+// ⚠️ 不要在本文件里重新引入 `safeTop`：顶部让位的唯一决策点是 utils/topInset.ts，
+//   由消费方各自调用。「谁负责让位」变化时本文件不应需要改动。
 const rootStyle = computed<Record<string, string>>(() => ({
-  paddingTop: safeTop.value + 'px',
   paddingBottom: safeBottom.value + 'px',
   // R2 关键帧降级：整条 animation 声明置 none（覆盖 infinite 循环），不是「放慢」
   ...(animationStyle.value ? { [SHIMMER_MOTION_VAR]: animationStyle.value } : {}),
@@ -117,8 +137,10 @@ const routeTransition = useRouteTransition()
 </script>
 
 <template>
-  <!-- 边到边基底（spec lynx-systembars D1/D2）：Root padding-top/bottom = 系统栏安全区，
-       系统栏区域染 .Root 的 surface 色（=「状态栏着色」诉求的平台正确实现）；
+  <!-- 边到边基底（spec lynx-systembars D1/D2）：**根容器只压 padding-bottom**（底部安全区）。
+       顶部让位已下沉到各页 spacer，见 utils/topInset.ts / ADR-0214 —— 不要在此加回 paddingTop。
+       系统栏区域染 .Root 的 surface 色（=「状态栏着色」诉求的平台正确实现），
+       该染色来自 .Root 的 background-color，与顶部让位归属无关；
        web-core 预览无 native → 恒 0，布局与历史形态等价 -->
   <page
     class="Root"
