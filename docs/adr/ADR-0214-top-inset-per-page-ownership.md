@@ -44,7 +44,10 @@ ADR-0168 落地时把顶部安全区做成**根容器集中补偿**（`App.vue` 
 - 顶部：25 条路由逐条显式声明归属（`RouteMeta.topInset`，**必填**，漏声明在 `vue-tsc` 层转红）。
   - `self`：页面自带一个**零内容 spacer** 让位。**按路由计 24 条**。
   - `bleed`：两侧都不让位，内容铺到状态栏底下。**按路由计 1 条**（首页），由构建期宏
-    `PICTELIO_HOME_BLEED=1` 控制，缺省 false。
+    `PICTELIO_HOME_BLEED` 控制，**缺省开启**（产品裁定 2026-10-02）；
+    **回退阀 = 显式 `PICTELIO_HOME_BLEED=0`** ⇒ 回到旧的 64dp 顶栏。
+    极性的唯一事实源是 `packages/app-lynx/homeBleedHeaderFlag.ts`，
+    由 `tests/homeBleedHeaderFlag.test.ts` 的真值表钉住（code-review 第 4 轮 B1/B2 补齐）。
 
   两个维度别混（第三轮 review 指出此处易被读成 25 个组件）：
   - **路由维度**：25 条 = 24 self + 1 bleed。路由比组件多 1，因为

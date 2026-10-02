@@ -42,10 +42,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
-    // *.bleed.test.ts 只属于 vitest.bleed.config.ts（那里宏为 true）。
-    // *.fallback.test.ts 只属于 vitest.fallback.config.ts（那里宏为 false，验旧顶栏那条路径）。
-    // 排除而非改文件名：那边用例含「宏必须为 false」的自检，误跑会立刻转红，
-    // 不会静默把两条路径当同一条测。
+    // 排除而非改文件名：fallback 用例含「宏必须为 false」的自检，误跑会立刻转红，
+    // 不会静默把两条路径当同一条测。两条路径的真值由
+    // tests/homeBleedHeaderFlag.test.ts 锚在**生产的极性表达式**上（不锚在这里的字面量）。
     exclude: [...configDefaults.exclude, '**/*.fallback.test.ts'],
     // i18n locale 钉源语言：Node ≥22 暴露 navigator.language（en-US），跟随系统探测会被带偏
     setupFiles: ['tests/setup/i18n-locale.ts'],

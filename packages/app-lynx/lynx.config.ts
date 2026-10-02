@@ -7,6 +7,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import JSON5 from 'json5'
 import { pluginLivereload } from './rspeedy-plugin-livereload.ts'
+import { HOME_BLEED_ENV_KEY, resolveHomeBleedHeaderFlag } from './homeBleedHeaderFlag.ts'
 
 const _root = dirname(fileURLToPath(import.meta.url))
 
@@ -122,7 +123,12 @@ export default defineConfig({
       // 显式关掉 ⇒ 回到旧的 64dp 顶栏（meta 变 'self'、模板走 spacer 分支，
       // 布局与本改动落地前逐像素一致）。刻意用 `!== '0'` 而非 `=== '1'`：
       // 默认值该由「关掉需要显式动作」表达，漏传 env 不该悄悄退回旧顶栏。
-      __HOME_BLEED_HEADER__: JSON.stringify(process.env.PICTELIO_HOME_BLEED !== '0'),
+      //
+      // 极性**不在此内联**：走 `resolveHomeBleedHeaderFlag`（唯一事实源 + 真值表门禁）。
+      // 内联过一次，且零机器防线 —— 极性翻回 `=== '1'` 时 CI 全绿而 APK 静默交付旧顶栏。
+      __HOME_BLEED_HEADER__: JSON.stringify(
+        resolveHomeBleedHeaderFlag(process.env[HOME_BLEED_ENV_KEY]),
+      ),
     },
   },
   server: {

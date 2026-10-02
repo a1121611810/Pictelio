@@ -69,6 +69,9 @@ const { routes } = await import('../router')
 
 describe('首页顶栏 · 旧顶栏回退路径（宏 = false，非生产缺省）', () => {
   it('自检：本配置下宏确实为 false（否则两条路径当同一条测了）', () => {
+    // ⚠️ 同 bleed 侧那条：这是 **characterization**（夹具自证），回读的是本配置
+    // define 里的字面量 `'false'`，与生产表达式无引用关系，不能当作「生产缺省是 false」
+    // 的证据。生产极性由 `tests/homeBleedHeaderFlag.test.ts` 钉住。
     expect(__HOME_BLEED_HEADER__).toBe(false)
   })
 

@@ -85,6 +85,17 @@
 
 GitHub Release 已发布完成。
 
+## 六之二、发布后回滚：首页顶栏构建开关（ADR-0214）
+
+**场景**：已发布版本首页顶栏出问题（沉浸悬浮顶栏渲染异常、通知按钮错位、状态栏遮罩压字），需要退回改动前的 64dp 实体顶栏。
+
+- **它不是运行时开关**：`PICTELIO_HOME_BLEED` 是**构建期**宏，在 rspeedy `define` 阶段被内联进 bundle。已发布的 APK **无法**在用户设备上回滚 —— 必须重新构建、重新发版。
+- **回退命令**：`PICTELIO_HOME_BLEED=0 pnpm build:android-host`（回退阀 = 显式 `=0`；缺省是**开启**，只有精确的 `0` 会关闭，`=false` / `=no` 都不关）。
+- **⚠️ 发布前必查**：`env | grep PICTELIO_HOME_BLEED`。本仓曾经历「缺省关闭」期，CI / 发布机 shell 里**可能残留 `PICTELIO_HOME_BLEED=0`** —— 它会静默让发布构建交付旧顶栏，且构建日志里没有任何提示。
+- **验真**：构建后确认产物真的翻回去了（不要只信构建成功）——
+  `grep -c 'topInset:\"self\"' packages/app-lynx/dist/main.web.bundle` 里首页那一处应为 `"self"`；或用 `packages/app-lynx/scripts/verify-top-inset.mjs` 取证。
+- 极性的唯一事实源：`packages/app-lynx/homeBleedHeaderFlag.ts`，真值表见 `packages/app-lynx/tests/homeBleedHeaderFlag.test.ts`。
+
 ## 七、覆盖发布（`pnpm run release -o`）
 
 **场景**：已发布的版本（如 v4.2.4）漏发资产或文案有误，需要修正 GitHub Release 页面，而非发布新版本。

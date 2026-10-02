@@ -11,20 +11,14 @@ import { fileURLToPath } from 'node:url'
  *
  * ## 为什么必须单独一套
  *
- * `__HOME_BLEED_HEADER__` 是**构建期**宏：主配置里恒为 `'false'`。
- * 于是首页的 bleed 分支（取消实体顶栏、封面出血、悬浮通知按钮、2s 淡出标题胶囊、
- * 顶部状态栏遮罩）在 CI 里**一次都不会执行** —— 它只被人在模拟器上看过。
- *
- * 「默认关的开关」天然带来这个盲区：CI 跑的那条路径恰好是**旧路径**，
- * 新代码在 CI 中是纯死代码，任何回归都不会被发现。（code-review 独立指出，判定为阻塞项。）
+ * `__HOME_BLEED_HEADER__` 是**构建期**宏，一个取值只能在一套 vitest 配置里成立。
+ * 缺省是新顶栏（主配置跑），于是「显式 `=0` 的旧顶栏」在主配置里**一次都不会执行** ——
+ * 它只被人在模拟器上看过。逃生阀不被 CI 覆盖 = 阀门锈死的那天没人知道。
  *
  * 主配置跑「缺省 = 新顶栏」，本配置跑「显式 0 = 旧顶栏」。
  * **两条路径都要绿** —— 缺任何一条都说明另一半未验证。
  * ⚠️ 本配置**刻意不 merge** 主配置 —— merge 后会丢掉 .vue 解析能力
  * （本仓的模板守卫是**读 .vue 源文本**而非挂载组件）。故此处自包含必要项。
- *
- * 注：本配置刻意**不 merge** 主配置 —— merge 后会丢掉 .vue 解析能力
- * （而本仓的模板守卫是读 .vue 源文本的）。故此处自包含必要项。
  */
 const _root = fileURLToPath(new URL('.', import.meta.url))
 const _appPkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
@@ -55,8 +49,15 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    // bleed 专属用例 + 模板源级守卫（后者在两套配置下各跑一次 ⇒ 两个分支都被覆盖）
-    include: ['src/**/*.fallback.test.ts', 'src/pages/recommendedBleedHeader.template.test.ts'],
+    // ⚠️ 只收 `*.fallback.test.ts` 一种形态，**刻意不**把模板守卫
+    // `recommendedBleedHeader.template.test.ts` 也列进来。
+    // 那个守卫只 `readFileSync` 读 `.vue`/`.ts` 源文本，从不把宏当值用 ——
+    // 在两套配置下各跑一次的**分支覆盖增量是 0**。而它留在 include 里会撑住
+    // 「本配置至少跑了一个文件」这件事，于是删掉 `homeHeaderMode.fallback.test.ts`
+    // 后本配置仍有 1 个文件，`passWithNoTests: false` 不触发，**逃生阀可以无声消失而 CI 仍绿**。
+    // （code-review 第 4 轮 B1；此处为实测，非推演。）
+    // 模板守卫的唯一归属是**主配置** —— 它的断言与宏取值无关，两边跑纯属重复劳动。
+    include: ['src/**/*.fallback.test.ts'],
     setupFiles: ['tests/setup/i18n-locale.ts'],
   },
 })

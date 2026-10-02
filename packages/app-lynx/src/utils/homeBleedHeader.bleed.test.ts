@@ -82,6 +82,12 @@ const NATIVE_INSET = 24
 describe('B 变体 · 默认路径（宏 = true = 生产缺省，真实执行该分支）', () => {
   it('自检：本配置下宏确实为 true（= 生产缺省）', () => {
     // 若在 fallback 配置下被误跑，这条立刻转红 —— 避免「两条路径当同一条测」静默通过。
+    //
+    // ⚠️ 本条是 **characterization**（夹具自证），不是 specification：
+    // 它回读的是 **vitest 自己的字面量** `'true'`（`vitest.config.ts` 的 define），
+    // 与生产表达式 `lynx.config.ts` 毫无引用关系。改生产极性它照样绿。
+    // 「生产缺省到底是什么」由 `tests/homeBleedHeaderFlag.test.ts` 锚在**生产表达式**上；
+    // 本条只负责「这套用例确实跑在宏为 true 的环境里」，不负责证明生产缺省。
     expect(__HOME_BLEED_HEADER__).toBe(true)
   })
 
