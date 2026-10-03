@@ -50,3 +50,11 @@ app-lynx 的全局导航与页面操作当前分散在三处：
 - `RefreshableList` 需新增 `:fab="false"` 开关，tab 页与非 tab 页行为分叉（tab 页前向到全局、非 tab 页保留自身）；需确认对现有列表调用无回归；
 - 深模块渲染面（几何/动效/reduced-motion）归 `GlobalFab.vue` 的 web-core+真机验证通道（沿用 ADR-0047/0108 已验证的 keyframes/旋转动画）；
 - a11y 标注统一化：`RECOMMENDED_A11Y_LABELS.refresh` 等被并入统一内环标注，**Appium/E2E 断言标号需同步**（避免 `client-kind-contract` 等依赖旧标号）。
+
+## 后续演进
+
+- [ADR-0218-app-lynx-top-nav-user-question-dimension.md](./ADR-0218-app-lynx-top-nav-user-question-dimension.md)（2026-10-03）：
+  本 ADR 定下的**载体**（外环 4 项放射导航）未变，但外环 4 项的**语义**由「媒介」
+  （推荐/插画/小说/我的）改为「用户问题」（发现/更新/书架/我的）；插画/小说降为「发现」页内 Tabs。
+  本 ADR 决策 5 遗留的 `components/NavigationBar.vue` 已在 ADR-0120 后成为零 `import` 孤儿，
+  由 ADR-0218 一并删除。
