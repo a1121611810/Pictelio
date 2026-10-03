@@ -584,6 +584,8 @@ _Avoid_: 用 React 命名空间式 `main-thread:` 语法（vue-lynx 用 `main-th
 vue-lynx `pluginVueLynx({ enableIFR: true })` 的主线程同步首屏渲染（双线程白屏消除）；**收益 = 首屏视觉（FCP）**，非交互杠杆（真机 T0/T1 无滚动跟手改善；2026-09-02 用户拍板保留启用，视觉改善确认）。代价 = bundle ×~2.2、TTI 上界 ×1.36（既有调研）。
 _Avoid_: 将 IFR 作为滚动跟手/交互性能手段；关掉它换取 bundle 体积（已拍板保留）
 
+【2026-10-04 模拟器复测，与上述真机确认不冲突】release 包交错 ABBA 5 对（API 34）：以「首帧上屏 = LynxView 首次 draw」为**代理指标**，IFR=off 中位 225ms / IFR=on 中位 420ms，配对差 **+196ms**（t=3.39/df=4，p≈0.03）；bundle 1,043,780 B → 2,026,785 B（1.94×）。**三项差异使二者不可直接比较**：① 模拟器非真机；② 未登录，首屏是登录页而非 feed；③ 「首次 draw」是**绘制完成**时刻，不等于用户感知的 FCP——vue-lynx 文档衡量的是 FCP，本次只能测到 draw。**故此复测不构成「关掉 IFR」的依据**；若要动开关，须真机 + 登录态 + 像素级/FCP 判据复核。
+
 ### 路由层（vue-router 迁移）
 
 **内存路由 / 官方 memory history**【2026-09-03 新增，vue-router 迁移】：

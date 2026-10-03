@@ -178,7 +178,14 @@ export default defineConfig({
       // 与 scoped 规则（[l-css-id="哈希"]...）不匹配 → 全部样式失效（只剩默认文本）。
       // enableCSSSelector 让选择器保留原始类名（.cls），web-core 按类名匹配即可应用。
       enableCSSSelector: true,
-      // 首屏直出（ADR-0134 定稿：用户拍板保留——首屏视觉收益；非交互杠杆）
+      // 首屏直出（IFR）——**决策正文在 packages/app-lynx/CONTEXT.md**
+      // 「首屏直出（IFR / instant first render）」词条（2026-09-02 用户拍板保留：
+      // 真机确认首屏视觉改善，非交互杠杆）。机制与边界见 ADR-0150 §背景
+      // （首帧画什么完全由 setup 的初始 ref 决定）与 vue-lynx IFR 文档
+      // https://vue.lynxjs.org/zh/guide/ifr。代价 bundle ×~2.2 为已接受项。
+      //
+      // ⚠️ 不要把锚点改回 ADR-0134：那是《小说正文列表虚拟化》，
+      // IFR 只在其决策 5 以「引用不回述」带过，不承载本决策。
       enableIFR: true,
     }),
     pluginTailwindCSS({
