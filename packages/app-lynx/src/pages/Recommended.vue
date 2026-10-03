@@ -304,17 +304,23 @@ function openNotifications(): void {
 <template>
   <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
   <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
-    <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页）。
-         B 变体（票 #906）下整条取消：内容出血到状态栏下，顶部让位交给 meta 的 'bleed'。 -->
-    <template v-if="!HOME_BLEED">
-      <!-- 自让位 spacer（票 #907 收口后必需）：根容器已不再兜底顶部补偿，
-           meta 为 'self' 时让位责任完全落在本页。漏掉它 ⇒ 整条顶栏上移顶进状态栏，
-           而编译/测试/门禁全绿（只有真机肉眼可见）。 -->
-      <view :style="{ height: topInsetSpacer + 'px' }" />
-      <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-        <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>
-      </view>
-    </template>
+    <!-- [票 #920 / ADR-0216] 四个根页去掉 header —— 本页**两种模式都不再画实体顶栏**。
+         结构说明（⚠️ 按实际模板写，勿照字面想象出并不存在的分支）：
+         下方是**两个**互为 v-if / v-else 的兄弟节点，它们承载「让位」与「悬浮层」，
+         **不是**顶栏行：
+           · `v-if="!HOME_BLEED"`（回退阀）→ 零内容让位 spacer，高度取 topInsetSpacer
+             （meta='self' ⇒ safeTop）。B 变体下该节点**不渲染**（meta='bleed' ⇒ 让位 0）。
+           · `v-else`（B 变体，缺省）→ 顶部悬浮覆盖层（通知按钮 + 标题胶囊），absolute 不占流内高度。
+         保留这对分支的**唯一目的**是让让位归属与 router meta 保持同源
+         （safeAreaJavaContract 门禁的核心不变量），不是为了「有没有顶栏」——两条都没有顶栏。
+
+         ⚠️ 回退阀下的观感 =「顶部一条让位空白 + 无标题 + 无悬浮层」。
+           **这与 ADR-0214:48/179 承诺的「回到旧的 64dp 实体顶栏、逐像素一致」相反**，
+           是票 #920 / ADR-0216「四个根页一律去 header」裁定的直接后果，不是回退阀失灵。
+           回退阀现在只回退**让位口径**（bleed↔self），不再回退顶栏本身。
+         ⚠️ 把 v-if 删掉会让 meta 与模板不同源（一边 bleed 一边 self），
+            破版在真机才可见、编译/单测/门禁全绿 —— 门禁正是为此设的。 -->
+    <view v-if="!HOME_BLEED" :style="{ height: topInsetSpacer + 'px' }" />
 
     <!-- B 变体悬浮层（票 #906）：absolute 覆盖层，不占流内高度 ⇒ 静止态顶部零占用。
          ① 通知按钮**必须有容器填充**（M3 对透明 app bar 的原话要求：容器透明时图标按钮要有底）；

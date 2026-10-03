@@ -57,6 +57,9 @@ ADR-0168 落地时把顶部安全区做成**根容器集中补偿**（`App.vue` 
     开关关闭时同一组件以 'self' 让位。
 - 底部：**完全不动**。根容器继续压 `paddingBottom`；6 个底部弹层继续各自消费 `safeBottom`。
   两侧并存不冲突（弹层让位 vs 页面内容兜底），删它要另开票。
+  > ⚠️ **[已执行]** 「另开的票」= [ADR-0216](./ADR-0216-four-root-pages-header-removal-and-fab-allowance-removal.md)
+  > （票 #920）：本段关于**底部 `paddingBottom` 保留**的结论**仍然有效**；被删的是
+  > 包裹层的 **`pb-18` FAB 占位带**（另一回事，见 ADR-0216 §2.2）。
 
 ### 3. 让位用零内容 spacer，**不用父容器 padding**
 

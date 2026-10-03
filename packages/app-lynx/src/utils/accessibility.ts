@@ -10,7 +10,11 @@
 
 /** Me 页全部 accessibility 标注（key = 标注位置的可读标识，value = accessibility-label 文本） */
 export const ME_A11Y_LABELS = {
-  // ── 页面标识（E2E 断言「Me 页完整渲染」的锚点文本） ──
+  // ── 页面标识（票 #920 订正：原注释写「E2E 断言 Me 页完整渲染的锚点」，**该说法无据**——
+  //    E2E 侧 a11y 树为空、只按坐标定位，读不到 label（见 fab-hit-testing-regression.spec.ts:15,28）。
+  //    真实用途 = #906 验收条件「取消顶栏后页面标题仍有可朗读语义来源」。
+  //    承载点随顶栏删除迁到 `Me.vue` 的账户组卡（GlassCard 属性 fallthrough，
+  //    全仓无先例、运行时暴露未取证，见 issue #920）。） ──
   pageTitle: '我的',
   // ── 关键交互（@tap 容器：view 默认不进 accessibility 树，必须显式标注） ──
   // （M3 改造后 Me 为底部导航顶层页，无返回箭头；back 标注已移除）

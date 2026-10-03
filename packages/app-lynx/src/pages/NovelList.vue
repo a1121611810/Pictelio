@@ -10,7 +10,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
-import PageTopBar from '../components/PageTopBar.vue'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import SubTabBar from '../components/SubTabBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
@@ -27,6 +27,9 @@ import { t } from '../i18n'
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
+// 顶部安全区让位高度（票 #920 去掉顶栏后**仍必须**让位，否则内容顶进状态栏）。
+// 口径唯一来源 = utils/topInset.ts，本页不做任何模式判断或兜底。
+const topInsetSpacer = useTopInsetSpacer()
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /
@@ -192,8 +195,11 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
-    <PageTopBar :title="t('novels.title')" />
+    <!-- [票 #920 / ADR-0216] 四个根页去掉 header：原 `<PageTopBar :title="t('novels.title')" />` 整条移除，
+         改为**只保留顶部安全区让位**的零内容 spacer。spacer 不是 header —— 它是内容盒的起点，
+         删掉它首屏内容会顶进状态栏下沿（真机才可见，编译/单测/门禁全绿）。
+         页面定位信息改由全局放射 FAB + 页内「推荐/关注」子 tab 承担。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条）（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
     <SubTabBar

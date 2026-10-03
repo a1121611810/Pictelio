@@ -61,11 +61,9 @@ const SCRIPT_BARE = readFileSync(SCRIPT, 'utf8')
  *     而门禁当时是绿的。下面「派生集合与登记清单必须一致」那条断言就是为此存在的。 */
 const CUSTOM_BAR_PAGES = [
   'DownloadManager.vue',
-  'Me.vue',
   'NetworkCheck.vue',
   'NovelDetail.vue',
   'PlatformCheck.vue',
-  'Recommended.vue',
   'UpdatePage.vue',
   'Watchlist.vue',
 ]
@@ -78,7 +76,21 @@ const countIn = (src: string, re: RegExp): number => (src.match(re) ?? []).lengt
  * `unreadable`，若**从不断言**就等于算了不用（code-review 第 7 轮 Spec 轴查出）。
  * 新页落进这一族时门禁会响，要求人工确认「它确实不是顶栏」或「它改用别的高度了」。
  */
-const CONFIRMED_NOT_BAR_PAGES = ['ErrorPage.vue', 'Login.vue', 'NovelIntro.vue']
+const CONFIRMED_NOT_BAR_PAGES = [
+  'ErrorPage.vue',
+  'Login.vue',
+  // Me.vue：票 #920 裁定「四个根页去掉 header」后本页**不再自绘顶栏**——只剩顶部安全区
+  // 让位 spacer（零内容、无高度语义）+ scroll-view 内容。它仍持有若干 h-[Nvw] 声明
+  // （头像 14.933vw / 按钮 10.667vw / 输入框等），属本名单定义的「不是顶栏」那一族。
+  // 注：它**不是**靠 COMMON PageTopBar 走的（那是 IllustList / NovelList 那类），
+  // 是「实体顶栏行被删除」，故必须显式登记，否则落进 unreadable 触发门禁报错。
+  'Me.vue',
+  'NovelIntro.vue',
+  // Recommended.vue：同上——票 #920 把 B 变体**与回退阀路径**的实体顶栏行一并删除
+  // （两分支都只保留让位 spacer / 悬浮覆盖层）。它仍有 h-[Nvw] 声明
+  // （pageError 提示条 16vw、scrim 遮罩 pt/pb 等），属「不是顶栏」那一族。
+  'Recommended.vue',
+]
 
 /** **派生**出自绘顶栏页：声明了正确高度、且不经公共顶栏。
  *  这不是「断言它等于 17.067」——那是同义反复；它的作用是**与登记清单比对**，

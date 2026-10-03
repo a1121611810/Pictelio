@@ -15,7 +15,7 @@ import { useRelatedInjectionStore } from '../stores/relatedInjection'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
-import PageTopBar from '../components/PageTopBar.vue'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import SubTabBar from '../components/SubTabBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
@@ -35,6 +35,9 @@ import { t } from '../i18n'
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
+// 顶部安全区让位高度（票 #920 去掉顶栏后**仍必须**让位，否则内容顶进状态栏）。
+// 口径唯一来源 = utils/topInset.ts，本页不做任何模式判断或兜底。
+const topInsetSpacer = useTopInsetSpacer()
 // ─── 相关作品注入行（spec docs/specs/related-injection.md）───
 const related = useRelatedInjectionStore()
 
@@ -247,8 +250,12 @@ onUnmounted(() => {
 <template>
   <!-- :id="heroTransition.rootId"：hero 覆盖层的 absolute 锚点 + 视口↔页面坐标换算基准（ADR-0211 决策 12） -->
   <view class="w-full h-full flex flex-col relative bg-surface" :id="heroTransition.rootId">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
-    <PageTopBar :title="t('illustList.title')" />
+    <!-- [票 #920 / ADR-0216] 四个根页去掉 header：原 `<PageTopBar :title="t('illustList.title')" />` 整条移除，
+         改为**只保留顶部安全区让位**的零内容 spacer。spacer 不是 header —— 它是内容盒的起点，
+         删掉它首屏内容会顶进状态栏下沿（真机才可见，编译/单测/门禁全绿）。
+         高度唯一来源仍是 utils/topInset.ts（useTopInsetSpacer），本页不改让位口径。
+         页面定位信息改由全局放射 FAB 承担（四个 tab 常驻可见）+ 页内「推荐/关注」子 tab。 -->
+    <view :style="{ height: topInsetSpacer + 'px' }" />
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中态 = text-primary + 底部 0.8vw primary 指示条）（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
     <SubTabBar
@@ -368,6 +375,7 @@ onUnmounted(() => {
           :end-text="t('illustList.footer.end')"
         />
       </list-item>
+
     </list>
     </template>
     </RefreshableList>

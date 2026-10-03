@@ -575,28 +575,40 @@ function pickAppearanceMode(mode: DarkModeId) {
   <!-- [lynx:fix] 设置页滚动（issue #90）：header 固定在滚动容器外（与 Bookmarks/Recommended 同模式），
        内容由 scroll-view 承接溢出，web-core 与 native LynxView 行为一致 -->
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- 顶部安全区让位（#900 T1 / ADR-0194 跳过清单页）：本页顶栏**自补偿**让位，高度取
-         utils/topInset.ts 的 barSpacerHeight（self 模式 = 状态栏安全区；bleed = 0）。
-         为什么是零内容 spacer 而不是给下面那行加 paddingTop：Lynx 的 border-box UA 默认会让
-         padding 吃掉内容高度（顶栏矮一截），web-core 预览却不复刻该默认 ⇒ 两端观感分叉
-         （App.vue 转场包裹层 pb-18 已登记过这个坑）。底部弹层家族（SearchSheet 等 6 个）用同款写法。
-         spacer 保持透明：状态栏染色仍由根容器 surface 背景承担。
-         为什么本页保留手写顶栏（不迁 PageTopBar）：PageTopBar 化需语义改本页既有测试
+    <!-- 顶部安全区让位（#900 T1 / ADR-0214）：**只保留让位，去掉实体顶栏**（票 #920 / ADR-0216，
+         四个根页统一无 header）。
+         ⚠️ 让位 spacer 必须留：它不是「header」，而是**内容盒的起点**。删掉它，内容会顶进状态栏
+         下沿（真机才可见，编译/单测/门禁全绿）。数值仍取 utils/topInset.ts 的 barSpacerHeight
+         （self 模式 = 状态栏安全区；bleed = 0），spacer 保持透明：状态栏染色仍由根容器 surface 承担。
+         为什么是零内容 spacer 而不是给内容加 paddingTop：Lynx 的 border-box UA 默认会让 padding
+         吃掉内容高度，web-core 预览却不复刻该默认 ⇒ 两端观感分叉（App.vue pb-18 已登记过这个坑）。
+         为什么本页保留手写结构（不迁 PageTopBar）：PageTopBar 化需语义改本页既有测试
          （a11y 注册表源级锁），与「既有页面测试零语义修改」硬门禁冲突。 -->
     <view :style="{ height: topInsetSpacer + 'px' }" />
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头；pageTitle 标注保留（E2E 锚点） -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text
-        class="text-title-large font-medium text-surface-on"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="ME_A11Y_LABELS.pageTitle"
-        >{{ t('me.title') }}</text
-      >
-    </view>
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1">
       <!-- 账户组：用户信息 + 收藏入口（GlassCard = M3 elevated card） -->
-      <GlassCard class="mt-3 mx-3 p-4">
+      <!-- [票 #920] `ME_A11Y_LABELS.pageTitle` 的承载点迁入账户组卡。
+           ⚠️ **订正此前的错误理由**：原注释称「它是 E2E 断言 Me 页完整渲染的锚点」——
+           该说法无据。`accessibility.ts` 的注释如此登记，但全仓读点只有本模板一处；
+           且 E2E 侧（`fab-hit-testing-regression.spec.ts:15,28,229`）自述
+           「Lynx a11y 树空是已知 SDK 限制 / uiautomator dump 必被 SIGKILL」，
+           只能用坐标定位、**读不到** a11y label。
+
+           **真实的理由**是 #906 的一条验收条件：「取消顶栏后页面标题仍有可朗读语义来源
+           （无障碍不能因『没有顶栏』而丢失）」。顶栏标题被删后，本页需要一个等价的
+           朗读语义来源，而账户组是 scroll-view 内**首个且无条件渲染**的元素
+           （用户信息块带 v-if，卡本身没有）⇒ 登录/未登录两态都成立。
+
+           ⚠️ **已知未取证**（Spec 轴 N3）：该 label 经 `GlassCard` 的**属性 fallthrough**
+           落到单根 `<view>` 上。全仓 0 处在组件上挂 `accessibility-label`（无先例），
+           且 `unit.test.ts` 的相关断言只是源码文本匹配，证明不了运行时暴露。
+           ⇒ 需真机 / Appium 拉一次 a11y 树确认（票 #920 待办）。 -->
+      <GlassCard
+        class="mt-3 mx-3 p-4"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="ME_A11Y_LABELS.pageTitle"
+      >
         <view v-if="auth.currentUser" class="flex flex-row items-center pb-4 border-b-[1px] border-b-outline-variant">
           <image
             class="w-[14.933vw] h-[14.933vw] rounded-full bg-surface-container-high"
@@ -1673,8 +1685,14 @@ function pickAppearanceMode(mode: DarkModeId) {
         </template>
       </view>
 
-      <!-- 底部留白：让滚动到底时最后一张卡片不贴底 -->
+      <!-- 底部留白（8vw）：**存量观感呼吸**，让末卡不贴底。与下方遮挡让位是两件事，
+           两者相邻容易误读为「重复留白」，故在此点明（术语表 glossary-bottom-occlusion-allowance.md §三·2：
+           不要用「底部留白」描述任一者）：
+             · 本项 = 纯观感，量的是「末卡离屏幕底多远」；
+             · 下方 FabAllowanceSpacer = 功能性，量的是「末卡能否滚到 FAB 之上而不被吞点击」。
+           这 8vw 在撤销全局 pb-18 之前就存在（与全局带并存），本次未增未减。 -->
       <view class="h-[8vw]" />
+
     </scroll-view>
 
     <!-- M3 Dialog（二次确认，选择 Range 时）：fixed 全屏 scrim 遮罩 + 居中卡片 + 标题/内容/操作区 -->
