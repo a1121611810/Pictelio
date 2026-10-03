@@ -47,6 +47,25 @@ import java.util.concurrent.Executors;
  *
  * <p>注册：{@code LynxServiceCenter.inst().registerService(PictelioImageService.getInstance())}
  * （在 {@code PictelioApp.initLynx()}，须早于任何 LynxView 创建）。
+ *
+ * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
+ * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
+ * Bitmap 的生命周期，渲染后可能 recycle，复用缓存原图会导致二次显示空白」。
+ * 2026-10-04 在 {@code pictelio_ui}（API 34）实测该前提不成立：
+ * <ul>
+ *   <li>直接交付缓存原实例，copy 与 direct 两轮合计 <b>185 次交付</b>，
+ *       1.5s / 5s 两个观察窗内 {@code isRecycled()} 命中 <b>0 次</b>；</li>
+ *   <li>direct 模式下 100/100 次交付的就是缓存实例本身，二次显示（同 URL 重取）
+ *       全部成功、拿到同一实例、0 失败、0 条「图片加载失败」。</li>
+ * </ul>
+ * ⇒ 引擎当前不回收所收 Bitmap，copy 是每张图一份 {@code w×h×4} 的纯开销
+ * （600×800 缩略图 ≈ 1.9MB/张，1200 级 master ≈ 5.8MB/张）。
+ *
+ * <p><b>未覆盖，改动前需复测的边界</b>：真机（本次全程模拟器）、master 大图
+ * （实测样本全是 600px 级缩略图）、>5s 的观察窗（若引擎改为「出屏才回收」则抓不到）、
+ * 以及与 #147 原始复现所用的引擎版本差异。命中路径因此保留
+ * {@code cached.isRecycled()} 检查作为兜底：若缓存项真被外部回收，仍走重取而非崩。
+ * 证据留档：issue #924 + throwaway 分支 {@code proto/image-copy-feasibility}。
  */
 public class PictelioImageService implements ILynxImageService {
 
@@ -171,17 +190,20 @@ public class PictelioImageService implements ILynxImageService {
         if (cached != null) {
             executor.execute(() -> {
                 try {
-                    Bitmap copy = cached.copy(Bitmap.Config.ARGB_8888, false);
-                    if (copy == null) {
-                        // 原图已不可拷贝（被外部 recycle/OOM）→ 移除缓存条目并回退下载
+                    // #147 曾在此交付副本（ARGB_8888 copy）以防引擎回收缓存原实例。
+                    // 2026-10-04 实测：该前提在本配置下不成立（详见下方注释），
+                    // 故改为直接交付缓存实例；防御性检查从「copy 返回 null」换成
+                    // 零成本的 isRecycled()——若缓存项真的被外部回收，仍走重取而非崩。
+                    if (cached.isRecycled()) {
+                        // 缓存项已失效（被外部 recycle/OOM）→ 移除条目并回退下载
                         memoryCache.remove(url);
                         loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                         return;
                     }
                     loadListener.onSuccess(
-                            new ImageContent(copy),
+                            new ImageContent(cached),
                             requestInfo,
-                            new ImageInfo(copy.getWidth(), copy.getHeight(), false));
+                            new ImageInfo(cached.getWidth(), cached.getHeight(), false));
                 } catch (Throwable t) {
                     Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
                     memoryCache.remove(url);
@@ -214,18 +236,14 @@ public class PictelioImageService implements ILynxImageService {
                 loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
                 return;
             }
-            // #147 解码成功入内存缓存（缓存存原图）；交付**副本**——引擎管理所收 Bitmap 生命周期，
-            // 若交付原实例可能被 recycle 从而击穿后续缓存命中（review 修正）
+            // 解码成功入内存缓存（缓存存原图）并**直接交付同一实例**。
+            // #147 曾交付副本防「引擎回收所收 Bitmap」，2026-10-04 实测该前提不成立：
+            // 见本类「交付副本为何可以撤掉」注释。
             memoryCache.put(url, bitmap);
-            Bitmap deliver = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-            if (deliver == null) {
-                // copy 失败（OOM 兜底）：直接交付原实例（引擎处理失败走 onFailure，缓存条目已入）
-                deliver = bitmap;
-            }
             loadListener.onSuccess(
-                    new ImageContent(deliver),
+                    new ImageContent(bitmap),
                     requestInfo,
-                    new ImageInfo(deliver.getWidth(), deliver.getHeight(), false));
+                    new ImageInfo(bitmap.getWidth(), bitmap.getHeight(), false));
         } catch (Throwable t) {
             // fire-and-forget 路径：捕 Throwable（含 OOM），绝不把异常抛到 JS 线程
             Log.w(TAG, "图片加载失败: " + url, t);
