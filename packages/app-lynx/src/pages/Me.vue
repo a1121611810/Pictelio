@@ -19,6 +19,7 @@ import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
 import M3SegmentedButton, { type M3SegmentOption } from '../components/M3SegmentedButton.vue'
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { appearanceClasses } from '../utils/appearanceClasses'
 import type { DarkModeId } from '../utils/darkMode'
 import {
@@ -1693,6 +1694,11 @@ function pickAppearanceMode(mode: DarkModeId) {
            这 8vw 在撤销全局 pb-18 之前就存在（与全局带并存），本次未增未减。 -->
       <view class="h-[8vw]" />
 
+      <!-- 底部遮挡让位（ADR-0217 / 术语表 glossary-bottom-occlusion-allowance.md）：
+           GlobalFab 是自绘悬浮层，平台 inset 管线看不见它 ⇒ 末项须能滚到它之上。
+           ⚠️ 本页滚动容器是 **<scroll-view>**（非 <list>）⇒ 用末尾零内容 view，语义与几何同构；
+              不需要 list-item 包裹（那是原生 <list> 的要求）。 -->
+      <FabAllowanceSpacer />
     </scroll-view>
 
     <!-- M3 Dialog（二次确认，选择 Range 时）：fixed 全屏 scrim 遮罩 + 居中卡片 + 标题/内容/操作区 -->

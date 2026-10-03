@@ -12,6 +12,13 @@ import { WATCH_LATER_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessib
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+// 底部遮挡让位（ADR-0217 / 票 #922 / 术语文档 glossary-bottom-occlusion-allowance.md）：
+// 模板末尾的让位占位。本页是**非 tab 内容页** ⇒ 档位为 search（让位 58.668vw）。
+//   **档位/高度/遮挡源/接线约定全部写在 `FabAllowanceSpacer.vue` 头注，本页只负责接线。**
+//   本页是票 #922 全量盘点（25 条路由）出的 4 个漏网页之一，补在 #922。
+// · 必须由本页写在滚动容器内末尾（原生 list 只认 list-item 子节点）。
+// · 不得塞进上方 footer 之类的三态条件渲染容器（ADR-0217 §2.2 / spec C1）。
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
@@ -123,6 +130,9 @@ function openItem(item: WatchLaterItem): void {
             </view>
           </view>
         </view>
+      </list-item>
+      <list-item :key="'fab-allowance'" item-key="fab-allowance" class="w-full" full-span>
+        <FabAllowanceSpacer />
       </list-item>
     </list>
   </view>

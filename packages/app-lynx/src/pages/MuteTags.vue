@@ -14,6 +14,12 @@ import { useSettingsStore } from '../stores/settingsStore'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { MUTE_TAGS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+// 底部遮挡让位（ADR-0217 / 票 #922 / 术语文档 glossary-bottom-occlusion-allowance.md）：
+// `</scroll-view>` 之前的让位占位。本页是**非 tab 内容页** ⇒ 档位为 search（让位 58.668vw）。
+//   **档位/高度/遮挡源/接线约定全部写在 `FabAllowanceSpacer.vue` 头注，本页只负责接线。**
+//   本页是票 #922 全量盘点（25 条路由）出的 4 个漏网页之一，补在 #922。
+// · 占位必须紧邻 `</scroll-view>`，其后不得再有别的元素。
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
 
@@ -77,6 +83,7 @@ function removeTag(name: string): void {
           <text class="text-label-large text-error">{{ t('muteTags.remove') }}</text>
         </view>
       </view>
+      <FabAllowanceSpacer />
     </scroll-view>
   </view>
 </template>

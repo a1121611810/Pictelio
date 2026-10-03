@@ -24,6 +24,7 @@ import {
 import { DOWNLOAD_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
 
@@ -261,8 +262,19 @@ const topInsetSpacer = useTopInsetSpacer()
             </view>
           </view>
         </view>
-      <view class="h-[30vw]" />
-      </scroll-view>
+      <!-- 底部遮挡让位（ADR-0217 / 票 #922）：此前这里是手写的 `h-[30vw]`（324px）。
+           ⚠️ 那个数是**当初凭手感写的**，既非 menu 档（19.2vw）也非 search 档（58.668vw）——
+           本页是**非 tab 内容页**（`/downloads`），`GlobalFab` 走 search 模式，
+           真机实测其顶边在内容区底之上 **58.611vw**（与收藏页/作品详情页/静音标签页逐字一致），
+           而 30vw 只有 324px，**短 310px**。
+           ⚠️ 「底部动作栏是 in-flow ⇒ 不遮挡」这个判断是**错的**：in-flow 只说明动作栏本身
+           不覆盖 scroll-view，而 FAB 是**从屏幕底边定位的固定浮层**，照样落在滚动内容上。
+           按本页自身档位核算（py-2 4.27 + 摘要行 4.27 + gap 1.07 + pill 行 10.67，
+           5 个 pill 横排在 1080px 上会换行则再 +10.67）⇒ 动作栏约 20.3~30.9vw = 219~334px，
+           远低于 FAB 顶边 633px ⇒ FAB 整个浮在滚动内容之上。
+           ⇒ 改用共享占位，档位由路由自动推导（见 FabAllowanceSpacer 头注）。 -->
+      <FabAllowanceSpacer />
+    </scroll-view>
 
       </view>
 

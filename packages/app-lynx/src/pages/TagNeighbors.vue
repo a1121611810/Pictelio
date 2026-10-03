@@ -32,6 +32,18 @@ import PageTopBar from '../components/PageTopBar.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import TagPressChip from '../components/TagPressChip.vue'
+// 底部遮挡让位（ADR-0217 / 术语文档 glossary-bottom-occlusion-allowance.md · 票 #921/#922）：
+// 模板末尾的 `item-key="fab-allowance"` list-item 是让位占位。
+//   · **档位、高度、遮挡源、为什么不能塞进 footer，全部写在 `FabAllowanceSpacer.vue` 头注**，
+//     本页只负责接线，不重复也不复述 —— 上一版把几何复述在 9 个页面里，集体写错过一次
+//     （把已修的缺陷写成现状），代价是 9 份注释一起骗人。
+//     ⚠️ 本页**不用** `RefreshableList`（裸 `<list>`，见文件头注①）⇒ 没有分页 FAB，
+//       唯一遮挡源就是 GlobalFab 的 search 模式；档位由组件按路由自动推导，本页不传高度。
+//   · ⚠️ 必须由本页写在 `<list>` 内（组件无法在页面 `<list>` 内追加子节点，原生 list 只认 list-item 子节点）。
+//   · ⚠️ 不得塞进上方 footer（三态 `v-if` 条件渲染 ⇒ 最常见态下节点不存在，ADR-0217 §2.2 / spec C1）。
+//   · ⚠️ 注释放 script 区而非模板区：本页有「模板区零中文」门禁（TagNeighbors.template.test.ts），
+//     模板注释里的中文会被判为硬编码文案。
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
 
@@ -286,6 +298,10 @@ function onDismissBroadening(): void {
         full-span
       >
         <FeedListFooter :error="errorMessage" :retry-text="t('tagNeighbors.retry')" @retry="store.retry()" />
+      </list-item>
+
+      <list-item :key="'fab-allowance'" item-key="fab-allowance" class="w-full" full-span>
+        <FabAllowanceSpacer />
       </list-item>
     </list>
   </view>

@@ -19,6 +19,16 @@ import PageTopBar from '../components/PageTopBar.vue'
 import UserRow from '../components/UserRow.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
+// 底部遮挡让位（ADR-0217 / 术语文档 glossary-bottom-occlusion-allowance.md · 票 #921/#922）：
+// 模板末尾的 `item-key="fab-allowance"` list-item 是让位占位。
+//   · **档位、高度、遮挡源、为什么不能塞进 footer，全部写在 `FabAllowanceSpacer.vue` 头注**，
+//     本页只负责接线，不重复也不复述 —— 上一版把几何复述在 9 个页面里，集体写错过一次
+//     （把已修的缺陷写成现状），代价是 9 份注释一起骗人。
+//   · ⚠️ 必须由本页写在 `<list>` 内（组件无法在页面 `<list>` 内追加子节点，原生 list 只认 list-item 子节点）。
+//   · ⚠️ 不得塞进上方 footer（三态 `v-if` 条件渲染 ⇒ 最常见态下节点不存在，ADR-0217 §2.2 / spec C1）。
+//   · ⚠️ 注释放 script 区而非模板区：本页有「模板区零中文」门禁（TagNeighbors.template.test.ts），
+//     模板注释里的中文会被判为硬编码文案。
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
 
@@ -212,6 +222,9 @@ const refreshEpoch = ref(0)
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
         <!-- 三态文案组件化（FeedListFooter，ADR-0194）；本页存量仅 loading 态（外层 list-item 保留） -->
         <FeedListFooter :loading="loadingMore" :loading-text="t('followList.footer.loading')" />
+      </list-item>
+      <list-item :key="'fab-allowance'" item-key="fab-allowance" class="w-full" full-span>
+        <FabAllowanceSpacer />
       </list-item>
     </list>
     </template>

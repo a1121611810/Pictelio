@@ -43,10 +43,28 @@ export interface FabInnerItem {
  */
 export type FabMode = 'menu' | 'search' | 'hidden'
 
+/**
+ * **路由派生**的 FAB 档位：只由路由名决定，**不含**「弹层打开 → hidden」那一层互斥。
+ *
+ * 为什么要与 {@link FabMode} 分开两个值：`FabMode` 叠加了弹层互斥，而**底部让位高度**
+ * 不能跟着弹层开关跳变——弹层一开高度就从 19.2 变 58.7（或反之）会让内容整体重排。
+ * 消费方要的是「**这条路由本来**用哪档几何」，与当前有没有弹层无关。
+ *
+ * 派生规则与 `FabMode` 同源（ADR-0132 决策 2）：tab → `menu`；会话/系统页 → `hidden`；
+ * 其余内容页 → `search`。路由名尚未解析时为 `hidden`（消费方须按「取高档」处理，见
+ * `utils/fabGeometry.fabAllowanceHeightVw` 的失败方向不对称说明）。
+ */
+export type RouteFabMode = 'menu' | 'search' | 'hidden'
+
 /** 组件读取的单一读模型。 */
 export interface FabView {
   /** 显示门三态（mode 派生见 view computed，规则源自 ADR-0132 决策 2） */
   mode: FabMode
+  /**
+   * 路由派生的档位（**不含**弹层互斥）。底部让位高度按它取值，**不要**用 `mode`——
+   * 那是会随弹层开关变化的瞬时量，跟着它走会让让位高度跳变、内容重排（票 #922）。
+   */
+  routeMode: RouteFabMode
   /** 兼容别名：mode !== 'hidden'（放射 FAB 是否渲染；原 ADR-0120 布尔门） */
   visible: boolean
   /** 当前 tab 名；非 tab 路由为 null */
@@ -172,11 +190,8 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
     return items
   })
 
-  /** 显示门三态派生（ADR-0132 决策 2）：tab → menu；内容页 → search；非内容页 → hidden。
-   *  互斥覆盖（issue #295 / ADR-0132 第 8 条）：弹层（评论/搜索等 modal）打开时恒 hidden——
-   *  优先于 menu/search（含搜索弹层自身：弹层打开后 FAB 无需在场，且 z-40 悬浮会误开搜索）。 */
-  const mode = computed<FabMode>(() => {
-    if (deps.hasOpenModal?.() === true) return 'hidden'
+  /** 路由派生的档位（无弹层互斥）：tab → menu；会话/系统页 → hidden；其余内容页 → search。 */
+  const routeMode = computed<RouteFabMode>(() => {
     const name = deps.routeState.value?.name
     if (!name) return 'hidden'
     if (deps.navTabs.some((t) => t.name === name)) return 'menu'
@@ -184,10 +199,19 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
     return 'search'
   })
 
+  /** 显示门三态派生（ADR-0132 决策 2）：tab → menu；内容页 → search；非内容页 → hidden。
+   *  互斥覆盖（issue #295 / ADR-0132 第 8 条）：弹层（评论/搜索等 modal）打开时恒 hidden——
+   *  优先于 menu/search（含搜索弹层自身：弹层打开后 FAB 无需在场，且 z-40 悬浮会误开搜索）。 */
+  const mode = computed<FabMode>(() => {
+    if (deps.hasOpenModal?.() === true) return 'hidden'
+    return routeMode.value
+  })
+
   const view = computed<FabView>(() => {
     const tab = activeTab.value
     return {
       mode: mode.value,
+      routeMode: routeMode.value,
       // 兼容别名：原 ADR-0120 布尔门（visible ⟺ 4 tab 名）；扩展后 = mode !== 'hidden'
       visible: mode.value !== 'hidden',
       active: tab?.name ?? null,

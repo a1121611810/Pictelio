@@ -14,6 +14,7 @@ import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import SubTabBar from '../components/SubTabBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -293,6 +294,15 @@ onUnmounted(() => {
           :loading-text="t('novels.footer.loading')"
           :end-text="t('novels.footer.end')"
         />
+      </list-item>
+      <!-- 底部遮挡让位（ADR-0217 / 术语表 glossary-bottom-occlusion-allowance.md）：
+           GlobalFab 是**自绘**悬浮层，平台 inset 管线看不见它 ⇒ 末项必须能滚到它之上。
+           形态 = 滚动内容**末尾**的零内容 full-span list-item（共识 A 的内容级 inset）。
+           ⚠️ 刻意独立于上方 footer：footer 是 v-if 三态条件渲染，三态皆假时该节点不存在，
+              塞进去会让占位在最常见的态下**整个消失**（spec C1）。
+           ⚠️ 必须由 list-item 包裹：原生 <list> 只认 list-item 子节点（同 FeedListFooter 先例）。 -->
+      <list-item :key="'fab-allowance'" item-key="fab-allowance" class="w-full" full-span>
+        <FabAllowanceSpacer />
       </list-item>
     </list>
     </template>

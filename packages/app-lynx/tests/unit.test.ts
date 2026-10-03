@@ -1495,13 +1495,32 @@ describe('GlobalFab.vue search 模式渲染标记（ADR-0131）', () => {
   it('几何：search 模式抬至分页菜单面板之上（双 FAB 堆叠 + 菜单高度，review P1-1）', () => {
     // 分页 FAB 底边 4.267 + 高 14.933 + 间隙 1.067 = 20.267vw（RefreshableList 浮层槽位）
     // + 菜单面板（2 pill 各 10.667 + 间隙 1.067 = 22.4vw，面板顶 42.667）+ 间隙 1.067 = 43.734vw
-    expect(globalFabVue).toContain('const FAB_MENU_PANEL_HEIGHT_VW = 10.667 * 2 + SPACING_UNIT_VW')
-    expect(globalFabVue).toContain(
-      'const FAB_BOTTOM_MARGIN_SEARCH_VW =\n  FAB_RIGHT_VW + FAB_SIZE_VW + SPACING_UNIT_VW + FAB_MENU_PANEL_HEIGHT_VW + SPACING_UNIT_VW',
+    //
+    // ⚠️ [票 #922] 原判据要求这两行公式**以字面量写在 GlobalFab.vue 里**（形态锁）：
+    //   推导迁到 utils/fabGeometry 后判据转红，但**意图毫发无损**——门禁锁的是
+    //   「公式在哪个文件」，不是「search 模式抬得够不够高」。事实上留在组件里正是
+    //   票 #922 的根因：底部让位要按档位取值，而占位侧根本看不到组件内的那一档，
+    //   9 个非 tab 页因此全都按 menu 档（19.2vw）让位、比真实遮挡源少 39.467vw。
+    // ⇒ 改为守「**单一来源 + 被真正消费**」；数值本身由
+    //   tests/bottomOcclusionAllowance.test.ts 的几何 oracle 跑出数字来卡。
+    const fabGeo = readFileSync(new URL('../src/utils/fabGeometry.ts', import.meta.url), 'utf8')
+    expect(fabGeo, 'search 抬高推导必须住在共享几何模块（单一来源）').toContain(
+      'export const FAB_BOTTOM_SEARCH_VW',
     )
+    expect(globalFabVue, 'GlobalFab 必须从共享模块取 search 底边').toMatch(
+      /import\s*\{[^}]*FAB_BOTTOM_SEARCH_VW[^}]*\}\s*from\s*['"][^'"]*fabGeometry['"]/,
+    )
+    expect(
+      globalFabVue,
+      'GlobalFab 不得再自带 search 抬高推导（第二个来源）',
+    ).not.toMatch(/FAB_MENU_PANEL_HEIGHT_VW|const\s+FAB_BOTTOM_SEARCH_VW\s*=/)
     // 内容区契约（ADR-0131）使几何依赖异步回调 → fabCySearch 为 computed（值经 screenHeightVw() 派生）
-    expect(globalFabVue).toContain('const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_MARGIN_SEARCH_VW - FAB_SIZE_VW / 2)')
-    expect(globalFabVue).toContain("top: `${view.value.mode === 'search' ? fabCySearch.value : fabCy.value}vw`")
+    expect(globalFabVue).toContain(
+      'const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_SEARCH_VW - FAB_SIZE_VW / 2)',
+    )
+    expect(globalFabVue).toContain(
+      "top: `${view.value.mode === 'search' ? fabCySearch.value : fabCy.value}vw`",
+    )
   })
 
   it('search 模式不渲染遮罩/环层：外层仍 v-if="view.visible"（search 也渲染 FAB），遮罩/环层仍 v-if="view.isOpen"（ADR-0123）', () => {

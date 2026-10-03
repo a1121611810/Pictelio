@@ -33,12 +33,10 @@ const fabIcon = computed<IconName>(() => {
 })
 
 // ── 几何（vw）：FAB 固定 right-4/bottom-4(4.267vw)，外/内环半径随屏宽缩放 ──
-const FAB_RIGHT_VW = 4.267
-const FAB_SIZE_VW = 14.933
-const R_OUTER_VW = 35 // 外环半径（vw；56dp 大圆需更大半径防重叠，ADR-0121）
-const R_INNER_VW = 20 // 内环半径（vw；动作圆与 FAB/外环拉开，避免重叠）
+// [ADR-0217] 几何提取到 utils/fabGeometry.ts —— 「底部遮挡让位」需要同一个数，
+//   两边各自硬编码会漂移（code-review Spec B1：把 spacing.18 改成 30vw 时门禁仍全绿，
+//   即「19.2vw 只写一次」曾是假声明）。现两处共用，改 FAB 尺寸占位**真的**跟随。
 // tailwind spacing 1 档 = 1.067vw（375dp 基准：4px / 3.75px，与 RefreshableList bottom-4 同口径）
-const SPACING_UNIT_VW = 1.067
 // search 模式堆叠偏移（ADR-0132 决策 2「双 FAB 竖排堆叠」——几何推导，P1-1 修复）：
 // 非 tab 列表页与 RefreshableList 的 feed 分页 FAB（bottom-4 right-4 56dp）同角竖排。
 // 分页 FAB 竖向占用（自屏幕底边起算）：[bottom-4=4.267vw, 4.267+14.933=19.2vw]，
@@ -47,11 +45,16 @@ const SPACING_UNIT_VW = 1.067
 // 搜索 FAB 若停在 20.267vw 槽位，菜单展开时「刷新」项会被搜索 FAB 遮挡并吞点击
 // （GlobalFab z-40 > 菜单 z-20）。故搜索 FAB 底边 = 面板顶 42.667 + 1.067 间隙 = 43.734vw。
 // 注意：当前非 tab 列表页均无 `:items`（菜单恒 2 项）；若未来传入 extras（菜单增项），
-// 须同步更新 FAB_MENU_PANEL_HEIGHT_VW（或改用菜单状态联动方案）。
-const FAB_MENU_PANEL_HEIGHT_VW = 10.667 * 2 + SPACING_UNIT_VW
-const FAB_BOTTOM_MARGIN_SEARCH_VW =
-  FAB_RIGHT_VW + FAB_SIZE_VW + SPACING_UNIT_VW + FAB_MENU_PANEL_HEIGHT_VW + SPACING_UNIT_VW
+// 须同步更新 FAB_MENU_ITEM_COUNT（现由 fabGeometry 导出，见下）。
+// ⚠️ [票 #922] 这整段推导**已迁入 utils/fabGeometry**：让位高度要按模式分档
+//   （search 模式顶边 58.668vw ≠ menu 模式 19.2vw），推导留在组件里就等于
+//   占位侧看不到 search 那一档 —— 此前 9 个非 tab 页因此全都少让位 39.467vw。
+import { FAB_BOTTOM_SEARCH_VW, FAB_EDGE_VW, FAB_SIZE_VW } from '../utils/fabGeometry'
 
+/** ⚠️ 一名两用：既作右距（fabCx）也作底距（fabCy）——见 fabGeometry.ts 的登记。 */
+const FAB_RIGHT_VW = FAB_EDGE_VW
+const R_OUTER_VW = 35 // 外环半径（vw；56dp 大圆需更大半径防重叠，ADR-0121）
+const R_INNER_VW = 20 // 内环半径（vw；动作圆与 FAB/外环拉开，避免重叠）
 declare const SystemInfo: ViewportSystemInfo
 
 // ── 内容区尺寸（ADR-0131）：SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset，
@@ -82,7 +85,7 @@ const fabCx = 100 - FAB_RIGHT_VW - FAB_SIZE_VW / 2
 // menu 模式：底边 = bottom-4（4.267vw 尾随边距）→ 中心坐标 = H - 4.267 - 14.933/2
 const fabCy = computed(() => screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2)
 // search 模式：底边 = 43.734vw（分页菜单面板顶 + 间隙，见上方注释）→ 中心 = H - 43.734 - 14.933/2
-const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_MARGIN_SEARCH_VW - FAB_SIZE_VW / 2)
+const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_SEARCH_VW - FAB_SIZE_VW / 2)
 
 // ── 定位（ADR-0123）：子元素一律 left/top vw（vw=视口基准），锚点=外层 (0,0) 零尺寸盒 ──
 // [lynx:fix] 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点
