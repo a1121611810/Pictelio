@@ -199,6 +199,20 @@ describe("路由字面量漂移门禁（S-1 机器防线）", () => {
     expect([...stripComments(three).matchAll(/b/g)].length).toBe(1)
   })
 
+  it("关注段空态引导出口的两个路径必须真实存在（spec §7；出口在数据表里，本门禁的 NAV_LITERAL 看不见）", () => {
+    // 关注段空态的两个出口写在 Updates.vue 的 FOLLOWING_EMPTY_ACTIONS 数据表里，
+    // 不是内联 `navigate('/…')` ⇒ 上面那条漂移门禁扫不到它们。此处补上，
+    // 否则删掉 /ranking 路由后空态按钮会静默变成「点了没反应」。
+    for (const p of ["/following", "/ranking"]) {
+      expect(ROUTE_PATHS.has(p), `引导出口 ${p} 不在路由表`).toBe(true)
+    }
+    // 出口表必须与本门禁认定的路径一致（防止数据表里写错成别处）
+    const updatesVue = readFileSync(join(SRC, "pages/Updates.vue"), "utf8")
+    for (const p of ["/following", "/ranking"]) {
+      expect(updatesVue, `Updates.vue 的引导出口表缺少 ${p}`).toContain(`to: '${p}'`)
+    }
+  })
+
   it("登录成功落点必须是 /discover（本次改名的直接受害者，单独钉住）", () => {
     const loginVue = readFileSync(join(SRC, "pages/Login.vue"), "utf8")
     // 期望值来源：router.ts 的 DISCOVER_PATH 事实源，不是从 Login.vue 反推。

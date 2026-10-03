@@ -122,7 +122,9 @@ const zhPages = {
   "login.token.placeholder": "粘贴 Pixiv refresh_token",
   "login.submit": "登录",
   "login.submitting": "登录中…",
-  "login.afterHint": "登录后进入推荐插画 / 小说 / 个人中心",
+  // ⚠️ 2026-10-03 随维度重构订正：登录落点是「发现」（router.ts 的 DISCOVER_PATH），
+  //   旧文案「推荐插画 / 小说 / 个人中心」描述的是重构前的三个顶层目的地。
+  "login.afterHint": "登录后进入「发现」，可浏览插画与小说",
 
   // ─── DownloadManager.vue（下载管理页） ───
   "downloads.title": "下载管理",
@@ -405,6 +407,10 @@ const zhPages = {
   "me.webdav.summaryCreatedAt": "备份时间：{{value}}",
   "me.webdav.summarySource": "来源引擎：{{engine}} · 版本 {{version}}",
   "me.webdav.summaryCounts": "设备级 {{device}} 项 / 账号级（当前账号）{{account}} 项 / sets {{sets}} 组",
+  // ─── 一次性迁移提示（spec §7「老用户找不到收藏/追更」第 2 条缓解，此前未实现）───
+  "me.migration.title": "导航已调整",
+  "me.migration.body": "插画与小说已合并到「发现」页；你的收藏、稍后看、通知与追更仍在下方。",
+  "me.migration.dismiss": "知道了",
   "me.webdav.cancel": "取消",
 
   // ── 排行榜页（spec docs/specs/ranking.md；#517 页面骨架）──
@@ -457,6 +463,12 @@ const zhPages = {
   "updates.section.watchlist": "追更新",
   "updates.section.notifications": "通知",
   "updates.empty": "暂无",
+  // 关注段空态：spec §7「关注更新空时引导去作者页/榜单」。此前只显示通用「暂无」，
+  // 零引导 —— 用户既不知道为什么空，也没有下一步可点（第三轮 Spec 审查 I-2 实证）。
+  "updates.emptyFollowingTitle": "还没有关注更新",
+  "updates.emptyFollowingHint": "关注作者后，他的新作品与新章节会出现在这里",
+  "updates.emptyFollowingToFollowing": "去关注作者",
+  "updates.emptyFollowingToRanking": "看看排行榜",
   "updates.viewAll": "查看全部",
   "updates.newCount": "{{count}} 条新",
 

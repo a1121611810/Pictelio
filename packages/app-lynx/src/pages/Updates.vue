@@ -64,6 +64,21 @@ function noteSection(name: UpdateSectionKey, count: number): void {
 /** 每段预览条数：聚合面只给"一眼看到有更新"，完整列表在各自的次级页 */
 const PREVIEW_N = 3
 
+/**
+ * 关注段「确实为空」时的两个出口（spec §7「关注更新空时引导去作者页/榜单」）。
+ *
+ * 为什么是这两条路：`/following` 是**关注流的来源**（关注的作者列表，也是用户唯一
+ * 能新增关注的地方），`/ranking` 是**没关注任何人时的替代内容**（先看榜单再决定关注谁）。
+ * 两者合起来覆盖了「去补关注」与「先逛逛」两种意图；只给前者会把还没决定关注谁的用户堵死。
+ *
+ * ⚠️ **刻意不放 `/illusts` / `/novels`**：空态里推荐「去看插画」答非所问——用户问的是
+ *   「我的更新在哪」，不是「有没有插画」。
+ */
+const FOLLOWING_EMPTY_ACTIONS = [
+  { to: '/following', label: t('updates.emptyFollowingToFollowing'), a11yLabel: UPDATES_A11Y_LABELS.emptyFollowingToFollowing },
+  { to: '/ranking', label: t('updates.emptyFollowingToRanking'), a11yLabel: UPDATES_A11Y_LABELS.emptyFollowingToRanking },
+] as const
+
 // ─── 段 1：关注更新（关注作者的新作品）───
 const following = ref<PixivIllust[]>([])
 const followingError = ref('')
@@ -279,10 +294,29 @@ onActivated(() => {
         </view>
       </view>
       <view v-else-if="following.length === 0" class="w-full">
+        <!-- ⚠️ 分两种空：①**加载失败**（followingError 非空）⇒ 只报错误，不给「去关注作者」——
+             失败时推荐「去关注」是误导（真正的问题是取不到数据，不是没关注）。
+             ②**确实为空** ⇒ spec §7 承诺的「关注更新空时引导去作者页/榜单」：
+             此前只显示通用「暂无」，用户既不知道为什么空、也没有下一步可点。 -->
         <view class="mx-3 mb-1.5 px-2.5 py-2.5 rounded-[var(--md-shape-medium)] bg-surface-container-low">
           <text class="text-body-small text-surface-on-variant">
-            {{ followingError || t('updates.empty') }}
+            {{ followingError || t('updates.emptyFollowingTitle') }}
           </text>
+          <text v-if="!followingError" class="text-body-small text-surface-on-variant mt-1">
+            {{ t('updates.emptyFollowingHint') }}
+          </text>
+          <view v-if="!followingError" class="flex flex-row flex-wrap gap-2 mt-2.5">
+            <view
+              v-for="a in FOLLOWING_EMPTY_ACTIONS"
+              :key="a.to"
+              class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] bg-primary"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="a.a11yLabel"
+              @tap="navigate(a.to)"
+            >
+              <text class="text-label-large text-primary-on">{{ a.label }}</text>
+            </view>
+          </view>
         </view>
       </view>
 

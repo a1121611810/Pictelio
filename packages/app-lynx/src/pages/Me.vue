@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore, type AiFilterMode } from '../stores/settingsStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useWatchLaterStore } from '../stores/watchLaterStore'
+import { useNavMigrationNoticeStore } from '../stores/navMigrationNotice'
 import type { ImageQuality } from '../utils/imageQuality'
 import type { UgoiraExtractMode } from '../api/ugoira'
 import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
@@ -72,6 +73,22 @@ const { listItemStyle } = useMotion()
 // 数值来源唯一：utils/topInset.ts 按当前路由 meta 裁决，公共入口 = composables/useTopInsetSpacer。
 // 'bleed'（内容铺到状态栏底下）下恒 0 ⇒ 模板里的 spacer 是 0 高，正确行为，不特判。
 const topInsetSpacer = useTopInsetSpacer()
+
+// ─── 一次性迁移提示（spec §7「老用户找不到收藏/追更」的第 2 条缓解）──────────
+// 【为什么落在「我的」而不是全局弹层】①「发现」页是 full-bleed 渗色流（ADR-0216/
+//   ADR-0075），顶部塞卡片会与整屏插画打架；②本页正是被保留的那 4 条次级入口所在处，
+//   提示紧贴它们相关性最高；③全局弹层要动 modalStack 与返回键契约，风险面大得多。
+//   ⇒ 刻意只做本页内联可关卡片。**这是一个有意的取舍，不是"全局提示"的实现**。
+const migration = useNavMigrationNoticeStore()
+onMounted(() => {
+  // 失败不得影响本页渲染（提示是旁路）：store 内部已 warn 并按"未看过"处理
+  void migration.load()
+})
+
+/** 关闭提示：按钮直接绑 dismiss（内部先落盘再改内存，顺序理由见 store 头注） */
+function dismissMigrationNotice(): void {
+  void migration.dismiss()
+}
 
 
 const auth = useAuthStore()
@@ -565,6 +582,30 @@ function pickAppearanceMode(mode: DarkModeId) {
     <view :style="{ height: topInsetSpacer + 'px' }" />
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1">
+      <!-- 一次性迁移提示（spec §7）。置于所有分组**之前**：它的作用就是解释
+           「为什么下面这些入口和以前不一样了」，压在入口上方才读得懂。
+           ⚠️ v-if 用 `!migration.seen` 而不是 `!seen`：store 是 pinia，模板里
+           直接解包 seen 也能响应，但经 store 引用更明确（且与本文件其他 store 用法一致）。 -->
+      <view
+        v-if="!migration.seen"
+        class="mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] bg-secondary-container"
+      >
+        <text class="text-title-small font-medium text-on-secondary-container">
+          {{ t('me.migration.title') }}
+        </text>
+        <text class="text-body-medium text-on-secondary-container mt-1">
+          {{ t('me.migration.body') }}
+        </text>
+        <view
+          class="h-[9vw] px-4 mt-3 self-end flex items-center justify-center rounded-[var(--md-shape-full)] bg-secondary"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.migrationDismiss"
+          @tap="dismissMigrationNotice"
+        >
+          <text class="text-label-large text-on-secondary">{{ t('me.migration.dismiss') }}</text>
+        </view>
+      </view>
+
       <!-- 账户组：用户信息 + 收藏入口（GlassCard = M3 elevated card） -->
       <!-- [票 #920] `ME_A11Y_LABELS.pageTitle` 的承载点迁入账户组卡。
            ⚠️ **订正此前的错误理由**：原注释称「它是 E2E 断言 Me 页完整渲染的锚点」——

@@ -10,6 +10,9 @@
 
 /** Me 页全部 accessibility 标注（key = 标注位置的可读标识，value = accessibility-label 文本） */
 export const ME_A11Y_LABELS = {
+  // 一次性迁移提示（spec §7「老用户找不到收藏/追更」第 2 条缓解）。标题与正文是纯文本，
+  // 朗读时按自然顺序读即可，无需逐段挂 label；只有可点的关闭按钮需要。
+  migrationDismiss: '知道了，关闭导航调整提示',
   // ── 页面标识（票 #920 订正：原注释写「E2E 断言 Me 页完整渲染的锚点」，**该说法无据**——
   //    E2E 侧 a11y 树为空、只按坐标定位，读不到 label（见 fab-hit-testing-regression.spec.ts:15,28）。
   //    真实用途 = #906 验收条件「取消顶栏后页面标题仍有可朗读语义来源」。
@@ -130,6 +133,11 @@ export const UPDATES_A11Y_LABELS = {
   viewAllFollowing: '查看全部关注更新',
   viewAllWatchlist: '查看全部追更新',
   viewAllNotifications: '查看全部通知',
+  // [维度重构 2026-10-03] 「关注更新」空态的两个出口（spec §7 承诺的
+  // 「关注更新空时引导去作者页/榜单」此前未实现，见 Updates.vue noteFollowingEmpty）。
+  // 文案跟着功能走，故随该出口一起在本注册表登记。
+  emptyFollowingToFollowing: '去关注作者',
+  emptyFollowingToRanking: '看看排行榜',
   openIllust: '打开插画',
   openNovel: '打开小说',
   openNotification: '打开通知',

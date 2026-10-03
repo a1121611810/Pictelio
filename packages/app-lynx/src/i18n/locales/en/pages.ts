@@ -119,7 +119,10 @@ const enPages = {
   "login.token.placeholder": "Paste a Pixiv refresh_token",
   "login.submit": "Sign in",
   "login.submitting": "Signing in…",
-  "login.afterHint": "After signing in, browse recommended illustrations, novels, and your profile",
+  // Corrected 2026-10-03 with the dimension restructure: sign-in lands on
+  // "Discover" (DISCOVER_PATH in router.ts). The old copy still named the three
+  // pre-restructure top-level destinations.
+  "login.afterHint": "After signing in, you'll land on Discover — illustrations and novels",
 
   // DownloadManager.vue
   "downloads.title": "Downloads",
@@ -407,6 +410,10 @@ const enPages = {
   "me.webdav.summaryCreatedAt": "Backup date: {{value}}",
   "me.webdav.summarySource": "Source engine: {{engine}} · version {{version}}",
   "me.webdav.summaryCounts": "{{device}} device keys / {{account}} account keys (current account) / {{sets}} sets",
+  // One-time navigation migration notice (spec §7 mitigation #2; previously absent)
+  "me.migration.title": "Navigation has changed",
+  "me.migration.body": "Illustrations and novels now live under Discover. Your bookmarks, watch-later, notifications and watchlist are all still below.",
+  "me.migration.dismiss": "Got it",
   "me.webdav.cancel": "Cancel",
 
   // ── Ranking page (spec docs/specs/ranking.md; #517 page skeleton) ──
@@ -460,6 +467,12 @@ const enPages = {
   "updates.section.watchlist": "Watchlist",
   "updates.section.notifications": "Notifications",
   "updates.empty": "Nothing yet",
+  // Following-segment empty state (spec §7). Previously the generic "Nothing yet"
+  // with no next step — found by the 3rd-round Spec review (I-2).
+  "updates.emptyFollowingTitle": "No followed updates yet",
+  "updates.emptyFollowingHint": "Follow artists and their new works and chapters show up here",
+  "updates.emptyFollowingToFollowing": "Follow artists",
+  "updates.emptyFollowingToRanking": "Browse rankings",
   "updates.viewAll": "View all",
   "updates.newCount": "{{count}} new",
 
