@@ -64,6 +64,7 @@ import {
   assertDebugApkInstalled,
   currentTopActivity,
   forceStopApp,
+  loginViaDevIntent,
   readAppLogcat,
   readClientPrefs,
   seedAppearance,
@@ -148,6 +149,39 @@ const COLOR_TOL = 6;
 const CTA_TOL = 3;
 /** 采样窗纯度下限：窗内众数色占比低于此值说明窗压到了内容/叠层，取样口径失效 → 转红。 */
 const PURITY_MIN = 0.95;
+
+/**
+ * 「屏不是空白」判据：整帧中**明显偏离 surface** 的像素占比下限。
+ *
+ * ⚠️ 为什么必须有这条（2026-10-03 实测教训）：采样窗落在 Root 的渗色带，那条带在
+ *   **任何页面**上都是纯 `--md-surface` —— 包括登录页、加载中的空白页。于是
+ *   「屏上什么都没有」也会让 A1/A2 满足「纯度 ≥0.95 + 色值命中令牌」而**空洞转绿**
+ *   （实测：32KB 纯色帧，4 条全过）。登录（beforeAll）能挡掉「未登录」，但挡不住
+ *   「已登录但内容还没渲染出来」—— 那正是骨架/空屏。
+ * ⇒ 采样窗只能证明「底色被画对了」，**证明不了「页面有内容」**；这条补上后半句。
+ *
+ * 阈值 0.05 取自实测：发现页有 feed 插画时远超此值（>0.2），
+ * 纯色空白屏为 0。留足余量以免正常渲染的波动误伤。
+ */
+const NON_BLANK_MIN_RATIO = 0.05;
+
+/** 帧内「明显偏离 surface」的像素占比（逐 8px 采样，控制开销） */
+function nonSurfaceRatio(p: Pixels, surface: Rgb): number {
+  let n = 0;
+  let total = 0;
+  for (let y = 0; y < p.h; y += 8) {
+    for (let x = 0; x < p.w; x += 8) {
+      const [r, g, b] = colorAt(p, x, y);
+      total++;
+      // 用色差而非「不等于」：压缩/色彩管理会带来几个色阶的抖动
+      if (
+        Math.max(Math.abs(r - surface[0]), Math.abs(g - surface[1]), Math.abs(b - surface[2])) > 24
+      )
+        n++;
+    }
+  }
+  return total === 0 ? 0 : n / total;
+}
 /** 每条断言连采的帧数（多帧采样兜底：单帧可能是骨架屏或半渲染中间态）。 */
 const FRAMES_PER_SAMPLE = 3;
 /** 连采间隔（ms）。要大于一次「首屏 + 懒加载首图」的可见抖动周期。 */
@@ -319,9 +353,15 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 /**
  * 播种外观 → 重启 → 等渲染 → 连采 N 帧**已收敛**的帧返回。
  *
- * 收敛判据 = 连续 3 帧的底色众数**完全相同**（不是「彼此接近」——完全相同才说明
- * 画面真的停住了，接近会把缓慢渐变当成已收敛）。这一步同时充当票面要求的
- * 「多帧采样兜底」：单帧可能是骨架屏/半渲染中间态，连采 3 帧一致才算稳。
+ * 收敛判据 = 连续 3 帧同时满足：①底色众数**完全相同**（不是「彼此接近」——完全相同才说明
+ * 画面真的停住了，接近会把缓慢渐变当成已收敛）；②**画面已有内容**（非底色像素占比
+ * 达 NON_BLANK_MIN_RATIO）。
+ *
+ * ⚠️ 条件②是 2026-10-03 补的，且**是改采样窗的连带后果**：采样窗移到 Root 渗色带后，
+ *   那条带是**静态**的 —— 只看①的话，第一批帧（内容尚未渲染完）就会「收敛」，
+ *   于是采到骨架/空屏帧。旧窗压在内容上时①隐含了②，收敛才真的代表画面稳定。
+ *   实测：A1/A2 因此采到 0.018 非底色占比的近纯色帧。
+ *   ②同时充当票面要求的「多帧采样兜底」：单帧可能是骨架屏/半渲染中间态。
  */
 async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; surface: Rgb }> {
   forceStopApp(serial);
@@ -340,17 +380,24 @@ async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; sur
     const recent = frames.slice(-FRAMES_PER_SAMPLE);
     if (
       recent.length === FRAMES_PER_SAMPLE &&
-      recent.every((p) => surfaceOf(p).join() === surfaceOf(recent[0]).join())
+      recent.every(
+        (p) =>
+          surfaceOf(p).join() === surfaceOf(recent[0]).join() &&
+          nonSurfaceRatio(p, surfaceOf(recent[0])) >= NON_BLANK_MIN_RATIO,
+      )
     ) {
       console.log(
-        `[md3-visual-tokens] ${label} 在第 ${i + 1} 帧收敛（连采 3 帧底色一致 = ${fmt(surfaceOf(recent[0]))}）`,
+        `[md3-visual-tokens] ${label} 在第 ${i + 1} 帧收敛` +
+          `（连采 3 帧底色一致 = ${fmt(surfaceOf(recent[0]))}，且画面已有内容 ` +
+          `非底色占比 ${nonSurfaceRatio(recent[0], surfaceOf(recent[0])).toFixed(3)}）`,
       );
       return { pixels: recent, surface: surfaceOf(recent[0]) };
     }
     await SLEEP(FRAME_INTERVAL_MS);
   }
   console.warn(
-    `[md3-visual-tokens] ${label} 采满 10 帧仍未收敛，返回最后 3 帧——后续断言会带着实测值转红`,
+    `[md3-visual-tokens] ${label} 采满 10 帧仍未收敛（底色一致但画面无内容，或一直不稳定），` +
+      "返回最后 3 帧——后续断言会带着实测值转红",
   );
   const tail = frames.slice(-FRAMES_PER_SAMPLE);
   return { pixels: tail, surface: surfaceOf(tail[0]) };
@@ -374,8 +421,13 @@ describe.skipIf(SKIPPED)(
       assertDebugApkInstalled(serial);
       await buildDebugApk(); // ANDROID_E2E_SKIP_BUILD=1 时跳过
       await installApk(serial);
-      // ⚠️ 刻意**不**做 `pm clear`：那会清掉 SecureStorage 里的 refresh_token，
-      // 而本 spec 不做登录（见文件头「不做登录」）。保留既有登录态是取到真实内容的前提。
+      // ⚠️ 2026-10-03 改为**主动登录**，此前依赖「设备上已有登录态」。
+      //   依赖环境状态的做法已被实测证伪：同批的 `settings-sync-contract` 会
+      //   `pm clear` 模拟升级前设备，若它排在本 spec 之前，本 spec 就对着
+      //   **未登录 / 空白屏**取样 —— 而登录页与空白屏同样是 `--md-surface`，
+      //   ⇒ A1/A2 会**空洞地转绿**（实测：帧仅 32KB 纯色，却 4 条全过）。
+      //   主动登录让本 spec 不再依赖同批 spec 的执行顺序与设备残留状态。
+      await loginViaDevIntent(serial);
       originalPrefsXml = readClientPrefs(serial).rawXml;
     }, 1_500_000);
 
@@ -403,6 +455,18 @@ describe.skipIf(SKIPPED)(
       const darkWant = readToken(".theme-sky.dark", "--md-surface");
       seedAppearance(serial, { themeColor: "sky", darkMode: "light" });
       const { pixels, surface } = await relaunchAndSample("a1-sky-light");
+
+      // 前置：屏上必须有内容。采样窗在渗色带上，**任何**页面（含登录页/空屏）都满足
+      // 「纯度达标 + 色值命中」⇒ 缺这条时空屏会空洞转绿（见 NON_BLANK_MIN_RATIO 注释）。
+      for (const [i, p] of pixels.entries()) {
+        const ratio = nonSurfaceRatio(p, surface);
+        expect(
+          ratio,
+          `A1 第 ${i} 帧非底色像素占比 ${ratio.toFixed(3)} < ${NON_BLANK_MIN_RATIO}` +
+            " —— 屏幕近乎纯色，说明页面**没有内容**（未登录 / 白屏 / 骨架未渲染）。" +
+            "此时底色断言即使通过也不说明问题：登录页与空屏同样是 --md-surface",
+        ).toBeGreaterThanOrEqual(NON_BLANK_MIN_RATIO);
+      }
 
       for (const [i, p] of pixels.entries()) {
         for (const w of SURFACE_WINDOWS) {
@@ -443,6 +507,16 @@ describe.skipIf(SKIPPED)(
       const darkWant = readToken(".theme-sky.dark", "--md-surface");
       seedAppearance(serial, { themeColor: "sky", darkMode: "dark" });
       const { pixels, surface } = await relaunchAndSample("a2-sky-dark");
+
+      // 与 A1 同一条前置：暗色空屏同样是纯 --md-surface，会让底色断言空洞转绿
+      for (const [i, p] of pixels.entries()) {
+        const ratio = nonSurfaceRatio(p, surface);
+        expect(
+          ratio,
+          `A2 第 ${i} 帧非底色像素占比 ${ratio.toFixed(3)} < ${NON_BLANK_MIN_RATIO}` +
+            " —— 屏幕近乎纯色，说明页面**没有内容**（未登录 / 白屏 / 骨架未渲染）",
+        ).toBeGreaterThanOrEqual(NON_BLANK_MIN_RATIO);
+      }
 
       for (const [i, p] of pixels.entries()) {
         for (const w of SURFACE_WINDOWS) {

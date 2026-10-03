@@ -404,6 +404,7 @@ export async function loginViaDevIntent(
   token = process.env.PIXIV_REFRESH_TOKEN,
   timeoutMs = 90_000,
   forceR18 = true,
+  attempts = 3,
 ): Promise<void> {
   if (!token) {
     throw new Error(
@@ -411,24 +412,41 @@ export async function loginViaDevIntent(
         "请确认 packages/app-lynx/.env 存在该键，或显式传入 token 参数。",
     );
   }
-  // 先杀进程，保证下面的 am start 走完整启动流程并触发 applyDevIntentHooks
-  forceStopApp(serial);
-  runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token, forceR18)], TIMEOUTS.adb);
+  // ⚠️ **有界重试**（2026-10-03）：模拟器到 Pixiv 的链路是**间歇性**的 ——
+  //   实测同一 token 连续 3 次里 2 次成功、1 次 `登录失败: Connection reset`
+  //   （约 10 秒后重置）。单次尝试超时会把**网络抖动**变成整条 spec 的红，
+  //   而报错指向「登录超时」，把排查方向引向 token/hook（实测就被误导过一次：
+  //   先以为是 token 失效，实际是自己的 shell 提取写错）。
+  //   ⇒ 重试只针对「没等到成功标记」这一种可恢复态；**用尽次数仍失败照旧抛错**，
+  //     且报错附上最后一次的 logcat 尾部，真实失败不会被重试掩盖。
+  let lastTail = "";
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    // 先杀进程，保证下面的 am start 走完整启动流程并触发 applyDevIntentHooks
+    forceStopApp(serial);
+    runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token, forceR18)], TIMEOUTS.adb);
 
-  const deadline = Date.now() + timeoutMs;
-  let tail = "";
-  while (Date.now() < deadline) {
-    tail = readAppLogcat(serial);
-    if (tail.includes(DEV_LOGIN_SUCCESS_MARK)) {
-      console.log("[android-e2e] ✓ dev hook 登录完成（已在 logcat 见到成功标记）");
-      return;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      lastTail = readAppLogcat(serial);
+      if (lastTail.includes(DEV_LOGIN_SUCCESS_MARK)) {
+        console.log(
+          `[android-e2e] ✓ dev hook 登录完成（logcat 见到成功标记${attempt > 1 ? `，第 ${attempt}/${attempts} 次尝试` : ""}）`,
+        );
+        return;
+      }
+      // 失败不做特殊分支：dev hook 的失败路径日志串未在源码中固定，交给超时分支统一暴露
+      await sleep(1_000);
     }
-    // 失败不做特殊分支：dev hook 的失败路径日志串未在源码中固定，交给超时分支统一暴露
-    await sleep(1_000);
+    if (attempt < attempts) {
+      console.warn(
+        `[android-e2e] dev hook 登录第 ${attempt}/${attempts} 次超时（${timeoutMs / 1000}s）——` +
+          "按间歇性网络抖动重试；若多次都失败请查 logcat 尾部的真实原因（可能是 token 或 hook）",
+      );
+    }
   }
   throw new Error(
-    `[android-e2e] dev hook 登录超时（${timeoutMs / 1000}s），未等到「${DEV_LOGIN_SUCCESS_MARK}」。\n` +
-      `logcat 尾部（已去敏，前 2000 字符）：\n${redactSecrets(tail).slice(0, 2_000)}`,
+    `[android-e2e] dev hook 登录超时（${attempts} 次尝试 × ${timeoutMs / 1000}s），未等到「${DEV_LOGIN_SUCCESS_MARK}」。\n` +
+      `logcat 尾部（已去敏，前 2000 字符）：\n${redactSecrets(lastTail).slice(0, 2_000)}`,
   );
 }
 
