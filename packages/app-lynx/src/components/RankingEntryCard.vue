@@ -107,7 +107,13 @@ onUnmounted(() => feed.dispose())
 </script>
 
 <template>
-  <view v-if="visible" class="mx-3 mt-3">
+  <!-- mx-3/mt-3 = 榜单卡自身留白；pb-3 = 榜单卡与下方列表之间的**分区间距**（票 #920 问题 3）。
+       缺它时榜单卡下缘直接贴住列表首行，视觉上像两张卡粘连。
+       为什么用 pb-3 而非在列表侧补上边距：列表是 `<list>`（ADR-0162 平台事实——
+       瀑布流 list-item 的插入/移除/替换分别导致静默丢弃/留空位/错位），
+       往 list 内部加间距要动列表结构，风险远高于在本容器上加一条 padding。
+       pb-3 复用与 mx-3/mt-3 同一档位，口径统一（12dp）。 -->
+  <view v-if="visible" class="mx-3 mt-3 pb-3">
     <!-- 有数据：榜首编辑大卡（第 1 名全幅背景 + 信息叠加 + 右侧 2/3 名竖排 + 收起） -->
     <view
       v-if="illusts.length > 0"
