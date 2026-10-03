@@ -110,3 +110,10 @@ ADR-0214 曾承诺 `PICTELIO_HOME_BLEED=0` ⇒「回到旧的 64dp 顶栏，布�
 实测该文件唯一的 `h-[Nvw]` 是 `:346` 的 `h-[10.667vw]`（40px 圆形头像），
 scrim 遮罩的 `pt-[24vw] pb-[10vw]` 不是 `h-`。结论不变（不移登记确会触发报错），
 但具体证据已订正。
+
+## 6. 后续演进
+
+- [ADR-0218-app-lynx-top-nav-user-question-dimension.md](./ADR-0218-app-lynx-top-nav-user-question-dimension.md)（2026-10-03）：
+  本 ADR §1 表格中的「首页/插画/小说/我的」**四个根页**已按"用户问题"维度重切为
+  发现/更新/书架/我的。§2.1「四个根页去顶栏」的结论随之**迁移到新的四个根页**继续成立
+  （ADR-0218 未改动顶栏与顶部让位的任何口径，`safeAreaJavaContract` 门禁不受影响）。
