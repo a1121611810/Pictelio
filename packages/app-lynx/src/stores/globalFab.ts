@@ -16,6 +16,7 @@ import { NAV_TABS } from '../components/navTabs'
 import { createGlobalFab } from '../primitives/createGlobalFab'
 import { useSearchSheetStore } from './searchSheetStore'
 import { useModalStack } from './modalStack'
+import { useNotificationStore } from './notificationStore'
 
 export const useGlobalFabStore = defineStore('globalFab', () => {
   const fab = createGlobalFab({
@@ -24,7 +25,22 @@ export const useGlobalFabStore = defineStore('globalFab', () => {
     navTabs: NAV_TABS,
     openSearch: () => useSearchSheetStore().openSearch(),
     hasOpenModal: () => useModalStack().hasOpenModal(),
+    // 外环「更新」未读角标（spec §2.2 / §3.2 承诺；P0-7 撤掉首页顶栏铃铛后，
+    // 这是通知唯一的全局级可发现性兜底）。**读点在此** —— 承诺若无此读点即
+    // silent misconfiguration（见 docs/research/review-data-flow-blindspot.md §1）。
+    // 只给「更新」挂角标：其余 tab 无未读概念，由本层（而非深模块）决定。
+    navBadge: (name) => (name === 'updates' ? useNotificationStore().unreadCount : 0),
   })
+  // ─── 本地度量读点（spec §4 P0.5「顶层触达率」）────────────────────────
+  // ⚠️ 记录点**刻意不在这里**。初版记在 dispatch 的 select 分支上，模拟器实测抓到漏记：
+  //   冷启动直接落在「发现」、登录成功后也直接 navigate 到 /discover，两条路径都不过
+  //   FAB dispatch ⇒ `tabHits.discover` 恒为 0，面板显示「发现 0% / 我的 100%」，
+  //   而用户每次启动都看的是「发现」—— 数字会让人判反。
+  // ⇒ 记录点上移到**路由落定侧**（App.vue 里监听 `routeState.value` 的那个 watch），
+  //   冷启动 / 登录后 / 切 tab 三条路径同源，也不会与本层的 dispatch 双计。
+  //   ⚠️ 那边监听的是**对象**不是 `.value.path`：占位初值与首落点同为 `/discover`，
+  //   监听 `.path` 会让 watcher 因「值没变」而不触发（同样只有真机能抓到）。
+  // 键匹配见 components/navTabs.ts 的 topLevelTabForPath。
   return {
     view: fab.view,
     dispatch: fab.dispatch,

@@ -1,0 +1,287 @@
+<script setup lang="ts">
+// [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
+defineOptions({ name: 'shelf' })
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { navigate } from '../router'
+import { t } from '../i18n'
+import { proxyImageUrl } from '../utils/imageUrl'
+import { artworkTitle } from '../utils/artworkTitle'
+import { openNovel } from '../utils/novelNavigation'
+import { useHeroSource } from '../composables/heroTransition'
+import { loadBookmarks } from '../api/illust'
+import type { PixivIllust } from '../api/types'
+import { useAuthStore } from '../stores/authStore'
+import { useWatchLaterStore } from '../stores/watchLaterStore'
+import { useGlobalFabStore } from '../stores/globalFab'
+import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
+import { createGenerationGate } from '../primitives/generationGate'
+import { useMotion } from '../composables/motion'
+import SkeletonImage from '../components/SkeletonImage.vue'
+import AppIcon from '../components/AppIcon.vue'
+import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
+import { A11Y_ELEMENT_ENABLED, SHELF_A11Y_LABELS } from '../utils/accessibility'
+
+// ─── 「书架」页（/shelf）[维度重构 2026-10-03] ───
+// 三段聚合面：我的收藏 / 稍后看 / 继续读。
+// 改造前这三个功能各占一个次级页、入口**全部**只从「我的」一行进入，且彼此不跳转
+//   ——「我存的」和「我追的」在产品里从不同时出现在一个视野中。
+// 外部依据：LINE WEBTOON 官方「我的漫畫」把「最近看過 + 我的最愛 + 下載」收在一个面里。
+//
+// ⚠️ **下载队列刻意不在本页**：`/downloads` 是任务队列控制面（start/pause/stop/toggle），
+//   不是内容列表 —— 留在「我的」。把控制面混进内容面会让两者的操作预期冲突。
+const topInsetSpacer = useTopInsetSpacer()
+// 统一入场出口（listItemStaggerContract L2）：scroll-view 消费页的分段卡片必须走这一个出口，
+// 逐页自写动画会在多页之间漂移（该门禁的原始动机）。
+const { listItemStyle } = useMotion()
+// 即时导航硬约束 #3：代际闸（与 Updates.vue 同一原语），保证后发者胜
+const gate = createGenerationGate()
+/** 首载加载态：段 1 走网络（loadBookmarks），在飞期间**不得**渲染成「还没有内容」
+ *  （那是把「还不知道」说成「你没有」——与 Updates.vue 同款缺陷，第二轮 review 指出本页漏修） */
+const loading = ref(false)
+/** 段 2（稍后看）首载加载态：hydrate 未完成时**不得**渲染成「还没有内容」。
+ *  独立于 `loading`（段 1 的网络态）：两段各自失败、各自表达，互不牵连。 */
+const laterLoading = ref(false)
+const auth = useAuthStore()
+const laterStore = useWatchLaterStore()
+
+/** 每段预览条数（聚合面只给"一眼看到我存了什么"，完整列表在各自次级页） */
+const PREVIEW_N = 3
+
+// ─── 段 1：我的收藏（Pixiv 服务端收藏，插画）───
+const bookmarks = ref<PixivIllust[]>([])
+const bookmarksError = ref('')
+
+async function loadBookmarksPreview(token: number): Promise<void> {
+  bookmarksError.value = ''
+  const uid = auth.currentUser?.id
+  if (typeof uid !== 'number') {
+    if (gate.isCurrent(token)) bookmarksError.value = t('error.fallback.loadFailed')
+    return
+  }
+  try {
+    const r = await loadBookmarks(uid, 'public')
+    if (!gate.isCurrent(token)) return
+    bookmarks.value = r.illusts.slice(0, PREVIEW_N)
+  } catch (e) {
+    console.warn('[shelf] 收藏加载失败', e)
+    if (gate.isCurrent(token)) bookmarksError.value = t('error.fallback.loadFailed')
+  }
+}
+
+// ─── 段 2：稍后看（本地同步快照，插画 + 小说双类型）───
+// ⚠️ 「本地 store 无网络依赖 ⇒ 渲染流一上来就有值」是**错的**（第三轮 Standards 审查 I-1 实证）：
+//   `laterStore.hydrate()` 是 async（await prefs），且 router.ts 启动预热 `void …hydrate()`
+//   **不 await** ⇒ 冷启动 + 慢 prefs + 用户快速点「书架」时，items 此刻确实为 0。
+//   若此时直接渲染 `shelf.empty`（"你还没有内容"），就是把**"还不知道"说成"你没有"** ——
+//   与 Updates 页 `loading` 死状态是同一族缺陷（S-5），只是这里靠 laterLoading 独立表达。
+const laterPreview = computed(() => laterStore.items.slice(0, PREVIEW_N))
+
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）。resolveSrc 要同时认两个来源：
+// 收藏（服务端 PixivIllust）与稍后看（本地快照），因为两段各有自己的缩略图盒。
+const heroTransition = useHeroSource({
+  resolveSrc: (id: number) => {
+    const b = bookmarks.value.find((i) => i.id === id)
+    if (b) return proxyImageUrl(b.image_urls.large || b.image_urls.medium || '')
+    const l = laterStore.items.find((i) => i.id === id)
+    return l ? proxyImageUrl(l.coverUrl) : ''
+  },
+})
+
+function openBookmark(id: number): void {
+  heroTransition.begin(id)
+  void navigate(`/illust/${id}`)
+}
+
+function openLaterItem(item: { kind: 'illust' | 'novel'; id: number }): void {
+  // ⚠️ 只有插画走图像转场；小说是 openNovel 分流，id 可能是 novelId —— 对它调 begin() 会测错盒子。
+  if (item.kind === 'illust') {
+    heroTransition.begin(item.id)
+    void navigate(`/illust/${item.id}`)
+  } else {
+    openNovel(item.id)
+  }
+}
+
+// ─── 段 3：继续读 —— 尚未实现 ──
+// ⚠️ 旧 WebView 客户端曾有 historyStore（ADR-0094），随 ADR-0203（WebView 源码删除）一并消失；
+//   本页**显式说明"即将上线"**而不是渲染一个空列表 —— 禁静默降级（测试硬约束 #3）：
+//   空列表会被读成"我没有阅读记录"，而真相是"这个功能还没做"。
+
+// ─── 刷新 ───
+async function refresh(): Promise<void> {
+  const token = gate.next()
+  loading.value = true
+  laterLoading.value = true
+  // ⚠️ hydrate 是 async 且可能 reject：必须 await + 收尾，否则 laterLoading 永远为 true
+  //   （骨架卡死）或不 await（骨架一闪而过、把"还不知道"渲染成"你没有"）。
+  const laterDone = laterStore.hydrate().finally(() => {
+    laterLoading.value = false
+  })
+  try {
+    await loadBookmarksPreview(token)
+  } finally {
+    if (gate.isCurrent(token)) loading.value = false
+  }
+  void laterDone
+}
+
+// ─── 全局放射 FAB 桥（ADR-0120）───
+let unreg: (() => void) | undefined
+onMounted(() => {
+  unreg = useGlobalFabStore().usePage('shelf', { refresh })
+  // ⚠️ 此处**不**再调 refresh()：本页在 KeepAlive include 内，首挂载时
+  //   onActivated 与 onMounted 都会触发（Me.vue:374-377 记过）⇒ 两处都调会并发两轮。
+})
+onUnmounted(() => {
+  unreg?.()
+  gate.invalidate()
+})
+onActivated(() => {
+  void refresh()
+})
+</script>
+
+<template>
+  <view class="w-full h-full flex flex-col bg-surface">
+    <view :style="{ height: topInsetSpacer + 'px' }" />
+
+    <!-- 页内标题（**不是顶栏**）。同 Updates.vue：ADR-0216 §2.1 规定根页不画实体顶栏，
+         <PageTopBar> 是带底色的顶栏行，故本页不用它；改用流内标题保留定位信息。 -->
+    <text
+      class="text-title-large font-medium text-surface-on px-4 mt-2 [max-line:1]"
+      :accessibility-element="A11Y_ELEMENT_ENABLED"
+      :accessibility-label="SHELF_A11Y_LABELS.pageTitle"
+      >{{ t('shelf.title') }}</text
+    >
+
+    <scroll-view class="w-full flex-1" scroll-orientation="vertical">
+      <!-- ══ 段 1：我的收藏 ══ -->
+      <view class="w-full">
+        <view class="flex flex-row items-center justify-between px-3 mt-3 mb-1.5" :style="listItemStyle(0)">
+          <text class="text-title-small font-medium text-surface-on">{{ t('shelf.section.bookmarks') }}</text>
+          <view
+            class="h-[8vw] px-2.5 flex items-center justify-center"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="SHELF_A11Y_LABELS.viewAllBookmarks"
+            @tap="navigate('/bookmarks')"
+          >
+            <text class="text-label-large text-primary">{{ t('shelf.viewAll') }}</text>
+            <AppIcon name="arrow_forward" :size="3.2" class="text-primary" />
+          </view>
+        </view>
+      </view>
+      <view v-for="it in bookmarks" :key="`b-${it.id}`" class="w-full">
+        <view
+          class="flex flex-row items-center mx-3 mb-1.5 p-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="SHELF_A11Y_LABELS.openBookmark"
+          @tap="openBookmark(it.id)"
+        >
+          <!-- ⚠️ 同 Updates.vue：API 字段的运行期值可能缺，模板里直接取会抛 TypeError，
+               而 vue-lynx 的渲染异常会让**整页变空白**（不是局部降级）。故先判后取。 -->
+          <SkeletonImage
+            v-if="it.image_urls && (it.image_urls.medium || it.image_urls.square_medium)"
+            :id="heroTransition.sourceId(it.id)"
+            :src="proxyImageUrl(it.image_urls.medium || it.image_urls.square_medium)"
+            height="18.667vw"
+            class="w-[18.667vw] rounded-[var(--md-shape-small)]"
+            lazy-load
+          />
+          <view class="flex-1 flex flex-col ml-2.5 min-w-0">
+            <text class="text-body-large text-surface-on [max-line:1]">{{ artworkTitle(it.title) }}</text>
+            <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ it.user?.name ?? '' }}</text>
+          </view>
+        </view>
+      </view>
+      <!-- 首载骨架（硬约束 #1「先渲染页面框架（含骨架屏占位）」）。
+           段 1 走网络 ⇒ 在飞时长度确实为 0；不加骨架就会把「还在请求」渲染成
+           「还没有内容」。⚠️ 段 2（稍后看）**也要骨架**：它的 hydrate 是 async
+           （第三轮 review I-1 纠正了此前「本地 store 一上来就有值」的错误注释）。 -->
+      <view v-if="loading && bookmarks.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
+          <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
+        </view>
+      </view>
+      <view v-else-if="bookmarks.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-2.5 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <text class="text-body-small text-surface-on-variant">
+            {{ bookmarksError || t('shelf.empty') }}
+          </text>
+        </view>
+      </view>
+
+      <!-- ══ 段 2：稍后看 ══ -->
+      <view class="w-full">
+        <view class="flex flex-row items-center justify-between px-3 mt-3 mb-1.5" :style="listItemStyle(1)">
+          <text class="text-title-small font-medium text-surface-on">{{ t('shelf.section.later') }}</text>
+          <view
+            class="h-[8vw] px-2.5 flex items-center justify-center"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="SHELF_A11Y_LABELS.viewAllLater"
+            @tap="navigate('/later')"
+          >
+            <text class="text-label-large text-primary">{{ t('shelf.viewAll') }}</text>
+            <AppIcon name="arrow_forward" :size="3.2" class="text-primary" />
+          </view>
+        </view>
+      </view>
+      <view v-for="item in laterPreview" :key="`l-${item.kind}-${item.id}`" class="w-full">
+        <view
+          class="flex flex-row items-center mx-3 mb-1.5 p-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="SHELF_A11Y_LABELS.openLater"
+          @tap="openLaterItem(item)"
+        >
+          <SkeletonImage
+            v-if="item.coverUrl"
+            :id="item.kind === 'illust' ? heroTransition.sourceId(item.id) : undefined"
+            :src="proxyImageUrl(item.coverUrl)"
+            height="18.667vw"
+            class="w-[18.667vw] rounded-[var(--md-shape-small)]"
+            lazy-load
+          />
+          <view class="flex-1 flex flex-col ml-2.5 min-w-0">
+            <text class="text-body-large text-surface-on [max-line:1]">{{ artworkTitle(item.title) }}</text>
+            <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ item.userName }}</text>
+          </view>
+        </view>
+      </view>
+      <view v-if="laterLoading && laterStore.items.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
+          <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
+        </view>
+      </view>
+      <view v-else-if="laterStore.items.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-2.5 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <text class="text-body-small text-surface-on-variant">{{ t('shelf.empty') }}</text>
+        </view>
+      </view>
+
+      <!-- ══ 段 3：继续读（未实现，显式说明而非空列表）══ -->
+      <view class="w-full">
+        <view class="flex flex-row items-center justify-between px-3 mt-3 mb-1.5" :style="listItemStyle(2)">
+          <text class="text-title-small font-medium text-surface-on">
+            {{ t('shelf.section.continueReading') }}
+          </text>
+        </view>
+      </view>
+      <view class="w-full">
+        <view class="mx-3 mb-1.5 px-3 py-4 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <view class="flex flex-row items-center">
+            <AppIcon name="schedule" :size="5.33" class="text-surface-on-variant" />
+            <text class="text-body-medium text-surface-on ml-2">
+              {{ t('shelf.continueReading.empty') }}
+            </text>
+          </view>
+          <text class="text-body-small text-surface-on-variant mt-1.5">
+            {{ t('shelf.continueReading.hint') }}
+          </text>
+        </view>
+      </view>
+
+      <FabAllowanceSpacer />
+    </scroll-view>
+  </view>
+</template>

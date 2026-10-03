@@ -4,8 +4,9 @@
 // 未抽取清单见 tickets #507——含 Me.vue WebDAV 区块大部分文案、FollowList「操作失败」、
 // NovelDetail「已追更」与《系列名》括号（拼音数据括号属翻译单元外）。
 const zhPages = {
-  // ─── Recommended.vue（综合推荐页） ───
-  "recommended.title": "推荐",
+  // ─── Recommended.vue（综合推荐页；页面已更名「发现」，但组件文件名沿用 Recommended） ───
+  // 注：原 "recommended.title" 键随维度重构删除 —— 该页不再画实体顶栏（ADR-0216），
+  //   标题改由「发现」页内的流内 <text> 承担（用 discover.title），已无 t() 消费点。
   "recommended.charCount": "{{count}} 字",
 
   // ─── IllustList.vue（插画分类页） ───
@@ -247,19 +248,31 @@ const zhPages = {
   "me.watchlist": "追更列表",
   "me.mypixiv": "好P友",
   "me.downloads": "下载管理",
-  "me.networkCheck": "网络自检",
   "me.notifications": "通知",
   "me.fullscreenMode": "全屏模式",
   "me.fullscreenModeDesc": "隐藏状态栏与导航栏，边缘滑动可临时唤出",
   // ─── Me.vue 网络组（ADR-0199 D4 / #779：限流退避四参数设置；delaySeconds 渲染档位秒数） ───
-  "me.network.title": "网络",
-  "me.network.hint": "请求被 Pixiv 限流时自动等待重试",
-  "me.network.backoff": "限流退避",
-  "me.network.backoffDesc": "收到 429 时自动等待并重试；关闭后立即报错",
-  "me.network.maxRetries": "最大重试次数",
-  "me.network.baseDelay": "初始等待",
-  "me.network.maxDelay": "最长等待",
-  "me.network.delaySeconds": "{{seconds}} 秒",
+  "advanced.network.title": "网络",
+  "advanced.network.hint": "请求被 Pixiv 限流时自动等待重试",
+  "advanced.network.backoff": "限流退避",
+  "advanced.network.backoffDesc": "收到 429 时自动等待并重试；关闭后立即报错",
+  "advanced.network.maxRetries": "最大重试次数",
+  "advanced.network.baseDelay": "初始等待",
+  "advanced.network.maxDelay": "最长等待",
+  "advanced.network.delaySeconds": "{{seconds}} 秒",
+  // ─── 本地使用度量组（spec §4 P0.5）——「复访间隔/顶层触达率/二级使用占比/空段出现率」
+  //   四指标的**唯一读出口**。比率函数对"分母为 0"返回 null（不得谎报 0%），
+  //   面板把 null 透传为 noData 文案，而不是替它编一个 0%。 ───
+  "advanced.metrics.title": "本地使用度量",
+  "advanced.metrics.hint": "只统计本机使用，不上传任何数据",
+  "advanced.metrics.revisit": "复访间隔",
+  "advanced.metrics.revisitLast": "最近一次",
+  "advanced.metrics.sampleCount": "样本数",
+  "advanced.metrics.samples": "样本 {{count}} 次",  "advanced.metrics.hours": "{{hours}} 小时",
+  "advanced.metrics.topShare": "顶层触达率",
+  "advanced.metrics.subShare": "二级使用占比",
+  "advanced.metrics.emptyRate": "空段出现率",
+  "advanced.metrics.noData": "暂无数据",
 
   // ─── Notifications.vue（通知中心页，ADR-0188 / #728） ───
   "notifications.title": "通知",
@@ -428,6 +441,42 @@ const zhPages = {
   "ranking.entry.collapseAria": "收起排行榜",
   "ranking.entry.stripAria": "排行榜入口",
   "ranking.entry.itemAria": "第{{rank}}名：{{title}}",
+
+  // ─── 维度重构（2026-10-03）：发现 / 更新 / 书架 / 高级 ───
+  // 顶层由「媒介维度」改为「用户要回答的问题维度」，媒介降为「发现」页内二级。
+
+  /** 发现（Recommended.vue 改造后）：页内二级 = 媒介维度 */
+  "discover.title": "发现",
+  "discover.tab.all": "全部",
+  "discover.tab.illust": "插画",
+  "discover.tab.novel": "小说",
+
+  /** 更新（三段聚合面：关注 / 追更 / 通知）——一页答完「有没有更新」 */
+  "updates.title": "更新",
+  "updates.section.following": "关注更新",
+  "updates.section.watchlist": "追更新",
+  "updates.section.notifications": "通知",
+  "updates.empty": "暂无",
+  "updates.viewAll": "查看全部",
+  "updates.newCount": "{{count}} 条新",
+
+  /** 书架（三段聚合面：收藏 / 稍后看 / 继续读） */
+  "shelf.title": "书架",
+  "shelf.section.bookmarks": "我的收藏",
+  "shelf.section.later": "稍后看",
+  "shelf.section.continueReading": "继续读",
+  "shelf.empty": "还没有内容",
+  // 书架自有的「查看全部」——分段头跳转，键属 shelf 命名空间（禁跨命名空间借用更新页的键）。
+  "shelf.viewAll": "查看全部",
+  // 继续读尚未实现（旧 WebView 客户端的 historyStore 随 ADR-0203 删除）——
+  // 文案说明「即将上线」而非伪装成空列表（禁静默降级：测试硬约束 #3）。
+  "shelf.continueReading.empty": "阅读记录即将上线",
+  "shelf.continueReading.hint": "上线后可从这里直接回到上次读到的位置",
+
+  /** 高级设置（承接原「我的」里的调试/自检项，使业务行与调试行不再平级混排） */
+  "advanced.title": "高级",
+  "advanced.networkCheck": "网络自检",
+  "advanced.platformCheck": "平台一致性自检",
 } as const;
 
 export default zhPages;

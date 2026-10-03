@@ -4,7 +4,7 @@
 // 本 seam 是全迁移的「第一行代码」，先于任何 store 改造落地。
 //
 // 模块加载期时序契约（ADR-0139 决策 4，实测结论 2026-09-03）：
-// router.ts 模块顶层 void router.replace(RECOMMENDED_PATH) 触发首导航，beforeEach 守卫
+// router.ts 模块顶层 void router.replace(DISCOVER_PATH) 触发首导航，beforeEach 守卫
 // 经 promise 链在 microtask 执行（纯 vue-router 行为，node 实测：push 同步返回后 0 tick
 // 内守卫才执行），而 index.ts 的 app.use(pinia) 与 import { router } 同属当前同步栈、
 // 先于 microtask —— 因此守卫执行时 pinia 必然已安装，无需 setActivePinia 兜底。

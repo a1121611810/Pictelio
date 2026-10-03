@@ -26,7 +26,6 @@ export const ME_A11Y_LABELS = {
   // 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）
   mypixiv: '好P友',
   downloads: '下载管理',
-  networkCheck: '网络自检',
   // 通知中心入口（ADR-0188 D7 / #728）：账户组行 + 行尾未读圆点
   notifications: '通知',
   // 静音标签管理入口（ADR-0187 D5 / #732）：内容组行（AI 三态分段之后）
@@ -76,11 +75,6 @@ export const ME_A11Y_LABELS = {
   // 全屏模式开关（spec lynx-systembars D5：Me 客户端卡 M3 switch 行）
   fullscreenMode: '全屏模式开关',
   // 网络组（ADR-0199 D4 / #779 T2：Me 网络卡组标题 + 限流退避开关行 + 三个档位行容器）
-  networkGroupTitle: '网络',
-  rateLimitBackoff: '限流退避',
-  rateLimitMaxRetries: '最大重试次数',
-  rateLimitBaseDelay: '初始等待',
-  rateLimitMaxDelay: '最长等待',
   // AI 作品三态过滤（ADR-0155）
   aiFilterShow: 'AI作品显示全部',
   aiFilterMask: 'AI作品遮罩',
@@ -127,6 +121,52 @@ export const UPDATE_A11Y_LABELS = {
 export const ERROR_A11Y_LABELS = {
   pageTitle: '登录已过期',
   backToLogin: '返回登录',
+} as const
+
+/** 「更新」页 accessibility 标注（/updates，[维度重构 2026-10-03] 新建页）。
+ *  ⚠️ 与 UPDATE_A11Y_LABELS（系统更新页 /update）**不同页、不同名**，勿混用。 */
+export const UPDATES_A11Y_LABELS = {
+  pageTitle: '更新',
+  viewAllFollowing: '查看全部关注更新',
+  viewAllWatchlist: '查看全部追更新',
+  viewAllNotifications: '查看全部通知',
+  openIllust: '打开插画',
+  openNovel: '打开小说',
+  openNotification: '打开通知',
+} as const
+
+/** 「书架」页 accessibility 标注（/shelf，[维度重构 2026-10-03] 新建页） */
+export const SHELF_A11Y_LABELS = {
+  pageTitle: '书架',
+  viewAllBookmarks: '查看全部收藏',
+  viewAllLater: '查看全部稍后看',
+  openBookmark: '打开收藏作品',
+  openLater: '打开稍后看条目',
+} as const
+
+/** 「高级」页 accessibility 标注（/advanced，[维度重构 2026-10-03] 新建页） */
+export const ADVANCED_A11Y_LABELS = {
+  pageTitle: '高级',
+  back: '返回',
+  networkCheck: '网络自检',
+  // [维度重构 2026-10-03] 以下 5 个键随「限流退避组」从 ME_A11Y_LABELS 整体迁来 ——
+  //   文案跟着功能走：留在 Me 的注册表里会同时骗过 unit.test.ts 的「注册表全部被 Me.vue 消费」
+  //   门禁与下一个读注册表的人（两边都看不到它们真正的宿主页）。
+
+  networkGroupTitle: '网络',
+  rateLimitBackoff: '限流退避',
+  rateLimitMaxRetries: '最大重试次数',
+  rateLimitBaseDelay: '初始等待',
+  rateLimitMaxDelay: '最长等待',
+  platformCheck: '平台一致性自检',
+  // [维度重构 2026-10-03] 本地使用度量组（spec §4 P0.5 的唯一读出口）。
+  //   三个子标题各有独立读出口，合并成一个 label 会让读屏用户只听到"本地使用度量"
+  //   而听不到下面三块分别是什么口径 —— 与「网络」组标题独立成键是同一理由。
+  metricsGroupTitle: '本地使用度量',
+  metricsRevisitGroup: '复访间隔',
+  metricsTopShareGroup: '顶层触达率',
+  metricsSubShareGroup: '二级使用占比',
+  metricsEmptyRateGroup: '空段出现率',
 } as const
 
 /** RefreshableList 列表操作 FAB menu 标注（ADR-0111）

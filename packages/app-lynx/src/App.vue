@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
-import { initRouter, exitHint } from './router'
+import { initRouter, exitHint, routeState } from './router'
 import GlobalFab from './components/GlobalFab.vue'
 import SearchSheet from './components/SearchSheet.vue'
+import { topLevelTabForPath } from './components/navTabs'
+import { useUsageMetricsStore } from './stores/usageMetrics'
+import { useNotificationStore } from './stores/notificationStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -49,7 +52,61 @@ const health = useApiQuery<{ illusts: unknown[] }>({
   staleTime: 60 * 1000,
   retry: false,
 })
+// ─── 本地度量读点（spec §4 P0.5「顶层触达率」）：记录点 = 路由落定 ──────────
+// 【为什么在这里而不是 FAB 的 dispatch】模拟器实测抓到漏记：冷启动直接落在「发现」、
+// 登录成功后也直接 navigate 到 /discover，两条路径都不过 FAB dispatch ⇒
+// `tabHits.discover` 恒为 0，面板显示「发现 0% / 我的 100%」。用户每次启动**都**看
+// 「发现」，这个数字会让人判反。指标叫「触达」而不是「切入」：到达即计。
+//
+// ⚠️ **不用 `immediate: true`**：routeState 的初值是 `DISCOVER_PATH` 这个**占位**
+//   （router.ts:207，afterEach 尚未跑），真正的落点在 initRouter() 的
+//   `navigate(ok ? DISCOVER_PATH : '/login')` 里异步发生。immediate 会把占位值
+//   记成一次触达 —— 未登录用户启动时甚至会凭空多出一次「发现」。
+//   initRouter() 在下方 onMounted 里调用，晚于本 watch 注册 ⇒ 首次真实落点必被捕获。
+//
+// ⚠️ 落点若在 hydrate 窗口内，stores/usageMetrics.ts 会**缓冲并在 hydrate 完成后重放**
+//   （P2-1 的机制），故这里无需自己排队。
+//
+// ⚠️⚠️ 监听的是 **routeState.value 这个对象**，不是 `.value.path`。这是被真机打脸后
+//   改的写法：routeState 的占位初值（router.ts:207）就是 `DISCOVER_PATH`，而冷启动的
+//   真实落点**也是** `DISCOVER_PATH` ⇒ 监听 `.path` 时新旧值相同，**watcher 根本不触发**
+//   （首次实测：面板仍显示「发现 0%」，而 3760 条测试全绿）。
+//   afterEach 每次都整体替换 `routeState.value = {…}`（router.ts:218，生产代码唯一赋值点、
+//   无原地改字段），故监听对象引用必然触发，且首次真实落点也不会漏。
+watch(
+  () => routeState.value,
+  ({ path }) => {
+    const tab = topLevelTabForPath(path)
+    if (!tab) return
+    try {
+      useUsageMetricsStore().recordTabVisit(tab.name)
+    } catch (e) {
+      console.warn('[app] 顶层触达度量记录失败（不影响导航）', e)
+    }
+  },
+)
 onMounted(() => {
+  // 本地度量读点（spec §4 P0.5「复访间隔」）：冷启动记一次，相邻差值即间隔。
+  // 只存本地、不上传（决策 5 = A）；失败不得影响启动。
+  try {
+    const metrics = useUsageMetricsStore()
+    // 先 hydrate 读回上次会话快照，再记本次启动 —— 顺序反了会丢掉历史间隔
+    void metrics.hydrate().then(() => metrics.recordLaunch(Date.now()))
+  } catch (e) {
+    console.warn('[app] 复访度量记录失败（不影响启动）', e)
+  }
+  // 外环「更新」角标的值来源（spec §2.2「更新」/ §3.2「撤掉同一功能两条路」）：**必须在冷启动拉一次**。
+  // ⚠️ 引用只到**章节**不给行号：spec 每轮复核都会重排行，行号引用必然腐化成假坐标
+  //     （本仓已踩：§2.2:84 一度指向代码围栏、§3.2:133 指向无关表格行）。
+  // ⚠️ 此前 refreshUnreadBadge 只在 Me.vue 挂载时调用 ⇒ 启动后不打开「我的」，
+  //    notificationStore.unreadCount 恒为 0 ⇒ 角标节点永远不渲染。
+  //    这正是审计一 read-point 纪律要防的「机制在、值不流动」。
+  //    失败不阻塞启动（通知读不到不该让 App 打不开），失败由 store 内部 warn。
+  try {
+    void useNotificationStore().refreshUnreadBadge()
+  } catch (e) {
+    console.warn('[app] 通知未读角标预取失败（不影响启动）', e)
+  }
   console.log(
     `[T3 useApiQuery] health: status=${health.status.value} isLoading=${health.isLoading.value} data=${health.data.value ? 'ok' : 'null'}`,
   )
@@ -201,7 +258,7 @@ const routeTransition = useRouteTransition()
            坑的同族正解见 `utils/topInset.ts` 约束 2（让位用零内容 spacer，不用父容器 padding）。 -->
       <view class="w-full h-full" :style="routeTransition.style.value">
         <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
-        <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking', 'mypixiv']">
+        <KeepAlive :include="['discover', 'updates', 'shelf', 'me', 'ranking', 'mypixiv']">
           <component :is="Component" />
         </KeepAlive>
       </view>

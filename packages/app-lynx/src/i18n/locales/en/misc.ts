@@ -6,9 +6,12 @@ import type { ZhMiscKey } from "../zh-CN/misc";
 
 const enMisc = {
   // ─── navTabs.ts ───
-  "navTabs.recommended": "Recommended",
-  "navTabs.illusts": "Illustrations",
-  "navTabs.novels": "Novels",
+  // Dimension restructure (2026-10-03): grouped by the question the user asks,
+  // not by medium. Media (illustrations/novels) demoted to a second-level tab
+  // inside Discover.
+  "navTabs.discover": "Discover",
+  "navTabs.updates": "Updates",
+  "navTabs.shelf": "Shelf",
   "navTabs.me": "Me",
 
   // ─── 作品标题归一化（utils/artworkTitle.ts；#893）───

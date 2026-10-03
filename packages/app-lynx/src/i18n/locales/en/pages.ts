@@ -4,8 +4,9 @@
 import type { ZhPagesKey } from "../zh-CN/pages";
 
 const enPages = {
-  // Recommended.vue
-  "recommended.title": "Recommended",
+  // Recommended.vue (renamed to "Discover"; component filename kept)
+  // "recommended.title" removed: the page no longer draws a physical top bar
+  //   (ADR-0216) — the heading is an in-flow <text> using discover.title.
   "recommended.charCount": "{{count}} characters",
 
   // IllustList.vue
@@ -243,19 +244,33 @@ const enPages = {
   "me.watchlist": "Watchlist",
   "me.mypixiv": "My Pixiv",
   "me.downloads": "Downloads",
-  "me.networkCheck": "Network check",
   "me.notifications": "Notifications",
   "me.fullscreenMode": "Fullscreen mode",
   "me.fullscreenModeDesc": "Hide status and navigation bars; swipe from the edge to reveal them",
   // Network group in Me.vue (ADR-0199 D4 / #779): rate-limit backoff settings; delaySeconds renders chip seconds
-  "me.network.title": "Network",
-  "me.network.hint": "Automatically wait and retry when rate-limited by Pixiv",
-  "me.network.backoff": "Rate-limit backoff",
-  "me.network.backoffDesc": "Wait and retry automatically on HTTP 429; off fails immediately",
-  "me.network.maxRetries": "Max retries",
-  "me.network.baseDelay": "Initial delay",
-  "me.network.maxDelay": "Max delay",
-  "me.network.delaySeconds": "{{seconds}}s",
+  "advanced.network.title": "Network",
+  "advanced.network.hint": "Automatically wait and retry when rate-limited by Pixiv",
+  "advanced.network.backoff": "Rate-limit backoff",
+  "advanced.network.backoffDesc": "Wait and retry automatically on HTTP 429; off fails immediately",
+  "advanced.network.maxRetries": "Max retries",
+  "advanced.network.baseDelay": "Initial delay",
+  "advanced.network.maxDelay": "Max delay",
+  "advanced.network.delaySeconds": "{{seconds}}s",
+  // Local usage metrics (spec §4 P0.5) — the single read-out for the four metrics
+  // (revisit interval / top-level share / sub-tab share / empty-section rate).
+  // Rate helpers return null for a zero denominator (never fake 0%); this panel
+  // surfaces that as noData rather than inventing a number.
+  "advanced.metrics.title": "Local usage metrics",
+  "advanced.metrics.hint": "Counted on this device only; never uploaded",
+  "advanced.metrics.revisit": "Revisit interval",
+  "advanced.metrics.revisitLast": "Latest",
+  "advanced.metrics.sampleCount": "Samples",
+  "advanced.metrics.samples": "{{count}} samples",
+  "advanced.metrics.hours": "{{hours}} h",
+  "advanced.metrics.topShare": "Top-level share",
+  "advanced.metrics.subShare": "Sub-tab share",
+  "advanced.metrics.emptyRate": "Empty-section rate",
+  "advanced.metrics.noData": "No data",
 
   // Notifications.vue (ADR-0188 / #728)
   "notifications.title": "Notifications",
@@ -428,6 +443,43 @@ const enPages = {
   "ranking.entry.collapseAria": "Collapse rankings",
   "ranking.entry.stripAria": "Rankings entry",
   "ranking.entry.itemAria": "No.{{rank}}: {{title}}",
+
+  // ─── Dimension restructure (2026-10-03): Discover / Updates / Shelf / Advanced ───
+  // Top level now groups by the question the user asks, not by medium;
+  // media demoted to a second-level tab inside Discover.
+
+  /** Discover (reworked Recommended.vue): second level = medium dimension */
+  "discover.title": "Discover",
+  "discover.tab.all": "All",
+  "discover.tab.illust": "Illustrations",
+  "discover.tab.novel": "Novels",
+
+  /** Updates (three-segment aggregate): following / watchlist / notifications */
+  "updates.title": "Updates",
+  "updates.section.following": "Following",
+  "updates.section.watchlist": "Watchlist",
+  "updates.section.notifications": "Notifications",
+  "updates.empty": "Nothing yet",
+  "updates.viewAll": "View all",
+  "updates.newCount": "{{count}} new",
+
+  /** Shelf (three-segment aggregate): bookmarks / watch later / continue reading */
+  "shelf.title": "Shelf",
+  "shelf.section.bookmarks": "Bookmarks",
+  "shelf.section.later": "Watch Later",
+  "shelf.section.continueReading": "Continue Reading",
+  "shelf.empty": "Nothing saved yet",
+  // Shelf's own "View all" (section-header jump) — stays in the shelf namespace.
+  "shelf.viewAll": "View all",
+  // Continue reading is not implemented yet (the old WebView client's historyStore
+  // was removed with ADR-0203) — say so instead of faking an empty list.
+  "shelf.continueReading.empty": "Reading history is coming soon",
+  "shelf.continueReading.hint": "When it ships you can jump straight back to where you stopped.",
+
+  /** Advanced settings (absorbs the debug/self-check rows previously in Me) */
+  "advanced.title": "Advanced",
+  "advanced.networkCheck": "Network self-check",
+  "advanced.platformCheck": "Platform consistency check",
 } as const satisfies Record<ZhPagesKey, string>;
 
 export default enPages;

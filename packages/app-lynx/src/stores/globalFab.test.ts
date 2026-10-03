@@ -21,6 +21,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import { ref, nextTick, type Ref } from "vue"
 import { setActivePinia, createPinia } from "pinia"
 import { useGlobalFabStore } from "./globalFab"
+import { NAV_TABS } from "../components/navTabs"
 
 type RouteStateLike = { name: string; path: string; params: Record<string, string> }
 
@@ -53,7 +54,7 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   // 注入新 ref（新 pinia 实例 + 新 routeState，避免前用例残留）
   holder.routeState = ref<RouteStateLike>({
-    name: "recommended",
+    name: "discover",
     path: "/recommended",
     params: {},
   })
@@ -103,8 +104,14 @@ describe("globalFab — view.mode 三态派生（ADR-0132 决策 2）", () => {
     }
   })
 
-  it("view.mode === 'menu' on 4 top-level tab routes", async () => {
-    for (const name of ["recommended", "illusts", "novels", "me"]) {
+  it("view.mode === 'menu' on the 4 top-level tab routes (discover/updates/shelf/me)", async () => {
+    // [维度重构 2026-10-03] 期望清单**显式写出**，不写成 NAV_TABS.map(...)：
+    //   后者是「遍历事实源、断言由同一事实源推导出的谓词」的重言式，恒真、抓不到任何东西。
+    // 期望值溯源：navTabs.ts:32-35 的 NAV_TABS 字面量（外环项集合）。
+    // 数量约束（navTabs.ts 顶部 ⚠️ 条）：外环 R=35vw / 环项 56dp，4 项中心距 60.5px 恰好排开，
+    //   第 5 项掉到 45.6px < 56dp 必重叠 ⇒ 集合是**封闭 4 项**，故基数单独钉一条断言。
+    expect(NAV_TABS).toHaveLength(4)
+    for (const name of ["discover", "updates", "shelf", "me"]) {
       holder.routeState!.value = { name, path: `/${name}`, params: {} }
       await nextTick()
       expect(store.view.mode).toBe("menu")
@@ -140,7 +147,7 @@ describe("globalFab — usePage 注册/注销", () => {
     // 初始 inner 至少含全局搜索项（kind='search'，固定首位）
     const initialInner = store.view.inner.length
     expect(store.view.inner.some((i) => i.kind === "search")).toBe(true)
-    const unregister = store.usePage("recommended", {
+    const unregister = store.usePage("discover", {
       refresh: vi.fn(),
       backToTop: vi.fn(),
     })
@@ -173,7 +180,7 @@ describe("globalFab — dispatch 命令", () => {
 
 describe("globalFab — 跨 store hasOpenModal 闭包", () => {
   it("hasOpenModal closure returns true → view.mode === 'hidden'", async () => {
-    // 初始在 'recommended' tab，mode='menu'，visible=true
+    // 初始在 'discover' tab，mode='menu'，visible=true
     expect(store.view.mode).toBe("menu")
     expect(store.view.visible).toBe(true)
     // 模拟弹层打开

@@ -225,12 +225,16 @@ describe('边界：容差本身被误传时不得静默通过', () => {
 
 // ── 路由声明解析：判据「跑不跑」的决定点，必须可测 ──
 //
-// 期望值来源：`src/router.ts` 的**真实两行**（逐字抄录，见下），
+// 期望值来源：`src/router.ts` 里对应行的**声明形态**（路径/路由名/条件极性），
 // 不是从实现反推的 mock。
+//
+// ⚠️ ROUTER_SRC 是**示意夹具、非真实 router.ts 摘录**：只保留解析器认得的三行，
+//    便于逐行看清「找哪一行」。改它之前先对 `src/router.ts` 现状（DISCOVER_PATH、
+//    illusts 路由名等），否则夹具会与生产分叉而门禁照绿。
 const ROUTER_SRC = [
-  "export const RECOMMENDED_PATH = '/recommended'",
-  "  { path: '/illust', name: 'illust', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },",
-  "  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },",
+  "export const DISCOVER_PATH = '/discover'",
+  "  { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },",
+  "  { path: DISCOVER_PATH, name: 'discover', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },",
 ].join('\n')
 
 // 产物里引号是「反斜杠+引号」的字面串；实测缺省构建 bleed 出现 2 次
@@ -239,36 +243,36 @@ const BUNDLE_SELF = 'topInset:\\"self\\"'.repeat(24)
 
 describe('resolveDeclaredTopInset：按应用自己的路由声明判「有没有顶栏」', () => {
   it('字面量 self 的路由 ⇒ self（不依赖构建）', () => {
-    expect(resolveDeclaredTopInset('illust', ROUTER_SRC, BUNDLE_BLEED)).toBe('self')
-    expect(resolveDeclaredTopInset('illust', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
+    expect(resolveDeclaredTopInset('illusts', ROUTER_SRC, BUNDLE_BLEED)).toBe('self')
+    expect(resolveDeclaredTopInset('illusts', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
   })
 
   it('首页在缺省构建 ⇒ bleed（判据据此直接拒绝，不再靠像素猜）', () => {
-    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, BUNDLE_BLEED)).toBe('bleed')
+    expect(resolveDeclaredTopInset('discover', ROUTER_SRC, BUNDLE_BLEED)).toBe('bleed')
   })
 
   it('首页在回退构建 ⇒ self（同一份源码，产物决定极性）', () => {
-    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
+    expect(resolveDeclaredTopInset('discover', ROUTER_SRC, BUNDLE_SELF)).toBe('self')
   })
 
   it('**不许把「读不到」当成「没有顶栏」**', () => {
     // 没构建过（bundleSrc = null）⇒ 不知道，必须放行后续像素判据。
     // 若这里返回 'bleed'，真缺陷页会被判成「不适用」—— 比误报危险得多。
-    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, null)).toBeNull()
+    expect(resolveDeclaredTopInset('discover', ROUTER_SRC, null)).toBeNull()
     // 路由名不存在 / 源码里没有该路由 ⇒ 同样不知道
     expect(resolveDeclaredTopInset('nonexistent', ROUTER_SRC, BUNDLE_BLEED)).toBeNull()
-    expect(resolveDeclaredTopInset('recommended', '', BUNDLE_BLEED)).toBeNull()
+    expect(resolveDeclaredTopInset('discover', '', BUNDLE_BLEED)).toBeNull()
   })
 
   it('形态不认识时返回 null 而不是瞎猜', () => {
     // 将来有人把路由表改成数组字面量或多行对象，这里必须老实说「不知道」
-    const weird = "  { name: 'recommended', topInset: someHelper() },"
-    expect(resolveDeclaredTopInset('recommended', weird, BUNDLE_BLEED)).toBeNull()
+    const weird = "  { name: 'discover', topInset: someHelper() },"
+    expect(resolveDeclaredTopInset('discover', weird, BUNDLE_BLEED)).toBeNull()
   })
 
   it('产物里 bleed 出现次数异常 ⇒ null（不猜是哪种构建）', () => {
     const odd = 'topInset:\\"bleed\\"'.repeat(9)
-    expect(resolveDeclaredTopInset('recommended', ROUTER_SRC, odd)).toBeNull()
+    expect(resolveDeclaredTopInset('discover', ROUTER_SRC, odd)).toBeNull()
   })
 })
 

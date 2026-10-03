@@ -13,7 +13,7 @@ import type { ImageQuality } from '../utils/imageQuality'
 import type { UgoiraExtractMode } from '../api/ugoira'
 import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
 import { proxyImageUrl } from '../utils/imageUrl'
-import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { ME_A11Y_LABELS, ADVANCED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import AppIcon from '../components/AppIcon.vue'
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
@@ -30,11 +30,6 @@ import {
   undoLastRestore,
 } from '../services/backupWiring'
 import { isNativeMode } from '../api/client'
-import {
-  RATE_LIMIT_BASE_DELAY_MS_OPTIONS,
-  RATE_LIMIT_MAX_DELAY_MS_OPTIONS,
-  RATE_LIMIT_MAX_RETRIES_OPTIONS,
-} from '../api/rateLimitBackoff'
 import {
   applyPreparedRestore,
   backupNow,
@@ -85,7 +80,7 @@ const settings = useSettingsStore()
 const notificationStore = useNotificationStore()
 // 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
 const watchLaterStore = useWatchLaterStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, fullscreenMode, downloadByAuthorDir, rateLimitBackoffEnabled, rateLimitMaxRetries, rateLimitBaseDelayMs, rateLimitMaxDelayMs } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
 
 
 
@@ -94,31 +89,10 @@ function toggleFullscreenMode() {
   settings.setFullscreenMode(!fullscreenMode.value)
 }
 
-// ─── 限流退避四参数（ADR-0199 D4 / #779）：网络组开关 + 三档位行（设备级 setter 自带落盘
-//     与组装注入 client 即时生效）；档位集合 = api/rateLimitBackoff.ts 单一事实源常量 ───
-
-/** 限流退避开关（一键翻转范式）：关闭后 429 立即报错零重试 */
-function toggleRateLimitBackoff() {
-  settings.setRateLimitBackoffEnabled(!rateLimitBackoffEnabled.value)
-}
-
-/** 档位选择（镜像 pickWebdavAutoBackupDays 范式） */
-function pickRateLimitMaxRetries(retries: number): void {
-  settings.setRateLimitMaxRetries(retries)
-}
-
-function pickRateLimitBaseDelayMs(ms: number): void {
-  settings.setRateLimitBaseDelayMs(ms)
-}
-
-function pickRateLimitMaxDelayMs(ms: number): void {
-  settings.setRateLimitMaxDelayMs(ms)
-}
-
-/** 档位毫秒 → 秒显示值（500→0.5、1000→1、…、60000→60；单一换算点供两个 delay 行复用） */
-function toSeconds(ms: number): number {
-  return ms / 1000
-}
+// [维度重构 2026-10-03] 限流退避四参数（ADR-0199 D4 / #779）已整体搬进 /advanced
+//   —— 原先它们与 7 个复访资产平级混排在本页，是 NN/g 所说的"视觉噪声"来源之一。
+//   本页**不再** import api/rateLimitBackoff，也不持有任何 rateLimit* ref：
+//   单一落点 = pages/AdvancedSettings.vue。
 
 // ─── WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生 LynxView 渲染，§2）───
 const webdavAvailable = isNativeMode()
@@ -446,8 +420,11 @@ function openDownloads() {
   void navigate('/downloads')
 }
 
-function openNetworkCheck() {
-  void navigate('/network-check')
+/** 「高级」入口（[维度重构 2026-10-03]）：网络自检 / 平台一致性自检 / 限流退避调参的落点。
+ *  替代原先本页的 `openNetworkCheck` 那一行 —— 现在 /network-check 由 /advanced 内部进入，
+ *  本页只保留一个二级入口。 */
+function openAdvanced() {
+  void navigate('/advanced')
 }
 
 /** 通知中心入口（ADR-0188 D7 / #728）：功能入口卡区行 */
@@ -685,14 +662,18 @@ function pickAppearanceMode(mode: DarkModeId) {
           <text class="text-title-medium text-surface-on">{{ t('me.downloads') }}</text>
           <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
-        <!-- 网络自检入口（spec docs/specs/network-self-check.md / #445） -->
+        <!-- 「高级」入口（[维度重构 2026-10-03]）：网络自检 / 平台一致性自检 / 限流退避调参
+             已整体搬进 /advanced。搬走它们让本页**只留账号与外观**，业务行与调试行不再平级混排
+             —— NN/g 可发现性失败的第四因正是"视觉噪声"（Amazon Rufus 案例：页面塞满竞争信息，
+             功能被淹没）。本行是它们的新落点，**不是**给同一个功能开第二条路
+             （被搬走的是 /network-check 与 /platform-check 两个页面，本行是它们唯一入口）。 -->
         <view
           class="flex flex-row items-center justify-between py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.networkCheck"
-          @tap="openNetworkCheck"
+          :accessibility-label="ADVANCED_A11Y_LABELS.pageTitle"
+          @tap="openAdvanced"
         >
-          <text class="text-title-medium text-surface-on">{{ t('me.networkCheck') }}</text>
+          <text class="text-title-medium text-surface-on">{{ t('advanced.title') }}</text>
           <AppIcon name="arrow_forward" :size="4.27" class="text-surface-on-variant" />
         </view>
         <!-- 通知中心入口（ADR-0188 D7 / #728）：行尾未读圆点（M3 error 语义色，纯 CSS） -->
@@ -733,87 +714,6 @@ function pickAppearanceMode(mode: DarkModeId) {
       </view>
 
       <!-- 网络组（ADR-0199 D4 / #779：限流退避四参数设置；卡片/行结构镜像客户端组） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]" :style="listItemStyle(1)">
-        <text
-          class="text-title-small font-medium text-surface-on"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.networkGroupTitle"
-          >{{ t('me.network.title') }}</text
-        >
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.network.hint') }}</text>
-        <!-- 限流退避开关行：关闭后 429 立即报错零重试 -->
-        <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.rateLimitBackoff"
-          @tap="toggleRateLimitBackoff"
-        >
-          <view class="flex flex-col">
-            <text class="text-title-medium text-surface-on">{{ t('me.network.backoff') }}</text>
-            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.network.backoffDesc') }}</text>
-          </view>
-          <M3Switch
-            :checked="rateLimitBackoffEnabled"
-          />
-        </view>
-        <!-- 最大重试次数档位行（镜像 webdavAutoBackupDays chips 行；档位集 = 单一事实源常量） -->
-        <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant">
-          <text class="text-title-medium text-surface-on">{{ t('me.network.maxRetries') }}</text>
-          <view
-            class="flex flex-row gap-2"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.rateLimitMaxRetries"
-          >
-            <view
-              v-for="n in RATE_LIMIT_MAX_RETRIES_OPTIONS"
-              :key="n"
-              class="px-3 py-1 rounded-[var(--md-shape-full)]"
-              :class="rateLimitMaxRetries === n ? 'bg-primary' : 'bg-surface-container-high'"
-              @tap="pickRateLimitMaxRetries(n)"
-            >
-              <text class="text-label-medium" :class="rateLimitMaxRetries === n ? 'text-primary-on' : 'text-surface-on'">{{ n }}</text>
-            </view>
-          </view>
-        </view>
-        <!-- 初始等待档位行：毫秒档位按 delaySeconds 插值渲染秒数（500→0.5 … 5000→5） -->
-        <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant">
-          <text class="text-title-medium text-surface-on">{{ t('me.network.baseDelay') }}</text>
-          <view
-            class="flex flex-row gap-2"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.rateLimitBaseDelay"
-          >
-            <view
-              v-for="ms in RATE_LIMIT_BASE_DELAY_MS_OPTIONS"
-              :key="ms"
-              class="px-3 py-1 rounded-[var(--md-shape-full)]"
-              :class="rateLimitBaseDelayMs === ms ? 'bg-primary' : 'bg-surface-container-high'"
-              @tap="pickRateLimitBaseDelayMs(ms)"
-            >
-              <text class="text-label-medium" :class="rateLimitBaseDelayMs === ms ? 'text-primary-on' : 'text-surface-on'">{{ t('me.network.delaySeconds', { seconds: toSeconds(ms) }) }}</text>
-            </view>
-          </view>
-        </view>
-        <!-- 最长等待档位行：10/30/60 秒（末行不带分隔线，镜像客户端组末行收尾） -->
-        <view class="flex flex-row items-center justify-between py-3.5">
-          <text class="text-title-medium text-surface-on">{{ t('me.network.maxDelay') }}</text>
-          <view
-            class="flex flex-row gap-2"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.rateLimitMaxDelay"
-          >
-            <view
-              v-for="ms in RATE_LIMIT_MAX_DELAY_MS_OPTIONS"
-              :key="ms"
-              class="px-3 py-1 rounded-[var(--md-shape-full)]"
-              :class="rateLimitMaxDelayMs === ms ? 'bg-primary' : 'bg-surface-container-high'"
-              @tap="pickRateLimitMaxDelayMs(ms)"
-            >
-              <text class="text-label-medium" :class="rateLimitMaxDelayMs === ms ? 'text-primary-on' : 'text-surface-on'">{{ t('me.network.delaySeconds', { seconds: toSeconds(ms) }) }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
 
       <!-- 外观组（主题色）：色板类 .theme-* 定义在 tokens.css，根 <page> 应用即整体换色；
            色块自身加对应色板类（默认 sky 用 .theme-sky，与基础 page 色板共用规则）+ bg-primary 预览该色板主色。

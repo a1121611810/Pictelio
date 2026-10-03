@@ -14,6 +14,10 @@ import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import AppIcon from '../components/AppIcon.vue'
+import BookmarkButton from '../components/BookmarkButton.vue'
+import ActionButton from '../components/ActionButton.vue'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
+import { useWatchLaterStore, toNovelSnapshot } from '../stores/watchLaterStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useNovelTranslateStore } from '../stores/novelTranslateStore'
@@ -58,6 +62,20 @@ const loading = ref(true)
 const errorMsg = ref('')
 
 const novelId = computed(() => Number(currentParams.value.id ?? 0))
+
+// ─── 稍后看（WatchLater，ADR-0191 D5）[维度重构 2026-10-03 新增] ───
+// ⚠️ 为什么正文页此前**没有**收藏/稍后看、而介绍页（NovelIntro）有：
+//   能力被绑在了「介绍页」这个**路由**上，而不是绑在「这本书」这个对象上。
+//   用户正在读书正文时想收藏，必须先退回介绍页 —— 这正是本次维度重构要修的「耦合错位 A」。
+//   本页接上后，能力绑对象：同一本书从介绍页或正文页进入，都能收藏/稍后看。
+const watchLater = useWatchLaterStore()
+const laterAdded = computed(() => watchLater.has('novel', novelId.value))
+
+function toggleWatchLater(): void {
+  const n = novel.value
+  if (!n) return
+  watchLater.toggle(toNovelSnapshot(n))
+}
 
 // ─── 评论弹层（issue #164）：入口在作者/元信息行附近；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
@@ -469,6 +487,34 @@ function onWatchlistCancel(): void {
           <!-- T12/ADR-0208：⬆ → Material Symbols `upload`（缺省 6.4vw = 原 text-[6.4vw]，尺寸不变） -->
           <AppIcon name="upload" />
           <text class="text-label-medium text-outline ml-1">{{ t('novelDetail.export.action') }}</text>
+        </view>
+        <!-- 收藏 + 稍后看（[维度重构 2026-10-03] 新增，修「能力绑路由不绑对象」的错位 A）。
+             放在导出入口之后、翻译 banner 之前：两者都是「对这本小说」的持久化动作，
+             与「评论/导出」同属元信息动作，语义相邻。 -->
+        <view
+          v-if="novel"
+          class="mt-3 flex flex-row items-stretch"
+        >
+          <view class="flex-1 flex items-center justify-center">
+            <BookmarkButton
+              class="self-center"
+              :key="novel.id"
+              target-kind="novel"
+              :illust-id="novel.id"
+              :initial-bookmarked="novel.is_bookmarked"
+              :bookmark-count="novel.total_bookmarks"
+            />
+          </view>
+          <view class="flex-1 min-w-0" @tap.stop>
+            <ActionButton
+              class="w-full"
+              :icon="LATER_ICON"
+              :label="laterAdded ? t('later.action.added') : t('later.action.add')"
+              :active="laterAdded"
+              :disabled="false"
+              @tap="toggleWatchLater"
+            />
+          </view>
         </view>
         <!-- 翻译入口（spec §6.2 顶部 banner 位置）：FAB 内联；R18/AI 受限时隐藏 -->
         <view v-if="translationEnabled" class="mt-3">

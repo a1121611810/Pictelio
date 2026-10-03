@@ -24,7 +24,7 @@ const CONTENT_ROUTE_NAMES = [
   'bookmarks', 'watchlist',
 ]
 
-function setup(initialName = 'recommended', opts: { openSearch?: () => void; hasOpenModal?: () => boolean } = {}) {
+function setup(initialName = 'discover', opts: { openSearch?: () => void; hasOpenModal?: () => boolean } = {}) {
   const routeState = ref<RouteState>({ name: initialName, path: `/${initialName}`, params: {}, topInset: 'self' })
   // 模拟真实 router：navigate 推进 routeState（这样选中其他 tab 后激活页随之切换）
   const navigate = vi.fn((path: string) => {
@@ -88,7 +88,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
   it('hasOpenModal=true → mode=hidden，覆盖 menu（tab 页）与 search（内容页，issue #295 互斥）', async () => {
     // 期望值来源：issue #295 验收「FAB 与弹层互斥」+ 实测场景（T4 遗留：modal 打开时
     // FAB z-40 悬浮于弹层之上、可点击并误开搜索）——任一弹层打开时 FAB 必须隐藏。
-    const { fab, routeState } = setup('recommended', { hasOpenModal: () => true })
+    const { fab, routeState } = setup('discover', { hasOpenModal: () => true })
     // 覆盖 menu：4 tab 页
     for (const tab of NAV_TABS) {
       routeState.value = { name: tab.name, path: tab.path, params: {}, topInset: 'self' }
@@ -110,7 +110,7 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
     // 响应式依赖 = 桩内 ref 的 .value 访问（真实接线 stores/globalFab.ts 的 () => hasOpenModal()
     // 是普通函数，穿透到 modalStack 内部 ref 的同一机制——computed 内 .value 读取即建立依赖）
     const modalOpen = ref(true)
-    const { fab } = setup('recommended', { hasOpenModal: () => modalOpen.value })
+    const { fab } = setup('discover', { hasOpenModal: () => modalOpen.value })
     await nextTick()
     expect(fab.view.value.mode).toBe('hidden')
     modalOpen.value = false
@@ -130,9 +130,24 @@ describe('createGlobalFab — mode 显示门三态（ADR-0132 决策 2）', () =
 })
 
 describe('createGlobalFab — view 读模型', () => {
-  it('outer 恒为 NAV_TABS（4 项，顺序不变）', () => {
+  it('outer 恒为 NAV_TABS（4 项，顺序不变）逐项 + badge 读点', () => {
+    // [维度重构 2026-10-03] 契约更新：outer 不再是 NAV_TABS 的**原样**引用，
+    // 而是「NAV_TABS 每项 + 该 tab 的未读角标计数」（spec §2.2 承诺的读点）。
+    // 故断言拆成两层：① 与事实源逐项同源（name/path/icon/labelKey 全等、顺序不变）；
+    //                 ② badge 字段存在且未接 navBadge 时为 0。
     const { fab } = setup()
-    expect(fab.view.value.outer).toEqual(NAV_TABS)
+    const outer = fab.view.value.outer
+    expect(outer).toHaveLength(NAV_TABS.length)
+    outer.forEach((item, i) => {
+      const src = NAV_TABS[i]!
+      expect({ name: item.name, path: item.path, icon: item.icon, labelKey: item.labelKey }).toEqual({
+        name: src.name,
+        path: src.path,
+        icon: src.icon,
+        labelKey: src.labelKey,
+      })
+      expect(item.badge, `${item.name} 的 badge 应为 0（未接 navBadge 依赖）`).toBe(0)
+    })
   })
 
   it('未有页面注册时 inner 仅含全局搜索项（首位）', () => {
@@ -142,7 +157,7 @@ describe('createGlobalFab — view 读模型', () => {
 
   it('内环按激活页动作装配：刷新/回顶顺延于全局搜索项；缺省即无', async () => {
     const { fab } = setup()
-    fab.usePage('recommended', { refresh: vi.fn(), backToTop: vi.fn() })
+    fab.usePage('discover', { refresh: vi.fn(), backToTop: vi.fn() })
     expect(fab.view.value.inner.map((i) => i.kind)).toEqual(['search', 'refresh', 'back-to-top'])
     // 图标名契约：↻ 刷新→refresh、↑ 回顶→arrow_upward（oracle 见文件头注释）
     expect(fab.view.value.inner.map((i) => i.icon)).toEqual(['search', 'refresh', 'arrow_upward'])
@@ -168,7 +183,7 @@ describe('createGlobalFab — 内环全局搜索项（ADR-0132 决策 2）', () 
     expect(searchItem.visible()).toBe(true)
     expect(fab.view.value.inner.filter((i) => i.kind === 'search')).toHaveLength(1)
     // 页面动作项顺延（刷新/回顶/extras 均排在搜索项之后）
-    fab.usePage('recommended', actions({ extras: [{ key: 'prev', icon: 'arrow_back', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap: vi.fn() }] }))
+    fab.usePage('discover', actions({ extras: [{ key: 'prev', icon: 'arrow_back', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap: vi.fn() }] }))
     expect(fab.view.value.inner[0].kind).toBe('search')
     expect(fab.view.value.inner.slice(1).map((i) => i.kind)).toEqual(['refresh', 'back-to-top', 'extra'])
     // extras 的图标名原样透传（渲染层才查表，本层不二次映射——ADR-0208 决策 3）
@@ -189,7 +204,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
     fab.dispatch({ type: 'toggle' })
     // 手动制造 busy：注册一个挂起的 refresh 并触发
     let release!: () => void
-    fab.usePage('recommended', { refresh: () => new Promise<void>((r) => { release = r }) })
+    fab.usePage('discover', { refresh: () => new Promise<void>((r) => { release = r }) })
     const p = fab.dispatch({ type: 'refresh' })
     await nextTick()
     expect(fab.view.value.isBusy).toBe(true)
@@ -201,14 +216,16 @@ describe('createGlobalFab — dispatch 命令通道', () => {
   })
 
   it('select 用 replace 导航；当前 tab no-op（不导航但收起）', async () => {
-    const { fab, navigate } = setup('recommended')
-    await fab.dispatch({ type: 'select', name: 'novels' })
-    expect(navigate).toHaveBeenCalledWith('/novels', { replace: true })
-    // navigate 已推进 routeState → 激活 tab 现为 novels
+    // [维度重构 2026-10-03] 用例从 'novels' 改用 'updates'：插画/小说已降为「发现」页内二级，
+    // 不再是顶层 tab —— 拿已非 tab 的 name 做 select 用例会让断言失去前提。
+    const { fab, navigate } = setup('discover')
+    await fab.dispatch({ type: 'select', name: 'updates' })
+    expect(navigate).toHaveBeenCalledWith('/updates', { replace: true })
+    // navigate 已推进 routeState → 激活 tab 现为 updates
     navigate.mockClear()
     await fab.dispatch({ type: 'toggle' })
     expect(fab.view.value.isOpen).toBe(true)
-    await fab.dispatch({ type: 'select', name: 'novels' }) // 当前 tab
+    await fab.dispatch({ type: 'select', name: 'updates' }) // 当前 tab
     expect(navigate).not.toHaveBeenCalled()
     expect(fab.view.value.isOpen).toBe(false)
   })
@@ -217,7 +234,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
     let release!: () => void
     const refresh = vi.fn(() => new Promise<void>((r) => { release = r }))
     const { fab } = setup()
-    fab.usePage('recommended', { refresh })
+    fab.usePage('discover', { refresh })
     const p = fab.dispatch({ type: 'refresh' })
     await nextTick()
     expect(fab.view.value.isBusy).toBe(true)
@@ -237,7 +254,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
 
   it('refresh 抛错：warn + busy 复位（无 rejection 逃逸）', async () => {
     const { fab } = setup()
-    fab.usePage('recommended', { refresh: () => { throw new Error('boom') } })
+    fab.usePage('discover', { refresh: () => { throw new Error('boom') } })
     await expect(fab.dispatch({ type: 'refresh' })).resolves.toBeUndefined()
     expect(fab.view.value.isBusy).toBe(false)
   })
@@ -245,7 +262,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
   it('back-to-top：调用激活页 backToTop 并收起；1s 连点只触发一次', async () => {
     const { fab } = setup()
     const backToTop = vi.fn()
-    fab.usePage('recommended', { backToTop })
+    fab.usePage('discover', { backToTop })
     await fab.dispatch({ type: 'toggle' })
     await fab.dispatch({ type: 'back-to-top' })
     expect(backToTop).toHaveBeenCalledTimes(1)
@@ -263,7 +280,7 @@ describe('createGlobalFab — dispatch 命令通道', () => {
     const onTap = vi.fn(() => new Promise<void>((r) => { release = r }))
     const extras: FabMenuExtraItem[] = [{ key: 'prev', icon: 'arrow_back', label: '上一页', accessibilityLabel: '上一页', visible: () => true, onTap }]
     const { fab } = setup()
-    fab.usePage('recommended', { extras })
+    fab.usePage('discover', { extras })
     const p = fab.dispatch({ type: 'extra', key: 'prev' })
     await nextTick()
     expect(onTap).toHaveBeenCalled()
@@ -277,8 +294,8 @@ describe('createGlobalFab — dispatch 命令通道', () => {
 describe('createGlobalFab — dispatch search 命令（ADR-0132 决策 2）', () => {
   it('dispatch({type:"search"})：收起菜单 + 调用注入的 openSearch；不设 busy', async () => {
     const openSearch = vi.fn()
-    const { fab } = setup('recommended', { openSearch })
-    fab.usePage('recommended', actions())
+    const { fab } = setup('discover', { openSearch })
+    fab.usePage('discover', actions())
     await fab.dispatch({ type: 'toggle' })
     expect(fab.view.value.isOpen).toBe(true)
     await fab.dispatch({ type: 'search' })
@@ -290,7 +307,7 @@ describe('createGlobalFab — dispatch search 命令（ADR-0132 决策 2）', ()
 
   it('search 模式（非 tab 内容页）下 dispatch("search") 同样触发 openSearch', async () => {
     const openSearch = vi.fn()
-    const { fab, routeState } = setup('recommended', { openSearch })
+    const { fab, routeState } = setup('discover', { openSearch })
     routeState.value = { name: 'illust-detail', path: '/illust/1', params: {}, topInset: 'self' }
     await nextTick()
     expect(fab.view.value.mode).toBe('search')
@@ -314,7 +331,7 @@ describe('createGlobalFab — dispatch search 命令（ADR-0132 决策 2）', ()
 describe('createGlobalFab — usePage 生命周期', () => {
   it('usePage 返回注销函数，注销后该页动作不再进入内环（全局搜索项常驻）', () => {
     const { fab } = setup()
-    const un = fab.usePage('recommended', { refresh: vi.fn() })
+    const un = fab.usePage('discover', { refresh: vi.fn() })
     expect(fab.view.value.inner.some((i) => i.kind === 'refresh')).toBe(true)
     un()
     expect(fab.view.value.inner.some((i) => i.kind === 'refresh')).toBe(false)
@@ -325,8 +342,8 @@ describe('createGlobalFab — usePage 生命周期', () => {
     const { fab } = setup()
     const r1 = vi.fn()
     const r2 = vi.fn()
-    const un1 = fab.usePage('recommended', { refresh: r1 })
-    fab.usePage('recommended', { refresh: r2 })
+    const un1 = fab.usePage('discover', { refresh: r1 })
+    fab.usePage('discover', { refresh: r2 })
     un1() // 注销旧的，不应删掉新的
     expect(fab.view.value.inner.some((i) => i.kind === 'refresh')).toBe(true)
   })

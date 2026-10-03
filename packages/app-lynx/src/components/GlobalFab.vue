@@ -246,6 +246,23 @@ function onFabTap(): void {
           :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
           style="font-size: 3.2vw"
         >{{ t(e.tab.labelKey) }}</text>
+        <!-- 未读角标（spec §2.2「更新」/ §3.2）：P0-7 撤掉首页顶栏铃铛后，这是通知
+             在全局级唯一的可发现性兜底。值来自 deps.navBadge 读点（notificationStore.unreadCount，
+             接线见 stores/globalFab.ts；值来源在 App.vue 冷启动预取，否则启动后恒为 0）。
+             ⚠️ 定位必须**落在自身圆环之内**（`top-/right-` 均为正值的内缩偏移，数值见下一元素
+             的 class），不能向外伸（`-top`/`-right`）：外环 4 项在 80° 扫角内中心距 60.5px、
+             圆直径 56px（间隙仅 4px，ADR-0121），向外伸必然被相邻环项压住。
+             ⚠️ 本注释**刻意不复写偏移数值**：抄一份就会在某次调参后与 class 悄悄分叉
+             （已发生过一次：注释 1.2vw vs 代码 0.8vw）。判据在 globalFabNavBadge.test.ts。
+             ⚠️ v-if="badge > 0"：0 时不渲染节点，避免空圆点。 -->
+        <view
+          v-if="e.tab.badge > 0"
+          class="absolute top-[0.8vw] right-[0.8vw] min-w-[5.6vw] h-[5.6vw] px-[0.6vw] rounded-full bg-error flex items-center justify-center"
+        >
+          <text class="text-[1.9vw] font-medium text-on-error" style="line-height: 5.6vw">{{
+            e.tab.badge > 99 ? '99+' : e.tab.badge
+          }}</text>
+        </view>
       </view>
 
       <!-- 内环：全局搜索项（首位）+ 页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
