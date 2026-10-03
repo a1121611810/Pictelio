@@ -1,5 +1,5 @@
 {
-  "version": "6.6.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.6.1",
-  "changelog": "# Pictelio 更新日志\n\n## 🐛 问题修复\n\n- **Lynx**：此前列表滚到底会被底部导航栏遮挡，现已可正常浏览全部内容；不同页面采用合适的底部间距\n- **Lynx**：首页、排行榜等四个根页面此前仍显示顶部标题栏，现已移除以让内容更沉浸，状态栏安全区仍正常保留\n- **Lynx 榜单页**：入口卡片与下方列表之间的间距已恢复正常，不再紧贴\n- **Lynx**：轮播组件在缺少图片时不再出现错位与越界显示"
+  "version": "6.7.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.7.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 引擎**：顶层导航从按媒介维度改为按用户问题维度组织\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：登录页部分文案已按规范修正"
 }
