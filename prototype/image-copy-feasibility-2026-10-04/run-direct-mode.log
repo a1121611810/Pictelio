@@ -1,0 +1,461 @@
+--------- beginning of main
+DELIVER mode=direct id185215244 600x779
+HANDOFF path=miss deliver=185215244 cached=185215244 same=true 600x779 bytes=1MB
+DELIVER mode=direct id156247146 600x450
+HANDOFF path=miss deliver=156247146 cached=156247146 same=true 600x450 bytes=1MB
+DELIVER mode=direct id254656209 600x398
+HANDOFF path=miss deliver=254656209 cached=254656209 same=true 600x398 bytes=0MB
+DELIVER mode=direct id222567734 600x400
+HANDOFF path=miss deliver=222567734 cached=222567734 same=true 600x400 bytes=0MB
+DELIVER mode=direct id109743524 600x423
+HANDOFF path=miss deliver=109743524 cached=109743524 same=true 600x423 bytes=0MB
+DELIVER mode=direct id1227987 600x690
+HANDOFF path=miss deliver=1227987 cached=1227987 same=true 600x690 bytes=1MB
+DELIVER mode=direct id196403216 600x847
+HANDOFF path=miss deliver=196403216 cached=196403216 same=true 600x847 bytes=1MB
+DELIVER mode=direct id149941564 600x374
+HANDOFF path=miss deliver=149941564 cached=149941564 same=true 600x374 bytes=0MB
+DELIVER mode=direct id14187205 600x335
+HANDOFF path=miss deliver=14187205 cached=14187205 same=true 600x335 bytes=0MB
+DELIVER mode=direct id183663642 600x848
+HANDOFF path=miss deliver=183663642 cached=183663642 same=true 600x848 bytes=1MB
+DELIVER mode=direct id208445736 600x485
+HANDOFF path=miss deliver=208445736 cached=208445736 same=true 600x485 bytes=1MB
+DELIVER mode=direct id112425255 600x873
+HANDOFF path=miss deliver=112425255 cached=112425255 same=true 600x873 bytes=1MB
+DELIVER mode=direct id75409364 600x881
+HANDOFF path=miss deliver=75409364 cached=75409364 same=true 600x881 bytes=2MB
+DELIVER mode=direct id61283692 600x848
+HANDOFF path=miss deliver=61283692 cached=61283692 same=true 600x848 bytes=1MB
+DELIVER mode=direct id58934587 600x848
+DELIVER mode=direct id77505624 600x800
+HANDOFF path=miss deliver=77505624 cached=77505624 same=true 600x800 bytes=1MB
+HANDOFF path=miss deliver=58934587 cached=58934587 same=true 600x848 bytes=1MB
+CHECK @1500ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+DELIVER mode=direct id181860887 600x600
+HANDOFF path=miss deliver=181860887 cached=181860887 same=true 600x600 bytes=1MB
+DELIVER mode=direct id151551981 600x800
+HANDOFF path=miss deliver=151551981 cached=151551981 same=true 600x800 bytes=1MB
+DELIVER mode=direct id233233954 400x711
+HANDOFF path=miss deliver=233233954 cached=233233954 same=true 400x711 bytes=1MB
+CHECK @1500ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+DELIVER mode=direct id246523504 600x389
+HANDOFF path=miss deliver=246523504 cached=246523504 same=true 600x389 bytes=0MB
+CHECK @1500ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+CHECK @1500ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @1500ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @1500ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @1500ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @1500ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @1500ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+CHECK @1500ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+CHECK @1500ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @1500ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+CHECK @5000ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+DELIVER mode=direct-hit id185215244 600x779
+HANDOFF path=hit deliver=185215244 cached=185215244 same=true 600x779 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x779 recycled=false
+CHECK @5000ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+DELIVER mode=direct-hit id156247146 600x450
+HANDOFF path=hit deliver=156247146 cached=156247146 same=true 600x450 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x450 recycled=false
+CHECK @5000ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+DELIVER mode=direct-hit id222567734 600x400
+HANDOFF path=hit deliver=222567734 cached=222567734 same=true 600x400 bytes=0MB
+CHECK @5000ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x400 recycled=false
+DELIVER mode=direct-hit id254656209 600x398
+HANDOFF path=hit deliver=254656209 cached=254656209 same=true 600x398 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x398 recycled=false
+CHECK @5000ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+DELIVER mode=direct-hit id109743524 600x423
+HANDOFF path=hit deliver=109743524 cached=109743524 same=true 600x423 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x423 recycled=false
+CHECK @5000ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @5000ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+DELIVER mode=direct-hit id196403216 600x847
+HANDOFF path=hit deliver=196403216 cached=196403216 same=true 600x847 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x847 recycled=false
+DELIVER mode=direct-hit id1227987 600x690
+HANDOFF path=hit deliver=1227987 cached=1227987 same=true 600x690 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x690 recycled=false
+CHECK @5000ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+DELIVER mode=direct-hit id14187205 600x335
+HANDOFF path=hit deliver=14187205 cached=14187205 same=true 600x335 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x335 recycled=false
+CHECK @5000ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+DELIVER mode=direct-hit id183663642 600x848
+HANDOFF path=hit deliver=183663642 cached=183663642 same=true 600x848 bytes=1MB
+CHECK @5000ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+DELIVER mode=direct-hit id149941564 600x374
+HANDOFF path=hit deliver=149941564 cached=149941564 same=true 600x374 bytes=0MB
+CHECK @5000ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+DELIVER mode=direct-hit id208445736 600x485
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x374 recycled=false
+HANDOFF path=hit deliver=208445736 cached=208445736 same=true 600x485 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x485 recycled=false
+CHECK @5000ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+DELIVER mode=direct-hit id112425255 600x873
+HANDOFF path=hit deliver=112425255 cached=112425255 same=true 600x873 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x873 recycled=false
+CHECK @5000ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @5000ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @5000ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+DELIVER mode=direct-hit id77505624 600x800
+HANDOFF path=hit deliver=77505624 cached=77505624 same=true 600x800 bytes=1MB
+DELIVER mode=direct-hit id58934587 600x848
+HANDOFF path=hit deliver=58934587 cached=58934587 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+DELIVER mode=direct-hit id75409364 600x881
+HANDOFF path=hit deliver=75409364 cached=75409364 same=true 600x881 bytes=2MB
+CHECK @5000ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x881 recycled=false
+DELIVER mode=direct-hit id61283692 600x848
+HANDOFF path=hit deliver=61283692 cached=61283692 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+CHECK @1500ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+CHECK @5000ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @5000ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @5000ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+DELIVER mode=direct-hit id151551981 600x800
+DELIVER mode=direct-hit id181860887 600x600
+HANDOFF path=hit deliver=151551981 cached=151551981 same=true 600x800 bytes=1MB
+HANDOFF path=hit deliver=181860887 cached=181860887 same=true 600x600 bytes=1MB
+DELIVER mode=direct-hit id233233954 400x711
+HANDOFF path=hit deliver=233233954 cached=233233954 same=true 400x711 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 400x711 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x600 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+CHECK @1500ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+CHECK @5000ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+DELIVER mode=direct-hit id246523504 600x389
+HANDOFF path=hit deliver=246523504 cached=246523504 same=true 600x389 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x389 recycled=false
+CHECK @1500ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+CHECK @1500ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @1500ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @1500ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @1500ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @1500ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @1500ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+CHECK @1500ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+CHECK @1500ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @1500ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+CHECK @5000ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+DELIVER mode=direct-hit id185215244 600x779
+HANDOFF path=hit deliver=185215244 cached=185215244 same=true 600x779 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x779 recycled=false
+CHECK @5000ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+DELIVER mode=direct-hit id156247146 600x450
+HANDOFF path=hit deliver=156247146 cached=156247146 same=true 600x450 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x450 recycled=false
+CHECK @5000ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+DELIVER mode=direct-hit id222567734 600x400
+HANDOFF path=hit deliver=222567734 cached=222567734 same=true 600x400 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x400 recycled=false
+CHECK @5000ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+DELIVER mode=direct-hit id254656209 600x398
+HANDOFF path=hit deliver=254656209 cached=254656209 same=true 600x398 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x398 recycled=false
+CHECK @5000ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+DELIVER mode=direct-hit id109743524 600x423
+HANDOFF path=hit deliver=109743524 cached=109743524 same=true 600x423 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x423 recycled=false
+CHECK @5000ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @5000ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+DELIVER mode=direct-hit id1227987 600x690
+HANDOFF path=hit deliver=1227987 cached=1227987 same=true 600x690 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x690 recycled=false
+DELIVER mode=direct-hit id196403216 600x847
+HANDOFF path=hit deliver=196403216 cached=196403216 same=true 600x847 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x847 recycled=false
+CHECK @5000ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @5000ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+DELIVER mode=direct-hit id14187205 600x335
+HANDOFF path=hit deliver=14187205 cached=14187205 same=true 600x335 bytes=0MB
+DELIVER mode=direct-hit id208445736 600x485
+HANDOFF path=hit deliver=208445736 cached=208445736 same=true 600x485 bytes=1MB
+CHECK @5000ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @5000ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x485 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x335 recycled=false
+DELIVER mode=direct-hit id149941564 600x374
+DELIVER mode=direct-hit id183663642 600x848
+HANDOFF path=hit deliver=149941564 cached=149941564 same=true 600x374 bytes=0MB
+HANDOFF path=hit deliver=183663642 cached=183663642 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x374 recycled=false
+CHECK @5000ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+DELIVER mode=direct-hit id112425255 600x873
+HANDOFF path=hit deliver=112425255 cached=112425255 same=true 600x873 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x873 recycled=false
+CHECK @5000ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+DELIVER mode=direct-hit id75409364 600x881
+HANDOFF path=hit deliver=75409364 cached=75409364 same=true 600x881 bytes=2MB
+CHECK @5000ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @5000ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x881 recycled=false
+DELIVER mode=direct-hit id61283692 600x848
+HANDOFF path=hit deliver=61283692 cached=61283692 same=true 600x848 bytes=1MB
+CHECK @5000ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+DELIVER mode=direct-hit id58934587 600x848
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+HANDOFF path=hit deliver=58934587 cached=58934587 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+DELIVER mode=direct-hit id77505624 600x800
+HANDOFF path=hit deliver=77505624 cached=77505624 same=true 600x800 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+CHECK @5000ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @5000ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @5000ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+DELIVER mode=direct-hit id151551981 600x800
+HANDOFF path=hit deliver=151551981 cached=151551981 same=true 600x800 bytes=1MB
+DELIVER mode=direct-hit id181860887 600x600
+HANDOFF path=hit deliver=181860887 cached=181860887 same=true 600x600 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x600 recycled=false
+DELIVER mode=direct-hit id233233954 400x711
+HANDOFF path=hit deliver=233233954 cached=233233954 same=true 400x711 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 400x711 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+CHECK @1500ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+CHECK @1500ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @5000ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+CHECK @1500ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+DELIVER mode=direct-hit id246523504 600x389
+HANDOFF path=hit deliver=246523504 cached=246523504 same=true 600x389 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x389 recycled=false
+CHECK @1500ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+CHECK @1500ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @1500ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @1500ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @1500ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @1500ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+CHECK @1500ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+CHECK @1500ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @1500ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+CHECK @5000ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+DELIVER mode=direct-hit id185215244 600x779
+HANDOFF path=hit deliver=185215244 cached=185215244 same=true 600x779 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x779 recycled=false
+CHECK @5000ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+DELIVER mode=direct-hit id156247146 600x450
+HANDOFF path=hit deliver=156247146 cached=156247146 same=true 600x450 bytes=1MB
+CHECK @5000ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x450 recycled=false
+CHECK @5000ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+DELIVER mode=direct-hit id222567734 600x400
+HANDOFF path=hit deliver=222567734 cached=222567734 same=true 600x400 bytes=0MB
+DELIVER mode=direct-hit id254656209 600x398
+HANDOFF path=hit deliver=254656209 cached=254656209 same=true 600x398 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x400 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x398 recycled=false
+CHECK @5000ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @5000ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @5000ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+DELIVER mode=direct-hit id1227987 600x690
+HANDOFF path=hit deliver=1227987 cached=1227987 same=true 600x690 bytes=1MB
+DELIVER mode=direct-hit id196403216 600x847
+DELIVER mode=direct-hit id109743524 600x423
+HANDOFF path=hit deliver=196403216 cached=196403216 same=true 600x847 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x690 recycled=false
+HANDOFF path=hit deliver=109743524 cached=109743524 same=true 600x423 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x847 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x423 recycled=false
+CHECK @5000ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @5000ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @5000ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @5000ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+DELIVER mode=direct-hit id208445736 600x485
+DELIVER mode=direct-hit id149941564 600x374
+HANDOFF path=hit deliver=208445736 cached=208445736 same=true 600x485 bytes=1MB
+DELIVER mode=direct-hit id14187205 600x335
+HANDOFF path=hit deliver=14187205 cached=14187205 same=true 600x335 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x335 recycled=false
+HANDOFF path=hit deliver=149941564 cached=149941564 same=true 600x374 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x485 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x374 recycled=false
+DELIVER mode=direct-hit id183663642 600x848
+HANDOFF path=hit deliver=183663642 cached=183663642 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+CHECK @5000ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+DELIVER mode=direct-hit id112425255 600x873
+HANDOFF path=hit deliver=112425255 cached=112425255 same=true 600x873 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x873 recycled=false
+CHECK @5000ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @5000ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @5000ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+DELIVER mode=direct-hit id61283692 600x848
+CHECK @5000ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+DELIVER mode=direct-hit id77505624 600x800
+HANDOFF path=hit deliver=77505624 cached=77505624 same=true 600x800 bytes=1MB
+DELIVER mode=direct-hit id75409364 600x881
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+HANDOFF path=hit deliver=75409364 cached=75409364 same=true 600x881 bytes=2MB
+HANDOFF path=hit deliver=61283692 cached=61283692 same=true 600x848 bytes=1MB
+DELIVER mode=direct-hit id58934587 600x848
+HANDOFF path=hit deliver=58934587 cached=58934587 same=true 600x848 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x881 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+CHECK @5000ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @5000ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+DELIVER mode=direct-hit id151551981 600x800
+HANDOFF path=hit deliver=151551981 cached=151551981 same=true 600x800 bytes=1MB
+CHECK @5000ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+DELIVER mode=direct-hit id181860887 600x600
+HANDOFF path=hit deliver=181860887 cached=181860887 same=true 600x600 bytes=1MB
+DELIVER mode=direct-hit id233233954 400x711
+HANDOFF path=hit deliver=233233954 cached=233233954 same=true 400x711 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 400x711 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x600 recycled=false
+CHECK @1500ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+CHECK @5000ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+DELIVER mode=direct-hit id246523504 600x389
+HANDOFF path=hit deliver=246523504 cached=246523504 same=true 600x389 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x389 recycled=false
+CHECK @1500ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+CHECK @1500ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+CHECK @1500ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @1500ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @1500ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @1500ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @1500ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @1500ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+CHECK @1500ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+CHECK @1500ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @1500ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+CHECK @5000ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+DELIVER mode=direct-hit id185215244 600x779
+HANDOFF path=hit deliver=185215244 cached=185215244 same=true 600x779 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x779 recycled=false
+CHECK @5000ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @5000ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+CHECK @5000ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+DELIVER mode=direct-hit id156247146 600x450
+DELIVER mode=direct-hit id222567734 600x400
+HANDOFF path=hit deliver=222567734 cached=222567734 same=true 600x400 bytes=0MB
+DELIVER mode=direct-hit id254656209 600x398
+HANDOFF path=hit deliver=156247146 cached=156247146 same=true 600x450 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x450 recycled=false
+HANDOFF path=hit deliver=254656209 cached=254656209 same=true 600x398 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x400 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x398 recycled=false
+CHECK @5000ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @5000ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @5000ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+DELIVER mode=direct-hit id196403216 600x847
+HANDOFF path=hit deliver=196403216 cached=196403216 same=true 600x847 bytes=1MB
+DELIVER mode=direct-hit id109743524 600x423
+HANDOFF path=hit deliver=109743524 cached=109743524 same=true 600x423 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x423 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x847 recycled=false
+DELIVER mode=direct-hit id1227987 600x690
+HANDOFF path=hit deliver=1227987 cached=1227987 same=true 600x690 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x690 recycled=false
+CHECK @5000ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @5000ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+DELIVER mode=direct-hit id149941564 600x374
+HANDOFF path=hit deliver=149941564 cached=149941564 same=true 600x374 bytes=0MB
+CHECK @5000ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @5000ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+DELIVER mode=direct-hit id14187205 600x335
+HANDOFF path=hit deliver=14187205 cached=14187205 same=true 600x335 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x335 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x374 recycled=false
+DELIVER mode=direct-hit id183663642 600x848
+HANDOFF path=hit deliver=183663642 cached=183663642 same=true 600x848 bytes=1MB
+DELIVER mode=direct-hit id208445736 600x485
+HANDOFF path=hit deliver=208445736 cached=208445736 same=true 600x485 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x485 recycled=false
+CHECK @5000ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+DELIVER mode=direct-hit id112425255 600x873
+HANDOFF path=hit deliver=112425255 cached=112425255 same=true 600x873 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x873 recycled=false
+CHECK @5000ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @5000ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+DELIVER mode=direct-hit id58934587 600x848
+HANDOFF path=hit deliver=58934587 cached=58934587 same=true 600x848 bytes=1MB
+CHECK @5000ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+DELIVER mode=direct-hit id77505624 600x800
+DELIVER mode=direct-hit id61283692 600x848
+HANDOFF path=hit deliver=77505624 cached=77505624 same=true 600x800 bytes=1MB
+HANDOFF path=hit deliver=61283692 cached=61283692 same=true 600x848 bytes=1MB
+CHECK @5000ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+DELIVER mode=direct-hit id75409364 600x881
+HANDOFF path=hit deliver=75409364 cached=75409364 same=true 600x881 bytes=2MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x848 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x881 recycled=false
+CHECK @5000ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+DELIVER mode=direct-hit id151551981 600x800
+HANDOFF path=hit deliver=151551981 cached=151551981 same=true 600x800 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x800 recycled=false
+CHECK @5000ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @5000ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+DELIVER mode=direct-hit id181860887 600x600
+DELIVER mode=direct-hit id233233954 400x711
+HANDOFF path=hit deliver=233233954 cached=233233954 same=true 400x711 bytes=1MB
+HANDOFF path=hit deliver=181860887 cached=181860887 same=true 600x600 bytes=1MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 400x711 recycled=false
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x600 recycled=false
+CHECK @1500ms deliver=185215244 recycled=false cachedRecycled=false 600x779
+CHECK @5000ms deliver=246523504 recycled=false cachedRecycled=false 600x389
+DELIVER mode=direct-hit id246523504 600x389
+HANDOFF path=hit deliver=246523504 cached=246523504 same=true 600x389 bytes=0MB
+REDELIVER ok sameAsFirst=true sameAsCached=true 600x389 recycled=false
+CHECK @1500ms deliver=222567734 recycled=false cachedRecycled=false 600x400
+CHECK @1500ms deliver=156247146 recycled=false cachedRecycled=false 600x450
+CHECK @1500ms deliver=254656209 recycled=false cachedRecycled=false 600x398
+CHECK @1500ms deliver=196403216 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=1227987 recycled=false cachedRecycled=false 600x690
+CHECK @1500ms deliver=109743524 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=208445736 recycled=false cachedRecycled=false 600x485
+CHECK @1500ms deliver=149941564 recycled=false cachedRecycled=false 600x374
+CHECK @1500ms deliver=183663642 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=14187205 recycled=false cachedRecycled=false 600x335
+CHECK @1500ms deliver=112425255 recycled=false cachedRecycled=false 600x873
+CHECK @1500ms deliver=75409364 recycled=false cachedRecycled=false 600x881
+CHECK @1500ms deliver=61283692 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=58934587 recycled=false cachedRecycled=false 600x848
+CHECK @1500ms deliver=77505624 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=181860887 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=151551981 recycled=false cachedRecycled=false 600x800
+CHECK @1500ms deliver=233233954 recycled=false cachedRecycled=false 400x711
+CHECK @1500ms deliver=246523504 recycled=false cachedRecycled=false 600x389
