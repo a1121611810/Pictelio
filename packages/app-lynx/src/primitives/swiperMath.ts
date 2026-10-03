@@ -1,8 +1,36 @@
-// 自研 swipe 轮播的纯数学函数（ADR-0115 / spec: app-lynx-recommended-carousel §3.1；
+// ─── 自研 swipe 轮播的纯数学函数（ADR-0115 / spec: app-lynx-recommended-carousel §3.1；
 // 吸附阈值 + fling 判定 = ADR-0118 / spec: app-lynx-recommended-carousel-polish-r2 §2.2/§3.1）。
 // 无依赖、纯 TS，node 可测（与 createMixFeed / mergeByTime 同「深模块可测」惯例）。
 // calcNearestPage 的 oracle = vue-lynx 教程《商品详情页图片轮播》语义（吸附最近页 round + 边界钳制）；
 // calcSnapTarget 的 oracle = ADR-0118 决策 2（1/3 屏宽阈值 + fling 甩动，双向对称）。
+//
+// ⚠️ **本模块是轮播吸附逻辑的唯一实现**，`CarouselSwiper.vue:15` 直接 import
+//   `calcSnapTarget` / `clampOffset`；本文件的单测**直接覆盖线上代码**（非规格副本）。
+//
+//   **为什么此前有人以为它「无生产调用方」**：票 #920 期间曾尝试把轮播改成 vue-lynx 官方
+//   主线程（MTS）方案。MTS 形态下 helper 必须内联进组件（主线程打包器对**不含
+//   `'main thread'` 指令的模块**只保留 import、剥离函数体** ⇒ MT 函数跨模块 import 本文件
+//   会在原生端拿到 `undefined`，表现为组件整块空白，见 docs/research/vue-lynx-swiper-tutorial.md:23）。
+//   该重写**未落地**，轮播保持后台线程方案。
+//
+//   ⚠️ **「主线程不可用」的归因已被证伪并裁决**（2026-10-03，票 #920）：
+//     · ADR-0115:88 原写「T5 真机验证判定不通过：主线程方案不可用」；
+//     · CONTEXT.md:580 写「完整可用且真机验证通过，ADR-0115 判定需修订」；
+//     · 本轮**逐级单变量对照**复刻原型（最小 view → +useMainThreadRef → +main-thread-ref
+//       → +单个 bind* → 完整 MTS）：每级均正常渲染（69.9k~70.4k 品红像素），
+//       拖动实测蓝条经 `setStyleProperty` 精确跟随平移。
+//   ⇒ **MTS 机制本身完整可用**；当年空白的真因是**跨模块 import 无 'main thread'
+//     指令的模块**（helper 被 MT 打包器剥离）—— 是**用法**问题，不是机制缺陷。
+//     完整裁决记录见 ADR-0115 的「裁决」块与 issue #920。
+//   ⇒ 本文件仍是**吸附逻辑的唯一实现**，BG 形态下由 `CarouselSwiper.vue` 直接 import。
+//     「仍用 BG」的理由已改为**性能取舍**（MTS 收益仅为跟手增量，不消除 48ms 输入派发地板），
+//     不再是「MTS 不可用」。
+//
+//   ⇒ **若将来再尝试 MTS**：本文件的函数将再次失去生产调用方，届时必须同步处理
+//     ① 本注释（改回「无生产调用方」形态）② CarouselSwiper.test.ts 的门禁形态
+//     （其条件式判据已按 BG/MTS 双形态写好，见该文件「若采用主线程（MTS）绑定…」一条）。
+//     不要留下「已无调用方」的登记却让代码仍 import 它——
+//     那是一条**反事实登记**，比不登记更危险：门禁冻结线 #5「会骗人的门禁会被人信」。
 
 /** 吸附阈值（屏宽比例）：拖过 1/3 屏宽松手即翻页，未过回弹（ADR-0118 决策 2） */
 export const SNAP_THRESHOLD_RATIO = 1 / 3

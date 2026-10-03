@@ -98,6 +98,40 @@
 代价：拖拽非零延迟（主线程方案的本意）。已在模拟器验证渲染 + 滑动 + 点卡进详情 + 单刷新 FAB（详见研究文档）。若后续 Lynx 主线程支持度提升，可再评估切回主线程（零延迟）。
 
 **待验证项（实现期闭环，web-core + 模拟器 + 真机）**：
+
+> ⚠️ **[2026-10-03 裁决 · 票 #920] 上面「主线程方案不可用」的判定已被证伪，MTS 在本项目完整可用。**
+>
+> **裁决实验**（emulator-5554 / Android 14 / 原生 LynxView 4.0.1，逐级单变量对照）：
+> 复刻 `2a93c977` 的 `MtsDemo.vue` 原型（当时判定「MTS 复核通过」的同一文件），
+> 逐项加回 MTS 机制，每级构建装机后按品红底像素计数判定是否渲染：
+>
+> | 级别 | 注入内容 | 渲染 |
+> |---|---|---|
+> | 0 | 最小 view（无任何 MTS） | ✅ 70375px（**探针自证有效**） |
+> | 1 | + `useMainThreadRef` + `'main thread'` 指令 | ✅ 70375px |
+> | 2 | + `:main-thread-ref` | ✅ 69899px |
+> | 3 | + 单个 `:main-thread-bindtouchstart` | ✅ 69906px |
+> | 4 | **完整 MTS**（3 个 `bind*` + `main-thread-ref` + `setStyleProperty`） | ✅ 69898px |
+>
+> 拖动实测：蓝条经 `setStyleProperty('transform', ...)` **精确跟随平移**（移动到右缘可见）。
+> ⇒ **MTS 机制在本项目原生端完整可用**，本节「不可用」判定不成立。
+>
+> **当年的空白另有其因**：`docs/research/vue-lynx-swiper-tutorial.md:23` §7 指出，
+> 根因是**跨模块 import 了无 `'main thread'` 指令的模块**（helper 被 MT 打包器剥离，
+> 主线程拿到 `undefined`）—— 即便「已内联标 `'main thread'` 的 helper」也不够，
+> **所有主线程代码必须在本模块内闭环**。这与本裁决的结论一致：
+> 机制本身无缺陷，是**用法**踩了打包边界。
+>
+> ⚠️ **本 ADR 的实现选择（后台线程）不变**，但**理由必须改写**：
+> 不是「MTS 不可用」，而是「当前 BG 实现已正常工作，MTS 的收益是消除 JS 处理后的
+> 跨线程渲染那一跳（跟手增量），不消除输入派发地板（48–50ms，SDK 层）」。
+> 是否切换属**性能优化决策**，不是可用性修复。切换时须遵守：
+> helper 内联进 `CarouselSwiper.vue`（否则命中同一个打包陷阱）。
+>
+> ⚠️ **本轮另有一条独立发现**：轮播「第 2 张起无图」的根因是
+> **被 `transform: translateX` 平移的容器内子元素不渲染**，与 MTS 无关。
+> 已用单变量对照定因并修复（改 `marginLeft` 平移），详见 `CarouselSwiper.vue` 头注。
+> ⇒ 若将来切回 MTS，**平移属性仍须用 `marginLeft`**，否则会重现该 bug。
 - 单测：`createMixFeed` time-merge 合并排序（oracle = app 端 `mergeAndSort` 语义）、`merge: 'time-merge'` 分支、受限过滤恢复（开关切换即恢复）、去重/竞态/超时在 time-merge 分支；
 - `pnpm check:app-lynx` 类型检查通过；
 - **web-core 预览实测**：滑动位移/吸附翻页/指示器同步/点指示器跳页/滑动到末尾自动 fetchMore（无限滑流）、tap-vs-drag 不误触详情；

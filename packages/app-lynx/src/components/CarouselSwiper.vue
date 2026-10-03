@@ -2,12 +2,46 @@
 // ─── 自研单卡 swipe 轮播（ADR-0115 / spec: app-lynx-recommended-carousel §3.1；
 // 吸附阈值 + fling = ADR-0118 / spec: app-lynx-recommended-carousel-polish-r2 §2.2）───
 // 非原生 <swiper> 元素：按 vue-lynx 官方教程《商品详情页图片轮播》手写。
-// [方案偏离 ADR-0115] 教程的「主线程脚本」（'main thread' + :main-thread-bindtouch*）在
-//   本项目原生 LynxView 上会导致组件整块渲染空白（真机验证：加回 main-thread-* 绑定 → 空白，
-//   移除 → 正常；与 display 模式 / helper 无关）。故回退到**后台线程**方案：
-//   触摸用 @touchstart/@touchmove/@touchend（后台线程），translateX 经 Vue 响应式 :style 绑定。
-//   代价：拖拽非零延迟（主线程方案的本意），但可正常渲染与滑动。见 ADR-0115「待验证项」与
-//   docs/research/vue-lynx-swiper-tutorial.md。
+// [方案偏离 ADR-0115] 本页用**后台线程**方案：触摸 @touchstart/@touchmove/@touchend，
+//   translateX 经 Vue 响应式 :style 绑定。代价：拖拽有非零跨线程延迟，但可正常渲染与滑动。
+// ⚠️ **[票 #920 订正] 此前此处登记的因果链已被真机证伪，勿照旧引用**：
+//   原文写「加回 main-thread-* 绑定 → 整块空白；**与 display 模式 / helper 无关**」，
+//   并把它归因于「主线程方案在本项目不可用」。两处都不成立：
+//     · `docs/research/vue-lynx-swiper-tutorial.md:23` §7 指出那次的根因是
+//       **跨模块 import 了无 `'main thread'` 指令的模块**（helper 被 MT 打包器剥离），
+//       并非「与 helper 无关」；
+//     · 票 #920 期间复刻 #906 的 `MtsDemo.vue` 原型（git show 2a93c977），
+//       **MTS 链路实测可用**（绿条 x=0~536→144~681 精确平移）。
+//   ⇒ 「主线程不可用」与 ADR-0115:88 的冲突**尚未裁决**（issue #920），此处不断言该结论。
+//     下方这套 BG 代码是**当前线上形态**，不是「因为 MTS 不可用才退而求其次」。
+//   ⇒ 若改用 MTS：helper 必须内联进本模块（见 primitives/swiperMath.ts 头注）。
+// [真机修复 2026-10-03] **平移方式：marginLeft，不是 transform**。
+//   此前用 `transform: translateX(...)`，真机 LynxView 上**第 2 张起的整个 slide 都不渲染**
+//   （不是「只有 <image> 不渲染」——连 slide 自身的背景色都不出现）。
+//   对照实验（emulator-5554 / Android 14 / 1080×2160，逐层染色定位）：
+//     · 注入 slide 底色（0=绿 / 1+=品红）→ 滑到第 2 页，图片区**纯黑**，品红也没出现
+//       ⇒ 整个 `swiper-slide` 未渲染，而非仅 `<image>` 缺失。
+//     · 唯一改动：`transform: translateX()` → `marginLeft: <px>`，其余完全不动
+//       ⇒ 第 2 页图片**完整渲染**，连滑 4 页全部正常。
+//   ⇒ 真因是**真机引擎对 `transform: translateX` 平移的容器内子元素不触发渲染**，
+//     与「是否首子元素」无关（此前 ADR-0119 据 <text> 现象推出的「非首子元素」结论被本实验证伪）。
+//   ⚠️ 语义等价性：`.swiper-container` 是 `display:flex; flex-direction:row`，占满 wrapper 宽；
+//     负 `marginLeft` 把整行向左拽，滑动边界与吸附逻辑（swiperMath/clampOffset）**逐字不变**。
+//     代价：margin 变化会触发**流内重排**（transform 只触发合成层位移），
+//     但实测 4 页连滑无卡顿；相对「真机完全不渲染」这是可接受的交换。
+//     若日后要回到 transform，必须先真机验证「被 transform 平移的容器内 <image>/<view> 是否渲染」，
+//     不得凭 web-core 表现下结论（web-core 两写法都正常，掩盖了该 bug）。
+// [未修复 → 本次已修] 首页轮播「第 2 张起无图」：见上方对照实验，根因为 transform 平移。
+//   ADR-0119 记载的「内容移出平移容器」路径**未采用**——本实验证明换平移方式即可，
+//   移动整个内容层的代价（scrim 需回到 slide 内、放弃页面级遮罩设计）大且无必要。
+// [MTS 已裁决 2026-10-03] 「主线程方案真机不可用」判定**已被证伪**：复刻原型逐级加回，
+//   完整 MTS（3×main-thread-bind* + main-thread-ref + setStyleProperty）渲染正常、
+//   拖动蓝条精确跟随（详见 ADR-0115 的裁决块）。当年空白的真因是**跨模块 import
+//   无 'main thread' 指令的模块**（helper 被 MT 打包器剥离），属用法问题非机制缺陷。
+//   ⇒ 本页**仍用后台线程**，但理由是「MTS 收益仅为跟手增量、不消除 48ms 输入派发地板」
+//     （性能优化决策），不再是「MTS 不可用」。
+//   ⚠️ 若将来切 MTS：helper 必须内联进本模块，且**平移属性仍须 marginLeft**
+//     （切回 transform 会重现上面的「第 2 张起无图」）。
 // [ADR-0118] 松手吸附改用 calcSnapTarget（1/3 屏宽阈值 + fling 甩动）：touchend 前用最后一段
 //   移动计算瞬时速度（px/ms），位移未过 1/3 时若速度超阈值也沿速度方向翻页（快甩短距离也翻页）。
 // [单位] slide 宽度 / 吸附 / translateX 全程 px（SystemInfo.pixelWidth/pixelRatio，官方一致）。
@@ -142,7 +176,7 @@ function handleTouchEnd() {
   <view class="swiper-wrapper">
     <view
       class="swiper-container"
-      :style="{ transform: `translateX(${containerOffset}px)` }"
+      :style="{ marginLeft: `${containerOffset}px` }"
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
@@ -163,6 +197,14 @@ function handleTouchEnd() {
 .swiper-wrapper {
   flex: 1;
   width: 100%;
+  /* ⚠️ 显式裁切相邻 slide（负 marginLeft 改平移后必需，见头注）：
+     margin 参与布局流，容器盒会真的向左溢出 wrapper 边界。
+     transform 不改布局流（只做视觉位移）所以从前不需要这条；
+     换 marginLeft 后必须由 wrapper 裁切，否则第 2 页会从左缘渗出。
+     真机取证（emulator-5554 / Android 14 / 1080×2160）：右缘最外 3 列
+     逐像素检查均为页面底色 (11,15,18) ⇒ 当前无渗出。
+     但那依赖祖先 flex 容器的隐式裁切（脆弱），此处显式声明以免换宿主布局时破版。 */
+  overflow: hidden;
 }
 .swiper-container {
   display: flex;
