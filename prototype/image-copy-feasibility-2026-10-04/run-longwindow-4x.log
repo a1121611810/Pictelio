@@ -1,0 +1,85 @@
+--------- beginning of main
+DELIVER mode=direct id189920425 600x839
+HANDOFF path=miss deliver=189920425 cached=189920425 same=true 600x839 bytes=1MB
+CHECK @1500ms deliver=189920425 recycled=false cachedRecycled=false 600x839
+DELIVER mode=direct id8930579 600x847
+HANDOFF path=miss deliver=8930579 cached=8930579 same=true 600x847 bytes=1MB
+DELIVER mode=direct id21054347 600x390
+HANDOFF path=miss deliver=21054347 cached=21054347 same=true 600x390 bytes=0MB
+DELIVER mode=direct id238577793 600x847
+HANDOFF path=miss deliver=238577793 cached=238577793 same=true 600x847 bytes=1MB
+DELIVER mode=direct id192843111 600x946
+HANDOFF path=miss deliver=192843111 cached=192843111 same=true 600x946 bytes=2MB
+DELIVER mode=direct id44090802 600x1000
+HANDOFF path=miss deliver=44090802 cached=44090802 same=true 600x1000 bytes=2MB
+DELIVER mode=direct id73177347 600x801
+HANDOFF path=miss deliver=73177347 cached=73177347 same=true 600x801 bytes=1MB
+DELIVER mode=direct id197699257 600x600
+HANDOFF path=miss deliver=197699257 cached=197699257 same=true 600x600 bytes=1MB
+DELIVER mode=direct id8766047 600x732
+HANDOFF path=miss deliver=8766047 cached=8766047 same=true 600x732 bytes=1MB
+DELIVER mode=direct id264500597 600x795
+HANDOFF path=miss deliver=264500597 cached=264500597 same=true 600x795 bytes=1MB
+DELIVER mode=direct id250847128 600x423
+HANDOFF path=miss deliver=250847128 cached=250847128 same=true 600x423 bytes=0MB
+DELIVER mode=direct id267088881 600x356
+HANDOFF path=miss deliver=267088881 cached=267088881 same=true 600x356 bytes=0MB
+DELIVER mode=direct id263167575 600x920
+HANDOFF path=miss deliver=263167575 cached=263167575 same=true 600x920 bytes=2MB
+DELIVER mode=direct id154295853 600x1067
+HANDOFF path=miss deliver=154295853 cached=154295853 same=true 600x1067 bytes=2MB
+CHECK @1500ms deliver=8930579 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=21054347 recycled=false cachedRecycled=false 600x390
+CHECK @1500ms deliver=192843111 recycled=false cachedRecycled=false 600x946
+CHECK @1500ms deliver=238577793 recycled=false cachedRecycled=false 600x847
+CHECK @1500ms deliver=44090802 recycled=false cachedRecycled=false 600x1000
+CHECK @1500ms deliver=73177347 recycled=false cachedRecycled=false 600x801
+CHECK @1500ms deliver=8766047 recycled=false cachedRecycled=false 600x732
+CHECK @1500ms deliver=197699257 recycled=false cachedRecycled=false 600x600
+CHECK @1500ms deliver=264500597 recycled=false cachedRecycled=false 600x795
+CHECK @1500ms deliver=263167575 recycled=false cachedRecycled=false 600x920
+CHECK @1500ms deliver=250847128 recycled=false cachedRecycled=false 600x423
+CHECK @1500ms deliver=267088881 recycled=false cachedRecycled=false 600x356
+CHECK @1500ms deliver=154295853 recycled=false cachedRecycled=false 600x1067
+CHECK @5000ms deliver=189920425 recycled=false cachedRecycled=false 600x839
+CHECK @5000ms deliver=8930579 recycled=false cachedRecycled=false 600x847
+CHECK @5000ms deliver=192843111 recycled=false cachedRecycled=false 600x946
+CHECK @5000ms deliver=21054347 recycled=false cachedRecycled=false 600x390
+CHECK @5000ms deliver=238577793 recycled=false cachedRecycled=false 600x847
+CHECK @5000ms deliver=44090802 recycled=false cachedRecycled=false 600x1000
+CHECK @5000ms deliver=73177347 recycled=false cachedRecycled=false 600x801
+CHECK @5000ms deliver=264500597 recycled=false cachedRecycled=false 600x795
+CHECK @5000ms deliver=8766047 recycled=false cachedRecycled=false 600x732
+CHECK @5000ms deliver=197699257 recycled=false cachedRecycled=false 600x600
+CHECK @5000ms deliver=250847128 recycled=false cachedRecycled=false 600x423
+CHECK @5000ms deliver=267088881 recycled=false cachedRecycled=false 600x356
+CHECK @5000ms deliver=263167575 recycled=false cachedRecycled=false 600x920
+CHECK @5000ms deliver=154295853 recycled=false cachedRecycled=false 600x1067
+CHECK @30000ms deliver=189920425 recycled=false cachedRecycled=false 600x839
+CHECK @30000ms deliver=8930579 recycled=false cachedRecycled=false 600x847
+CHECK @30000ms deliver=192843111 recycled=false cachedRecycled=false 600x946
+CHECK @30000ms deliver=21054347 recycled=false cachedRecycled=false 600x390
+CHECK @30000ms deliver=238577793 recycled=false cachedRecycled=false 600x847
+CHECK @30000ms deliver=44090802 recycled=false cachedRecycled=false 600x1000
+CHECK @30000ms deliver=73177347 recycled=false cachedRecycled=false 600x801
+CHECK @30000ms deliver=264500597 recycled=false cachedRecycled=false 600x795
+CHECK @30000ms deliver=8766047 recycled=false cachedRecycled=false 600x732
+CHECK @30000ms deliver=197699257 recycled=false cachedRecycled=false 600x600
+CHECK @30000ms deliver=267088881 recycled=false cachedRecycled=false 600x356
+CHECK @30000ms deliver=250847128 recycled=false cachedRecycled=false 600x423
+CHECK @30000ms deliver=263167575 recycled=false cachedRecycled=false 600x920
+CHECK @30000ms deliver=154295853 recycled=false cachedRecycled=false 600x1067
+CHECK @60000ms deliver=189920425 recycled=false cachedRecycled=false 600x839
+CHECK @60000ms deliver=8930579 recycled=false cachedRecycled=false 600x847
+CHECK @60000ms deliver=238577793 recycled=false cachedRecycled=false 600x847
+CHECK @60000ms deliver=192843111 recycled=false cachedRecycled=false 600x946
+CHECK @60000ms deliver=21054347 recycled=false cachedRecycled=false 600x390
+CHECK @60000ms deliver=44090802 recycled=false cachedRecycled=false 600x1000
+CHECK @60000ms deliver=73177347 recycled=false cachedRecycled=false 600x801
+CHECK @60000ms deliver=264500597 recycled=false cachedRecycled=false 600x795
+CHECK @60000ms deliver=197699257 recycled=false cachedRecycled=false 600x600
+CHECK @60000ms deliver=8766047 recycled=false cachedRecycled=false 600x732
+CHECK @60000ms deliver=250847128 recycled=false cachedRecycled=false 600x423
+CHECK @60000ms deliver=267088881 recycled=false cachedRecycled=false 600x356
+CHECK @60000ms deliver=263167575 recycled=false cachedRecycled=false 600x920
+CHECK @60000ms deliver=154295853 recycled=false cachedRecycled=false 600x1067
