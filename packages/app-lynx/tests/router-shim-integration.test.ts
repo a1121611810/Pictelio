@@ -62,6 +62,12 @@ vi.mock('../src/pages/NovelList.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NovelDetail.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NovelIntro.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Me.vue', () => ({ default: {} }))
+// [维度重构 2026-10-03] 三个新顶层/次级页：占位组件，同款理由（路由只需 component 引用）。
+// ⚠️ 本测试的 vitest 配置**没装 vue 插件**，任何漏桩的 .vue 都会在 import 期
+//    抛 "Failed to parse source for import analysis" —— 新增页面时**必须**同步补桩。
+vi.mock('../src/pages/Updates.vue', () => ({ default: {} }))
+vi.mock('../src/pages/Shelf.vue', () => ({ default: {} }))
+vi.mock('../src/pages/AdvancedSettings.vue', () => ({ default: {} }))
 vi.mock('../src/pages/UserHome.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Following.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Bookmarks.vue', () => ({ default: {} }))
@@ -93,12 +99,12 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('25 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('28 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(25)
+    expect(mod.routes).toHaveLength(28)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
-    expect(nameOf('/recommended')).toBe('recommended')
+    expect(nameOf('/discover')).toBe('discover')
     expect(nameOf('/illust/:id')).toBe('illust-detail')
     expect(nameOf('/novel/:id')).toBe('novel-detail')
     // 通知中心（ADR-0188 D7 / #728）：业务次级页，requiresAuth 守卫鉴权
@@ -141,7 +147,7 @@ describe('路由表完整性（spec D3）', () => {
       expect(meta?.requiresAuth, `${p} 不得标 requiresAuth（P0-1）`).toBeUndefined()
     }
     // 业务页 requiresAuth 标注
-    expect(mod.routes.find((r) => r.path === '/recommended')?.meta?.requiresAuth).toBe(true)
+    expect(mod.routes.find((r) => r.path === '/discover')?.meta?.requiresAuth).toBe(true)
     expect(mod.routes.find((r) => r.path === '/downloads')?.meta?.requiresAuth).toBe(true)
     expect(mod.routes.find((r) => r.path === '/login')?.meta?.requiresAuth).toBeUndefined()
   })
@@ -164,7 +170,7 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     env.auth.loggedIn.value = true
     const mod = await loadRouter()
     await mod.initRouter()
-    expect(mod.router.currentRoute.value.path).toBe('/recommended')
+    expect(mod.router.currentRoute.value.path).toBe('/discover')
   })
 
   it('bootstrap 完成后未登录访问业务页 → 守卫重定向 /login（replace）', async () => {
@@ -194,7 +200,7 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     env.auth.loggedIn.value = true
     const mod = await loadRouter()
     await mod.initRouter()
-    expect(mod.router.currentRoute.value.path).toBe('/recommended')
+    expect(mod.router.currentRoute.value.path).toBe('/discover')
     // 强制更新链：updateStore.resetHistory() → navigate('/update')
     mod.resetHistory()
     await mod.navigate('/update', { replace: true })
@@ -238,19 +244,19 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     await mod.navigate('/login', { replace: true })
     env.auth.loggedIn.value = true
     mod.markSessionEstablished()
-    await mod.navigate('/recommended', { replace: true })
+    await mod.navigate('/discover', { replace: true })
     // 新会话根路由：无可返回页（旧 /illust/42、/me 不可经 back 进入）
     expect(mod.hasBackEntry()).toBe(false)
     mod.goBack()
     await vi.waitFor(() => {
-      expect(mod.router.currentRoute.value.path).toBe('/recommended')
+      expect(mod.router.currentRoute.value.path).toBe('/discover')
     })
     // 新会话内正常 push/back 不受影响
     await mod.navigate('/illusts')
     expect(mod.hasBackEntry()).toBe(true)
     mod.goBack()
     await vi.waitFor(() => {
-      expect(mod.router.currentRoute.value.path).toBe('/recommended')
+      expect(mod.router.currentRoute.value.path).toBe('/discover')
     })
     expect(mod.hasBackEntry()).toBe(false)
   })
@@ -265,7 +271,7 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     expect(mod.hasBackEntry()).toBe(false)
     // 重定向后正常路径（换到已登录会话）不受垃圾条目影响
     env.auth.loggedIn.value = true
-    await mod.navigate('/recommended', { replace: true })
+    await mod.navigate('/discover', { replace: true })
     expect(mod.hasBackEntry()).toBe(false)
   })
 

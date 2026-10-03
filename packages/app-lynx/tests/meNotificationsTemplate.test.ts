@@ -9,12 +9,14 @@ const meVue = readFileSync(fileURLToPath(new URL("../src/pages/Me.vue", import.m
 const a11y = readFileSync(fileURLToPath(new URL("../src/utils/accessibility.ts", import.meta.url)), "utf8")
 
 describe("Me.vue 通知中心入口（ADR-0188 D7 / #728）", () => {
-  it("入口行：networkCheck 行后、openNotifications → /notifications", () => {
-    // 行序：networkCheck 消费点在 notifications 消费点之前（票面指定插入位）
-    const networkCheckIdx = meVue.indexOf("ME_A11Y_LABELS.networkCheck")
+  it("入口行：「高级」行后、openNotifications → /notifications", () => {
+    // [维度重构 2026-10-03] 排序锚点由 ME_A11Y_LABELS.networkCheck 改为
+    // ADVANCED_A11Y_LABELS.pageTitle —— 原 networkCheck 行已搬进 /advanced，
+    // 接替它**同一槽位**的是「高级」行，通知行仍在其后。契约（相对顺序）不变，锚点换人。
+    const advancedIdx = meVue.indexOf("ADVANCED_A11Y_LABELS.pageTitle")
     const notificationsIdx = meVue.indexOf("ME_A11Y_LABELS.notifications")
-    expect(networkCheckIdx).toBeGreaterThan(-1)
-    expect(notificationsIdx).toBeGreaterThan(networkCheckIdx)
+    expect(advancedIdx).toBeGreaterThan(-1)
+    expect(notificationsIdx).toBeGreaterThan(advancedIdx)
     expect(meVue).toContain("function openNotifications()")
     expect(meVue).toContain("navigate('/notifications')")
   })

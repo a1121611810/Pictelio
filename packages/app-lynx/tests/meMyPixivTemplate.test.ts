@@ -37,7 +37,12 @@ describe("Me.vue 好P友入口（ADR-0193 D3 / #754 T7）", () => {
     const row = meVue.match(/<view[^>]*:accessibility-label="ME_A11Y_LABELS\.mypixiv"[^>]*>/)?.[0] ?? ""
     expect(row).not.toBe("")
     expect(row).toContain(':accessibility-element="A11Y_ELEMENT_ENABLED"')
-    const labelCount = (meVue.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
+    // [维度重构 2026-10-03] 计数改为**注册表无关**（匹配任意 `*.key` 形式的 a11y-label）。
+    //   本页新增「高级」行用的是 ADVANCED_A11Y_LABELS 而非 ME_A11Y_LABELS，但**真不变量**
+    //   是「每个 accessibility-label 都配一个 accessibility-element」，
+    //   而不是「必须用哪个注册表」。原写法把不变量误写成注册表专属，页面一旦引入第二个
+    //   注册表就假红 —— 那是判据写窄了，不是页面写错了。
+    const labelCount = (meVue.match(/:accessibility-label="[A-Z_0-9]+A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (meVue.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(elementCount)
   })

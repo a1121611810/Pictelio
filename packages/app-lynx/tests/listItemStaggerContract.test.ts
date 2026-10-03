@@ -15,7 +15,8 @@
 //    与「抽取器塌了」同形（这是本仓反复吃过的假绿）。
 //
 // ── 期望值出处（Oracle 溯源，禁自证）───
-// - 七个目标页 = ADR-0211 决策 5 逐字点名的「剩余手写 <scroll-view> 列表」，
+// - 十个目标页 = ADR-0211 决策 5 逐字点名的「剩余手写 <scroll-view> 列表」，
+//   加 [维度重构 2026-10-03] 新增的 AdvancedSettings / Shelf / Updates 三页；
 //   交叉验证：全仓 `<scroll-view` 消费页集合与之**逐一相等**（多一个 = 漏网，
 //   少一个 = 清单过期），故本清单不靠人工维护而是双侧夹逼。
 // - 延迟值 0/60/120 与 STAGGER_STEP_MS=60 的关系 = motion.ts 导出值（唯一入口），
@@ -36,8 +37,14 @@ const SRC_ROOT = join(PKG_ROOT, 'src')
 const PAGES_DIR = join(SRC_ROOT, 'pages')
 const REFRESHABLE_LIST = join(SRC_ROOT, 'components', 'RefreshableList.vue')
 
-/** ADR-0211 决策 5 点名的七个手写 <scroll-view> 列表页。 */
+/** ADR-0211 决策 5 点名的手写 <scroll-view> 列表页（七个 + 维度重构新增三页 = 十页）。 */
+// [维度重构 2026-10-03] 新增 AdvancedSettings.vue：它从 Me.vue 搬走调试项后成为独立
+// <scroll-view> 消费页。门禁的「漏网/过期双向暴露」保证要求每个 scroll-view 消费页
+// 都在册且接入统一入场出口 —— 不登记它 = 该保证对新页失效。
 const TARGET_PAGES = [
+  'AdvancedSettings.vue',
+  'Shelf.vue',
+  'Updates.vue',
   'DownloadManager.vue',
   'IllustDetail.vue',
   'Me.vue',
@@ -236,12 +243,12 @@ describe('L1 · 唯一出口 listItemStyle：形态、延迟、上限、减弱�
 })
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2 · 七个目标页逐个接入（清单与「全仓 scroll-view 消费页」双侧夹逼）
+// L2 · 十个目标页逐个接入（清单与「全仓 scroll-view 消费页」双侧夹逼）
 // ───────────────────────────────────────────────────────────────────────────
 
-describe('L2 · 七个手写列表页全部接入统一入场出口', () => {
+describe('L2 · 十个手写列表页全部接入统一入场出口', () => {
   it('扫描面非空：目标页逐个可读（防「清单里的文件不存在 ⇒ 什么都没扫到」）', () => {
-    expect(TARGET_PAGES.length).toBe(7)
+    expect(TARGET_PAGES.length).toBe(10)
     const missing = TARGET_PAGES.filter((f) => readIfExists(join(PAGES_DIR, f)) === null)
     expect(missing, `目标页读不到：${missing.join(', ')}`).toEqual([])
   })

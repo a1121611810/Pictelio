@@ -5,10 +5,13 @@
 // 原被源级测试钉住跳过，本批同步改测试为「t(key) 调用形态 + zh 字典值逐字节不变」双断言。
 // 仍未抽取：utils/accessibility.ts 全部 A11Y 注册表、navTabs a11yLabel、backupCore WEBDAV_ERROR_MESSAGES。
 const zhMisc = {
-  // ─── navTabs.ts（底部导航 tab label；a11yLabel 属 E2E 契约不抽取） ───
-  "navTabs.recommended": "推荐",
-  "navTabs.illusts": "插画",
-  "navTabs.novels": "小说",
+  // ─── navTabs.ts（导航 tab label；a11yLabel 属 E2E 契约不抽取） ───
+  // 维度重构（#2026-10-03）：由「按媒介切」改为「按用户要回答的问题切」——
+  // 发现（有什么新的）/ 更新（我关注的更新了吗）/ 书架（我存的、没看完的）/ 我的（账号与设置）。
+  // 媒介（插画/小说）降为「发现」页内二级，不再占顶级位置（M3：同主题的并列视角属 Tabs）。
+  "navTabs.discover": "发现",
+  "navTabs.updates": "更新",
+  "navTabs.shelf": "书架",
   "navTabs.me": "我的",
 
   // ─── 作品标题归一化（utils/artworkTitle.ts；#893）───

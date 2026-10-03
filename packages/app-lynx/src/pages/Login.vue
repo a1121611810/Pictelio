@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { navigate, markSessionEstablished } from '../router'
+import { navigate, markSessionEstablished, DISCOVER_PATH } from '../router'
 import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -82,7 +82,7 @@ async function submit() {
       // [lynx:fix] 登录成功 = 会话新起点（ADR-0049）：先清除会话标记（beginSession 语义，
       //  否则守卫会把随后的 replace 导航拦截回 /login）再 replace 导航入站
       markSessionEstablished()
-      await navigate('/recommended', { replace: true })
+      await navigate(DISCOVER_PATH, { replace: true })
     } else {
       errorMsg.value = auth.authError ?? t('login.error.failed') // i18n: 赋值时快照（瞬态）
     }

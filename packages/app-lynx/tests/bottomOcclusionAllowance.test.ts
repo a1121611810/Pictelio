@@ -262,6 +262,11 @@ const SCROLLVIEW_PAGES = [
   'src/pages/MuteTags.vue',
   // #922：原为手工 h-[30vw]（324px）⇒ 少让位 310px，已改用共享占位（search 档）
   'src/pages/DownloadManager.vue',
+  // [维度重构 2026-10-03] 三个新页。**必须登记**：本清单的形态判据（「占位紧邻 </scroll-view>」）
+  //   只有在册页面才会被跑到；不登记 = 新页的让位形态无人守护（登记前它们曾把占位多包一层 view）。
+  'src/pages/Updates.vue', // 顶层页 → menu 档
+  'src/pages/Shelf.vue', // 顶层页 → menu 档
+  'src/pages/AdvancedSettings.vue', // 次级页 → search 档
 ]
 const IMMERSIVE_PAGE = 'src/pages/Recommended.vue'
 

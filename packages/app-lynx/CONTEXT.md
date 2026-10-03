@@ -39,7 +39,7 @@ AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明�
 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点（即使该祖先未设 position，与 Web 回退到视口的语义不同，模拟器实测偏离）。因此覆盖层元素的绝对定位一律用 **left/top vw + translate 居中**（vw 为视口基准，从锚点 (0,0) 起算恒等于视口坐标）；**禁止**在非全屏父盒内用 `right/bottom`（按父盒边缘解析 → 元素跑出屏幕，实测 FAB 消失）。
 
 **真机导航钩子（benchNav intent deep-link）**【2026-09-02 新增，ADR-0136】：
-原生 adb `am start --es benchNav <scenario>` 直达目标页的**测试导航通道**（深链绕过真机 `@tap` 失效——见「平台约束」）。形成三层：原生 `LynxActivity.onLoadSuccess` 读 extra → 事件名编码 → 4 次广播（1.5/3/4.5/6s 防挂载竞态）；`router.ts` 监听 → `/illusts`、`/novels`、`/recommended` 等；页面层监听 → 切「关注」子tab。**生产双重消除**：原生 `if (BuildConfig.DEBUG)`（release R8 剔除）+ 前端 `if (__DEV__)`（生产构建死代码消除，同 auth.ts 凭证范式）——**仅 debug 构建带钩子**。**任何真机验证的导航第一选择——不要退回模拟点击**（放射 FAB 环项/子 tab 已实证失效）。_Avoid_: 用注入 tap 导航（仅登录页等部分命中路径可行）、在 main 上验证时怀疑「钩子不存在」（已入 main，debug 可用）。
+原生 adb `am start --es benchNav <scenario>` 直达目标页的**测试导航通道**（深链绕过真机 `@tap` 失效——见「平台约束」）。形成三层：原生 `LynxActivity.onLoadSuccess` 读 extra → 事件名编码 → 4 次广播（1.5/3/4.5/6s 防挂载竞态）；`router.ts` 监听 → `/illusts`、`/novels`、`/discover`（`pictelioBenchNavCarousel` 现指向 `DISCOVER_PATH`）等；页面层监听 → 切「关注」子tab。**生产双重消除**：原生 `if (BuildConfig.DEBUG)`（release R8 剔除）+ 前端 `if (__DEV__)`（生产构建死代码消除，同 auth.ts 凭证范式）——**仅 debug 构建带钩子**。**任何真机验证的导航第一选择——不要退回模拟点击**（放射 FAB 环项/子 tab 已实证失效）。_Avoid_: 用注入 tap 导航（仅登录页等部分命中路径可行）、在 main 上验证时怀疑「钩子不存在」（已入 main，debug 可用）。
 
 ### 作品标识（Work indicators）
 
@@ -504,7 +504,7 @@ _Avoid_: 在 `<script setup>` 里写 `export { ... }` / `export default`；依�
 ### 放射导航（Radial navigation）
 
 **放射导航 FAB（radial nav FAB）**：
-全局唯一的右下角悬浮 FAB，是导航中枢；点按展开成「双层环」放射菜单，替代底部 M3 `NavigationBar`（4 tab）与各顶层 tab 页自己的刷新 FAB。仅在 4 个顶层 tab 页（推荐/插画/小说/我的）显示。详见 ADR-0120、`docs/adr/glossary-app-lynx-radial-nav-fab.md`。
+全局唯一的右下角悬浮 FAB，是导航中枢；点按展开成「双层环」放射菜单，替代底部 M3 `NavigationBar`（4 tab）与各顶层 tab 页自己的刷新 FAB。仅在 4 个顶层 tab 页（**发现/更新/书架/我的**，ADR-0218 维度重构后；原为推荐/插画/小说/我的）显示。详见 ADR-0120、ADR-0218、`docs/adr/glossary-app-lynx-radial-nav-fab.md`。
 _Avoid_: 底部导航栏、浮动按钮、feed 分页 FAB（见下）
 
 **双层环（double ring）**：
@@ -590,7 +590,7 @@ _Avoid_: 将 IFR 作为滚动跟手/交互性能手段；关掉它换取 bundle 
 app-lynx 现状的**自研内存路由**（`src/router.ts` `_state` + `_history` + `<component :is>`，路由语义与 vue-router 对齐、无 URL 环境）将迁移为**官方 vue-router `createMemoryHistory()`**（ADR-0066/ADR-0049 语义保持；迁移可行性双端实证见 `docs/research/vue-router-migration-feasibility.md`）。官方特殊性仅两点：初始位置为 nowhere（须手动指定**首启动点**）+ 无 URL 环境；memory 下 `history.state` 是**每条目可携带的数据**（`push(to, data?)` 第二参数），不是浏览器 `{back, current, forward}` 结构。_Avoid_: 继续维护自研路由、把 RouterView 空白归因 vue-router 兼容性（根因 = kebab-case 陷阱，见下）
 
 **首帧内容化（first-frame content）**【2026-09-03 新增，vue-router 迁移】：
-启动首帧直接渲染推荐页（骨架屏）、不等登录态恢复（#61/#63）；未登录由 initRouter 收敛 replace 到 /login（不入栈）。迁移后 = 模块顶层同步 `router.replace('/recommended')`（memory history 无自动初始导航，此即**首启动点**）。_Avoid_: 首帧前 await restoreToken（登录页闪屏回归）、用 push 定起点（登录页被返回可达）
+启动首帧直接渲染「发现」页（骨架屏）、不等登录态恢复（#61/#63）；未登录由 initRouter 收敛 replace 到 /login（不入栈）。迁移后 = 模块顶层同步 `router.replace(DISCOVER_PATH)`（`router.ts:189`，`DISCOVER_PATH = '/discover'`，`router.ts:29`；memory history 无自动初始导航，此即**首启动点**）。⚠️ 【2026-10-03 ADR-0218 维度重构】首帧路由**已由 `/recommended` 改为 `/discover`**，原推荐轮播组件 `Recommended.vue` 现挂在 `/discover` 上（页面内容未变，变的是外环语义：插画/小说已降为页内二级 tab）。_Avoid_: 首帧前 await restoreToken（登录页闪屏回归）、用 push 定起点（登录页被返回可达）、把首帧路径写回 `/recommended`
 
 **返回裁决链（back decision chain）**【2026-09-03 新增】：
 系统返回的逐级裁决：**modalStack 弹层 → 返回守卫 → `meta.backBehavior:'exit'` → `hasBackEntry()` 有历史则 `router.back()` → 无历史提示「再按一次退出应用」+ 2s 窗口 exit**。入口 = 系统返回桥（原生 `LynxActivity` `OnBackPressedDispatcher`，返回键/侧滑同路径 → 全局事件 `pictelioBack` → JS `handleSystemBack`；ADR-0066，迁移原生侧不动）。旧等价物 `evaluateBackRoute`（routerCore 纯函数）顺序不变，仅③④实现来源换 vue-router 等价物。_Avoid_: 重排裁决顺序（modalStack 最前；exit 页不允许回退到已失效会话）

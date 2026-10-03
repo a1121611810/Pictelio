@@ -60,6 +60,10 @@ vi.mock('../pages/FollowList.vue', () => ({ default: {} }))
 vi.mock('../pages/Following.vue', () => ({ default: {} }))
 vi.mock('../pages/Bookmarks.vue', () => ({ default: {} }))
 vi.mock('../pages/Me.vue', () => ({ default: {} }))
+// [维度重构 2026-10-03] 三个新页补桩（本配置无 vue 插件，漏桩即 import 期解析失败）
+vi.mock('../pages/Updates.vue', () => ({ default: {} }))
+vi.mock('../pages/Shelf.vue', () => ({ default: {} }))
+vi.mock('../pages/AdvancedSettings.vue', () => ({ default: {} }))
 vi.mock('../pages/Watchlist.vue', () => ({ default: {} }))
 vi.mock('../pages/WatchLater.vue', () => ({ default: {} }))
 vi.mock('../pages/Notifications.vue', () => ({ default: {} }))
@@ -94,12 +98,12 @@ describe('B 变体 · 默认路径（宏 = true = 生产缺省，真实执行该
   it('【真实执行分支】首页路由表里 topInset 被求值为 bleed', () => {
     // import 路由表时**真的**跑过 `__HOME_BLEED_HEADER__ ? 'bleed' : 'self'`。
     // 宏翻成 false 时本条转红 ⇒ 行为断言，不是文本断言。
-    expect(routes.find((r) => r.name === 'recommended')?.meta?.topInset).toBe('bleed')
+    expect(routes.find((r) => r.name === 'discover')?.meta?.topInset).toBe('bleed')
   })
 
-  it('其余 24 条路由仍是 self（bleed 只作用于首页一处）', () => {
-    const others = routes.filter((r) => r.name !== 'recommended')
-    expect(others).toHaveLength(24)
+  it('其余 27 条路由仍是 self（bleed 只作用于首页一处）', () => {
+    const others = routes.filter((r) => r.name !== 'discover')
+    expect(others).toHaveLength(27)
     for (const r of others) expect(r.meta?.topInset, String(r.name) + ' 不应是 bleed').toBe('self')
   })
 

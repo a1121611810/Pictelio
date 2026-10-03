@@ -25,8 +25,12 @@ import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 import { runStartupAutoBackup } from './services/backupWiring'
 
-/** 首帧/栈空回退目标（ADR-0049）：初始路由 = 推荐页（首帧内容化） */
-export const RECOMMENDED_PATH = '/recommended'
+/** 首帧/栈空回退目标（ADR-0049）：初始路由 = **「发现」页**（首帧内容化）。
+ *  ⚠️ 目的地名已随维度重构改叫「发现」；承载组件仍是 `pages/Recommended.vue`（文件名未改），
+ *     故此处按**目的地**称「发现」而非按组件名称「推荐页」——两者指的是同一页。
+ *  ⚠️ routeState 的初值就是本常量（见下方 routeState），它是**占位值**而非真实落点；
+ *     依赖「初值 ≠ 落点」的监听写法会在冷启动时漏记，详见 App.vue 的顶层触达读点注释。 */
+export const DISCOVER_PATH = '/discover'
 
 // route meta 类型（vue-router RouteMeta 增强）：requiresAuth（守卫鉴权）、
 // backBehavior（返回键行为，原路由声明的 backBehavior 迁入 meta——ADR-0138 决策 6）、
@@ -54,6 +58,9 @@ declare module 'vue-router' {
 // MVP 用静态加载降低复杂度，bundle 体积可接受（实测 ~160KB）
 import Login from './pages/Login.vue'
 import Recommended from './pages/Recommended.vue'
+import Updates from './pages/Updates.vue'
+import Shelf from './pages/Shelf.vue'
+import AdvancedSettings from './pages/AdvancedSettings.vue'
 import IllustList from './pages/IllustList.vue'
 import IllustDetail from './pages/IllustDetail.vue'
 import NovelList from './pages/NovelList.vue'
@@ -93,7 +100,20 @@ export const routes: RouteRecordRaw[] = [
   // ⚠️ 绝不能是 'root'：该模式已随根容器补偿一起删除，含义退化成「完全不让位」，
   //    顶栏会整体上移顶进状态栏，而编译/测试/门禁全绿。
   // ⚠️ meta 与模板必须同源于本宏（模板见 Recommended.vue 的 HOME_BLEED 分支）。
-  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },
+  { path: DISCOVER_PATH, name: 'discover', component: Recommended, meta: { requiresAuth: true, topInset: __HOME_BLEED_HEADER__ ? 'bleed' : 'self' } },
+  // ── [维度重构 2026-10-03] 三个新的顶层目的地 ──
+  // 「更新」：三段聚合面（关注更新 / 追更新 / 通知），一页答完"有没有更新"。
+  //   此前 /following 零用户入口（仅 benchNav 深链）、追更与通知各只有 Me.vue 单入口 ——
+  //   三件回答同一问题的事分散三处，本条把它们收进一个顶层位置。
+  { path: '/updates', name: 'updates', component: Updates, meta: { requiresAuth: true, topInset: 'self' } },
+  // 「书架」：三段聚合面（我的收藏 / 稍后看 / 继续读）。继续读尚未实现（ADR-0203 删除了
+  //   旧 WebView 客户端的 historyStore），页内显式说明"即将上线"而非伪装成空列表。
+  { path: '/shelf', name: 'shelf', component: Shelf, meta: { requiresAuth: true, topInset: 'self' } },
+  // 「高级」：承接原「我的」里的调试/自检项（网络自检 / 限流退避调参 / 平台一致性自检），
+  //   使业务入口行与调试行不再平级混排（决策 4 = B：只搬调试项，账号区与外观区不动）。
+  { path: '/advanced', name: 'advanced', component: AdvancedSettings, meta: { requiresAuth: true, topInset: 'self' } },
+  // 插画/小说列表页**保留路由**（深链 / benchNav / 从二级页返回的回退目标），但不再出现在导航：
+  //   媒介已降为「发现」页内二级（M3：同主题的并列视角属 Tabs，不属顶级导航目的地）。
   { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true, topInset: 'self' } },
   { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true, topInset: 'self' } },
@@ -163,14 +183,14 @@ router.beforeEach((to) => {
   return decision
 })
 
-// [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
+// [首帧内容化]（#61/#63）：初始路由为「发现」页——首帧直接渲染推荐页骨架屏，
 // 消除已登录用户启动时的登录页闪屏；未登录用户由 initRouter 登录守卫
 // replace 到 /login（不入栈，ADR-0049 语义不变）。
 // memory history 初始位置是 "nowhere"（官方 API 文档确认），必须显式定起点
 //（官方示例在 app.mount() 前 push）；此处用 replace——与 initRouter 收敛语义一致
 // 且不入历史栈。若该导航失败（守卫/依赖错误）→ RouterView 无匹配渲染空白，
 // 属于「先渲染后加载」的显式前提（code-review P3）。
-void router.replace(RECOMMENDED_PATH)
+void router.replace(DISCOVER_PATH)
 
 export interface RouteState {
   name: string
@@ -189,8 +209,8 @@ export interface RouteState {
 
 /** 路由状态（兼容导出，原 _state ref）：以 router.currentRoute 为准 */
 export const routeState = ref<RouteState>({
-  name: 'recommended',
-  path: RECOMMENDED_PATH,
+  name: 'discover',
+  path: DISCOVER_PATH,
   params: {},
   topInset: 'self',
 })
@@ -318,8 +338,8 @@ export function goBack(): void {
   }
   _sessionStack.length = 0
   // 栈空降级回推荐页：物理上是 replace，但语义仍是「返回上层」⇒ 显式声明 back 覆盖 replace 档
-  requestRouteTransition(decideRouteDirection({ declared: 'back' }), RECOMMENDED_PATH)
-  void router.replace(RECOMMENDED_PATH)
+  requestRouteTransition(decideRouteDirection({ declared: 'back' }), DISCOVER_PATH)
+  void router.replace(DISCOVER_PATH)
 }
 
 // ─── 返回守卫（spec app-lynx-novel-series-watchlist §US3，issue #222） ───
@@ -427,7 +447,7 @@ function registerBenchNavHandler(): void {
   const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
   if (!emitter || typeof emitter.addListener !== 'function') return
   const TARGETS: Record<string, string> = {
-    pictelioBenchNavCarousel: RECOMMENDED_PATH,
+    pictelioBenchNavCarousel: DISCOVER_PATH,
     pictelioBenchNavIllust: '/illusts',
     pictelioBenchNavNovel: '/novels',
     pictelioBenchNavFollowing: '/following',
@@ -531,7 +551,7 @@ export async function initRouter(): Promise<void> {
   // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
   // 失败仅 warn，不阻塞启动（spec §7）
   void runStartupAutoBackup()
-  await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
+  await navigate(ok ? DISCOVER_PATH : '/login', { replace: true })
   // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
   markBootstrapDone()
 }

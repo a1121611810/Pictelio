@@ -144,7 +144,19 @@ describe('B 变体顶栏 · 通知按钮（源级守卫）', () => {
 
   it('通知入口带 a11y 标签（取消顶栏后不能丢失朗读路径）', () => {
     const c = code(SRC)
-    expect(c).toMatch(/ME_A11Y_LABELS\.notifications/)
+    // [维度重构 2026-10-03] 本用例守的**真不变量**是「通知不能丢失朗读路径」，
+    //   而不是「铃铛必须长在首页顶栏」。首页那个铃铛是为「通知只能从『我的』进入」打的
+    //   局部补位补丁（其原注释自陈如此），按 NN/g「不要给同一功能开多条进入路径」已撤。
+    //   ⇒ 路径改由「更新」页承接（UPDATES_A11Y_LABELS.viewAllNotifications 等）。
+    //   这里改成**负断言**：铃铛确实不在了，且不许被静默加回。
+    expect(c).not.toMatch(/ME_A11Y_LABELS\.notifications/)
+    expect(c).not.toMatch(/openNotifications/)
+    // 朗读路径的新落点：必须在 Updates 页上真的存在（不是只删了旧的、新的没接）
+    const updates = readFileSync(
+      fileURLToPath(new URL('./Updates.vue', import.meta.url)),
+      'utf8',
+    )
+    expect(updates).toMatch(/UPDATES_A11Y_LABELS\.viewAllNotifications/)
   })
 })
 

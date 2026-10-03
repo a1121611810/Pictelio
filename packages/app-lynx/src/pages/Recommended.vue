@@ -1,5 +1,7 @@
 <script setup lang="ts">
-// 综合推荐页（/recommended）：插画 + 小说混合，改**单卡 swipe 轮播**（ADR-0115）。
+// 发现页（/discover）：[维度重构 2026-10-03] 顶层目的地由「推荐」改名为「发现」，
+// 插画/小说降为页内二级 Tabs；本页承接原综合推荐页的插画 + 小说混合内容，
+// 改**单卡 swipe 轮播**（ADR-0115）。
 // 数据层由 createMixFeed（merge:'time-merge'）承载：两路（插画/小说）按 create_date 时间交叉
 // 合并成增长流 + fetchMore（双防抖/竞态代/去重/分批渲染/15s 超时）；页面只做 ref 快照桥接 + 渲染。
 // 渲染层 = CarouselSwiper（自研 swipe，**后台线程**触摸 + Vue 响应式 :style 绑定 translateX + px 吸附，
@@ -11,7 +13,7 @@
 //   aspectFill）；首载渲染流为空即显沉浸骨架（CarouselSkeleton，不依赖 loading）；滑页 scrim 区
 //   展示标签胶囊行（TagChipRow，3+N）。吸附阈值 + fling 在 CarouselSwiper 内部（swiperMath）。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
-defineOptions({ name: 'recommended' })
+defineOptions({ name: 'discover' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 
 import { navigate } from '../router'
@@ -30,6 +32,7 @@ import { useGlobalFabStore } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
 import CarouselSkeleton from '../components/CarouselSkeleton.vue'
+import SubTabBar from '../components/SubTabBar.vue'
 import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
@@ -38,6 +41,8 @@ import AppIcon from '../components/AppIcon.vue'
 import { safeTop } from '../utils/safeArea'
 import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useUsageMetricsStore } from '../stores/usageMetrics'
+import { type DiscoverTabKey } from '../primitives/usageMetrics'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import { t } from '../i18n'
 
@@ -91,25 +96,46 @@ function mapNovels(r: {
   }
 }
 
-const feedSources: MixFeedSource[] = [
-  {
-    name: 'illust',
-    fetchPage: (signal, nextUrl) =>
-      nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : loadRecommended(signal).then(mapIllusts),
-  },
-  {
-    name: 'novel',
-    fetchPage: (signal, nextUrl) =>
-      nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : loadRecommendedNovels(signal).then(mapNovels),
-  },
-]
+/** 发现页内二级 tab：媒介维度（'all' = 插画+小说混流时间交叉）。
+ *  [维度重构 2026-10-03] 插画/小说此前是两个**顶层**目的地，但它们是同一目录下的两个视角，
+ *  按 M3 应属页内 Tabs（"Tabs share a common subject, whereas bottom navigation destinations
+ *  are top-level and disconnected from each other"）⇒ 降为二级，顶层让位给"更新/书架"。
+ *  复用 SubTabBar（IllustList/NovelList 已在用，ADR-0194），不新造组件。 */
+type DiscoverTab = DiscoverTabKey
+const tab = ref<DiscoverTab>('all')
 
-const feed = createMixFeed({
-  sources: feedSources,
-  merge: 'time-merge',
-  autoStart: false, // 页面统一经 refreshFeed 触发首载（含 token 恢复补拉）
-  onUpdate: () => sync(), // 模块内部自动补触发（P1）完成后通知页面重新快照
-})
+const illustSource: MixFeedSource = {
+  name: 'illust',
+  fetchPage: (signal, nextUrl) =>
+    nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : loadRecommended(signal).then(mapIllusts),
+}
+const novelSource: MixFeedSource = {
+  name: 'novel',
+  fetchPage: (signal, nextUrl) =>
+    nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : loadRecommendedNovels(signal).then(mapNovels),
+}
+
+/** 按二级 tab 组装 source 列表。sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。 */
+function sourcesFor(m: DiscoverTab): MixFeedSource[] {
+  if (m === 'illust') return [illustSource]
+  if (m === 'novel') return [novelSource]
+  return [illustSource, novelSource]
+}
+
+function makeFeed(m: DiscoverTab) {
+  return createMixFeed({
+    sources: sourcesFor(m),
+    merge: 'time-merge',
+    autoStart: false, // 页面统一经 refreshFeed 触发首载（含 token 恢复补拉）
+    onUpdate: () => sync(), // 模块内部自动补触发（P1）完成后通知页面重新快照
+  })
+}
+
+// ⚠️ 用 `let` 而非 ref：createMixFeed 返回的是带方法的命令式对象，全文 5 处调用点
+// （items/error/pageError/refresh/fetchMore/dispose）都写死成 `feed.xxx()`。
+// 改成 ref 会把每处都变成 `feed.value.xxx()`，diff 变大且无收益——切换时**重建实例**即可，
+// 这与 IllustList/NovelList 的 makeFeed(mode) + mode 重建实例是同一套路。
+let feed = makeFeed(tab.value)
 
 // ─── 响应式桥接：feed 是纯函数式状态，页面用本地 ref 快照渲染 ───
 // [ADR-0118] 首载骨架「渲染流为空即显」（不依赖 loading）：loading 标志不再参与显隐，移除本地镜像。
@@ -121,6 +147,33 @@ function sync() {
   items.value = feed.items()
   errorMsg.value = feed.error() ?? ''
   pageError.value = feed.pageError() ?? ''
+}
+
+// ─── 发现页内二级 tab（媒介维度）───
+const tabItems = computed(() => [
+  { key: 'all' as const, label: t('discover.tab.all') },
+  { key: 'illust' as const, label: t('discover.tab.illust') },
+  { key: 'novel' as const, label: t('discover.tab.novel') },
+])
+
+/** 切二级：作废旧 feed 实例并按新 source 重建（不跨媒介复用已加载的流）。
+ *  ⚠️ 必须先 dispose 再重建——旧实例内部还有 in-flight 请求与定时器，
+ *  不释放会在切 tab 后继续往共享 ref 里写脏数据。 */
+function switchTab(next: DiscoverTab): void {
+  if (next === tab.value) return
+  // 本地度量读点（spec §4 P0.5「二级使用占比」）。失败不得影响切换。
+  try {
+    useUsageMetricsStore().recordSubTabUse(next)
+  } catch (e) {
+    console.warn('[discover] 二级使用度量记录失败（不影响切换）', e)
+  }
+  tab.value = next
+  feed.dispose()
+  feed = makeFeed(next)
+  items.value = []
+  errorMsg.value = ''
+  pageError.value = ''
+  void refreshFeed()
 }
 
 // ─── 封面比例显示（ADR-0118 / spec §2.1、§3.2）：可视区尺寸由 SystemInfo 派生 ───
@@ -136,7 +189,12 @@ function slideViewport(): { width: number; height: number } {
   const screenH = SystemInfo.pixelHeight ? SystemInfo.pixelHeight / SystemInfo.pixelRatio : w * 1.78
   // B 变体无实体顶栏 ⇒ 扣除项为 0；否则扣 64dp 顶栏（17.067vw）
   const bars = HOME_BLEED ? 0 : 0.17067 * w
-  return { width: w, height: Math.max(1, screenH - bars) }
+  // ⚠️ [维度重构 2026-10-03] 二级 tab（SubTabBar，h-[12.8vw]）是**流内**元素，
+  //   在**两种模式下**都占高度（bleed 下额外加 safeTop 让位）。
+  //   漏扣的后果：封面按"比实际更高"的视口算比例 ⇒ 铺出容器外被裁，且每张图都错却不自证。
+  const safe = typeof safeTop === 'number' ? safeTop : 0
+  const tabBar = 0.128 * w + (HOME_BLEED ? safe : 0)
+  return { width: w, height: Math.max(1, screenH - bars - tabBar) }
 }
 const SLIDE_VIEWPORT = slideViewport()
 
@@ -240,7 +298,7 @@ function coverSrc(data: PixivIllust | PixivNovel): string {
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(() => {
-  unreg = useGlobalFabStore().usePage('recommended', {
+  unreg = useGlobalFabStore().usePage('discover', {
     refresh: refreshFeed,
     backToTop: () => {
       refreshEpoch.value++
@@ -295,10 +353,8 @@ onUnmounted(() => {
   if (titleChipTimer) clearTimeout(titleChipTimer)
 })
 
-/** 悬浮通知入口：通知页目前只能从「我的」进入，顶栏补一个直达位。 */
-function openNotifications(): void {
-  void navigate('/notifications')
-}
+/** 标题胶囊文案 = 当前二级 tab 名（切到「小说」时说「发现」会误导定位）。 */
+const chipText = computed(() => tabItems.value.find((i) => i.key === tab.value)?.label ?? t('discover.title'))
 </script>
 
 <template>
@@ -323,10 +379,16 @@ function openNotifications(): void {
     <view v-if="!HOME_BLEED" :style="{ height: topInsetSpacer + 'px' }" />
 
     <!-- B 变体悬浮层（票 #906）：absolute 覆盖层，不占流内高度 ⇒ 静止态顶部零占用。
-         ① 通知按钮**必须有容器填充**（M3 对透明 app bar 的原话要求：容器透明时图标按钮要有底）；
-            真机无 backdrop-filter ⇒ 半透明实色是本仓可读性上限（浅色封面下对比度需实测）。
-         ② 只放通知，不放搜索 —— 搜索入口已在全局 FAB 内环（ADR-0132），再放一个是重复入口。
-         ③ 标题胶囊进场显示、2s 淡出（真机实测本页无纵向滚动，scroll 触发源不存在）。 -->
+         ⚠️ [维度重构 2026-10-03] **通知按钮已移除**。原注释自陈「通知页目前只能从「我的」进入，
+            顶栏补一个直达位」——那是分组错误下的**局部补丁**，等于给同一功能开第二条进入路径。
+            NN/g：progressive disclosure 的目标是让用户尽快用上首屏，"it's rarely a good idea to
+            offer **multiple ways to progress to secondary options**"。
+            通知的主入口现为「更新」页第三段，外环「更新」项另带未读角标（读点见
+            stores/globalFab.ts 的 navBadge），本页不再重复。
+            ⚠️ 「我的」页按决策 4=B 仍保留通知/追更次级入口，故严格说通知有 3 条路径而非唯一；
+            该偏离已在 spec §2.4 / §3.2 显式登记，不再在此复述。
+         ① 状态栏可读性遮罩保留（与通知按钮无关，见下）。
+         ② 标题胶囊进场显示、2s 淡出（真机实测本页无纵向滚动，scroll 触发源不存在）。 -->
     <view v-else class="absolute left-0 right-0 top-0 z-30">
       <!-- ① 状态栏可读性兜底（票 #906 风险①/⑤，实测驱动）：
            封面出血到 y=0 后，**系统状态栏图标的底色变成不可预测的封面像素**。
@@ -344,33 +406,48 @@ function openNotifications(): void {
           background: 'var(--md-statusbar-scrim)',
         }"
       />
-      <view class="flex flex-row justify-end" :style="{ paddingTop: safeTop + 'px' }">
-        <view
-          class="w-[10.667vw] h-[10.667vw] rounded-full flex items-center justify-center"
-          style="background: var(--md-scrim)"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.notifications"
-          @tap="openNotifications"
-        >
-          <AppIcon name="notifications" class="text-white" />
-        </view>
-      </view>
-      <view class="px-3 mt-2">
+      <!-- 标题胶囊：顶部原先有一行通知按钮占位，移除后本容器需自带 safeTop 让位，
+           否则胶囊会压进状态栏（状态栏遮罩只解决**底色对比度**，不解决**布局避让**）。 -->
+      <view class="px-3" :style="{ paddingTop: safeTop + 8 + 'px' }">
         <view
           v-if="titleChipVisible"
           class="self-start inline-flex flex-row items-center rounded-full px-4 h-8.5 max-w-[72vw]"
           :style="{ background: 'var(--md-scrim)', transition: chipTransition }"
         >
           <!-- max-w + [max-line:1]：胶囊是**内容宽**，无上限时长标题（德语等）会横向撑出屏幕。
-               风险④（真机：长语言标题）就落在这两条上。 -->
+               风险④（真机：长语言标题）就落在这两条上。
+               文案取**当前二级 tab 名**而非固定「发现」：切到「小说」时仍说发现会误导定位。 -->
           <text
             class="text-title-medium font-medium text-white [max-line:1]"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="t('recommended.title')"
-            >{{ t('recommended.title') }}</text
+            :accessibility-label="chipText"
+            >{{ chipText }}</text
           >
         </view>
       </view>
+    </view>
+
+    <!-- 二级 tab（媒介维度）。
+         ⚠️ 必须在**正常流内**且在两种模式下都渲染：
+           ① 放进上面的 absolute 悬浮层 → 只在 HOME_BLEED 分支出现，回退阀下二级 tab 直接消失；
+           ② 放进 absolute → 不占流内高度，轮播内容会与它重叠（SubTabBar 自身 h-[12.8vw]）。
+           放在 v-if/v-else 让位分支**之后**、轮播**之前**，两种模式的顶部让位口径都能保持不变。
+
+         ⚠️⚠️ 必须 `relative + zIndex 40` 压住上方悬浮层（z-30）。真机实测（emulator-5554）：
+           悬浮层是 `absolute left-0 right-0 top-0`，内含状态栏遮罩（高 = safeTop×2.2）
+           与标题胶囊容器（paddingTop = safeTop+8）——它的高度会**盖住二级 tab 的上半部分**，
+           而 SubTabBar 在正常流里 z-index 无效 ⇒ 文字可见但**点击被遮罩吞掉，tab 切不动**。
+           ⚠️ 不用 `pointer-events-none`：本项目 Tailwind preset 裁掉了 pointerEvents
+           （写上去是死类名、无规则），与 CommentOverlay 里登记的同一个坑。
+           ⇒ 用 z 序解决，不依赖 pointer-events。 -->
+    <view
+      class="relative"
+      :style="{
+        zIndex: 40,
+        ...(HOME_BLEED ? { paddingTop: safeTop + 'px' } : {}),
+      }"
+    >
+      <SubTabBar :items="tabItems" :model-value="tab" @change="switchTab" />
     </view>
 
     <!-- 首载沉浸骨架 / 整页错误（ADR-0118：渲染流为空即显骨架，不依赖 loading——冷启动请求前立即出现） -->

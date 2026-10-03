@@ -267,7 +267,7 @@ describe('novel.extractNovelTextFromHtml', () => {
 describe('routerCore 路由匹配', () => {
   const coreRoutes = [
     { path: '/login', name: 'login' },
-    { path: '/recommended', name: 'recommended' },
+    { path: '/discover', name: 'discover' },
     { path: '/illust/:id', name: 'illust-detail' },
     { path: '/novels', name: 'novels' },
     { path: '/novel/:id', name: 'novel-detail' },
@@ -275,8 +275,8 @@ describe('routerCore 路由匹配', () => {
   ]
 
   it('静态路径精确匹配', () => {
-    const m = matchRoute(coreRoutes, '/recommended')
-    expect(m?.route.name).toBe('recommended')
+    const m = matchRoute(coreRoutes, '/discover')
+    expect(m?.route.name).toBe('discover')
     expect(m?.params).toEqual({})
   })
 
@@ -1328,7 +1328,12 @@ describe('Me 页 accessibility 标注注册表（issue #103）', () => {
     //    「每处 label 引用都伴随 element 开启」的模板内配对关系不破。
     //    计数是**相对断言**（两者相等），不写死绝对值——客户端切换组下线（ADR-0203 决策 7）
     //    已把该数从 71 降到 65，写死数字只会让每次正当删减都要改测试。
-    const labelCount = (meVueSource.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
+    // [维度重构 2026-10-03] 计数改为**注册表无关**（匹配任意 `*_A11Y_LABELS.key` 形态的 label）。
+    //   本页新增的「高级」行用 ADVANCED_A11Y_LABELS 而非 ME_A11Y_LABELS，但**真不变量**
+    //   是「每个 accessibility-label 都配一个 accessibility-element」——
+    //   原写法把不变量误写成「必须用 ME 这一个注册表」，页面一旦引入第二个注册表就假红。
+    //   （同族修法已用在 meMyPixivTemplate / meWatchLaterTemplate。）
+    const labelCount = (meVueSource.match(/:accessibility-label="[A-Z_0-9]+A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (meVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(elementCount)
     // b. 迁移的 11 个段 key 必须经 options 消费（M3SegmentedButton 段级 a11y 的唯一接线点）。
@@ -1388,18 +1393,25 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
 // ✎ 小说→menu_book、◎ 我的→person），非从 navTabs.ts 现状反推——icon 名写错时
 // <AppIcon> 只能抛错/渲染错图标，本断言先于运行时拦下。
 describe('navTabs.ts 图标名契约（ADR-0208 决策 3）', () => {
-  const navBarVue = readFileSync(fileURLToPath(new URL('../src/components/NavigationBar.vue', import.meta.url)), 'utf8')
+  // [维度重构 2026-10-03] 渲染方从 NavigationBar.vue 换成 GlobalFab.vue（外环项）——
+  //   NavigationBar 组件在 ADR-0120 之后已零 import，本次随「零孤儿清理」一并删除。
+  //   真不变量（图标必须经 <AppIcon :name> 查表渲染、不许插值字形）**不变**，只是守卫对象换文件。
+  const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
 
-  it('NAV_TABS 四 tab 的 icon 是 ICON_CODEPOINTS 已登记的 IconName，按 推荐/插画/小说/我的 顺序', () => {
-    expect(NAV_TABS.map((tab) => tab.icon)).toEqual(['home', 'explore', 'menu_book', 'person'])
+  it('NAV_TABS 四 tab 的 icon 是 ICON_CODEPOINTS 已登记的 IconName，按 发现/更新/书架/我的 顺序', () => {
+    // 期望值来自 iconMap 码点表的语义分组，非从 navTabs.ts 现状反推：
+    //   home=家/首页 · notifications=铃铛（更新提醒）· favorite_border=心形边框（我存的）· person=人（账号）
+    // ⚠️ 这组图标随维度重构换过一次（explore/menu_book → notifications/favorite_border），
+    //   换的根据是**新顶层的语义**（更新 / 书架），不是为了让断言好过。
+    expect(NAV_TABS.map((tab) => tab.icon)).toEqual(['home', 'notifications', 'favorite_border', 'person'])
     for (const tab of NAV_TABS) {
       expect(Object.keys(ICON_CODEPOINTS)).toContain(tab.icon)
     }
   })
 
-  it('NavigationBar 图标位经 <AppIcon :name="tab.icon"> 渲染，模板不再插值图标字形', () => {
-    expect(navBarVue).toContain(':name="tab.icon"')
-    expect(navBarVue).not.toMatch(/\{\{\s*tab\.icon\s*\}\}/)
+  it('外环图标位经 <AppIcon :name="tab.icon"> 渲染，模板不再插值图标字形', () => {
+    expect(globalFabVue).toContain(':name="e.tab.icon"')
+    expect(globalFabVue).not.toMatch(/\{\{\s*e\.tab\.icon\s*\}\}/)
   })
 })
 

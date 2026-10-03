@@ -71,8 +71,11 @@ export interface FabView {
   active: string | null
   isOpen: boolean
   isBusy: boolean
-  /** 外环：4 个导航 tab（NAV_TABS 事实源） */
-  outer: readonly NavTab[]
+  /** 外环：4 个导航 tab（NAV_TABS 事实源）+ 各自的未读角标计数。
+   *  ⚠️ `badge` 来自 deps.navBadge 的**读点**（spec §2.2 / §3.2 承诺的
+   *  「外环「更新」项带未读计数」）。承诺若无读点即 silent misconfiguration，
+   *  故此处是显式数据通道而非渲染层临时计算——接线证据见 globalFabNavBadge.test.ts。 */
+  outer: readonly (NavTab & { badge: number })[]
   /** 内环：全局搜索项（固定首位）+ 激活页注册动作 */
   inner: readonly FabInnerItem[]
 }
@@ -118,6 +121,10 @@ export interface CreateGlobalFabDeps {
   navigate: (path: string, opts?: { replace?: boolean }) => void
   /** 导航 tab 事实源（=NAV_TABS；测试可注入 stub） */
   navTabs: NavTab[]
+  /** 各 tab 的未读角标计数（spec §2.2）。缺省 = 全 0（无角标）。
+   *  接线方：stores/globalFab.ts 从 notificationStore.unreadCount 供给。
+   *  ⚠️ 本模块保持纯函数化——**不**在此直接 import 任何 store（否则单测需 active pinia）。 */
+  navBadge?: (tabName: string) => number
   /** 搜索弹层打开回调（ADR-0132 决策 2/3；缺省 no-op + warn，T5 由 stores/globalFab 接线）
    *  注：不 port 化（in-process 依赖注入，ADR-0120 端口取舍同款） */
   openSearch?: () => void
@@ -219,7 +226,7 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
       // search 模式渲染树无遮罩/环层（ADR-0123：关闭态无全屏元素）
       isOpen: tab !== null && menu.isOpen,
       isBusy: menu.isBusy,
-      outer: deps.navTabs,
+      outer: deps.navTabs.map((t) => ({ ...t, badge: deps.navBadge?.(t.name) ?? 0 })),
       inner: inner.value,
     }
   })
