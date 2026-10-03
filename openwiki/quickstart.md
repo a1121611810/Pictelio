@@ -20,11 +20,11 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 | Attribute | Value |
 |-----------|-------|
-| App version | 6.3.0 (`pictelio-app-lynx`) |
+| App version | 6.6.1 (`pictelio-app-lynx`) |
 | Framework | vue-lynx (Vue 3.5.40 + `vue-lynx` 0.5.1) on the ReactLynx runtime |
 | Language | TypeScript 7.0 (strict); `check` runs `vue-tsc --noEmit -p src/tsconfig.json` (ADR-0144) |
 | Bundler | rspeedy (`@lynx-js/rspeedy`) for `dev`/`build`/`preview` |
-| Styling | Tailwind CSS via `@lynx-js/tailwind-preset` + Fluent semantic color palette (ADR-0046); spacing=`vw`, fontSize=`rpx` |
+| Styling | Tailwind CSS via `@lynx-js/tailwind-preset` + MD3 (Material Design 3) semantic tokens (material-web v0.192 baseline, ADR-0205); spacing=`vw`, fontSize=`rpx` |
 | Routing | vue-router 5.3.1 (`createMemoryHistory`) |
 | Data Fetching | @tanstack/vue-query 5.103 (ADR-0141) |
 | State | Pinia 4.0 setup stores (`stores/pinia.ts` seam, ADR-0139/0140) |
@@ -250,6 +250,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0202 | OTA web bundle channel retirement — the web-bundle update path is retired; only APK update-check (`checkForUpdate`) remains; see [ADR-0202](/docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md) |
 | 0203 | WebView client source removal (2026-09-29) — `packages/app` (SolidJS + Capacitor + tests) is deleted; the Android host moves to `packages/android-host`; OAuth credentials + product version move to `packages/app-lynx`; client switching is removed (decision 7); see [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md) |
 | 0204 | root command naming (2026-09-29) — bare `dev`/`build`/`check`/`test`/`preview` now delegate to `pictelio-app-lynx`; host actions use an explicit `:android-host` suffix; deleted-webview commands removed; see [ADR-0204](/docs/adr/ADR-0204-root-command-naming.md) |
+| 0205–0217 | MD3 design-system alignment + immersive layout (v6.4.0 → v6.6.1) — app-lynx design baseline anchored to Material Design 3 (material-web v0.192 generated tokens; ADR-0205 19-gap audit); typography type scale (0206), shape/state-layer guardrails (0207), Material Symbols subset-font icons (0208), MD3 filled text field (0209), Lynx style-stack capability boundary (0210), UI-continuity motion contract (0211), tonal elevation over shadow (0212); immersive media view — detail fullscreen + tap-to-hide (0213), top-inset per-page ownership (0214), fail-safe aux mechanisms (0215), four root pages header removal + FAB allowance removal (0216), bottom-occlusion scoped to scroll content (0217); see individual ADRs under `/docs/adr/` |
 
 ## Key Source Files
 
@@ -305,9 +306,11 @@ A **CodeGraph MCP server** is registered in [`.mcp.json`](/.mcp.json) (`codegrap
 
 ## Repo Evolution (Recent History)
 
-The repository has been actively refactored through **v5.5.0**, then underwent the **single-engine consolidation** (v6.3.0). Key themes in recent commits:
+The repository has been actively refactored through **v5.5.0**, underwent the **single-engine consolidation** (v6.3.0), then the **MD3 design-system alignment + immersive layout** workstream (v6.4.0 → v6.6.1). Key themes in recent commits:
 
 - **Single-engine consolidation (ADR-0201 → ADR-0204, 2026-09-29, v6.3.0):** The WebView/SolidJS/Capacitor client was fully removed. ADR-0201 consolidated the dual-client facade; ADR-0202 retired the OTA web-bundle channel; ADR-0203 deleted `packages/app` (295 SolidJS `src/` files, 220 unit + 16 agent-browser tests) and moved the Android host to `packages/android-host` (22,559 Java lines + 37 android-e2e files + release scripts preserved), relocating OAuth credentials and the product version into `packages/app-lynx` and deleting the client-switch capability (decision 7); ADR-0204 re-pointed bare root commands (`dev`/`build`/`check`/`test`/`preview`) at `pictelio-app-lynx` and named host actions `:android-host`. Result: a single Lynx engine (`pictelio-app-lynx` 6.3.0) + a build host (`@pictelio/android-host`).
+
+- **MD3 design-system alignment + immersive layout (ADR-0205 → ADR-0217, 2026-09-30 → 2026-10-03, v6.6.1):** app-lynx's design baseline was formally anchored to Material Design 3 — material-web v0.192 generated token files became the sole numeric source (ADR-0205), closing a 19-gap audit and demoting the leftover Fluent/WebView-era guidance in `AGENTS.md`. Follow-ups landed the MD3 type scale (0206), shape/state-layer guardrails (0207), Material Symbols subset-font icons (0208), the MD3 filled text field (0209), the Lynx style-stack capability boundary (0210), a UI-continuity motion contract (0211), and tonal-elevation-over-shadow layering (0212). A parallel immersive-viewing track added detail-page fullscreen with tap-to-hide (0213), per-page top-inset ownership (0214), fail-safe aux mechanisms (0215), removed the four root pages' headers plus the global FAB placeholder band (0216), and scoped bottom-occlusion allowance to scroll content (0217).
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
 - **Feed store split + legacy cleanup:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) have been split into dedicated per-tab stores using the same factory. `recommendedStore.ts` and `followStore.ts` (with `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts`) now power the home page feed panels directly via `IllustFeedPanel`/`NovelFeedPanel` — the standalone `RecommendedFeed`/`FollowFeed` components and `NovelRecommendedFeed`/`NovelFollowFeed` route panels were later **deleted** in the ADR-0083 dead-code cleanup. Both legacy monolithic stores and their tests have been **deleted** (commit `b30366f`). Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
