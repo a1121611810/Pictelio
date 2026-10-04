@@ -388,6 +388,8 @@ This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK
 
 A native Bitmap LRU memory cache that accelerates second renders: decoded `Bitmap`s are cached in Java memory (LRU eviction) so re-visiting an image renders instantly instead of re-decoding from disk. Introduced alongside detail image quality tiers (default `medium`) that skip the original image for single-page works (#145/#146/#148).
 
+**Zero-copy delivery (v6.7.1, #147 follow-up):** Before v6.7.1, [`PictelioImageService`](#pictelioimageservice) handed the engine a `copy(ARGB_8888, false)` of every cached `Bitmap`, on the assumption that Lynx recycles the bitmaps it receives (reusing the cache instance would blank a second render). A 2026-10-04 measurement on the API 34 emulator disproved that premise — 185 copy+direct deliveries with 0 `isRecycled()` hits, and 100/100 direct second renders succeeded — so the service now delivers the cached instance itself. This removes a per-image `w×h×4` copy (~1.9 MB per 600×800 thumbnail, ~5.8 MB per 1200px master) that was pure overhead when scrolling long/large images. The copy was replaced by a zero-cost `cached.isRecycled()` guard: a genuinely recycled cache entry is evicted and falls back to download rather than crashing. Untested edges before further changes: real devices (emulator-only), master-scale originals (only 600px thumbnails sampled), >5s observation windows, and engine-version differences from the original #147 repro (evidence: issue #924, branch `proto/image-copy-feasibility`).
+
 ### PictelioApp.java (full flavor)
 
 `/packages/app/android/app/src/full/java/io/pictelio/app/PictelioApp.java`

@@ -20,7 +20,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 | Attribute | Value |
 |-----------|-------|
-| App version | 6.6.1 (`pictelio-app-lynx`) |
+| App version | 6.7.1 (`pictelio-app-lynx`) |
 | Framework | vue-lynx (Vue 3.5.40 + `vue-lynx` 0.5.1) on the ReactLynx runtime |
 | Language | TypeScript 7.0 (strict); `check` runs `vue-tsc --noEmit -p src/tsconfig.json` (ADR-0144) |
 | Bundler | rspeedy (`@lynx-js/rspeedy`) for `dev`/`build`/`preview` |
