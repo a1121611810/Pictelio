@@ -1,5 +1,5 @@
 {
-  "version": "6.7.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.7.0",
-  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 引擎**：顶层导航从按媒介维度改为按用户问题维度组织\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：登录页部分文案已按规范修正"
+  "version": "6.7.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.7.1",
+  "changelog": "# Pictelio 更新日志\n\n## ⚡ 体验优化\n\n- 图片加载链路去除了多余的像素拷贝，翻阅插画时滚动更顺，长图与大图的内存占用也有所降低"
 }
