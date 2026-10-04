@@ -19,11 +19,12 @@ defineOptions({ name: 'continueReading' })
 //   📌 票 #928 **扩写了这份挂账的覆盖面**（不是新开一份）：新增「已读完」分组 = 一条
 //   条件 list-item（组头）+ 一组 v-for list-item。原生 list 对「中间插入/移除行」的处理
 //   正是 ADR-0162 点名的风险面，故把该场景并入上面的三场景一并取证。
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { goBack, navigate } from '../router'
 import { openNovel } from '../utils/novelNavigation'
 import { useContinueReadingStore } from '../stores/continueReadingStore'
 import { useBrowsingHistoryStore } from '../stores/browsingHistoryStore'
+import { useModalStack } from '../stores/modalStack'
 import { mergeContinueEntries, type ContinueEntry } from '../primitives/continueEntries'
 import { useHeroSource } from '../composables/heroTransition'
 import PageTopBar from '../components/PageTopBar.vue'
@@ -34,7 +35,14 @@ import ContinueRow from '../components/ContinueRow.vue'
 import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import type { IconName } from '../utils/iconMap'
+
+// 按压反馈载体（ADR-0211 决策 2）：颜色状态层走 `pressColor.className` 工具类
+// （`.transition-colors` 的 transition-property **不含 opacity/background-color 之外的形态**，
+// 裸挂 `active:bg-layer-*` 会让过渡静默失效 ⇒ `pressStateLayerTransition` 门禁钉这条）。
+// 时长与曲线一律取自 composables/motion.ts（唯一入口），本页不写时长/曲线字面量。
+const { pressColor } = useMotion()
 
 const continueStore = useContinueReadingStore()
 const historyStore = useBrowsingHistoryStore()
@@ -86,6 +94,54 @@ function removeItem(entry: ContinueEntry): void {
   refreshEpoch.value++
 }
 
+// ─── 跨轴批量清理（票 #929 / spec US28「清除全部浏览记录」）───────────────
+// 两个入口都是**不可逆的硬删**（浏览历史无软删态可回落；「已读完」清除即真删），
+// 故一律经二次确认弹窗，结构对齐 `Watchlist.vue` 取消追更确认（M3 Dialog + modalStack）。
+//
+// 📌 **两个动作分属两条轴，绝不合并成一个「清空」**：
+//   `history` → `historyStore.clearAll()`（插画浏览流水）
+//   `completed` → `continueStore.clearCompleted()`（小说已读完，**保留在读的**）
+//   理由同 ADR-0219 §2.5：两轴生命周期不同（流水 30 天过期 / 未完成事项不过期），
+//   用户对二者的心理预期也不同；合成一个按钮等于替用户决定「在读的书也算历史」。
+const CLEAR_TARGETS = ['history', 'completed'] as const
+type ClearTarget = (typeof CLEAR_TARGETS)[number]
+
+/** 待确认的批量清理目标（null = 弹窗关闭） */
+const clearTarget = ref<ClearTarget | null>(null)
+
+/** 弹窗正文里的条数（打开那一刻取，避免清除过程中数字跳动） */
+const clearCount = ref(0)
+
+function askClear(target: ClearTarget): void {
+  // 📌 计数口径不同轴不同：浏览历史 = 全部条目数；「已读完」= `completed` 分组数
+  //   （`clearCompleted` 只删这一组，在读的不受影响 ⇒ 弹窗报的数必须与之相等，
+  //   否则用户看到的数字和实际被删的数字对不上）。
+  clearCount.value = target === 'history' ? historyStore.items.length : continueStore.completed.length
+  clearTarget.value = target
+}
+
+function cancelClear(): void {
+  clearTarget.value = null
+  clearCount.value = 0
+}
+
+function confirmClear(): void {
+  if (clearTarget.value === 'history') historyStore.clearAll()
+  else if (clearTarget.value === 'completed') continueStore.clearCompleted()
+  cancelClear()
+  // ⚠️ 与单条 `removeItem` 同因：原生 list 走子节点 patch 删除会索引错位（ADR-0107 D4）
+  //   ⇒ 批量删除后同样整树重建。批量清空的错位面比单条更大（一次移除整组行）。
+  refreshEpoch.value++
+}
+
+// 返回键拦截（对齐 Watchlist.vue 的 unwatchTarget 同款接线）：
+// 弹窗打开期间系统返回**优先关弹窗**，而不是直接 pop 页面。
+watch(clearTarget, (target, _prev, onCleanup) => {
+  if (!target) return
+  const unregister = useModalStack().registerModal(() => cancelClear())
+  onCleanup(unregister)
+})
+
 // 首载三态：两轴**都** ready 才算「落定」。⚠️ 与书架段 3 同纪律——
 // 缺它会把 hydrate 在飞渲染成空态，把「还不知道」说成「你没有」（测试硬约束 #3）。
 // ⚠️ 两轴分两个标志位而不是共用一个：它们各自失败、各自表达，互不牵连。
@@ -97,6 +153,24 @@ const isEmpty = computed(
 )
 const showSkeleton = computed(
   () => !settled.value && entries.value.length === 0 && finishedEntries.value.length === 0,
+)
+
+/**
+ * 批量清理入口的可见性（票 #929 / spec US28）。
+ * 📌 **hydrate 未落定前一律不显示**（同 `settled` 纪律）：此刻长度是「还不知道」，
+ *   拿它当「没有可清的」就是在把在飞状态说成结论（测试硬约束 #3）。
+ * 📌 没有可清内容时**不显示**按钮：给一个点了只会 no-op 的入口是噪音（也是假承诺）。
+ */
+const canClearHistory = computed(() => settled.value && historyStore.items.length > 0)
+const canClearCompleted = computed(() => settled.value && continueStore.completed.length > 0)
+const showClearBar = computed(() => canClearHistory.value || canClearCompleted.value)
+
+/** 弹窗文案（按目标分流；两套文案各自独立，不共用一条含混的「确定要清除吗」） */
+const clearTitleKey = computed(() =>
+  clearTarget.value === 'history' ? 'continue.clear.history.title' : 'continue.clear.completed.title',
+)
+const clearHintKey = computed(() =>
+  clearTarget.value === 'history' ? 'continue.clear.history.hint' : 'continue.clear.completed.hint',
 )
 </script>
 
@@ -124,6 +198,37 @@ const showSkeleton = computed(
 
     <view v-else-if="isEmpty" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <EmptyState :icon="EMPTY_ICON" :title="t('continue.empty.title')" :hint="t('continue.empty.hint')" />
+    </view>
+
+    <!-- ══ 跨轴批量清理入口（票 #929 / spec US28）══
+         📌 刻意放在 `<list>` **之外**、页面级 flex 容器内：原生 list 对中间插入/移除行
+           的处理需设备 spike（ADR-0162，本页文件头那份挂账），把工具条塞进 list
+           等于给它再加一个「插入行」的场景。放在外面它只是普通 view，行为可预测。
+         📌 入口**分别**对应两条轴（「清除全部浏览记录」/「清除已读完」），不合并。 -->
+    <view
+      v-if="!showSkeleton && !isEmpty && showClearBar"
+      class="w-full flex flex-row items-center justify-end gap-4 px-3 py-1.5"
+    >
+      <view
+        v-if="canClearHistory"
+        class="py-1"
+        :class="[pressColor.className, 'active:bg-layer-pressed-primary']"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('continue.clear.history')"
+        @tap="askClear('history')"
+      >
+        <text class="text-label-large text-error">{{ t('continue.clear.history') }}</text>
+      </view>
+      <view
+        v-if="canClearCompleted"
+        class="py-1"
+        :class="[pressColor.className, 'active:bg-layer-pressed-primary']"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('continue.clear.completed')"
+        @tap="askClear('completed')"
+      >
+        <text class="text-label-large text-error">{{ t('continue.clear.completed') }}</text>
+      </view>
     </view>
 
     <list v-else :key="refreshEpoch" class="w-full flex-1" list-type="single" scroll-orientation="vertical">
@@ -183,5 +288,40 @@ const showSkeleton = computed(
         <FabAllowanceSpacer />
       </list-item>
     </list>
+
+    <!-- M3 Dialog（批量清理二次确认，票 #929 / spec US28）：结构对齐 Watchlist.vue 取消追更确认。
+         ⚠️ **不可逆操作必须有确认层**：两个动作都是硬删（浏览历史无软删态可回落、
+           「已读完」清除即真删），误触一次就是吞掉用户数据（测试硬约束 #3 的反面）。
+         📌 文案与条数按目标分流，不共用一条含混提示——用户须知道自己正在删哪一批。 -->
+    <view v-if="clearTarget" class="fixed inset-0 bg-scrim z-50 flex items-center justify-center">
+      <view
+        class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]"
+      >
+        <text class="text-headline-small font-medium text-surface-on">{{ t(clearTitleKey) }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-4">
+          {{ t(clearHintKey, { count: clearCount }) }}
+        </text>
+        <view class="flex flex-row justify-end mt-6 gap-2">
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center"
+            :class="[pressColor.className, 'active:bg-layer-pressed-primary']"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="t('continue.clear.cancel')"
+            @tap="cancelClear"
+          >
+            <text class="text-label-large font-medium text-primary">{{ t('continue.clear.cancel') }}</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center"
+            :class="[pressColor.className, 'active:bg-layer-pressed-primary']"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="t('continue.clear.confirm')"
+            @tap="confirmClear"
+          >
+            <text class="text-label-large font-medium text-error">{{ t('continue.clear.confirm') }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
 </template>

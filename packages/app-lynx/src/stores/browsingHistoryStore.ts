@@ -240,6 +240,24 @@ export const useBrowsingHistoryStore = defineStore("browsingHistory", () => {
   }
 
   /**
+   * 清除**全部**浏览记录（票 #929 兑现 spec US28 / spec §11「28 ❌ 未实现」）：
+   * 清空本轴全部条目——本 store 就是浏览历史的全部（浏览历史**只此一处**，
+   * 不跨 store、不跨段；续读是**另一条轴**，绝不在此连带清除）。
+   *
+   * ⚠️ **不可逆**（硬删，流水无软删态可回落）⇒ 调用点**必须**先过二次确认弹窗。
+   * ⚠️ **只清插画轴**：两条轴按作品类型物理隔离（术语文档易混辨析 #2），
+   *   「清除全部浏览记录」**不得**顺带清掉「在读的小说」——那是两件事、两套生命周期
+   *   （ADR-0219 §2.5：流水 30 天过期 / 未完成事项不过期）。
+   *   故本函数只动本 store 的 `_items`，与续读 store 零 import。
+   * ⚠️ 空列表时 no-op 且不写盘（同 `remove` 的空操作纪律：没有东西可清就不产生一次写）。
+   */
+  function clearAll(): void {
+    if (_items.value.length === 0) return
+    _items.value = []
+    persist()
+  }
+
+  /**
    * 账号数据装载（认证就绪后调用一次；uid 变化由下方 watch 自动重载）。
    * 键缺失 = 该账号暂无数据（空列表，不 warn）；
    * 损坏/读失败 → warn + 空列表兜底（禁静默降级）；
@@ -278,5 +296,5 @@ export const useBrowsingHistoryStore = defineStore("browsingHistory", () => {
     },
   )
 
-  return { items, ready, has, record, markUnavailable, remove, hydrate }
+  return { items, ready, has, record, markUnavailable, remove, clearAll, hydrate }
 })

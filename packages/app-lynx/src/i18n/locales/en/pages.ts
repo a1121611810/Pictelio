@@ -510,6 +510,16 @@ const enPages = {
   "continue.unavailable": "This work is no longer available",
   "continue.label.chapter": "Stopped at chapter {{n}}",
   "continue.completed.title": "Finished",
+  // 跨轴批量清理（票 #929 / spec US28）。占位符必须 `{{count}}` 双花括号——
+  // 单花括号不被 applyVars 匹配，会原样显示在行里。
+  "continue.clear.history": "Clear all browsing history",
+  "continue.clear.completed": "Clear finished",
+  "continue.clear.history.title": "Clear all browsing history?",
+  "continue.clear.history.hint": "This permanently deletes {{count}} history entries. This cannot be undone.",
+  "continue.clear.completed.title": "Clear finished entries?",
+  "continue.clear.completed.hint": "This permanently deletes {{count}} finished entries. This cannot be undone.",
+  "continue.clear.cancel": "Cancel",
+  "continue.clear.confirm": "Clear",
 
   /** Advanced settings (absorbs the debug/self-check rows previously in Me) */
   "advanced.title": "Advanced",

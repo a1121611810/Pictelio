@@ -505,6 +505,18 @@ const zhPages = {
   "continue.label.chapter": "上次读到 第{{n}}话",
   "continue.completed.title": "已读完",
 
+  // ─── 跨轴批量清理（票 #929 / spec US28「清除全部浏览记录」）───
+  // 📌 占位符是 `{{name}}`（双花括号）：`applyVars` 的正则只认 `\{\{(\w+)\}\}`，
+  //   单花括号会被**原样返回** ⇒ 行里显示字面量 `{count}``{name}`。本仓已因此翻过一次车。
+  "continue.clear.history": "清除全部浏览记录",
+  "continue.clear.completed": "清除已读完",
+  "continue.clear.history.title": "清除全部浏览记录？",
+  "continue.clear.history.hint": "将永久删除 {{count}} 条浏览记录，此操作无法撤销。",
+  "continue.clear.completed.title": "清除已读完的条目？",
+  "continue.clear.completed.hint": "将永久删除 {{count}} 条已读完记录，此操作无法撤销。",
+  "continue.clear.cancel": "取消",
+  "continue.clear.confirm": "清除",
+
   /** 高级设置（承接原「我的」里的调试/自检项，使业务行与调试行不再平级混排） */
   "advanced.title": "高级",
   "advanced.networkCheck": "网络自检",

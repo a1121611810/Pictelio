@@ -210,6 +210,49 @@ export function decideNovelCompletion(input: NovelCompletionInput): boolean {
   return chapterNo === chapterTotal // ② 末话；中间话为 false（反例）
 }
 
+/**
+ * 系列级联补完的**目标集合**（spec §11.2 / 票 #929，PRD 拍板修法）：
+ * 完成「第 N 话」时，把**同 `seriesId` 且 `chapterNo < N`** 的已记录条目一并标记完成。
+ *
+ * **为什么必须有这条**（纯机制缺陷，非边缘 case）：续读条目的去重键是 `novelId`，
+ * 而 Pixiv 的「一话」= 一个 novel ⇒ 读完一个 12 话的系列 = **12 条记录**，
+ * 只有末话被标完成，其余 11 条永远挂在「在读」——而它们其实早已读完。
+ * 这直接损伤本功能的核心价值（召回），且顺读 / 追更是小说阅读的主要形态 ⇒ **必然发生**。
+ *
+ * 📌 **`chapterNo < N` 而非「全部同系列」**：走到末话只蕴含「前面都读了」，
+ *   **不**蕴含后面读了。用 `<` 把规则钉在「已读区间」上。
+ * 📌 **`seriesId` 或 `chapterNo` 缺失 ⇒ 不参与**（返回空集）：单本小说无系列；
+ *   章节不在服务端首页返回范围内时序号不可确定（NovelDetail 会 warn）——
+ *   坐标不可确定时宁可不级联，与「坐标不可确定 ⇒ 不完成」同一保守口径。
+ * 📌 **已完成的条目被排除**：完成时刻是「读完了」的事实，重复触底不刷新（见 `markCompleted`）。
+ *
+ * ⚠️ **本函数不判断「当前是不是末话」**——那一层由调用点保证：
+ *   `markCompleted` 只在 `decideNovelCompletion` 成立时被调用，而该判定只有
+ *   「单本读到底」与「**末话**读到底」两种情形（ADR-0219 §2.3）。
+ *   ⇒ 级联天然**只在末话完成时触发**；跳读场景（先读第 5 话再回头读第 1 话）
+ *   中间话根本不调 `markCompleted`，未读的第 1 话不会被误标完成。
+ */
+export function decideSeriesSweepIds(
+  items: readonly ContinueReadingItem[],
+  seed: Pick<ContinueReadingItem, "novelId" | "seriesId" | "chapterNo">,
+): number[] {
+  if (seed.seriesId == null || seed.chapterNo == null) return []
+  // 📌 收窄到局部 const：下面进 `.filter` 回调后 TS 不再保留 seed 上的窄化
+  //   （回调是另一个执行上下文，TS 无法假定 seed 属性不变）。
+  const seriesId = seed.seriesId
+  const chapterNo = seed.chapterNo
+  return items
+    .filter(
+      (it) =>
+        it.novelId !== seed.novelId &&
+        it.seriesId === seriesId &&
+        it.chapterNo != null &&
+        it.chapterNo < chapterNo &&
+        it.completedAt === undefined,
+    )
+    .map((it) => it.novelId)
+}
+
 export const useContinueReadingStore = defineStore("continueReading", () => {
   const auth = useAuthStore()
   /** 当前账号 ID（未登录 null）——uid 变化由下方 watch 重载 */
@@ -303,11 +346,22 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
    * 已完成则 no-op（重复触底不刷新完成时刻——完成时刻是「读完了」的事实，不是退出时刻）。
    * 📌 不复活：重开后 `record()` 刻意保留 `completedAt`（见上），本函数只在「判定成立」时调用，
    *   而判定要求 `reachedBottom`，故「打开即复活」在结构上不成立。
+   *
+   * 📌 **同系列更早的话一并标记**（spec §11.2 / 票 #929）：单独标记末话会留下僵尸条目
+   *   （12 话系列 = 12 条记录、只有末话完成、其余 11 条永远挂在「在读」）。
+   *   级联集合由纯函数 `decideSeriesSweepIds` 给出；「只在末话触发」由调用点的
+   *   `decideNovelCompletion` 保证（中间话根本不调本函数）。
+   * ⚠️ **级联条目不刷新既有完成时刻**：它们与末话同批被标记，共享同一 `completedAt`。
    */
   function markCompleted(novelId: number, completedAt: number = Date.now()): void {
     const hit = _items.value.find((it) => it.novelId === novelId)
     if (!hit || hit.completedAt !== undefined) return
+    const sweepIds = decideSeriesSweepIds(_items.value, hit)
     hit.completedAt = completedAt
+    for (const id of sweepIds) {
+      const swept = _items.value.find((it) => it.novelId === id)
+      if (swept) swept.completedAt = completedAt
+    }
     _items.value = [..._items.value]
     persist()
   }
@@ -316,6 +370,26 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
   function remove(novelId: number): void {
     if (!has(novelId)) return
     _items.value = _items.value.filter((it) => it.novelId !== novelId)
+    persist()
+  }
+
+  /**
+   * 清除全部**已读完**条目（票 #929 / spec US10「可在「查看全部」里找到它并清除」的**批量**面）：
+   * 移除 `completedAt !== undefined` 的条目，**保留**在读的。
+   *
+   * 📌 **硬删**（不是软删）：`markCompleted` 的软删是「完成态标记」，供 `/continue` 页展示；
+   *   本函数是用户显式说「这些不用留了」⇒ 条目连同完成态一并消失。
+   *   不可逆 ⇒ 调用点**必须**先过二次确认弹窗（`/continue` 页 `clearConfirmTarget`）。
+   * ⚠️ 与「软删后仍可找回」不冲突：软删期间（未点本入口）条目始终在「已读完」分组可见；
+   *   只有用户亲自确认清除才真删。
+   * ⚠️ 未登录不写盘（账号级语义，同 `persist`）；无已读完条目时 no-op 且不写盘
+   *   （同 `remove` 的空操作纪律）。
+   */
+  function clearCompleted(): void {
+    const before = _items.value.length
+    const kept = _items.value.filter((it) => it.completedAt === undefined)
+    if (kept.length === before) return
+    _items.value = kept
     persist()
   }
 
@@ -367,6 +441,7 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
     markCompleted,
     markUnavailable,
     remove,
+    clearCompleted,
     hydrate,
   }
 })
