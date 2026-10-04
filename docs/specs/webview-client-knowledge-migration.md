@@ -186,7 +186,7 @@ _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 ## 复核
 
 ```bash
-cd /Users/lilianda/develop/pixivizer
+cd /path/to/Pictelio
 # 两条高优先词条已落 Lynx 侧
 grep -c "关键词的两个硬约束" packages/app-lynx/CONTEXT.md   # 应 ≥1
 grep -c "源无关命中" packages/app-lynx/CONTEXT.md            # 应 ≥1

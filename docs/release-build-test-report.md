@@ -48,7 +48,7 @@ cd android && ./gradlew assembleRelease
 `apksigner` was located in the Android SDK build-tools (`.../build-tools/36.1.0/apksigner`).
 
 ```bash
-/Users/lilianda/Library/Android/sdk/build-tools/36.1.0/apksigner verify --verbose android/app/build/outputs/apk/release/app-release.apk
+$ANDROID_HOME/build-tools/36.1.0/apksigner verify --verbose android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Build Output Summary

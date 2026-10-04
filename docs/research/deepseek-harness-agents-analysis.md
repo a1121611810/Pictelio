@@ -9,7 +9,7 @@ tags: [agents, skills, code-review, pre-push-checks, quality-gates, oracle-probl
 # DeepSeek Harness .agents 系统深度分析
 
 > 调研目标：评估 DSH 的 ".agents" 系统对 Pictelio "如何保证 AI 模型遵守仓库规范（尤其测试规范）"问题的借鉴价值。
-> 调研范围：DSH 仓库 "/Users/lilianda/develop/deepseek-harness/.agents/" 的全部文件 + 源码中加载 .agents 的代码路径。
+> 调研范围：DSH 仓库 "/path/to/deepseek-harness/.agents/" 的全部文件 + 源码中加载 .agents 的代码路径。
 > 语言：中文为主，技术术语保留英文。
 
 ---
@@ -485,4 +485,4 @@ description: Pictelio 专属 code review — 包含测试期望值溯源检查
 | `.agents/notes/implemented/process/2026-07-06-parallel-pre-push-gates.md` | parallel pre-push gates Agent Note |
 | `.agents/notes/implemented/process/2026-07-22-fast-local-git-hooks.md` | fast local git hooks Agent Note |
 
-> 以上路径均相对于 `/Users/lilianda/develop/deepseek-harness/`。
+> 以上路径均相对于 `/path/to/deepseek-harness/`。

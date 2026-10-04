@@ -2,7 +2,7 @@
 
 | 场景 | 指标 | 值 | 判定线 | pass | 判定线出处 |
 |---|---|---|---|---|---|
-| coldstart | error | Command failed: python3 analyze_rec.py /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.mp4 --out /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.frames.json | | **FAIL** | |
+| coldstart | error | Command failed: python3 analyze_rec.py /path/to/Pictelio/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.mp4 --out /path/to/Pictelio/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.frames.json | | **FAIL** | |
 | detail | skeleton_ms | 9 | ≤1100 | PASS | docs/research/real-interaction-audit.md 场景 2（骨架帧 ≤1.1s） |
 | detail | interactive_ms | 707 | ≤2000 | PASS | docs/research/real-interaction-audit.md 场景 2（可交互帧 ≤2s） |
 | back | response_ms_max | 201 | ≤400 | PASS | docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms） |

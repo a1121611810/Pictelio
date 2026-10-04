@@ -126,7 +126,7 @@
 
 ```bash
 # 构建（沙盒 worktree）
-cd /Users/lilianda/develop/pixivizer-lynx-only
+cd /path/to/Pictelio-lynx-only
 ANDROID_HOME=~/Library/Android/sdk pnpm build:android
 
 # 装到模拟器

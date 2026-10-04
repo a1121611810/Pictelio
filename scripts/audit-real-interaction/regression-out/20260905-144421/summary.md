@@ -8,7 +8,7 @@
 | coldstart | totaltime_ms | 582 | — | 记录 | docs/research/ri-365-coldstart-report.md（暖基线 1782ms；网络/缓存波动，仅记录不设回归线） |
 | coldstart | chrome_cdp_ms | 3016 | — | 记录 | 体检报告场景 1 首屏帧口径的 DOM 代理（/home 路由首现） |
 | coldstart | first_image_cdp_ms | 3298 | — | 记录 | 体检报告场景 1 首图帧口径的 DOM 代理（首卡 img complete） |
-| coldstart | note | mp4 解析失败（Error: Command failed: python3 analyze_rec.py /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regressio）→ 降级 screencap → 降级 screencap 轮询整场景重跑 | | | |
+| coldstart | note | mp4 解析失败（Error: Command failed: python3 analyze_rec.py /path/to/Pictelio/scripts/audit-real-interaction/regressio）→ 降级 screencap → 降级 screencap 轮询整场景重跑 | | | |
 | detail | skeleton_ms | 40 | ≤1100 | PASS | docs/research/real-interaction-audit.md 场景 2（骨架帧 ≤1.1s） |
 | detail | interactive_ms | 704 | ≤2000 | PASS | docs/research/real-interaction-audit.md 场景 2（可交互帧 ≤2s） |
 | back | response_ms_max | 383 | ≤400 | PASS | docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms） |

@@ -192,7 +192,7 @@ Pictelio 有两套「渲染引擎」，用户可切换、App 也会自动降级�
 adb devices
 
 # 方式 A（完整：会构建 APK）—— 需要 E2E 钩子的用例必须用这个
-cd /Users/lilianda/develop/pixivizer
+cd /path/to/Pictelio
 ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e
 
 # 方式 B（复用已有 APK，快速迭代）

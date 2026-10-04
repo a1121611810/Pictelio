@@ -192,7 +192,7 @@ test:android:unit = npm run sync:credentials && cd android && ./gradlew testDebu
 ## 复核判据
 
 ```bash
-cd /Users/lilianda/develop/pixivizer
+cd /path/to/Pictelio
 test ! -d packages/app                                  # 客户端已删除
 test -d packages/android-host/android/app/src/lynx     # 宿主已就位
 grep -rn "\.\./app/" packages/app-lynx/lynx.config.ts   # 跨包读取已解除（应无输出）

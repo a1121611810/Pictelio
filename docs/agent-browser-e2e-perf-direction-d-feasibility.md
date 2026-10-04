@@ -64,7 +64,7 @@ LLM 断言（方向 C）、图片 mock（方向 E）、并行/重试（方向 F�
 
 ### 2.1 运行时解析的是 0.34.0，不是 PATH 里的 0.31.1
 
-- 系统 PATH 的 `agent-browser` 是 bun 全局安装的 **0.31.1**（`/Users/lilianda/.bun/bin/agent-browser`）。
+- 系统 PATH 的 `agent-browser` 是 bun 全局安装的 **0.31.1**（`~/.bun/bin/agent-browser`）。
 - 但测试经 pnpm 运行时会解析 `packages/app/node_modules/.bin/agent-browser`（pnpm 的
   `.bin` 包装脚本），实测 `PATH=.../node_modules/.bin:$PATH agent-browser --version`
   输出 **0.34.0**，与 `package.json` 声明的 `^0.34.0` 一致。

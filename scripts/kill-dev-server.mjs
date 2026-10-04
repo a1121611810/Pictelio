@@ -276,7 +276,7 @@ async function getProcessCwd(pid) {
     const output = execSyncTrim(`lsof -a -p ${pid} -d cwd`);
     // 输出格式：
     // COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
-    // node    65707 lilianda  cwd    DIR   1,14      832 6531621 /path/to/cwd
+    // node    65707 user  cwd    DIR   1,14      832 6531621 /path/to/cwd
     const lines = output.split("\n");
     const dataLine = lines.find((l) => /\bcwd\b/.test(l));
     if (!dataLine) return null;

@@ -155,7 +155,7 @@ _Avoid_ 清单（描述当前状态时一律禁用）：双引擎、双客户端
 ## 复核命令
 
 ```bash
-cd /Users/lilianda/develop/pixivizer
+cd /path/to/Pictelio
 # 源码已删除
 test ! -d packages/app && echo "OK: packages/app 不存在"
 # 依赖已清零
