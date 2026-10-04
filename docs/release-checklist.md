@@ -205,11 +205,11 @@ GitHub Release 已发布完成。
 
 - ✅ `website/` 已推送到 `origin/gh-pages` 分支
 - ⏳ 需要你在 GitHub 仓库设置中启用 GitHub Pages：
-  1. 打开 https://github.com/a1121611810/pixivizer/settings/pages
+  1. 打开 https://github.com/a1121611810/Pictelio/settings/pages
   2. Source 选择 **Deploy from a branch**
   3. Branch 选择 `gh-pages`，文件夹选 `/ (root)`
   4. 点击 Save
-- 启用后官网地址：https://a1121611810.github.io/pixivizer
+- 启用后官网地址：https://a1121611810.github.io/Pictelio/
 
 ## 发版前 QA 防线（#547 / ADR-0163）
 

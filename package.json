@@ -3,7 +3,7 @@
   "version": "1.5.6",
   "private": true,
   "description": "Pictelio monorepo - Lynx single-engine Pixiv client + landing page",
-  "homepage": "https://a1121611810.github.io/pixivizer",
+  "homepage": "https://a1121611810.github.io/Pictelio/",
   "type": "module",
   "scripts": {
     "vp": "node_modules/.bin/vp",
