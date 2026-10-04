@@ -1,4 +1,4 @@
-// 完成判定**前置条件**的接线面源级守卫（票 #930 / ADR-0219 §2.3 触底前置）。
+// 完成判定**前置条件**的接线面源级守卫（ADR-0219 §2.3 / ADR-0219 §2.3 触底前置）。
 //
 // 守卫防的是「有人把接线拆了/换成 setup 期固化，而纯函数用例全绿」。
 // 纯函数面（单位换算、前置语义、降级）→ `src/primitives/novelContentFitsViewport.test.ts`。
@@ -14,10 +14,10 @@
 // 且用 `git diff --stat` 断言只改了一处。
 //
 // 期望值溯源（测试硬约束 #6）：
-// - 前置必须进判定入参         → ADR-0219 §2.3 触底行 + 票 #930
-// - 视口不得固化在 setup        → 票 #930 竞态防护（旋转/分屏）
-// - 拿不到视口高要 warn + 保守侧 → 测试硬约束 #3 禁静默降级 + 票 #930
-// - 「为何不用停留时长」的理由必须在 → 票 #930（防后人重复发明同一道被否决的方案）
+// - 前置必须进判定入参         → ADR-0219 §2.3 触底行 + ADR-0219 §2.3
+// - 视口不得固化在 setup        → ADR-0219 §2.3 竞态防护（旋转/分屏）
+// - 拿不到视口高要 warn + 保守侧 → 测试硬约束 #3 禁静默降级 + ADR-0219 §2.3
+// - 「为何不用停留时长」的理由必须在 → ADR-0219 §2.3（防后人重复发明同一道被否决的方案）
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 
@@ -36,13 +36,13 @@ const bodyFrom = (s: string, anchor: string): string => {
 
 const NOVEL_DETAIL = "../src/pages/NovelDetail.vue"
 
-describe("接线面：前置条件真的进了完成判定（票 #930 / ADR-0219 §2.3）", () => {
+describe("接线面：前置条件真的进了完成判定（ADR-0219 §2.3 / ADR-0219 §2.3）", () => {
   it("📌 判定入参里带着几何前置 —— 删掉这一行 ⇒ 前置形同不存在", () => {
     const body = bodyFrom(src(NOVEL_DETAIL), "function applyCompletionDecision(")
     // 反事实：把 `contentExceedsViewport: bodyExceedsViewport(),` 这行删掉 ⇒ 转红
     expect(
       body,
-      "判定入参缺 contentExceedsViewport ⇒ 一屏放得下仍会当场软删，票 #930 缺陷复发",
+      "判定入参缺 contentExceedsViewport ⇒ 一屏放得下仍会当场软删，ADR-0219 §2.3 缺陷复发",
     ).toMatch(/contentExceedsViewport:\s*bodyExceedsViewport\(\)/)
     // 反向钉住：前置喂的是**解算结果**，不是就地写死的 true
     expect(body).not.toMatch(/contentExceedsViewport:\s*true\b/)
@@ -67,7 +67,7 @@ describe("接线面：前置条件真的进了完成判定（票 #930 / ADR-0219
   })
 })
 
-describe("接线面：视口高不得固化在 setup（票 #930 竞态防护）", () => {
+describe("接线面：视口高不得固化在 setup（ADR-0219 §2.3 竞态防护）", () => {
   it("📌 每次判定前都重拉内容区尺寸（旋转/分屏 ⇒ 契约无推送，只能重拉）", () => {
     const s = src(NOVEL_DETAIL)
     // 锚点是**重拉函数本身**而非标识符出现
@@ -113,7 +113,7 @@ describe("接线面：视口高不得固化在 setup（票 #930 竞态防护）"
   })
 })
 
-describe("接线面：拿不到视口高不得静默（测试硬约束 #3 / 票 #930）", () => {
+describe("接线面：拿不到视口高不得静默（测试硬约束 #3 / ADR-0219 §2.3）", () => {
   it("📌 降级显式 warn 一次，且措辞点明保守侧（条目保留、不标记完成）", () => {
     const body = bodyFrom(src(NOVEL_DETAIL), "function bodyExceedsViewport(")
     // 反事实：删掉这段 warn ⇒ 转红（降级变成静默，测试硬约束 #3）
@@ -133,7 +133,7 @@ describe("接线面：拿不到视口高不得静默（测试硬约束 #3 / 票 
   })
 })
 
-describe("决策留痕：为何不用停留时长（票 #930，防重复发明）", () => {
+describe("决策留痕：为何不用停留时长（ADR-0219 §2.3，防重复发明）", () => {
   it("📌 理由句必须写在判定函数上（删掉 ⇒ 后人会把被否决的方案再发明一次）", () => {
     const s = src("../src/stores/continueReadingStore.ts")
     const i = s.indexOf("/**\n * 完成判定（")
@@ -160,7 +160,7 @@ describe("决策留痕：为何不用停留时长（票 #930，防重复发明�
     expect(s).toMatch(/任意阈值|客观事实/)
   })
 
-  it("📌 入参面仍不得出现停留时长 / 滚动百分比（票 #930 沿用 #928 的反例守卫口径）", () => {
+  it("📌 入参面仍不得出现停留时长 / 滚动百分比（ADR-0219 §2.3 沿用 #928 的反例守卫口径）", () => {
     const s = src("../src/stores/continueReadingStore.ts")
     const iStart = s.indexOf("export interface NovelCompletionInput {")
     expect(iStart, "锚点 NovelCompletionInput 未命中 ⇒ 本守卫已失效").toBeGreaterThan(-1)
@@ -178,7 +178,7 @@ describe("决策留痕：为何不用停留时长（票 #930，防重复发明�
 
 describe("本票不引入 i18n 文案 ⇒ 两侧 locale 不得被顺手改动", () => {
   it("📌 完成判定全程静默（无新增用户可见文案）——出现新键反而说明有人加了提示", () => {
-    // 期望值溯源：票 #930 的修法只收紧判定口径，不新增任何面向用户的提示。
+    // 期望值溯源：ADR-0219 §2.3 的修法只收紧判定口径，不新增任何面向用户的提示。
     // 反事实：有人在降级路径上塞一句 t('…') 提示 ⇒ 本守卫转红（那需要走 i18n 评审 + 两侧 locale）
     const s = src(NOVEL_DETAIL)
     const body = bodyFrom(s, "function bodyExceedsViewport(")
