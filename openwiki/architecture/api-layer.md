@@ -1,219 +1,261 @@
 ---
 type: Concept
 title: API Layer & Authentication
-description: Pixiv API HTTP client — production native traffic routes through the PixivApiPlugin Java gateway (access_token hidden from JS), while dev mode uses fetch + Vite proxy. OAuth PKCE flow, 401 auto-refresh on Java side, GET request deduplication, and query key system.
-tags: [pixiv-api, oauth, http-client, authentication, tanstack-query, pixiv-api-gateway]
+description: Pixiv API gateway for the app-lynx client — the JS api layer (client, per-entity endpoints, TanStack Query) delegates native traffic through the Lynx Native Modules PictelioApi/PictelioAuth into Java PixivApiCore, which holds the access_token in the Java heap. Covers refresh-token OAuth, token storage and restore, 401 retry (JS Promise queue plus Java synchronized refresh), the auth-ready token barrier, and 429 rate-limit backoff.
+tags: [pixiv-api, oauth, http-client, authentication, tanstack-query, rate-limit, native-module, lynx]
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-04T18:40:18.128Z
+sources:
+  - id: openwiki-source-ef23994e4e6eff1937056370
+    resource: repo://docs/adr/0004-401-concurrent-retry-promise-queue.md
+  - id: openwiki-source-febdf2e89ab1941eecfaa438
+    resource: repo://docs/adr/ADR-0053-lynx-nativemodule-contract.md
+  - id: openwiki-source-67586dbe031583a16ff24360
+    resource: repo://docs/adr/ADR-0199-app-lynx-rate-limit-backoff.md
+  - id: openwiki-source-cea6ad9ea049a9b602b8ce91
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java
+  - id: openwiki-source-4e44fe9911495c948a4a28f2
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAuthModule.java
+  - id: openwiki-source-3fdaadb0f882ee5a93597ec7
+    resource: repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivApiCore.java
+  - id: openwiki-source-6c64f95061d2a6535c4c87f4
+    resource: repo://packages/app-lynx/src/api/auth.ts
+  - id: openwiki-source-918bba1cfbc15400a7909164
+    resource: repo://packages/app-lynx/src/api/client.ts
+  - id: openwiki-source-c61ff29522a37a9952976bcf
+    resource: repo://packages/app-lynx/src/api/queryClient.ts
+  - id: openwiki-source-af5ed6908757179faa783708
+    resource: repo://packages/app-lynx/src/api/queryKeys.ts
+  - id: openwiki-source-4ac3070bd184f790704b3db0
+    resource: repo://packages/app-lynx/src/api/rateLimitBackoff.ts
+  - id: openwiki-source-5efc5944a078cf72d7872cc0
+    resource: repo://packages/app-lynx/src/pages/Login.vue
+  - id: openwiki-source-458d6403d83ae9ebe6c1fb91
+    resource: repo://packages/app-lynx/src/stores/authStore.ts
+  - id: openwiki-source-1bc8ca2265cceb3b5cafdd23
+    resource: repo://packages/app-lynx/src/utils/tokenStorage.ts
+generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 ---
 
 # API Layer & Authentication
 
 ## Architecture
 
-The Pixiv API layer lives in `/packages/app/src/api/`. It consists of:
+The Pixiv API layer lives in `packages/app-lynx/src/api/`. Its surface is a small typed transport client (`apiClient`), thin per-entity endpoint adapters, and the TanStack Query key/client plumbing:
 
-- **`client.ts`** — Core HTTP client (transport dispatch, error classification, GET dedup, DEV-mode auth)
-- **`auth.ts`** — OAuth token refresh (refresh_token grant); delegates to `PixivApiPlugin` on native
-- **`pkceAuth.ts`** — PKCE authorization code flow
-- **`_oauthFetch.ts`** — Web-only OAuth fetch helper (DEV mode only)
-- Domain modules: `illust.ts`, `novel.ts`, `user.ts`, `comment.ts`, `search.ts`
-- **`queryKeys.ts`** — TanStack Query key factory
-- **`queryClient.ts`** — Query client singleton with error normalization
-- **`types.ts`** — Pixiv API response types and error types
+- **`client.ts`** — the core transport. It owns native/web mode dispatch, URL rewriting and the bearer-token guard, error classification, GET dedup, the JS-side 401 Promise queue, and the auth-ready gate.
+- **`auth.ts`** — the OAuth refresh-token grant (`oauthTokenRequest` / `loginWithRefreshToken`), with the SparkMD5 `X-Client-Time`/`X-Client-Hash` signature.
+- **`rateLimitBackoff.ts`** — pure capped-exponential + full-jitter backoff (ADR-0199).
+- **`queryClient.ts` / `queryKeys.ts`** — TanStack Query singleton defaults and key factories.
+- **`types.ts`, `id.ts`, `userAgent.ts`** — shared response/error types, branded IDs, and UA/Referer/content-type constants sourced from `__PUBLIC_CONFIG__`.
+- **Per-entity endpoint modules** — `illust.ts`, `novel.ts`, `user.ts`, `comment.ts`, `search.ts`, `notification.ts`, `ranking.ts`, `ugoira.ts` (plus `translate.ts` / `nativeTranslate.ts` for the separate LLM-translation channel). Each is a thin mapping of `apiClient.get/post` calls onto Pixiv App API paths.
 
-## Transport Architecture (v3.18.0+)
+The design principle inherited from [ADR-0037](../../docs/adr/ADR-0037-pixiv-api-plugin-gateway.md) is that **the `access_token` must never enter the JavaScript heap**. In the current Lynx client that principle is implemented by routing native API traffic through Lynx Native Modules into Java, rather than through the old Capacitor `PixivApiPlugin` (see [ADR-0053](../../docs/adr/ADR-0053-lynx-nativemodule-contract.md) and the extraction of `PixivApiCore` described in its header comment).
 
-Since v3.18.0, the client uses two distinct transport paths:
+## Transport Modes
 
-| Mode | Environment | Mechanism | Auth Token Location |
-|------|-------------|-----------|-------------------|
-| **Native** | Android (Capacitor) | `PixivApiPlugin` Java gateway via JSBridge | Java `volatile` field — **never** in JS heap |
-| **Web** | Dev `pnpm dev` / PWA | `fetch` via Vite proxy | `devAccessToken` module variable |
+`client.ts` selects a transport **per request** via `isNativeMode()`, which probes `NativeModules` (both the bare global and `globalThis`, because the Lynx runtime exposes it as a global that is *not* on `globalThis`) and returns true only when a real `Pictelio*` module is present. The web-core preview worker injects empty-shell `NativeModules` without those modules, so it is correctly classified as web.
 
-Platform detection: `Capacitor.isNativePlatform()` — checked at request time.
+| Mode | Environment | Mechanism | Auth token location |
+|------|-------------|-----------|---------------------|
+| **Native** | LynxView on Android | `NativeModules.PictelioApi.request(...)` → Java `PixivApiCore` | `PixivApiCore.accessToken` (volatile static, Java heap) — **never returned to JS** |
+| **Web** | `web-core` dev preview | `fetch` via `/pixiv-api` proxy | `accessToken` module variable in JS |
 
-### Native Transport (PixivApiPlugin Gateway)
+### Native Transport (PictelioApi → PixivApiCore)
 
-All native Pixiv API requests route through the **PixivApiPlugin** Java Capacitor plugin (ADR-0037):
+`execute()`/`executeRaw()` in native mode call `NativeModules.PictelioApi.request(method, path, body, callback)`. The JS side passes only `method`, a **relative** path, and a form-encoded body — no headers and no token:
 
-1. JS calls `PixivApi.request({ method, path, params, body })` — no access_token, no headers
-2. Java side (OkHttp) constructs the full URL, injects `Authorization: Bearer`, `Referer`, `User-Agent`
-3. If the response is **401**, Java internally refreshes the token (`synchronized` lock prevents concurrent refreshes) and retries once
-4. Response JSON is returned to JS via JSBridge
-5. **access_token is never passed back to JavaScript**
+1. `client.ts` rewrites absolute `next_url` values back to relative paths (see [URL Rewrite & Token Guard](#url-rewrite--token-guard)), appends the query string, and calls `PictelioApi.request`.
+2. `PictelioApiModule.request` concatenates `PixivApiCore.apiBase()` + path, resolves the `Accept-Language` header from the `settings_language` pref on the worker thread (ADR-0200), and submits the blocking I/O to a cached thread pool (`API_EXECUTOR`), so the Lynx call thread is not occupied.
+3. `PixivApiCore.executeRequest` builds an OkHttp request, injecting `Authorization: Bearer <accessToken>`, `Referer`, `User-Agent`, and (optionally) `Accept-Language`, then executes it against the shared `OkHttpClient`.
+<!-- openwiki: broken internal link [#java-side-401-refresh] heading anchor "java-side-401-refresh" does not exist in /openwiki/architecture/api-layer.md. Fix the href or restore the target, then delete this comment. -->
+4. If the response is 401, Java silently refreshes once and retries (see [Java-Side 401 Refresh](#java-side-401-refresh)).
+5. The callback returns `(status, data, rotatedRefreshToken)` to JS — `data` is the raw response body (JSON for `request`, raw text for `requestRaw`), and `rotatedRefreshToken` is non-empty only when the refresh rotated the refresh token.
 
-**Path normalization (`rewriteUrl`):** `nativeExecuteRequest` passes the request path through `rewriteUrl()` before the plugin call. The plugin accepts only a **relative** path (Java concatenates `apiBase + path`), so `rewriteUrl` strips the Pixiv host from absolute `next_url` values (e.g. `https://app-api.pixiv.net/v1/search/illust?...` → `/v1/search/illust?...`) and leaves relative paths untouched. Passing an absolute URL would produce a double-domain URL (`apiBase + https://app-api.pixiv.net/...`) and Pixiv returns 404.
-
-This replaces the previous architecture (three native paths: CapacitorHttp, PictelioHttp with DoH DNS, and fetch). The old `PictelioHttpPlugin.java` and `PictelioHttp.ts` were deleted.
-
-`AuthPlugin.refreshToken()` was converged onto the shared `PixivApiCore.getSharedClient()` OkHttp singleton (#386) so OAuth refresh reuses the app-wide connection pool, dispatcher, and timeouts instead of building its own client.
+The callback never includes the `access_token`; `PixivApiCore`'s `accessToken` is a `static volatile` field written only on the Java side.
 
 ### Web/Dev Transport
 
-In development (`pnpm dev`) or PWA mode, the client uses standard `fetch` through a Vite proxy:
+In web mode the client uses `fetch` through the Vite/rspeedy dev proxy: relative API paths become `/pixiv-api/*` and the OAuth endpoint becomes `/pixiv-oauth/auth/token`. The JS module variable `accessToken` (set via `setAccessToken`) supplies the `Authorization: Bearer` header, and `rewriteUrl`/`shouldAttachAuth` decide whether a header is attached at all.
 
-- `devAccessToken` is stored as a module variable (only in DEV builds, eliminated by Oxc minifier in production)
-- 401 handling uses the older Promise queue pattern (`devAuth.onUnauthorized` / `devAuth.refreshPromise`)
-- URLs are rewritten through Vite proxy (`/pixiv-api` → Pixiv API, `/pixiv-oauth` → auth endpoint)
+### URL Rewrite & Token Guard
 
-### URL Rewrite Trusted Boundary & Token Guard (ADR-0100)
+`rewriteUrl(path)` normalizes both directions:
 
-`rewriteUrl()` normalizes request paths; the web branch rewrites Pixiv hosts to `/pixiv-*` proxy paths. Before ADR-0100 it used an unbounded `startsWith(PIXIV_API_BASE)`, so a **pseudo-suffix domain** (`https://app-api.pixiv.net.evil.com`) was mis-rewritten to `/pixiv-api.evil.com/...` — and `execute`'s web branch attached `devAccessToken` to the result unconditionally, leaking the bearer token to a non-Pixiv host.
+- **Native mode** strips the Pixiv host from absolute `next_url` values (`https://app-api.pixiv.net/v1/...` → `/v1/...`) because the Java module concatenates `apiBase` + path; passing an absolute URL would produce a double-domain URL and a Pixiv 404. Relative paths pass through unchanged.
+- **Web mode** maps known Pixiv hosts to `/pixiv-api` / `/pixiv-oauth` proxy paths, and leaves other absolute URLs untouched.
 
-The fix (aligned with the lynx client's security review #165):
+`shouldAttachAuth(rewrittenUrl)` gates the bearer header **after** rewriting: web mode only attaches to local `/pixiv-*` paths; native mode only attaches to `http`-prefixed URLs whose hostname is in the trusted whitelist. `isTrustedPixivHost` parses the hostname from `PIXIV_API_BASE`/`PIXIV_AUTH_BASE` and compares exactly (with lowercase normalization), which rejects pseudo-suffix domains such as `app-api.pixiv.net.evil.com` — a defense-in-depth mirror of the webview client's ADR-0100 fix.
 
-- **Strict boundary:** `path === PIXIV_API_BASE || path.startsWith(PIXIV_API_BASE + "/")` (auth URL additionally covers `+ "?"` for query strings). Pseudo-suffix domains no longer match any branch and pass through un-rewritten.
-- **`isTrustedPixivHost(url)`** — a pure function that parses the hostname whitelist from `__PUBLIC_CONFIG__` constants (`PIXIV_API_BASE` / `PIXIV_AUTH_URL`, no hardcoded domain strings per project constraint) and requires `https:` (fail-closed).
-- **`shouldAttachAuth(rewrittenUrl)`** — decides bearer attachment on the **already-rewritten** URL: web mode returns `rewrittenUrl.startsWith("/pixiv-")`; native mode returns `http`-prefixed URL whose hostname is in the trusted whitelist (defense-in-depth — native tokens are actually managed Java-side). `execute` now rewrites first, then gates `Authorization` on `shouldAttachAuth(url) && devAccessToken`.
+```mermaid
+sequenceDiagram
+    participant Store as Query store
+    participant Client as client.ts
+    participant Module as PictelioApiModule
+    participant Core as PixivApiCore
+    participant Pixiv as Pixiv App API
 
-Result: the bearer token only rides local `/pixiv-` proxy paths; external URLs (including pseudo-suffix domains) never receive `Authorization`.
+    Store->>Client: apiClient.get(path, params)
+    Client->>Client: auth-ready gate and GET dedup
+    Client->>Module: request(method, path, body, cb)
+    Module->>Core: executeRequest(method, url, body, acceptLanguage, false, listener)
+    Core->>Pixiv: OkHttp request with Bearer Referer User-Agent
+    Pixiv-->>Core: response
+    Core-->>Module: JSONObject status and data
+    Module-->>Client: cb(status, data, rotatedRefreshToken)
+    Client-->>Store: parsed JSON or ApiError
+```
+
+*Native request path: JS passes only method, relative path, and body; Java injects headers, performs the HTTP call, and returns status/body/rotated-token.*
 
 ## OAuth Authentication
 
-### Token Refresh (auth.ts)
+### Refresh-Token Grant
 
-Primary auth flow uses a Pixiv `refresh_token`:
+The app-lynx client has a **single OAuth grant type: `refresh_token`**. There is no PKCE or password flow in this client; the Login page accepts a pasted refresh token (`Login.vue` → `auth.loginWithToken`), and everything else flows from that token.
 
-1. **Production (Native):** `refreshToken()` passes the `refresh_token` to Java as a call argument to `AuthPlugin.refreshToken()` for the OAuth exchange, then pushes the new `access_token` into `PixivApi.setAccessToken()`. `import.meta.env.DEV` gates ensure the returned `access_token` is only set in JS during dev. In production builds, `access_token` is returned as an empty string. Durable storage and Java memory sync of the `refresh_token` happen through the [Token Persistence & Backup Integrity](#token-persistence--backup-integrity) module — the old `PixivApi.setRefreshToken()` call was removed in the v3.21.6 security hardening.
-2. **Dev mode:** Falls back to `_oauthFetch` using OAuth credentials from the Vite env.
+`auth.ts`'s `oauthTokenRequest(grantType, extraParams)` is the single OAuth transport helper (the ADR-0028 deduplication: one shared function instead of per-file copies). It builds:
 
-Key source: `auth.ts`, `PixivApi.ts`, `secureStorage.ts`.
+- `X-Client-Time` = current UTC ISO-8601 time (`...+00:00`), and
+- `X-Client-Hash` = `MD5(time + HASH_SECRET)` via `spark-md5`,
+- plus `App-OS` / `App-OS-Version` / `User-Agent`, and a form body containing `client_id`, `client_secret`, `grant_type`, `get_secure_url=1`, and the grant-specific parameters.
 
-### PKCE Flow (pkceAuth.ts)
+On the web path it `fetch`es `/pixiv-oauth/auth/token` (or, in native dev, the absolute `PIXIV_AUTH_BASE`) and calls `setAccessToken(data.access_token)`. The function is gated by `__DEV__` plus an `isOAuthCredsInjected` fail-closed check so that empty compile-time credentials never produce an outbound request in production builds.
 
-For first-time login, Pictelio uses the PKCE authorization code flow:
+### Native OAuth Exchange
 
-1. `codeVerifier` and `codeChallenge` are generated
-2. User is directed to Pixiv OAuth page in a WebView (`OAuthWebView` component)
-3. The native `OAuthPlugin` intercepts the redirect and extracts the authorization code
-4. `exchangeCodeForToken()` calls `OAuthPlugin.exchangeCode()`, then sets the access_token on PixivApiPlugin via `PixivApi.setAccessToken()` (Java-side storage)
-5. `refresh_token` is persisted via `saveRefreshToken()` (encrypted `capacitor-secure-storage` + Java memory sync, see below)
+In native mode, `authStore.performRefresh` does **not** call `oauthTokenRequest`. It calls `NativeModules.PictelioAuth.loginWithRefreshToken(token, callback)`, and `PictelioAuthModule` delegates to `PixivApiCore.oauthTokenExchange(refreshToken)`:
 
-### Auth Initialization Dedup (`authStore.ts`)
+1. Java builds the same `X-Client-Time`/`X-Client-Hash` signature and posts `grant_type=refresh_token` to `OAuthConfig.AUTH_URL`.
+2. On success it writes `PixivApiCore.accessToken` (and, if rotated, `PixivApiCore.refreshToken`) **into the Java heap only**.
+3. The JS callback receives `userInfoJson` — `userId`, `userName`, `userAccount`, `profileImageUrls`, and the rotated `refreshToken` — but **never the access_token**.
 
-`initializeAuth()` in `authStore.ts` uses a **promise-based dedup pattern**: instead of a simple boolean guard (`_authInitialized`), it stores the actual initialization promise in `_authPromise`. Concurrent callers (e.g. `main.tsx`'s `void initializeAuth()` and `RootLayout.onMount`'s `await initializeAuth()`) share the same async operation rather than racing.
-
-- First call stores the Promise in `_authPromise` and begins the refresh flow
-- Subsequent calls return the stored Promise — no duplicate refresh
-- `loginWithToken()` and `loginWithPKCE()` reset `_authPromise = null` before starting, then set it to `Promise.resolve()` after success, ensuring a fresh init on the next `initializeAuth()` call after a login flow
-
-Token restoration is converged into a single call: `initializeAuth()` now invokes `restoreRefreshToken()` from [Token Persistence & Backup Integrity](#token-persistence--backup-integrity), which internally runs the backup integrity check → read (with one-time legacy `@capacitor/preferences` migration) → native injection. Any storage exception is handled uniformly as "clear token → return null" (forced re-login) instead of the old split get/migrate path.
-
-`setupUnauthorizedHandler()` additionally registers a **`refreshTokenRotated`** listener on `PixivApi` (skipped silently on Web, where the plugin is absent): if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS, which updates the in-memory signal and calls `saveRefreshToken()` to persist the new value — preventing the app from restoring a stale token after restart. The listener is removed on `logout()`. (Defensive only: Pixiv does not currently rotate refresh tokens.)
-
-### Token Persistence & Backup Integrity
-
-Since v3.21.6 (security hardening, [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md)), `/packages/app/src/utils/secureStorage.ts` is a deep module with a **single three-interface API**: `restoreRefreshToken()` / `saveRefreshToken()` / `clearRefreshToken()`. All token state changes must go through these three entry points, which together enforce the invariant "persisted state and native memory never drift". Implementation facts are grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md).
-
-- **`restoreRefreshToken()`** — startup restore, three phases: (1) backup integrity check via the `__pictelio_backup_marker` marker — a marker read error means the Keystore key is unavailable (e.g. restored backup onto a different device); (2) read the token from `@aparajita/capacitor-secure-storage` via `SecureStorage.getItem` (raw string, not JSON-parsed) with `unquoteTokenValue` for backward compatibility with historical `SecureStorage.set` JSON-wrapped values; (3) inject the token into Java memory via `PixivApi.syncToken()`. Any storage exception (marker read failure or AES/GCM decryption error after Keystore key recreation) is handled uniformly as clear token + native memory → return `null` → forced re-login. First launch writes the marker.
-- **`saveRefreshToken()`** — writes the token to secure storage via `SecureStorage.setItem` (raw string — aligned with the Lynx client's `SecureStorageCompat.setItem`), then syncs it to Java memory (`syncToken`). The raw-string format prevents cross-client parse errors: the WebView and Lynx clients share the same encrypted `SharedPreferences` key, and a JSON-wrapped write from one side would cause the other side's `JSON.parse` to throw `StorageError` (misinterpreted as storage corruption, triggering token clear → white screen, issue #127). Persistence failure does not block native injection.
-- **`clearRefreshToken()`** — removes the token from secure storage and calls `syncToken(null)`, which also wipes Java memory and the historical plaintext residue in `PictelioPrefs.xml`.
-
-The restore flow (the layer-③ defense):
+`PictelioAuth.setAccessToken(token)` exists as a backup push path, and `PictelioAuth.clearTokens(cb)` nulls both Java-heap tokens on logout.
 
 ```mermaid
-flowchart TD
-    Init[initializeAuth] --> Restore[restoreRefreshToken]
-    Restore --> Check{SecureStorage.get backup_marker\nthrows?}
-    Check -- yes --> Clear[clearRefreshToken: wipe storage + native memory\nreturn null]
-    Check -- no --> Decrypt{SecureStorage.get refresh_token\nthrows?}
-    Decrypt -- yes --> Clear
-    Decrypt -- no --> Migrate[one-time legacy Preferences migration\nwhen secure store is empty]
-    Migrate --> Sync[syncToken into PixivApiPlugin Java memory]
-    Sync --> Done[return token / null]
-    Clear --> Relogin[forced re-login]
-```
-
-The Android backup-exclusion layers (① `data_extraction_rules.xml`, ② `backup_rules.xml`) and the native `syncToken` memory model are documented in [Android Native & Build — Backup Rules](/openwiki/integrations/android-native.md#backup-rules--token-storage-exclusions-adr-0003), and the anti-drift test guarding the XML file names in [Testing Strategy](/openwiki/testing/overview.md#config-consistency-anti-drift-tests).
-
-### OAuth Token Error Detection
-
-Pixiv returns HTTP 400 (not 401) for expired `refresh_token`. The function [`isOAuthTokenErrorResponse()`](/packages/app/src/api/client.ts) in `client.ts` recognizes **two real response shapes** (aligned across both clients per [ADR-0098](/docs/adr/ADR-0098-cross-engine-consistency.md)):
-
-- **String form:** `{ error: "invalid_grant" }` — the standard `refresh_token`-expired response (first-party sources pixivpy#374 / gallery-dl#9331). Previously the app **missed this form** (it only checked the object form), classifying it `UNKNOWN` ("请求失败") instead of `UNAUTHORIZED`; the lynx client already recognized it.
-- **Object form:** `{ error: { message: "...OAuth...invalid_request..." } }`.
-
-Both forms (plus the `invalid_grant` substring inside the object form's message) map to `ApiErrorType.UNAUTHORIZED` → the session-expiry flow.
-
-**Permanent vs transient error branching** (`authStore.ts`): When `performRefresh` catches an error, the auth store distinguishes:
-- **Permanent errors** (OAuth HTTP 400-409): The `refresh_token` is irrecoverably expired or revoked. `isAuthErrorPermanent()` first short-circuits on `err instanceof TypeError` (always transient), then checks for `"HTTP 40"` in the error message (covering 400 through 409). Errors that match neither (unknown types) default to transient. Triggers full `logout()` which deletes the persisted token.
-- **Transient errors** (TypeError/network timeout/HTTP 429 rate limiting): Temporary connectivity or throttling failure. `clearAuthState()` resets the in-memory signal state (`isLoggedIn`, `user`, `tokenReady`) and calls `appStateListener?.remove()` to prevent duplicate listener registration, but **preserves** the persisted `refresh_token` so the next `initializeAuth()` call (e.g. on app resume) can retry.
-
-This replaces the earlier unconditional `logout()` on any refresh failure — introducing resilience to network flakiness during startup auth.
-
-## Request Flow (Native Production)
-
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Parse error on line 40: ... end end Expecting 'SPACE', 'NEWLINE', 'INVALID', 'create', 'box', 'end', 'autonumber', 'activate', 'deactivate', 'title', 'legacy_title', 'acc_title', 'acc_descr', 'acc_descr_multiline_value', 'loop', 'rect', 'opt', 'alt', 'par', 'par_over', 'critical', 'break', 'else', 'participant', 'participant_actor', 'destroy', 'note', 'links', 'link', 'properties', 'details', 'ACT -->
-```text
 sequenceDiagram
-    participant Store
-    participant Client as client.ts
-    participant JS as PixivApi.ts (JS)
-    participant Java as PixivApiPlugin (Java)
-    participant Pixiv
+    participant Store as authStore
+    participant Auth as PictelioAuthModule
+    participant Core as PixivApiCore
+    participant OAuth as oauth.secure.pixiv.net
 
-    Store->>Client: get<T>(path, params)
-    Client->>Client: Check inflight GET map
-    alt inflight exists
-        Client-->>Store: Return existing promise
-    else new request
-        Client->>JS: PixivApi.request({ method, path, params })
-        JS-->>Java: JSBridge (no access_token)
-        Java->>Java: Inject Bearer token
-        Java->>Pixiv: OkHttp request
-        alt 401 response
-            Java->>Java: synchronized token refresh
-            Java->>Pixiv: POST refresh_token
-            Pixiv-->>Java: new access_token
-            Java->>Pixiv: Retry original request
-            Pixiv-->>Java: Success response
-            Java-->>JS: JSON response
-            JS-->>Client: parsed result
-            Client-->>Store: data
-        else 400 OAuth error (refresh_token expired)
-            Java-->>JS: error response
-            Client-->>Store: authStore.performRefresh(err)
-            alt permanent (OAuth 400)
-                Client-->>Store: logout() — delete token
-            else transient (TypeError / network)
-                Client-->>Store: clearAuthState() — preserve token for retry
-        else success
-            Pixiv-->>Java: Success response
-            Java-->>JS: JSON response
-            JS-->>Client: parsed result
-            Client-->>Store: data
-        end
-    end
+    Store->>Auth: loginWithRefreshToken(token, cb)
+    Auth->>Core: oauthTokenExchange(refreshToken)
+    Core->>OAuth: POST auth token grant refresh_token plus X-Client-Time Hash
+    OAuth-->>Core: access_token refresh_token user
+    Core-->>Auth: result JSONObject
+    Auth->>Core: accessToken set in Java heap only
+    Auth-->>Store: cb(userInfoJson, empty) without access_token
+    Store->>Store: persist rotated refresh_token
 ```
 
-## GET Request Deduplication
+*Native refresh-token exchange: the access_token stays in `PixivApiCore`; only user info and the rotated refresh token cross the bridge.*
 
-`client.ts` maintains an `inflightGetRequests` Map keyed by `GET:{path}:{JSON(params)}`. If a GET is already in-flight for the same URL+params, subsequent callers receive the same promise. Entries are deleted on resolution or rejection.
+> Initial-token acquisition (PKCE authorization code flow) is documented in `docs/pixiv-auth-methods.md`, but that document is now **archival**: the webview client it describes was removed by ADR-0203, and the current app-lynx client obtains its initial refresh token by user paste.
 
-## Query Key System
+## Token Storage & Restore
 
-[`queryKeys.ts`](/packages/app/src/api/queryKeys.ts) defines `as const` key factories following the TanStack Query convention — every key starts with its resource type (`illust` / `novel` / `user` / `search`), which enables prefix-level invalidation (`queryClient.invalidateQueries({ queryKey: ["illust"] })` clears all illust caches, e.g. on logout):
+`refresh_token` persistence follows ADR-0050 through `utils/tokenStorage.ts`, a dual-path wrapper:
 
-| Factory | Key shape |
-|---------|-----------|
-| `queryKeys.bookmarks(userId, restrict)` | `["illust", "bookmarks", userId, restrict]` |
-| `queryKeys.userIllusts(userId, type)` | `["illust", "userWorks", userId, type]` |
-| `queryKeys.userNovels(userId)` | `["novel", "userWorks", userId]` |
-| `queryKeys.followList(mode, userId)` | `["user", "followList", mode, userId]` |
-| `queryKeys.searchIllust(word, sort, target)` | `["search", "illust", word, sort, target]` |
-| `queryKeys.searchNovel(word, sort, target)` | `["search", "novel", word, sort, target]` |
-| `queryKeys.searchAutocomplete(word)` | `["search", "autocomplete", word]` |
+- **Web-core** (the Lynx background worker has no `localStorage`): the token is stored in **IndexedDB** (`idbSet`/`idbGet`/`idbRemove`, key `refresh_token`).
+- **Native** LynxView: `NativeModules.PictelioSecureStorage` reads/writes the AndroidKeyStore-backed storage aligned with the main project's `@aparajita/capacitor-secure-storage` (same key and ciphertext format, so login state is shared with the webview client).
 
-`createTQFeedStore` also builds feed keys internally (`["illust", "feed", tab, subTab]` / `["novel", "feed", tab, subTab]`). The factory approach guarantees precise TypeScript key derivation (no manual string arrays) and is the Phase 1–3 surface of ADR-0093.
+`loadRefreshToken` on the native path applies `unquoteNativeString`, because the Lynx `Callback.invoke(String)` JSON-serializes string arguments — without the unquote the token would arrive wrapped in quotes and produce a 400 `invalid_grant` (issue #120).
 
-## Error Handling
+### Restore Flow
 
-- `normalizeQueryError.ts` — Converts errors to `ApiError` type with `type` (network, timeout, auth, server, parse, unknown) and `message`
-- `extractPixivErrorMessage()` — Parses Pixiv's error response body (system errors, OAuth errors) into a human-readable message
-- TanStack Query's `queryClient` default error handler logs to console
+`authStore.restoreToken()` is the startup entry point. It:
+
+1. short-circuits if already ready, and dedups concurrent callers through `_restoreInFlight` (the promise is cleared in `finally`, so a failed restore is not memoized);
+2. loads the persisted `refresh_token`;
+3. runs `performRefresh(token)` — native exchange or web OAuth — and populates user state plus `_accessTokenReady`.
+
+The 401 handler's refresh path (`registerUnauthorizedHandler`) prefers the in-memory `_refreshToken` but **falls back to the persistent layer** when memory is empty, self-healing the startup race where a request's 401 arrives before the restore exchange has completed (#815).
+
+Every successful login/refresh and every rotated token from a Java-side 401 refresh is written back through `saveRefreshToken` (fire-and-forget with a warn on failure, so persistence failure does not block the in-memory state).
+
+## 401 Handling & Concurrent Retry
+
+There are two independent 401-refresh layers, and they cooperate rather than overlap:
+
+### Java-Side 401 Refresh (Native Primary Path)
+
+`PixivApiCore.executeRequest` handles 401 **silently** on the native path: on a 401 with `isRetry == false` it takes a `synchronized (PixivApiCore.class)` block, checks `!isRefreshing` and that `accessToken` is still the same instance it saw, and calls `refreshAccessTokenCore()` once; then it retries the original request with `isRetry == true`. The token **reference-identity** comparison (`!=` not `equals`) is deliberate: a successful refresh always assigns a new `String` instance, so "someone else already refreshed" is detected as `accessToken != tokenBefore` and the request is replayed with the shared new token without a second refresh (ADR-0159 concurrency review). `refreshAccessTokenCore()` returns null on failure (e.g. no saved refresh token or a rejected exchange), in which case the original 401 is returned to JS.
+
+```mermaid
+sequenceDiagram
+    participant Module as PictelioApiModule
+    participant Core as PixivApiCore
+    participant Pixiv as Pixiv App API
+
+    Module->>Core: executeRequest(isRetry false)
+    Core->>Pixiv: request with current access_token
+    Pixiv-->>Core: HTTP 401
+    Core->>Core: synchronized refreshAccessTokenCore once
+    Core->>Pixiv: retry with new access_token
+    Pixiv-->>Core: 2xx response
+    Core-->>Module: status and data and rotated token
+```
+
+*Java-side 401 handling: a single synchronized refresh, then one replay of the original request.*
+
+### JS-Side Promise Queue (Web Mode / Backstop)
+
+For web mode (and as a backstop when a native response is still 401), `execWithAuthRetry` implements the ADR-0004 pattern: a module-level `refreshPromise` is shared so concurrent 401 responses await **one** `onUnauthorizedHandler` invocation, then each replays its request once. The handler is registered by `authStore.registerUnauthorizedHandler`, which runs `performRefresh`; on a failed refresh that also left `_accessTokenReady === false`, it reports a full-screen session error only when there really was an existing session.
+
+`authStore.performRefresh` distinguishes **permanent** failures (credential errors containing "凭证" or "invalid", or a web-mode `UNAUTHORIZED` ApiError) — which set `authPermanentFailure` and clear state — from **transient** failures, which leave state ready for a later retry.
+
+### Token Barrier & Permanent-Failure Short-Circuit
+
+The token barrier (ADR-0041, refined by ADR-0151 and the #815 correction) prevents the startup race where first-frame requests outrun the restore exchange:
+
+- `authPermanentFailure` short-circuits at the top of `execute`/`executeRaw` with a synchronous throw, so no network traffic is generated once auth is known dead.
+- `awaitAuthReady()` gates **GET** requests that have no JS `access_token`: it awaits the provider registered by `authStore` (`setAuthReadyProvider(() => useAuthStore().restoreToken())`) with a 10-second cap (`withTimeout`), swallowing timeouts. Web mode then throws `UNAUTHORIZED` only if no token exists; native mode proceeds to the Java gateway.
+- The gate is applied to the **native branch too** (the #815 correction): in native mode `accessToken` is always empty in JS, but the Java-heap token is produced asynchronously by the OAuth exchange, so "no JS token" is not a readiness signal. POST requests are deliberately not gated (no startup POST read path goes through this client; adding the gate would only delay writes).
+
+## Rate-Limit Backoff (429)
+
+`rateLimitBackoff.ts` provides capped exponential backoff with full jitter (ADR-0199):
+
+- `computeRateLimitBackoffDelayMs(attempt, config, random)` computes `floor(random() × min(maxDelayMs, baseDelayMs × 2^attempt))` — multiplier 2 and full jitter are fixed algorithm parameters, not user-configurable.
+- `runWithRateLimitBackoff(fn, config, options)` retries only on `ApiErrorType.RATE_LIMIT` (HTTP 429), up to `maxRetries` additional attempts (default `3`, so at most 4 total attempts), waits via an injectable `sleep` (default `setTimeout` + abort listener), and — when retries are exhausted — throws the rate-limit error with `params.attempts` attached for observability. `enabled: false` or `maxRetries: 0` restores the zero-retry behavior.
+
+In `client.ts`, `request`/`requestRaw` wrap the inner `execute`/`executeRaw` with `runWithRateLimitBackoff`, inside the outer `execWithAuthRetry`. This makes 429 backoff orthogonal to 401 refresh: a replayed request after refresh re-enters the backoff loop. The config is injected via `setRateLimitBackoffConfig` (mirroring the `setOnUnauthorized` seam) so the settings store can tune `enabled`, `maxRetries`, `baseDelayMs`, and `maxDelayMs` without the client depending on Pinia. Each retry logs `[client] 429 限流退避重试` with the attempt number and delay.
+
+## Query Key System & Query Client
+
+`queryKeys.ts` uses `as const` factories under a `['pictelio', <resource>, ...]` namespace, with sub-namespaces `illusts` / `novels` / `users` / `search` / `watchlist` / `notifications` / `settings`. Key order is significant; the top-level `pictelio` prefix plus resource prefixes enable prefix-level invalidation (`queryClient.invalidateQueries({ queryKey: queryKeys.illusts.all })`). `mutationKeys` and `invalidateKeys` centralize mutation grouping and invalidation targets.
+
+`queryClient.ts` exports a per-app-cycle singleton (`createAppQueryClient`) with these defaults:
+
+- `staleTime: 0` (mount-refetch, the project's "pessimistic refresh" convention), `retry: false` (401/4xx/5xx retry semantics belong to `apiClient`, not TanStack Query — keeping the Java `synchronized` refresh contract unbroken),
+- `gcTime: 30s`, `refetchOnWindowFocus: false` (Lynx has no window focus event), `refetchOnReconnect: true`, `placeholderData: keepPreviousData`, `structuralSharing: true`.
+
+Per-query overrides raise `gcTime` to 5 minutes for stable detail/user/novel content and lower it to 0 for recommended/follow/search feeds (avoiding stale reads).
+
+## Error Classification
+
+`classifyError(status, error, responseBody)` in `client.ts` is the single error-normalization point shared by `get`/`post`/`requestRaw`:
+
+- a `proxy_error` body → `ApiErrorType.PROXY` (local proxy failure);
+- a fetch rejection (`TypeError`) with no status → `NETWORK`;
+- 401 → `UNAUTHORIZED`, 403 → `FORBIDDEN`, 429 → `RATE_LIMIT`;
+- 400 with an OAuth-token error body → `UNAUTHORIZED` (see below), `>= 500` → `SERVER`, other positive statuses → `UNKNOWN`.
+
+`isOAuthTokenErrorResponse(status, body)` recognizes Pixiv's 400 `{ error: "invalid_grant" }` string form **and** the object form `{ error: { message: "...OAuth...invalid_request..." } }`, mapping both to `UNAUTHORIZED` so an expired/revoked refresh token enters the permanent-failure cleanup path. `extractPixivErrorMessage` pulls a human-readable message from Pixiv's `errors.system.message`/`message`/`error` shapes.
+
+## Focused Tests
+
+- `client.test.ts` exercises `requestRaw` (and the shared request pipeline) in both modes via stubbed `fetch` and `NativeModules`: URL rewrite + bearer attachment, 404/500/network classification, 401 refresh-and-replay, and the unlogged `UNAUTHORIZED` path.
+- `rateLimitBackoff.test.ts` verifies the ADR-0199 delay formula with injected `random` endpoints and injectable `sleep`, the retry/abort/exhaustion semantics, and the config seam.
 
 ## Related
 
-- [Feed Store Factory](/openwiki/domain/feed-and-browsing.md#feed-store-factory) — How stores consume the API via TanStack Query
-- [Android Native & Build](/openwiki/integrations/android-native.md) — Native auth plugins (AuthPlugin, OAuthPlugin) and PictelioHttp
-- ADR-0004: 401 concurrent retry with Promise queue
-- ADR-0028: OAuth transport deduplication
+- [Image Pipeline](image-pipeline.md) — how image/ugoira downloads reuse `PixivApiCore.getSharedClient()` and the `PictelioApi` module.
+- [Architecture Overview](overview.md) — where this layer sits in the app-lynx runtime.
+- [Feed & Browsing](../domain/feed-and-browsing.md) — how stores consume the API via TanStack Query.
+- [Android Native & Build](../integrations/android-native.md) — the Android host, `PixivApiCore`, and Lynx module registration.
+- [Testing Strategy](../testing/overview.md) — behavioral-test conventions referenced above.
+- [Quickstart](../quickstart.md) — running the web-core preview (which uses the web transport path).
+- ADR-0037 — access_token Java-heap isolation gateway; ADR-0053 — Lynx NativeModule contract; ADR-0004 — 401 Promise queue; ADR-0041/ADR-0151 — token barrier; ADR-0028 — OAuth transport dedup; ADR-0050 — refresh_token persistence; ADR-0199 — rate-limit backoff.

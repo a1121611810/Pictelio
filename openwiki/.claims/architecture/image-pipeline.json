@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7e5c14b2d505fff62eb2f37cd6c5da72b1736451f6759230d841e061d8b3eac5",
+  "claims": [
+    {
+      "id": "claim_12d61e0ae8994cc897c4e4e5126234ef",
+      "statement": "Pictelio is a Lynx single-engine client: the WebView client source, its Capacitor plugins, and the `packages/app` tree were removed (ADR-0203), so the image pipeline now spans `packages/android-host` (Android Gradle host + shared Java image core and Lynx native modules), `packages/app-lynx` (vue-lynx client), and `packages/ugoira` (shared pure-TS ugoira library).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        },
+        {
+          "resource": "repo://docs/adr/glossary-webview-client-removal.md",
+          "version": "repo-file-v1:sha256:71bbbbb00c1bfcf7bbf76b99506904dab5d71da00d29e71872cacf4dabd9bf3d"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        }
+      ]
+    },
+    {
+      "id": "claim_93f079f398de46a4b08ee72b6e42d3f6",
+      "statement": "`PixivImageLoader` (ADR-0054) is the single source of truth for image bytes: it rewrites `/pixiv-img/{path}` to `OAuthConfig.IMAGE_CDN_URL + \"/\" + path` with URI normalization, keys a disk cache under `pictelio-images/` with Base64 URL-safe names and oldest-first byte-budget eviction, downloads via the shared OkHttp pool with `Referer`/`User-Agent`, throws on non-2xx or empty bodies without caching, and serializes concurrent same-URL loads with a per-URL lock plus double-check.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0054-image-pipeline-unified-core.md",
+          "version": "repo-file-v1:sha256:e71116fa6d133213f62a95c9fb7cd7d70d838fab23acc82cb86f351cbc81a462"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java",
+          "version": "repo-file-v1:sha256:b9f9ddaca32288d935df08b43c0a0651f57a4c26985fea7babc5b186e0f6bba6"
+        }
+      ]
+    },
+    {
+      "id": "claim_a816cd8609884ed29315203280cc254f",
+      "statement": "`PictelioImageService` is the sole image backend for the Lynx client: it implements `ILynxImageService`, registers `<image>`/`<inline-image>` behaviors at construction, and `fetchImage` checks the bitmap memory cache then delegates to `PixivImageLoader`, samples-decodes with a 2048 px cap, and delivers `ImageContent`; animation hooks are static-only and a canonical-path-whitelisted `file://` branch serves ugoira frames from `cache/ugoira/`.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0054-image-pipeline-unified-core.md",
+          "version": "repo-file-v1:sha256:e71116fa6d133213f62a95c9fb7cd7d70d838fab23acc82cb86f351cbc81a462"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java",
+          "version": "repo-file-v1:sha256:b0e357330234e3f768b907330bdc518157788bff1819d4cebce98b7f2137752c"
+        }
+      ]
+    },
+    {
+      "id": "claim_e58ac3ebd21c4dd8b8f5a5b4c0228c49",
+      "statement": "A 64 MB native `ImageMemoryCache` (built on the generic pure-JVM `LruCache`) caches decoded bitmaps keyed by URL with byte size `width × height × 4` and LRU eviction, so a revisit skips disk read plus decode; delivery uses the cached instance directly with an `isRecycled()` guard instead of a per-delivery `ARGB_8888` copy.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java",
+          "version": "repo-file-v1:sha256:b0e357330234e3f768b907330bdc518157788bff1819d4cebce98b7f2137752c"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java",
+          "version": "repo-file-v1:sha256:7a8e8f0661f46b252e82f7a223d0a073ff28135e1240e25e3d355b9dd01fa1f7"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/LruCache.java",
+          "version": "repo-file-v1:sha256:17f15ee8dc185a1019fa5f20e11a0a09d18d33de8c6cdcc3b3ead4ebbcb349c3"
+        }
+      ]
+    },
+    {
+      "id": "claim_e4a17b7d17074928a59d4deb6d4411b8",
+      "statement": "`ImageHostConfig.resolve(officialUrl)` (ADR-0143) decides the download source in Java: `single` uses the selected host, `weighted` samples enabled weight>0 hosts, `fastest-ip` uses a 30 s-TTL probe with immediate weighted fallback, and `race` degrades to `weighted`; the cache key is always the official URL; mirror failure retries the official URL once under a smaller mirror budget; and `pximg.net`/`pixiv.net` mirror hosts are skipped to prevent self-looping.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0143-imagehost-download-source-java-sink.md",
+          "version": "repo-file-v1:sha256:e0a2562bfc4ff94bec05e431189be497489af9675b1c706180ef393be8fbc439"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java",
+          "version": "repo-file-v1:sha256:7821ade229d14edbb0f77d40380938a5003969a8687799db51a9085d42fc4157"
+        }
+      ]
+    },
+    {
+      "id": "claim_820eaa4aa7df45e69aa86ccc740079cb",
+      "statement": "`ImageHostConfig` reads `image_host_settings` from `SharedPreferences(\"CapacitorStorage\")`, parses lazily with corrupt config treated as host-off, and triggers a single-flight `fastest-ip` probe on a dedicated executor with a 5 s timeout whose result is cached for 30 s; its write-side settings UI was removed with the WebView client.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java",
+          "version": "repo-file-v1:sha256:7821ade229d14edbb0f77d40380938a5003969a8687799db51a9085d42fc4157"
+        }
+      ]
+    },
+    {
+      "id": "claim_c6283fe15aae43d0a5617676c3f926a2",
+      "statement": "Native ugoira playback extracts frames in Java via `PictelioApi.ugoiraExtract`: it downloads the zip (https-only with `Referer`/UA), decompresses with `ZipInputStream`, writes `cache/ugoira/<illustId>/frame_N.{png|jpg}`, returns `file://` URLs, skips the download when a per-illust integrity check hits, and LRU-cleans the directory at 300 files / 50 MB.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0125-lynx-ugoira-unpacked-pipeline.md",
+          "version": "repo-file-v1:sha256:cf08c9b3c899fa5c7b78771aa8adc1f1aa6091793b3bdbf3b7556d830fca36cb"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0126-ugoira-flicker-and-range-fallback.md",
+          "version": "repo-file-v1:sha256:96a44d9bd3b72a1f31a6f2e9a6e0e55945504c661c53ba1651f9e3b942b71813"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java",
+          "version": "repo-file-v1:sha256:c8c20d666e4a895f2d7efc5e0b725f3a806aaf1d83884fa8526ed6dbe21ab578"
+        }
+      ]
+    },
+    {
+      "id": "claim_296ee3b779ea4035a4d370978190f084",
+      "statement": "`UgoiraStreamEngine` + `ugoiraExtractStream`/`ugoiraExtractStreamPoll`/`ugoiraExtractStreamCancel` (ADR-0128) stream the zip with a local-header-driven `ZipInputStream`, write frames to disk in batches and deliver `file://` URL batches through a pull-mode state machine; cache hits deliver all frames in one poll, cancel preserves written frames, and the first batch arrives at roughly 4.5–8.6% of the download.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0128-ugoira-native-streaming-playback.md",
+          "version": "repo-file-v1:sha256:495acda187cfd555bc0ab2996673e36068d019912dcecf0514c7b088d656d210"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java",
+          "version": "repo-file-v1:sha256:c8c20d666e4a895f2d7efc5e0b725f3a806aaf1d83884fa8526ed6dbe21ab578"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/UgoiraStreamEngine.java",
+          "version": "repo-file-v1:sha256:826bd4fac637a2536b9764e57117d708e463da0662aba8bfc54863bc890e7e8c"
+        }
+      ]
+    },
+    {
+      "id": "claim_b65825b5b07d468092a3aba3c108de93",
+      "statement": "`@pictelio/ugoira` is the shared pure-TS ugoira library: `index.ts` parses EOCD/central-directory and slices or unzips frames for store and deflate entries, while `createStreamFrameSource` (ADR-0127) emits frames in `fileOrder` as each entry completes, buffers out-of-order entries, and throws a `ugoira:`-prefixed error on corruption or missing frames.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0127-ugoira-streaming-playback.md",
+          "version": "repo-file-v1:sha256:e3642d9d0967436b60757c1a5096d2b85c9cb03717e9d27cf994b9b75058209c"
+        },
+        {
+          "resource": "repo://packages/ugoira/src/index.ts",
+          "version": "repo-file-v1:sha256:3954f2db486a3649104d45407c6b1b93f43bf69e695ee4a1912167e98a2c956e"
+        },
+        {
+          "resource": "repo://packages/ugoira/src/stream.ts",
+          "version": "repo-file-v1:sha256:795b30c5a7666d99ded2f811f025b7feae35bd466b3b273bd97f3b4a8ff510a1"
+        }
+      ]
+    },
+    {
+      "id": "claim_94bc7ae4bf3e4c88ac7ea8788bfb237c",
+      "statement": "In `packages/app-lynx`, static images pass through `proxyImageUrl` (i.pximg.net → `/pixiv-img/`, with a `pximg.net`/`pixiv.net` host whitelist), and `UgoiraViewer.vue` uses `downloadUgoiraFrames` (fflate/range → base64 `data:` URLs, with range degrading to fflate) in web mode versus `ugoiraExtractStreamFrames` (with full `ugoiraExtractFrames` fallback) in native mode, scheduling frames by `delay` with `defer-src-invalidation` and tail-waiting while streaming.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0126-ugoira-flicker-and-range-fallback.md",
+          "version": "repo-file-v1:sha256:96a44d9bd3b72a1f31a6f2e9a6e0e55945504c661c53ba1651f9e3b942b71813"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/ugoira.ts",
+          "version": "repo-file-v1:sha256:f19b9b3ff4cbe6f6cc24a6d89ebb57d9aef54a96edd6a5235162cbfb2108b051"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/UgoiraViewer.vue",
+          "version": "repo-file-v1:sha256:dd6feaebcb27345d64a9859926acef4b8527fe353fb45011b0674c5fcb4f4420"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/imageUrl.ts",
+          "version": "repo-file-v1:sha256:8daa1ecefbb430b893e2919d3e06c101bbf914e7892fec6c3fdbddcdc2865e1d"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}

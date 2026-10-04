@@ -1,297 +1,283 @@
 ---
 type: Concept
 title: Image Loading Pipeline
-description: The complete path from Pixiv API response to screen rendering — three-layer image cache, multi-host selection, WebView proxy interception, Web Worker measurement, periodic GC, and ugoira streaming playback across the WebView and lynx clients.
-tags: [images, caching, performance, webview, android]
+description: End-to-end image loading for the Lynx single-engine client — native bitmap memory cache, shared PixivImageLoader disk cache, Java image-host download-source selection, the PictelioImageService backend, and ugoira unpacked/streaming playback.
+tags: [images, caching, lynx, android, ugoira]
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-04T18:40:18.128Z
+sources:
+  - id: openwiki-source-b5e289f92fb0592c3dbc523f
+    resource: repo://docs/adr/ADR-0054-image-pipeline-unified-core.md
+  - id: openwiki-source-489cdead3da8215fb7dcf74d
+    resource: repo://docs/adr/ADR-0125-lynx-ugoira-unpacked-pipeline.md
+  - id: openwiki-source-acd8ff7f8c9ee063fb8f2510
+    resource: repo://docs/adr/ADR-0126-ugoira-flicker-and-range-fallback.md
+  - id: openwiki-source-6fec432c8953f2743e97e755
+    resource: repo://docs/adr/ADR-0127-ugoira-streaming-playback.md
+  - id: openwiki-source-5cc63b2c12127d537ff30676
+    resource: repo://docs/adr/ADR-0128-ugoira-native-streaming-playback.md
+  - id: openwiki-source-351a9dcb353c4bbb79791e4d
+    resource: repo://docs/adr/ADR-0143-imagehost-download-source-java-sink.md
+  - id: openwiki-source-638aca70ff0d5527fe48d664
+    resource: repo://docs/adr/ADR-0203-webview-client-source-removal.md
+  - id: openwiki-source-1d6a07deffe55a66cc1311f8
+    resource: repo://docs/adr/glossary-webview-client-removal.md
+  - id: openwiki-source-5b54a58d1b51cd490b0e7162
+    resource: repo://package.json
+  - id: openwiki-source-cea6ad9ea049a9b602b8ce91
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java
+  - id: openwiki-source-c74c5350d4c128eeb868cc8d
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java
+  - id: openwiki-source-2dd408c9d010e770c4ad416e
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/UgoiraStreamEngine.java
+  - id: openwiki-source-5a67f083c40f2c6bdf720bb2
+    resource: repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java
+  - id: openwiki-source-8a34e9ee9402c2e7eb4623ac
+    resource: repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java
+  - id: openwiki-source-3a8e99085767aa1324c0937f
+    resource: repo://packages/android-host/android/app/src/main/java/io/pictelio/app/LruCache.java
+  - id: openwiki-source-4e043f6717b4a5f938708fba
+    resource: repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java
+  - id: openwiki-source-730125d23f500d4fcea076fd
+    resource: repo://packages/app-lynx/src/api/ugoira.ts
+  - id: openwiki-source-efee16bc28583359a92f8898
+    resource: repo://packages/app-lynx/src/components/UgoiraViewer.vue
+  - id: openwiki-source-7ff56e28f7a6aa2975a60baa
+    resource: repo://packages/app-lynx/src/utils/imageUrl.ts
+  - id: openwiki-source-354361bcd224881950b5f458
+    resource: repo://packages/ugoira/src/index.ts
+  - id: openwiki-source-31d28355e5730767584572ca
+    resource: repo://packages/ugoira/src/stream.ts
+generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 ---
 
 # Image Loading Pipeline
 
 ## Overview
 
-The image loading pipeline is documented exhaustively in `/docs/image-loading-pipeline.md` (~40KB). This page summarizes the architecture and key components.
+Pictelio is now a **Lynx single-engine client**. The WebView client runtime, its Capacitor plugin layer, and its `packages/app` source tree were removed in [ADR-0203](../../docs/adr/ADR-0203-webview-client-source-removal.md); the image pipeline therefore no longer passes through `shouldInterceptRequest`, `imageLoader.ts`, or a browser HTTP cache. It now spans three packages:
+
+- `packages/android-host` — the Android Gradle host plus the shared Java image core (`PixivImageLoader`, `ImageHostConfig`, `ImageMemoryCache`, `LruCache`) and the Lynx-specific `PictelioImageService`/`PictelioApiModule`/`UgoiraStreamEngine`.
+- `packages/app-lynx` — the vue-lynx client, which renders `<image>` elements, rewrites Pixiv CDN URLs to proxy paths, and schedules ugoira playback.
+- `packages/ugoira` — the shared pure-TS ugoira frame library consumed by the client.
 
 ```mermaid
 flowchart LR
-    API[Pixiv API] --> IL[imageLoader.ts]
-    IL --> L1[L1 LRU Key Set - in-memory]
-    IL --> L2[L2 Browser Cache - fetch cache]
-    IL --> L3[L3 Android Disk Cache - ImageCachePlugin]
-    IL --> HS[ImageHostService - host selection]
-    HS --> PX[PixivImage.tsx - Component render]
-    PX --> WV[WebView - shouldInterceptRequest]
-    WV --> L3
+    Vue["app-lynx &lt;image&gt;"] --> Svc[PictelioImageService]
+    Svc --> Mem[ImageMemoryCache 64MB]
+    Svc --> Core[PixivImageLoader]
+    Core --> Disk["disk cache pictelio-images"]
+    Core --> Host[ImageHostConfig.resolve]
+    Host --> CDN[i.pximg.net or mirror]
 ```
 
-## Three-Layer Cache
+The single request path: a vue-lynx `<image>` element is routed to the native `PictelioImageService`, which checks the in-memory bitmap cache, falls back to `PixivImageLoader` for a disk-cache hit or a download (with `Referer`/`User-Agent`), samples-decodes the bytes, and hands back a `Bitmap`. The download source is decided per request by `ImageHostConfig.resolve(officialUrl)`.
 
-| Layer | Store | Location | Eviction |
-|-------|-------|----------|----------|
-| **L1** | LRU `Set<string>` (URL keys) | `imageLoader.ts` | Periodic GC with context-aware scoring (image width, file size, staleness) |
-| **L2** | Browser HTTP cache | `fetch` response cache | Standard HTTP caching |
-| **L3** | Android disk cache | `ImageCachePlugin.java` / `PixivImageLoader.java` (native) | LRU with configurable max size |
+## Cache Layers
 
-### L1 Cache (LRU Key Set)
+The current cache story has two general-purpose tiers plus a dedicated ugoira frame cache.
 
-The L1 cache stores only URL strings (not image blobs) in a `Set`. When a URL is accessed, it's removed and re-added to the set (LRU ordering). Periodic GC runs every 30 seconds:
+| Tier | Store | Location | Eviction |
+|------|-------|----------|----------|
+| **L1** | Decoded `Bitmap` LRU | `ImageMemoryCache` (64 MB) | Byte-budget LRU (`width × height × 4`) |
+| **L2** | Image bytes on disk | `PixivImageLoader` under `pictelio-images/` | Byte-budget LRU by `lastModified` (`CACHE_MAX_BYTES`, 300 MB) |
+| **Ugoira** | Frame files on disk | `cache/ugoira/<illustId>/frame_N.{png,jpg}` | Count/size LRU (300 files / 50 MB) |
 
-- **Scoring function** considers: image width, estimated file size, time since last access
-- **Threshold-based eviction:** URLs with score < `threshold` (dynamically adjusted) are evicted
-- Cache capacity: default 500 entries (configurable)
+### L1 — native bitmap memory cache
 
-Context-aware eviction (ADR-0030) prevents large, rarely-used images from crowding out frequently-viewed thumbnails.
+[`ImageMemoryCache`](../../packages/android-host/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java) caches decoded `ARGB_8888` bitmaps keyed by the image URL, with byte size estimated as `width × height × 4`. Its 64 MB budget holds roughly four 2048×2048 originals, but typical list thumbnails are much smaller. It is built on the generic, pure-JVM [`LruCache`](../../packages/android-host/android/app/src/main/java/io/pictelio/app/LruCache.java), a `LinkedHashMap` in `accessOrder` mode whose `put` trims the oldest entries until the byte budget is satisfied; all operations are `synchronized` because Lynx image requests arrive on multiple threads.
 
-## User-Facing Cache Controls (ADR-0090)
+A memory hit skips disk read and decode. The service delivers the cached instance directly, guarded by `cached.isRecycled()` — if the engine ever recycled the bitmap, the entry is removed and the URL is re-downloaded (ADR-0054/#147 follow-up; the earlier per-delivery `ARGB_8888` copy was removed after measurement showed it was pure overhead).
 
-The three internal cache layers are exposed to users as three **independent switches** on a dedicated `/image-cache` settings route ([`ImageCacheSettings.tsx`](/packages/app/src/routes/ImageCacheSettings.tsx)), replacing the old "图片缓存限制" LRU-entry-count slider which had no measurable effect on render speed:
+### L2 — shared disk cache in PixivImageLoader
 
-| Switch | Layer | Mechanism | Default |
-|--------|-------|-----------|---------|
-| **A — 磁盘缓存** | L3 Android disk cache | `ImageCachePlugin.setDiskCacheEnabled()`; `MainActivity.interceptImage()` checks the flag + file existence | on |
-| **B — 浏览器缓存** | Browser HTTP cache | `interceptImage()` adds `Cache-Control: public, max-age=31536000, immutable` to `WebResourceResponse`; a hit never reaches `shouldInterceptRequest` | on |
-| **C — 后台预取** | JS prefetch (LRU + disk) | `VirtualFeed.tsx`'s prefetch `createEffect` gates on the `imageCachePrefetch` signal | on |
+The disk tier is owned by [`PixivImageLoader`](../../packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java): files are keyed with `keyToFilename(url)` (Base64 URL-safe, no padding), stored under `OAuthConfig.CACHE_DIR` = `pictelio-images`, and evicted oldest-first by `lastModified` once the directory exceeds `OAuthConfig.CACHE_MAX_BYTES` (300 MB). Writes are atomic (`tmp` + `rename`), so a truncated write can never be read back as a hit, and `.tmp` residue is cleaned on failure.
 
-A real **磁盘缓存上限** slider (50–1000 MB) now bounds the disk layer. `cacheSize` (the legacy entry-count state) is kept internally for `resetUiStore` compatibility but no longer exposed in the UI. Explicitly rejected: blob URLs (blob lifetime binds to LRU eviction → broken `<img>` refs) and Service Worker caching (Capacitor 8 has no SW by default and it would conflict with the local-server mechanism).
+### Ugoira frame cache
 
-## Image Host Selection
+Ugoira frames live under `cache/ugoira/<illustId>/frame_N.{png|jpg}` and are bounded by an LRU cleanup (300 files or 50 MB, oldest `lastModified` first). A per-illust integrity check (frame count matches `meta.frames` and every file is non-empty) makes repeat playback zero-download.
 
-`imageHostStore.ts` and `imageHostService.ts` manage multiple Pixiv image CDN hosts:
+### Historical: ADR-0090 three-switch UI (removed)
 
+The WebView-era "three-layer cache" of [ADR-0090](../../docs/adr/ADR-0090-image-cache-three-layer.md) — three user switches for disk cache, browser `Cache-Control: immutable` headers, and JS prefetch — was a WebView/Capacitor construct. Its settings UI was removed with the WebView client as an accepted gap (ADR-0203). The Lynx equivalents are the native bitmap memory cache and the shared disk cache above; list-image eager-loading pressure is handled by the engine-level `lazy-load` attribute and batched data rendering instead of a JS prefetch cache ([ADR-0060](../../docs/adr/ADR-0060-lynx-feed-image-lazy-loading.md)).
+
+## PixivImageLoader — shared image core
+
+[`PixivImageLoader`](../../packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java) (ADR-0054) is the single source of truth for image bytes, consumed by `PictelioImageService`, `GallerySaver` (via `loadFile`), and `NovelExporter` (via the injectable `loadBytes` test seam). Responsibilities:
+
+- **URL rewrite** — `rewriteUrl()` maps `/pixiv-img/{path}` to `OAuthConfig.IMAGE_CDN_URL + "/" + path` (`https://i.pximg.net/...`) with `URI.normalize()` dot-segment folding; non-proxy URLs pass through unchanged.
+- **Disk cache** — `cachedFile()`/`keyToFilename()`/`getCacheDir()` implement the read side; `writeFile()` is the atomic write; `enforceCacheLimit()` does oldest-first eviction.
+- **Download** — `download()` resolves the source via `ImageHostConfig.resolve`, then `fetch()` injects `Referer: https://app-api.pixiv.net/` and the Pixiv iOS `User-Agent`, reusing `PixivApiCore.getSharedClient()` (connect 15 s / read 30 s / call 45 s, `maxRequestsPerHost=10`, `maxRequests=20`). Non-2xx or empty bodies throw `IOException` without writing to cache.
+- **Concurrency** — `loadFile`/`loadBytes`/`loadFileWithProgress` use a per-URL lock in a `ConcurrentHashMap` plus double-checked cache read, so concurrent same-URL loads download exactly once.
+- **Streaming** — `loadFileWithProgress(url, sink, cancel)` streams 8 KB chunks to the target file, reports progress every ~64 KB, honors cancellation, and atomically replaces the target on success.
+
+The mirror path uses a smaller budget (`connect 5 s / call 15 s`) so a degraded mirror fails fast and falls back to the official URL rather than delaying first paint.
+
+## Image host selection
+
+The image-host (mirror) decision is a Java deep module, [`ImageHostConfig`](../../packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java) (ADR-0143), with one public entry point:
+
+```java
+String resolve(String officialUrl)  // official URL in → actual download URL out
 ```
-i.pixiv.re       — Primary (official mirror)
-i.pixiv.nl        — Alternative
-api.pixiv.cat     — Alternative
-i.pximg.net       — Direct Pixiv CDN
-```
 
-**Selection modes:**
-
-| Mode | Behavior |
-|------|----------|
-| `race` | Request all hosts, use first response |
-| `weighted` | Prefer highest-weighted healthy host |
-| `fastest-ip` | DNS-resolve all, connect to fastest |
-| `single` | Always use a single configured host |
-
-Host health is tracked with success/failure counts and timeouts.
-
-### Native download-source sink (ADR-0143, v4.35.0)
-
-Since **v4.35.0** (ADR-0143, spec [`imagehost-native-fix.md`](/docs/specs/imagehost-native-fix.md) #376), the image-host decision was sunk into the Java download layer so it finally reaches the out-image path on Android. `imageHostStore`/`imageHostService` remain the config producer (settings page + Web/dev mode), but native download-source selection now lives in a deep module [`ImageHostConfig.java`](/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java) with a single entry point `resolve(officialUrl)` — official URL in, actual download URL out. Four thin adapters wire it into every download path: `PixivImageLoader.download`, `PixivApiPlugin.prefetchImage`, and lynx `PictelioApiModule.downloadZip`/`streamDownloadZip`, so images and ugoira zips both flow through the mirror on both engines.
+It reads `image_host_settings` JSON from `SharedPreferences("CapacitorStorage")`, parses lazily, and reuses the parsed config while the raw string is unchanged. Corrupt config, shape failure, a disabled master switch, non-`http(s)` input, or an empty usable-host list all return the official URL unchanged (with a `Log.w`, never a silent degrade). The write-side settings UI was removed with the WebView client, so the reader still honors any previously persisted mirror config but users now default back to the official host.
 
 ```mermaid
 flowchart TD
     A["resolve(officialUrl)"] --> B{"host off / invalid / no host?"}
-    B -- yes --> Z["return officialUrl unchanged"]
+    B -- yes --> Z["return officialUrl"]
     B -- no --> C{"mode?"}
-    C -- single --> S["selected host (fallback: first enabled)"]
+    C -- single --> S["selected host or first enabled"]
     C -- weighted --> W["weight-sampled host"]
     C -- race --> W
     C -- fastest-ip --> F{"probe within 30s TTL?"}
     F -- yes --> FH["fastest host"]
     F -- no --> W
-    S --> R["host-rewritten URL (path+query preserved)"]
+    S --> R["host-rewritten URL, path and query preserved"]
     W --> R
     FH --> R
 ```
 
-The `resolve()` decision — official URL in, download source out, with `race` degrading to `weighted` and `fastest-ip` falling back to `weighted` when the probe TTL expires.
+### Four-mode mapping
 
-- **Cache-key invariant (D2):** the cache key is always the **official URL** (download source follows the image host, the cache key does not) — switching source, toggling the host, or changing mirror never invalidates cached entries. A machine-enforced anti-drift test asserts `keyToFilename(officialUrl)` ≡ the interceptor's `rewriteUrl` product.
-- **Four-mode mapping (D3):** `single` = selected host (invalid → first enabled); `weighted` = per-request weight sampling; `fastest-ip` = in-memory probe result (30s TTL) with immediate weighted fallback while a single-flight lazy probe (5s timeout) runs — the probe now lives in Java so it works for both engines; `race` is **not implemented natively** and explicitly degrades to `weighted` (settings page labels it 仅 Web/Web-only).
-- **Failure fallback (D4):** mirror download failure → one official retry (mirror connect/call budgets lower than official); corrupt/missing config → image host treated as off with a visible warn; a mirror `baseUrl` on the official pximg.net domain is skipped (anti-self-loop, symmetric with the JS `validateHostInput` write-side guard).
-- **Cleartext mirror guard (#383, [`imagehost-cleartext-mirror.md`](/docs/specs/imagehost-cleartext-mirror.md)):** native validation rejects `http://` mirror URLs (Android 9+ forbids cleartext HTTP — the manifest keeps `usesCleartextTraffic` off), and a startup migrate auto-disables any previously-saved `http://` hosts with a warn. Web/dev mode keeps `http://`.
+| Mode | Native behavior |
+|------|-----------------|
+| `single` | Use the selected host; if it is missing/disabled, fall back to the first enabled host. |
+| `weighted` | Sample enabled `weight > 0` hosts independently per request (injected `Random`; weight 0 normalizes to 1). |
+| `fastest-ip` | Use the in-memory probe result if it is within a 30 s TTL; otherwise immediately fall back to `weighted` while lazily kicking a single-flight probe. |
+| `race` | Explicitly degrades to `weighted` — race was never implemented natively (labeled "Web-only" in the removed settings UI). |
 
-## PixivImage Component
+The URL rewrite (`transform`) only replaces the host (protocol/host/port from the mirror baseUrl, official path + query preserved byte-for-byte), or substitutes a `{path}` template with the official path minus its leading `/`.
 
-`/packages/app/src/components/PixivImage.tsx` — The main image display component that:
+### Cache-key invariant
 
-1. Resolves the illust URL through the image host system
-2. Applies Fluent Design image tokens (border-radius, shadow)
-3. Handles loading states with skeleton shimmer
-4. Integrates with the three-layer cache
+The **cache key is always the official URL**, never the resolved mirror URL. Switching source, toggling the host, or changing mirrors therefore never invalidates cached bytes; every download from any source is stored under the official-URL key. `PixivImageLoader` consumes the official input URL for cache addressing and ignores the `resolve` return value for keying (enforced by `PixivImageLoaderTest.keyToFilename_rewriteUrlProduct_equalsOfficialUrlKey`).
 
-## LazyDetailImage Component
+### Failure fallback and self-loop guard
 
-`/packages/app/src/components/LazyDetailImage.tsx` — Lazy-loading wrapper for multi-page illust detail images with dual visibility detection:
+Mirror failure (connection/HTTP/empty body) triggers **one official retry**; if both fail, the mirror's original error is thrown. A mirror whose hostname is on the official `pximg.net`/`pixiv.net` domain is skipped (`isOfficialDomain`), mirroring the removed JS `validateHostInput` write-side guard. `fastest-ip` probes run on a dedicated single-thread daemon executor with a 5 s call timeout, and a monotonic seed-overwrite rule prevents a reparse from clobbering a freshly completed probe result (issue #658).
 
-1. **Signal-driven preload** — `preloaded()` memo uses windowed logic: pages within `visiblePage + PRELOAD_WINDOW` (currently `PRELOAD_WINDOW = 6`) trigger `loadImage()` prefetch to disk cache. The `visiblePage` prop is tracked by the parent `IllustDetail` component as the user scrolls between pages, ensuring the next several pages are loaded ahead of the viewport.
-2. **Local IntersectionObserver** — Always-active `createEverVisible` observer (removed `skipObserver` in v3.21.3). Elements entering the viewport independently trigger `loadImage()` regardless of `preloaded()`. This is the fallback path when `visiblePage` is undefined or the windowed preload is insufficient.
+## PictelioImageService — the Lynx image backend
 
-**Native cache prefill (v3.21+):** A `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than doing a synchronous network fetch on the UI thread. The `shouldInterceptRequest` → `interceptImage()` path delegates to [`PixivImageLoader`](/openwiki/integrations/android-native.md#pixivimageloader) (shared singleton), which handles URL rewriting, disk cache read/write, and OkHttp download — reusing the connection pool from `PixivApiPlugin.getSharedClient()`. Per-URL locking prevents concurrent cache writes from multi-threaded WebView interception.
+[`PictelioImageService`](../../packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java) implements `ILynxImageService` and is the sole image backend for the vue-lynx client, registered via `LynxRuntimeInitializer` before any `LynxView` is created. It exists because Lynx does not download images itself and the default Fresco service cannot inject the `Referer` header `i.pximg.net` requires (403 without it).
 
-**Race condition elimination (v3.21.1):** The initial implementation used a simple `cacheReady: boolean` signal. The current version uses `cacheReadyFor: Signal<string>` — keyed by the image URL string, not a boolean. A dedicated `createEffect` resets both `cacheReadyFor` to `""` and `retryTrigger` to `0` on `props.src` change (cross-illust navigation, v3.21.2 also resets the retry counter). The `loadImage().then()` success handler checks `if (props.src === src)` before marking the URL as ready, while the `.catch()` handler does not mark it — a stale-closure guard that prevents an in-flight async completion from incorrectly signaling a _different_ illust's image as ready, and ensures failures don't bypass the retry mechanism. The `canDisplayImage` memo returns true only when `cacheReadyFor() === props.src && shouldLoad()` (with an additional `props.src` truthiness guard). See the [detail image loading glossary](/docs/adr/glossary-detail-image-loading.md) for all related terminology.
-
-**OkHttp concurrency** (`PixivApiPlugin`): `maxRequestsPerHost = 10`, `maxRequests = 20`, and `callTimeout` = `TIMEOUT_CONNECT + TIMEOUT_READ` (v3.21.3+). A custom `Dispatcher` with a cached thread pool prevents thread starvation under concurrent prefetches. With `PRELOAD_WINDOW = 6`, up to 7 pages (visible page + 6 ahead) may download in parallel per illust. The per-host limit of 10 ensures no single CDN host is overwhelmed. See [ADR-0039](/docs/adr/ADR-0039-detail-image-cache-ready.md) for the full design rationale.
-
-**Prefetch retry on failure (v3.21.2+):** If `loadImage()` → `PixivApiPlugin.prefetchImage()` fails or exceeds a 12-second timeout, `LazyDetailImage`'s `createEffect` catches the failure and retries via a `retryTrigger` signal, up to `MAX_RETRIES = 3` attempts with `RETRY_DELAY_MS = 2000` between them. The 12s timeout (v3.21.3+) uses `Promise.race` against `loadImage()` and guards against OkHttp queue congestion when many concurrent image requests are queued — timing out allows the retry to land on a different connection slot. Cleanup via `onCleanup` cancels any pending retry or timeout timer on component unmount or `props.src` change.
-
-**Fallback on retry exhaustion (v3.21.4):** When all `MAX_RETRIES` attempts fail, the `.catch()` handler now falls through to `setCacheReadyFor(src)` instead of leaving the image in an unready state. This marks the image ready for `PixivImage` rendering, and `shouldInterceptRequest` delegates to [`PixivImageLoader.loadBytes()`](/openwiki/integrations/android-native.md#pixivimageloader) (synchronous download + disk cache write) or `PixivImageLoader.download()` (when disk cache is off). The degraded performance (UI-thread fetch) is preferable to a permanently blank image area.
+- **Behavior registration** — the constructor calls `LynxEnv.inst().addBehaviors(...)` to register `<image>` (`UIImage`/`FlattenUIImage`/`AutoSizeImage`) and `<inline-image>` (`InlineImageShadowNode`); implementing the interface alone leaves a permanent skeleton on device.
+- **`fetchImage`** — checks `ImageMemoryCache` first; on miss, calls `PixivImageLoader.loadBytes(rewriteUrl(url))`, `decodeSampled` (powers-of-two `inSampleSize`, 2048 px cap), stores the bitmap, and delivers `ImageContent(bitmap)` via `onSuccess`. Failures (including `OutOfMemoryError`) are caught on the worker thread and reported through `onFailure`.
+- **`file://` frames** — a whitelisted branch reads bytes directly from `cache/ugoira/` (canonical-path prefix check) for ugoira playback, bypassing OkHttp.
+- **`canParseUrl`** — accepts `http(s)`, `/pixiv-img/` proxy paths, and only `file://` URLs inside the ugoira cache.
+- **Static-only** — `startAnimation`/`resumeAnimation`/`pauseAnimation`/`stopAnimation` return `false`; animation is driven by the JS `UgoiraViewer.vue` frame loop, not the native animation hooks.
 
 ```mermaid
 sequenceDiagram
-    participant LDI as LazyDetailImage
-    participant IL as imageLoader.ts
-    participant PP as PixivApiPlugin (native)
-    participant DC as L3 Disk Cache
-    participant WV as WebView shouldInterceptRequest
+    participant Img as LynxImage
+    participant Svc as ImageService
+    participant Mem as MemoryCache
+    participant Core as PixivImageLoader
+    participant Host as ImageHostConfig
+    participant CDN as pximgCDN
 
-    Note over LDI: Component mounts or src/visiblePage changes
-    LDI->>LDI: preloaded = visiblePage + PRELOAD_WINDOW (window=6)
-    LDI->>LDI: shouldLoad = preloaded || ioVisible
-    alt shouldLoad() && !cacheReady && src changes
-        LDI->>IL: createEffect -> loadImage(src)
-        IL->>PP: prefetchImage(url)
-        PP->>DC: OkHttp download -> disk cache write
-        Note over IL: inflight dedup: same URL reuses existing promise
-        LDI->>LDI: Promise resolves -> cacheReadyFor = src
-        LDI->>LDI: On failure: retry up to MAX_RETRIES x 2s
-        LDI->>LDI: Exhausted -> setCacheReadyFor(src) fallback
+    Img->>Svc: fetchImage(url)
+    Svc->>Mem: get(url)
+    alt memory hit
+        Mem-->>Svc: Bitmap
+        Svc-->>Img: onSuccess(ImageContent)
+    else memory miss
+        Svc->>Core: loadBytes(rewriteUrl(url))
+        Core->>Core: cachedFile(url)?
+        alt disk hit
+            Core-->>Svc: bytes
+        else disk miss
+            Core->>Host: resolve(officialUrl)
+            Host-->>Core: downloadUrl
+            Core->>CDN: GET with Referer and UA
+            CDN-->>Core: bytes
+            Core->>Core: atomic write and LRU evict
+        end
+        Svc->>Svc: decodeSampled 2048 cap
+        Svc->>Mem: put(url, bitmap)
+        Svc-->>Img: onSuccess(ImageContent)
     end
-    Note over WV: PixivImage renders with ready URL
-    WV->>DC: interceptImage() -> PixivImageLoader -> cache HIT
-    DC-->>WV: WebResourceResponse (instant)
-    Note over WV: Misses delegate to PixivImageLoader.loadBytes() (shared OkHttpClient pool + write cache)
 ```
 
-## WebView Proxy Interception
+The TS-side counterpart is [`proxyImageUrl`](../../packages/app-lynx/src/utils/imageUrl.ts): it rewrites `https://i.pximg.net/...` to `/pixiv-img/...` and refuses any host outside `*.pximg.net` / `*.pixiv.net` (SSRF guard, returning an empty string). The native service accepts the `/pixiv-img/` path and maps it back to the CDN with `rewriteUrl`.
 
-On Android, `MainActivity.java` intercepts image requests via `shouldInterceptRequest()`, delegating to a shared [`PixivImageLoader`](/openwiki/integrations/android-native.md#pixivimageloader) singleton:
+## Ugoira (animated illust) pipeline
 
-- **URL rewriting:** `PixivImageLoader.rewriteUrl()` converts `/pixiv-img/…` paths to Pixiv CDN URLs
-- **Disk cache check:** `PixivImageLoader.cachedFile()` looks up the L3 disk cache (Base64 URL-safe filename) — hit returns a `WebResourceResponse` with `FileInputStream`
-- **Cache miss with disk enabled:** `PixivImageLoader.loadBytes()` downloads via shared OkHttp pool, writes to disk cache, returns `byte[]` wrapped as `WebResourceResponse`
-- **Cache miss with disk disabled:** `PixivImageLoader.download()` downloads without writing to disk
-- **Per-URL locking** (`ConcurrentHashMap`) prevents concurrent cache writes from multi-threaded WebView interception
-- SSRF protection via URL whitelist (ADR-0002)
-- Errors are logged via `android.util.Log` instead of `printStackTrace()`
+Ugoira is Pixiv's animated format: a ZIP of frames plus per-frame `delay` timing in `meta.frames`. Pictelio splits the work between shared pure-TS frame extraction and native Java download/decode, keeping frame bytes off the JS heap (ADR-0037).
 
-## WebView Performance Round (v4.32.0, #355–#360)
+### Shared `@pictelio/ugoira` pure functions
 
-A four-round, emulator-benchmarked effort (`bench-scroll.mjs` / `bench-webview-nav.mjs`, `dumpsys gfxinfo framestats`) that reshaped several image-path behaviors (emulator numbers are not directly extrapolable to real devices). The changes that live in the image pipeline:
+[`packages/ugoira`](../../packages/ugoira/src/index.ts) is a zero-network, zero-framework pure-TS library consumed by `packages/app-lynx`:
 
-- **T1 progressive loading (round 2, #357):** a new [`createProgressiveImage`](/packages/app/src/primitives/createProgressiveImage.ts) primitive drives the thumbnail→original hand-off. Its state machine: L1 hit → mount full directly; miss + valid thumb → show thumb and preload full via `loadImage` (inflight-deduped with feed prefetch); miss + in-flight prefetch → skip thumb and wait for full; no thumb or `thumb===full` → single-segment load (current behavior). Thumb failure drops the thumb layer; full failure keeps the thumb as fallback; double failure sets `failed`. The home `IllustSingleCard` renders a double-layer `<img>` (thumb `medium` under full `large‖medium`); `NovelRowCard` downgrades its cover to `square_medium`.
-- **Prefetch-hit skip-thumb (round 4, #359):** [`isImagePrefetching(url)`](/packages/app/src/utils/imageLoader.ts) exposes the in-flight prefetch set so `createProgressiveImage` can skip the thumb entirely when the full image is already being prefetched — a three-state oracle with `checkImageCache` (L1 hit / in-flight / neither) that removes the second request + decode of the progressive path.
-- **T3 disk warmup 50→300:** `warmCacheFromDisk` registers the 300 most-recent disk keys into L1 at startup (key-registration only, zero decode cost).
-- **B5 home-feed prefetch + atomic writes:** `FeedList` prefetches the next `FEED_PREFETCH_COUNT=12` card images via [`pickUnprefetchedUrls`](/packages/app/src/utils/imageLoader.ts), with the prefetch key byte-identical to the card display URL. On the write side, both `writeFile` and `prefetchImage` converged on `tmp+rename` atomic replacement — eliminating truncated-file bad-image hits — and `.tmp` residue no longer breaks `getCachedKeys`.
-- **X1 interception chain (round 2, #357):** the duplicated `interceptImage` bodies were extracted into a shared [`ImageIntercept`](/packages/app/android/app/src/webview/java/io/pictelio/app/ImageIntercept.java) (both full/webview flavors compile the webview source set; lynx does not). It adds `PerfLog` DEBUG-gated telemetry, a 32MB [`ImageBytesMemoryCache`](/packages/app/android/app/src/webview/java/io/pictelio/app/ImageBytesMemoryCache.java) memory fast-path (≤512KB/entry, so originals are excluded), and the **F1 fix** — disk hits now return `Cache-Control: public, max-age=31536000, immutable` (matching `bytesResponse`) instead of the `no-store` that `OtaPlugin.ensureNoStore` had injected into null headers, which had forced a re-entry to the interceptor for every render of the same URL.
+- `parseZipEocd` / `parseZipCentralDir` / `computeFrameOffset` / `sliceStoreFrame` / `unzipFrames` implement full-file and Range-mode frame slicing for both `store` and `deflate` entries.
+- [`createStreamFrameSource(fileOrder)`](../../packages/ugoira/src/stream.ts) (ADR-0127) is the streaming frame extractor: callers `push(chunk, final?)` and receive `onFrame(name, bytes)` **in `fileOrder`** as soon as each entry's data completes (fflate `ondata(final)` semantics), buffering out-of-order entries and dropping non-frame/duplicate entries. Corruption or a missing frame at end-of-stream throws a `ugoira:`-prefixed error for the caller to fall back to the full path.
+
+### Web-mode playback
+
+In web mode (dev/web-core preview), [`downloadUgoiraFrames`](../../packages/app-lynx/src/api/ugoira.ts) downloads the zip and produces base64 `data:` URLs — `fflate` full-unzip by default, or a `range` path that reads the EOCD + central directory + per-frame offsets. The `range` path degrades to `fflate` with a `console.warn` when Range is unavailable (ADR-0126); `ugoiraMode` only affects this web-mode path.
+
+### Native extract-to-disk (ADR-0125)
+
+Native LynxView cannot use the relative `/pixiv-img/` path for fetches (`LynxFetchModule` rejects scheme-less URLs), and `data:` URLs are not renderable through the custom image service. `PictelioApi.ugoiraExtract(zipUrl, framesJson, illustId, cb)` therefore downloads the zip in Java (`https`-only, `Referer`/UA injected), decompresses it with `ZipInputStream`, writes `cache/ugoira/<illustId>/frame_N.{png|jpg}`, and returns a `file://` URL list. A cache hit (integrity-checked) returns the URL list with zero download.
+
+### Native streaming (ADR-0128)
+
+Native first playback is progressive via [`UgoiraStreamEngine`](../../packages/android-host/android/app/src/lynx/java/io/pictelio/app/UgoiraStreamEngine.java) plus `ugoiraExtractStream`/`ugoiraExtractStreamPoll`/`ugoiraExtractStreamCancel` in [`PictelioApiModule`](../../packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java). Because Lynx `Callback` is one-shot, delivery is a **pull-mode** state machine: `start` launches the stream, `poll` returns the frames delivered since the last poll (`{delivered, urls[], done, error}`), and `cancel` closes the input stream while preserving already-written frames. The zip is read with a local-header-driven `ZipInputStream` (no central directory), frames are written to disk in batches, and a frame-order assertion guards against mixed/missing frames. The first batch arrives at roughly 4.5–8.6% of the download.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Evaluate: src changes
-    Evaluate --> DirectFull: L1 cache hit
-    Evaluate --> ThumbShown: miss and thumb valid
-    Evaluate --> WaitFull: miss and full prefetching
-    Evaluate --> SingleLoad: no thumb or thumb equals full
-    ThumbShown --> FullReady: full preload resolves
-    WaitFull --> FullReady: full preload resolves
-    FullReady --> FullPainted: main img onLoad
-    DirectFull --> FullPainted: main img onLoad
-    SingleLoad --> FullPainted: main img onLoad
-    ThumbShown --> ThumbFailed: thumb onError
-    ThumbFailed --> FullReady: full continues
-    ThumbShown --> ThumbFallback: full preload rejects
-    ThumbFallback --> [*]
-    FullPainted --> [*]
+sequenceDiagram
+    participant V as UgoiraViewer
+    participant A as PictelioApi
+    participant E as StreamEngine
+    participant C as StreamCore
+    participant D as FrameDisk
+
+    V->>A: ugoiraExtractStream(zipUrl, framesJson, illustId, 5)
+    A->>E: start(source, framesJson, dir, batch)
+    alt cache hit (frames complete)
+        E-->>A: poll delivers all URLs, done
+    else miss
+        E->>C: runStream on executor
+        loop each frame batch
+            C->>D: write frame_N
+            C-->>E: batch URLs plus bytesRead
+        end
+    end
+    V->>A: ugoiraExtractStreamPoll()
+    A-->>V: delivered, urls, done
+    V->>V: append frames, playFrom(0) at first batch
+    Note over V: tail-wait until done, then loop
 ```
 
-The `createProgressiveImage` state machine — thumbnail placeholder, in-flight-prefetch skip, and failure fallbacks (a double thumb+full failure sets `failed`, handled by the caller).
+`streamDownloadZip` also routes the zip through `ImageHostConfig.resolve`, but its mirror fallback covers only connection establishment / HTTP status / body acquisition — never a mid-stream failure (switching sources mid-zip would corrupt the entry stream).
 
-## Web Worker Measurement
+### Playback component
 
-`packages/app/src/primitives/createImageSizeWorker.ts` uses a Web Worker (`imageSize.worker.ts`) to:
-
-- Fetch image metadata (width, height) without loading the full image
-- Cache dimension results
-- Used by the virtual scroller to calculate item sizes before rendering
-
-## Ugoira (Animated Illust) Pipeline
-
-Ugoira is Pixiv's animated illust format (ZIP of frames with timing data). Pictelio handles ugoira with a dedicated loading and playback pipeline.
-
-### Inline Playback with Progress Indicator
-
-Introduced in v3.17.4-3.17.5, the ugoira experience was rewritten to support **inline playback** directly on the illust detail page (replacing the previous full-screen viewer):
-
-1. **Cover image remains in place** during loading — the illust detail page keeps the cover image rendered beneath the loading indicator
-2. **Progress indicator** — an SVG ring progress bar with numeric percentage (0-100%) displays during ZIP download and frame extraction
-3. **Seamless transition** — once all frames are decoded, the cover is replaced by `UgoiraViewer` with zero visual gap
-
-### Streaming Playback (v4.23.0, ADR-0127 / ADR-0128)
-
-Since v4.23.0, both clients play ugoira **progressively** instead of "download the whole ZIP, then play":
-
-- **App (WebView) — `streamUgoiraFrames` (ADR-0127):** `packages/app/src/api/illust.ts` feeds the ZIP body reader into the shared [`@pictelio/ugoira`](/packages/ugoira/) `createStreamFrameSource`, which emits each frame as soon as its data is complete (fflate `ondata(final)` semantics), buffering out-of-order entries. The viewer creates a blob URL per frame and starts playback at the first frame — **first frame ≈2% download** (was 100%, ~8s for a 12.9MB/406-frame illust).
-- **Lynx native — Java streaming (ADR-0128):** `UgoiraStreamEngine` + `ugoiraExtractStream`/`ugoiraExtractStreamPoll`/`ugoiraExtractStreamCancel` in [`PictelioApiModule.java`](/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java) stream the zip in Java (`ZipInputStream`, local-header-driven, no central directory), write frames to disk in batches, and deliver frame-URL batches through a pull-mode state machine (Lynx `Callback` is one-shot). First batch arrives at ~4.5–8.6% download.
-
-Both paths keep frame bytes off the JS heap (ADR-0037); lynx native delivers only `file://` URL lists. The shared stream semantics (`createStreamFrameSource`) are pure-TS and covered by increment/out-of-order/corrupt tests; the Java batch core is pure-JVM and unit-tested.
-
-### Native Extract-to-Disk (lynx, ADR-0125)
-
-In native LynxView, the WebView `shouldInterceptRequest` proxy never runs, so relative `/pixiv-img/...` URLs are rejected by `LynxFetchModule` (no scheme). `PictelioApi.ugoiraExtract(zipUrl, framesJson, cb)` downloads the zip via OkHttp (with `Referer`/UA), decompresses with `ZipInputStream`, writes `cache/ugoira/<illustId>/frame_N.{png|jpg}`, and returns a `file://` URL list. [`PictelioImageService`](/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java) gained a `file://` branch (`canParseUrl` + `loadAndDeliver` read-from-disk). On repeat playback, an integrity check (frame count matches `framesJson` and non-empty) skips the download entirely (ADR-0126).
-
-### Playback Fixes (ADR-0126)
-
-- **Lynx flicker:** `UgoiraViewer.vue` added `defer-src-invalidation` on `<image>` — the default clears the displayed frame before the next load, causing blank flashes at 20–80ms frame intervals. The attribute keeps the old frame until the new one loads.
-- **App `range` mode:** the interceptor destroys 206 semantics (`Content-Length` invisible to fetch; `bytes=…` responses truncated or `ERR_FAILED`), so the official streaming scheme cannot work through `shouldInterceptRequest`. `extractRange` now degrades to the fflate full path with a `console.warn` (no silent fallback).
-
-### `downloadAndExtractUgoira()` (legacy full path)
-
-Shared function in `/packages/app/src/api/illust.ts` that consolidates the ZIP download + per-frame extraction logic (now the **full-download path**, still used by `range` mode and preloaded compatibility):
-- Stream-downloads the ugoira ZIP from Pixiv
-- Decompresses each frame in sequence
-- Supports a progress callback for the UI progress indicator
-- Returns `{ blobUrls: string[], frames: UgoiraFrame[] }`
-
-### UgoiraViewer Component
-
-`/packages/app/src/components/UgoiraViewer.tsx` — the playback component with:
-
-| Prop | Type | Purpose |
-|------|------|---------|
-| `illustId` | `number` | Pixiv illust ID for loading |
-| `coverUrl` | `string` | Fallback cover image URL |
-| `inline` | `boolean` | If true, renders inline with `aspectRatio` (not full-screen) |
-| `aspectRatio` | `string` | Container aspect ratio for inline mode |
-| `preloadedFrames` | `UgoiraFrame[]` | Optional pre-loaded frames (skips internal fetch) |
-
-The `preloadedFrames` prop allows the parent (`IllustDetail`) to preload frames and pass them directly, enabling the progress indicator display on the parent's cover image before `UgoiraViewer` mounts. The streaming path appends ready frames incrementally and the player waits at the tail for new frames (ADR-0127).
-
-### List Card Aspect Ratio
-
-For ugoira illusts in feed lists (virtual scroll):
-- **ImageCard** uses a fixed 1:1 square `aspect-ratio` for ugoira cards
-- **VirtualFeed** `estimateSize` and **LazyImageCard** skeleton dimensions are synchronized to match the 1:1 aspect ratio
-- This prevents layout shift and keeps grid consistency between static and animated cards
+[`UgoiraViewer.vue`](../../packages/app-lynx/src/components/UgoiraViewer.vue) schedules frames with `setTimeout(delay)` and plays from the first batch. In native mode it uses `ugoiraExtractStreamFrames` and falls back to the full `ugoiraExtractFrames` on stream error; in web mode it uses `downloadUgoiraFrames`. The `<image>` element sets `:defer-src-invalidation="true"` (ADR-0126) so a new frame load does not clear the previous frame before the next one is ready — eliminating the 20–80 ms frame-swap flicker — and the player waits at the list tail (50 ms polling) while streaming is still in progress.
 
 ## Key Files
 
 | Purpose | Path |
 |---------|------|
-| Image loader (L1 cache, GC, prefetch) | `/packages/app/src/utils/imageLoader.ts` |
-| Image host selection and management | `/packages/app/src/stores/imageHostStore.ts` |
-| Image host service | `/packages/app/src/services/imageHostService.ts` |
-| Image host native download-source decision (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java` |
-| PixivImage display component | `/packages/app/src/components/PixivImage.tsx` |
-| LazyDetailImage lazy-loading wrapper | `/packages/app/src/components/LazyDetailImage.tsx` |
-| Image cache native plugin | `/packages/app/src/native/ImageCache.ts` |
-| Web Worker for size measurement | `/packages/app/src/primitives/createImageSizeWorker.ts` |
-| Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`, `streamUgoiraFrames()`) |
-| Ugoira streaming frame source (shared) | `/packages/ugoira/src/stream.ts` (`createStreamFrameSource`) |
-| Ugoira playback component (app) | `/packages/app/src/components/UgoiraViewer.tsx` |
-| Ugoira playback component (lynx) | `/packages/app-lynx/src/components/UgoiraViewer.vue` |
-| Ugoira native extract + streaming | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java`, `UgoiraStreamEngine.java` |
-| Ugoira `file://` frame service | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
-| Full pipeline documentation | `/docs/image-loading-pipeline.md` |
-| ADR: Three-layer cache design | `/docs/adr/ADR-0090-image-cache-three-layer.md` |
-| ADR: L1 key set migration | `/docs/adr/0014-l1-image-cache-key-set.md` |
-| ADR: Periodic GC | `/docs/adr/ADR-0030-image-cache-periodic-gc.md` |
-| ADR: SSRF whitelist | `/docs/adr/0002-ssrf-url-whitelist-strategy.md` |
-| ADR: Detail image cache-ready rendering | `/docs/adr/ADR-0039-detail-image-cache-ready.md` |
-| Glossary: Detail image loading | `/docs/adr/glossary-detail-image-loading.md` |
+| Shared image core (rewrite/cache/download/locking) | `packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java` |
+| Image-host download-source decision | `packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java` |
+| Native bitmap memory cache + generic LRU | `packages/android-host/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java`, `LruCache.java` |
+| Lynx image service (ILynxImageService) | `packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
+| Ugoira extract/stream native module | `packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` |
+| Ugoira streaming engine | `packages/android-host/android/app/src/lynx/java/io/pictelio/app/UgoiraStreamEngine.java` |
+| Shared pure-TS ugoira library | `packages/ugoira/src/index.ts`, `packages/ugoira/src/stream.ts` |
+| Image URL proxying + quality | `packages/app-lynx/src/utils/imageUrl.ts`, `packages/app-lynx/src/utils/imageQuality.ts` |
+| Ugoira data pipeline + playback | `packages/app-lynx/src/api/ugoira.ts`, `packages/app-lynx/src/components/UgoiraViewer.vue` |
+| Native tests | `PixivImageLoaderTest`, `PixivImageLoaderProgressTest`, `ImageHostConfigTest`, `ImageMemoryCacheTest`, `LruCacheTest`, `PictelioImageServiceTest`, `PictelioApiModuleTest` (under `packages/android-host/android/app/src/test/`) |
+| Shared ugoira tests | `packages/ugoira/tests/index.test.ts`, `packages/ugoira/tests/stream.test.ts` |
 
 ## Related
 
-- [Architecture Overview](/openwiki/architecture/overview.md)
-- [Android Native & Build](/openwiki/integrations/android-native.md)
-- ADR-0003, ADR-0014, ADR-0030, ADR-0039, ADR-0125, ADR-0126, ADR-0127, ADR-0128
+- [Architecture Overview](overview.md)
+- [API Layer](api-layer.md)
+- [Android Native & Build](../integrations/android-native.md)
+- [Feed & Browsing](../domain/feed-and-browsing.md)
+- [Quickstart](../quickstart.md)
+- ADR-0054 ([unified image core](../../docs/adr/ADR-0054-image-pipeline-unified-core.md)), ADR-0090 ([three-layer cache](../../docs/adr/ADR-0090-image-cache-three-layer.md)), ADR-0125/0126/0127/0128 ([ugoira pipeline](../../docs/adr/ADR-0125-lynx-ugoira-unpacked-pipeline.md)), ADR-0143 ([image-host Java sink](../../docs/adr/ADR-0143-imagehost-download-source-java-sink.md)), ADR-0203 ([WebView removal](../../docs/adr/ADR-0203-webview-client-source-removal.md))

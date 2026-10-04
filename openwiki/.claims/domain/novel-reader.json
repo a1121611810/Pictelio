@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:5e31101791914e5828fae81c72b71f4e7968d6efe9450474aea542e32284cf7c",
+  "claims": [
+    {
+      "id": "claim_440001d18f634ed78882ef797b653a19",
+      "statement": "app-lynx is the repository's only runtime novel client; the former SolidJS/Capacitor webview client and its novel-reader code were deleted in ADR-0203, with the Android host moved to packages/android-host.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        }
+      ]
+    },
+    {
+      "id": "claim_6806a561785847a4ab36c80c0a32ce3d",
+      "statement": "The /novels page renders a single-column native list (list-type=single) feed through createMixFeed with recommend/follow sub-tabs, in-flow restricted novel cards, data-layer AI-only/tag-mute removal, and navigation through the openNovel(id) seam.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelList.vue",
+          "version": "repo-file-v1:sha256:b63e9ad6123348dd3f27efd0ded5465916b0230df7a899e779e5684e2b4560f2"
+        }
+      ]
+    },
+    {
+      "id": "claim_dedc8f202c8e4aa1a82ce26ab2f460a3",
+      "statement": "Novel entry points route through the openNovel(id) seam, which applies the device-level novel_intro_first setting to emit either /novel/:id/intro or /novel/:id with no route-level redirect (ADR-0167/ADR-0183).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0167-lynx-novel-intro-three-segment.md",
+          "version": "repo-file-v1:sha256:997528fd417123aaff782cac663058c4e54db669ddeff1e73db51497f4fbec64"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0183-lynx-novel-intro-toggle.md",
+          "version": "repo-file-v1:sha256:3acfd0845e8f1a3512079e0faeff8292c7190db2637b2a2ec480a209d4ef126b"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelList.vue",
+          "version": "repo-file-v1:sha256:b63e9ad6123348dd3f27efd0ded5465916b0230df7a899e779e5684e2b4560f2"
+        }
+      ]
+    },
+    {
+      "id": "claim_e760b4a5ffc24d2ab05eac24d4682c9f",
+      "statement": "NovelIntro.vue is a cover-scrim decision surface whose restricted/AI masking reuses the body predicates (R18 before AI) with handler-guarded greying, and whose main CTA switches between start-reading and continue-reading labels while always navigating to /novel/:id.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md",
+          "version": "repo-file-v1:sha256:743eb3059295c4f6dc8fd4e2b64e97a179993a9f015c266e0d9d3e12f016035a"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelIntro.vue",
+          "version": "repo-file-v1:sha256:656352b922147fb9afb3f7a7a303b70bb0d444025ee8f33c814ea5b74a26b08c"
+        }
+      ]
+    },
+    {
+      "id": "claim_32629e05d8d94e8fb2f24ece1a3f4af3",
+      "statement": "The intro page builds a narrower export snapshot using caption text and an empty image map because it does not prefetch the novel body.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelIntro.vue",
+          "version": "repo-file-v1:sha256:656352b922147fb9afb3f7a7a303b70bb0d444025ee8f33c814ea5b74a26b08c"
+        }
+      ]
+    },
+    {
+      "id": "claim_6f2bf06157ad4ae38eb9fb7735805a54",
+      "statement": "Novel bookmark and watch-later actions are available from both the intro page and the body page after the object-bound dimension refactor, using BookmarkButton with target-kind=novel.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelIntro.vue",
+          "version": "repo-file-v1:sha256:656352b922147fb9afb3f7a7a303b70bb0d444025ee8f33c814ea5b74a26b08c"
+        }
+      ]
+    },
+    {
+      "id": "claim_6513ce8d065e42bf96bc88bdb5a9c78a",
+      "statement": "NovelDetail.vue loads detail first and fetches body text/images only for non-restricted, non-AI novels, with a loadGeneration gate discarding stale responses and restricted novels bypassing the body list entirely.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        }
+      ]
+    },
+    {
+      "id": "claim_4c7448dee10d493d98219bb9e587c9af",
+      "statement": "The novel body is virtualized with a native list (list-type=single) of per-paragraph list-items using stable p-idx keys and estimated heights, plus meta/end/fab-allowance items; ADR-0134 measured deep-scroll jank and memory improvements from this change.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0134-app-lynx-novel-list-virtualization.md",
+          "version": "repo-file-v1:sha256:e1ca0572a55ab9202b445af6991d1855e02d35b999201e1c291a4ce4a4c618df"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        }
+      ]
+    },
+    {
+      "id": "claim_58a9598f4f764279b7b4c1f383285e52",
+      "statement": "Reading progress uses the main-thread scroll signal via main-thread-bindscroll for the watchlist prompt's ≥70% signal and scrolltolower as the authoritative bottom signal, with a visible warn fallback when the MT signal does not dispatch.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0134-app-lynx-novel-list-virtualization.md",
+          "version": "repo-file-v1:sha256:e1ca0572a55ab9202b445af6991d1855e02d35b999201e1c291a4ce4a4c618df"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        }
+      ]
+    },
+    {
+      "id": "claim_a032f199c56b446599f0947e40ff4e99",
+      "statement": "NovelDetail.vue records a session-last continue-reading position on entry and evaluates completion via decideNovelCompletion at bottom, after chapter-coordinate backfill, and after a re-pulled viewport size (ADR-0219).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md",
+          "version": "repo-file-v1:sha256:743eb3059295c4f6dc8fd4e2b64e97a179993a9f015c266e0d9d3e12f016035a"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        }
+      ]
+    },
+    {
+      "id": "claim_0cc00f8580174e6fb6981b7d1b4d4c1d",
+      "statement": "Lynx text selection requires static selection attribute literals, a native clipboard module (there is no navigator/clipboard), and UTF-16 code-unit index snapping; createTextSelection.ts owns event parsing, measurement, placement, dismissal, and copy/search with no optimistic copy success.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0165-lynx-text-selection-and-toolbar.md",
+          "version": "repo-file-v1:sha256:2b9e23891fd7d5524418326aa020b6048b764ab5383b5353965b704b45fb72a6"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/createTextSelection.ts",
+          "version": "repo-file-v1:sha256:5ac1b99cc8f66cdc4739144d9e2d5a3ea52889a3debd9773f5608ea90b508c89"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ec68caa38354745b5d86e7e59324f5e",
+      "statement": "The lynx translation stack is a from-scratch BYOK feature (no shared package and no webview reuse) built on a provider-agnostic TranslationProvider whose single OpenAIResponsesProvider maps the OpenAI Responses API events to five TranslationChunk types.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0169-translation-provider-interface.md",
+          "version": "repo-file-v1:sha256:2972b295c4d358eb252d834b07f89a45755e552607d9526d71e8d90220a3f223"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/translate.ts",
+          "version": "repo-file-v1:sha256:e12f25d6c79ccf181df792f6a52f8ba323e272210422b54de7bb8d4248da32ed"
+        }
+      ]
+    },
+    {
+      "id": "claim_61ba9c3d6eec45acb3737b57239ba42f",
+      "statement": "The LLM API key is stored in Android Keystore via the Java PictelioTranslateModule and never enters the JS heap; JS only receives the LlmEndpointPublic mirror, and stream delivery uses the pictelioTranslateFrame global event bus with streamId/seq dedup rather than per-chunk callbacks.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0170-lynx-translate-nativemodule-bridge.md",
+          "version": "repo-file-v1:sha256:6c8dae651365302c0a15b06cdf07ba24a0b5b5813d451927124214d4f7257065"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+        }
+      ]
+    },
+    {
+      "id": "claim_fbf4fb39b3b54525bee32438a996f292",
+      "statement": "createNovelTranslator implements paragraph-boundary chunking at ≤2000 chars, a fixed worker pool (concurrency 3, or 1 on the native bridge), blank-line and [N]-anchor alignment with fallback/overflow reporting, and silent AbortSignal exit.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0169-translation-provider-interface.md",
+          "version": "repo-file-v1:sha256:2972b295c4d358eb252d834b07f89a45755e552607d9526d71e8d90220a3f223"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/createNovelTranslator.ts",
+          "version": "repo-file-v1:sha256:2f30678a260178cbe5b6f7c651b036a716c30b1227ff0166a5e84dbef09b2178"
+        }
+      ]
+    },
+    {
+      "id": "claim_c3baf996047b4c95af059317afa95bd9",
+      "statement": "novelTranslateStore owns the 8-state translation machine, a generation gate and AbortController, a per-chapter in-flight map that reuses the running translation, and a displayParagraphs render source that shows original, translated, or 〔未翻译〕 placeholder text.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+        }
+      ]
+    },
+    {
+      "id": "claim_bda54511133848399823fcf8e9f4c1e6",
+      "statement": "Translation cache entries are keyed by novelId|chapterId|targetLang|modelId|sourceHash|baseURLHash with FNV-1a hashes, an LRU cap of 200, only completed chapters written, and a dual adapter: IndexedDB in web-core dev and a native filesystem channel (cacheDir/translations plus manifest.json) in PrimJS.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0171-translation-cache-strategy.md",
+          "version": "repo-file-v1:sha256:6bf1a9ede0aa35f387a5a18d8c55c0494baa7146f4e43a389e156844f70c0c05"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0175-app-lynx-native-translation-cache-channel.md",
+          "version": "repo-file-v1:sha256:b4a1d5342c932e7ef99da2c8e21afaecfa66a87417f5c3dd47b6bdac821848de"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/filesystemTranslationCache.ts",
+          "version": "repo-file-v1:sha256:17fb17b6991430c9b98fd691671256d69a61a372b30e7bf7bcf9f46d04a35056"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/translationCache.ts",
+          "version": "repo-file-v1:sha256:80342a0a65598198d581a6f1e4e87d5b07dc87eb099ac58f33acf598f881d7d5"
+        }
+      ]
+    },
+    {
+      "id": "claim_e379a89fb89940ecbe30c3bd21640f30",
+      "statement": "Translation authorization is independent of content display: isTranslationRestricted aborts R18/R18G requests before any content leaves the device, while endpoint compatibility (dummy key) and credential verification (real key) are separate persisted states.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0173-llm-endpoint-probe-and-verification.md",
+          "version": "repo-file-v1:sha256:d65ffce07c5bd4c32c9f54ec8aea01d985ab515207f8e213c8e87a0d01108d5f"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+        }
+      ]
+    },
+    {
+      "id": "claim_dde75358b17d4528b256befacc34db18",
+      "statement": "A retryable chunked-pipeline failure triggers one whole-batch fallback (stream=false) with 0ms backoff and isRetryingHint, and partial results render translated paragraphs plus a 〔未翻译〕 placeholder without reporting 100% progress.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0178-app-lynx-translation-retry-and-partial-ui.md",
+          "version": "repo-file-v1:sha256:a1c9ae859912e7293953f4549b995a506a58be63db43bffa62907d7a617348cb"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e9412ea102f4a06b653334e469173c7",
+      "statement": "@pictelio/novel-export is the zero-DOM single source of truth for the 9-format whitelist, block parsing, HTML extraction, and NovelExportPayload/task-draft construction consumed by app-lynx.",
+      "evidence": [
+        {
+          "resource": "repo://packages/novel-export/src/blocks.ts",
+          "version": "repo-file-v1:sha256:83107d7be957de238f490b528edff4a3adb65560f6cc9f8d906e0f7b659d6921"
+        },
+        {
+          "resource": "repo://packages/novel-export/src/exportPayload.ts",
+          "version": "repo-file-v1:sha256:ef7f4dc78deedf433d31712452f75a8fc7f9f1de96c9297315e2dab2edbe983b"
+        },
+        {
+          "resource": "repo://packages/novel-export/src/formats.ts",
+          "version": "repo-file-v1:sha256:fee4d7daa9cba500d0d9866418249f746ac03ca5ead0124278b5d4229c298f25"
+        },
+        {
+          "resource": "repo://packages/novel-export/src/index.ts",
+          "version": "repo-file-v1:sha256:f51e172d1e169827088901bc0c98bbe41f597fa8cc28fab8a2f7ec6c40d613b0"
+        }
+      ]
+    },
+    {
+      "id": "claim_e03b0764d0754f2283e1d4cba42707c4",
+      "statement": "NovelExporter.java is the Java facade that serializes txt/html/md/rtf/json/fb2 inline and delegates epub/docx/pdf to NovelEpubEncoder/NovelDocxEncoder/NovelPdfEncoder, fetching images via PixivImageLoader with bytes never entering JS and outputting through GallerySaver to Downloads/Pictelio.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/NovelExporter.java",
+          "version": "repo-file-v1:sha256:18719a941b8c5c96fe2aab17234ed47a195594930ade7e84dab5c4bfef364e94"
+        },
+        {
+          "resource": "repo://packages/novel-export/src/formats.ts",
+          "version": "repo-file-v1:sha256:fee4d7daa9cba500d0d9866418249f746ac03ca5ead0124278b5d4229c298f25"
+        }
+      ]
+    },
+    {
+      "id": "claim_96835c924d5b4c07b9f19671404fa155",
+      "statement": "Novel export is a kind=novel download-queue task whose opaque payloadJson snapshots targetFormat and content switches at enqueue time, reusing the queue's persistence, resume, progress, and share capabilities.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0154-novel-export.md",
+          "version": "repo-file-v1:sha256:979958fe4ecae1eae7203920b3388cb6f34ef39b4ee11b6582c32c9b0cf5259d"
+        },
+        {
+          "resource": "repo://packages/novel-export/src/exportPayload.ts",
+          "version": "repo-file-v1:sha256:ef7f4dc78deedf433d31712452f75a8fc7f9f1de96c9297315e2dab2edbe983b"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}

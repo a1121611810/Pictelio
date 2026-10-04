@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7e5e3820075e90e31c4e430af32ffcd5b4deb2014a25ad5211b7d915fc46ffb7",
+  "claims": [
+    {
+      "id": "claim_28697105e1194dc0a5ea30128f90c883",
+      "statement": "CI gating is three jobs in .github/workflows/ci.yml: `check` runs `pnpm check:all` (vue-tsc/tsc type checks) plus `pnpm lint:all`; `test` runs `pnpm test:all` (Vitest unit tests only — Android emulator E2E never enters CI); `android-unit-test` runs the JVM/Robolectric gate `./gradlew testDebugUnitTest` after `sync:credentials`.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml",
+          "version": "repo-file-v1:sha256:37ec086171a6a2702f95497a33a4d67cf376aaaa254505cb35b9369deaea5279"
+        },
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        }
+      ]
+    },
+    {
+      "id": "claim_25f20ef05c434bc49b282fec8c87ae70",
+      "statement": "Task caching is enabled only for `pnpm check:all` (via `--cache`); `pnpm test:all` is deliberately uncached because a cache hit on the test gate would mean the tests never actually executed, reproducing the fake-green condition ADR-0084 eliminated.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        }
+      ]
+    },
+    {
+      "id": "claim_e0b9326e81494ef49af482a713f8c01a",
+      "statement": "The active testing tiers are app-lynx Vitest unit/template/contract tests, android-host Vitest contract gates, android-host JVM/Robolectric `testDebugUnitTest`, manual Appium/WebdriverIO emulator E2E, and local Stryker mutation over @pictelio/ugoira and @pictelio/update-check; the agent-browser, Playwright, and Vitest browser-component suites were removed with the WebView client (ADR-0203).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        },
+        {
+          "resource": "repo://docs/testing/conventions.md",
+          "version": "repo-file-v1:sha256:4de88de27a63d15a1687efce0013b1b88e380030f66ca1e6d0def5e1cb4fc87c"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md",
+          "version": "repo-file-v1:sha256:dd1a532621c60433ba6bf8c83d8c3945803e6d62393dd1f20fcb7fc59c42e915"
+        }
+      ]
+    },
+    {
+      "id": "claim_4a06093c4a8741dda2805458f025190a",
+      "statement": "packages/android-host/vitest.config.ts includes `tests/unit/**/*.test.ts` and `tests/android-e2e/unit/**/*.test.ts` as two separate globs (issue #818) and excludes `tests/android-e2e/specs/**`, with `passWithNoTests: false`, so the android-e2e contract-tool unit tests reach `pnpm test` → `test:all` → CI without pulling emulator specs in.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/vitest.config.ts",
+          "version": "repo-file-v1:sha256:0b7a5c721ad4d3da6180c05199a513e01d7b273e296fe2584728bed71a5c5c90"
+        }
+      ]
+    },
+    {
+      "id": "claim_947cfc851eb74cf4bd424ece9dd3540d",
+      "statement": "webviewRemovalInvariants.test.ts is the authoritative WebView-client-removal gate: 10 invariant groups (no packages/app, zero Capacitor dependency declarations, host assets present, persisted-format literals intact, no cross-read of the deleted dir, root commands point at the single client, facade wording converged, client-switch gone, Gradle generation present, pnpm call sites resolve) enforced by 19 counterfactual positive controls plus 2 scan-coverage assertions.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/webviewRemovalInvariants.test.ts",
+          "version": "repo-file-v1:sha256:6917b24a14c7f2536f84997d3bf28aa700564e8734168c9c003bdb78f0839928"
+        }
+      ]
+    },
+    {
+      "id": "claim_51fb12463e384d00bf6aac0c6af55604",
+      "statement": "agentsMd.contract.test.ts gates AGENTS.md: a ≤30,720-byte volume hard gate, Fluent-spec verbatim assertions pointing at the archive file with an entry pointer in AGENTS.md, hard-constraint anchor survival, single-engine facade wording (LynxActivity present; MainActivity/registerPlugin/'双引擎' absent), OPENWIKI marker-pair survival, stale-phrase zeroing, and root command-table reachability against root package.json scripts.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/agentsMd.contract.test.ts",
+          "version": "repo-file-v1:sha256:739ee4aea01b3efc00aeed39c0ed76950a752375d54e4c67c015a004fbcdb4b6"
+        }
+      ]
+    },
+    {
+      "id": "claim_ccb17a1ba70e488b9f3e5a8c473c1f3e",
+      "statement": "e2eContractSuiteCollected.test.ts guards that the 8 tests/android-e2e/unit contract tests are both on disk and matched by the host vitest.config.ts include globs, because passWithNoTests:false detects 'nothing collected' but not 'one directory dropped' (issue #818).",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts",
+          "version": "repo-file-v1:sha256:473ccd33cc66537a574115b0a9f4abdbb47be9a0d0e158815e87f5f3093c1080"
+        }
+      ]
+    },
+    {
+      "id": "claim_188a655d6ec7404f977aeecbf601d462",
+      "statement": "app-lynx has two Vitest configs: the main config injects compile-time constants with `__HOME_BLEED_HEADER__: 'true'` and excludes `**/*.fallback.test.ts`, while vitest.fallback.config.ts sets `__HOME_BLEED_HEADER__: 'false'` and collects only `src/**/*.fallback.test.ts`; `pnpm test` runs both configs so the default and fallback home-top-bar paths are each CI-covered.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/package.json",
+          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+        },
+        {
+          "resource": "repo://packages/app-lynx/vitest.config.ts",
+          "version": "repo-file-v1:sha256:d70d5d1a12537117121b9b2aafa97405a8e2d039b74835d0a9e2899b907abd75"
+        },
+        {
+          "resource": "repo://packages/app-lynx/vitest.fallback.config.ts",
+          "version": "repo-file-v1:sha256:8ddb924dab2cb51efb54eb4c98fea3d94a91d1df6c6ead5d0f69e5bb4e79ed5e"
+        }
+      ]
+    },
+    {
+      "id": "claim_58c1d5bc0fe04d8d9777642e6e0b8197",
+      "statement": "Android emulator E2E is a manual Appium/WebdriverIO suite (packages/android-host/tests/android-e2e/) whose setupAndroidE2e chains AVD start, Chromedriver provisioning, APK build/install, Appium server, and a WebdriverIO session; because Lynx 4.0.1 exposes no accessibility view/text nodes, interactions use adb taps/swipes and content is asserted via screenshot + pixel analysis.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md",
+          "version": "repo-file-v1:sha256:dd1a532621c60433ba6bf8c83d8c3945803e6d62393dd1f20fcb7fc59c42e915"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/vitest.config.ts",
+          "version": "repo-file-v1:sha256:53e350f5a3146b333feff84837b9c404f2f5e5f5f89b37b4a5b46daae97b02a2"
+        }
+      ]
+    },
+    {
+      "id": "claim_753f022476e643b88e1ff5f9868bbf73",
+      "statement": "transition-matrix.spec.ts is the @release-gate spec — a 3-row (R1–R3) list-surface × user-action × content-assertion matrix whose assertions must be region-scoped frame diffs (content comparison), not single-frame existence; it runs before release and on big-PR manual trigger, never in per-PR CI.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts",
+          "version": "repo-file-v1:sha256:4a221624a31054daa6d2f257e3435d12ebdcb8b40e7283e79b099e1e0df25695"
+        }
+      ]
+    },
+    {
+      "id": "claim_09d58ac245d741e8bfb26a2047016160",
+      "statement": "The release-gate outer gate is a three-state classifier (releaseGate.ts): rows with judged>0 judge normally; judged=0 with skipped>0 warn 'unverified'; judged=0 with skipped=0 fail red; partial coverage (judged<expected) warns, so content-shape-induced skips never become random release-gate reds while a rewritten `return` cannot silently pass.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/support/releaseGate.ts",
+          "version": "repo-file-v1:sha256:bbb7e7b9dd701802b39f55dc6cd27b535ea2d6bab4a74415657bce68933824ca"
+        }
+      ]
+    },
+    {
+      "id": "claim_c2d66e2a868d4173b1738959cab20321",
+      "statement": "StrykerJS mutation testing is a local, non-CI sensitivity gate over @pictelio/ugoira and @pictelio/update-check (`pnpm test:mutation`); its mutation score is a weak-assertion detector, never correctness evidence, complementing the oracle check.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0101-stryker-mutation-trial.md",
+          "version": "repo-file-v1:sha256:7af1d585e5e3695f53f55419bee1b3a4775c54fa1acbc6d6b5cc5b375c8db613"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        },
+        {
+          "resource": "repo://packages/ugoira/stryker.config.ts",
+          "version": "repo-file-v1:sha256:43764c7b42ea240788cc3b05edec3f873ca6af141560b39b60e7cafeb1c2b058"
+        },
+        {
+          "resource": "repo://packages/update-check/stryker.config.ts",
+          "version": "repo-file-v1:sha256:d97e94fc7898744a03c8594484a64dbace0da7ccd2b6e207b25fa876f96a5140"
+        }
+      ]
+    },
+    {
+      "id": "claim_36a1caa0f0d1405f9ff8442e5e6fa20d",
+      "statement": "AGENTS.md enforces six test hard constraints — IO dual-path coverage, real-sample contracts, no silent degradation, refactor invariance, E2E reachability, and oracle traceability — with docs/testing/conventions.md as the verbatim detailed version; the detailed doc numbers the oracle constraint #5 (= AGENTS #6) and adds a detail-only #6 (async-test determinism).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        },
+        {
+          "resource": "repo://docs/testing/conventions.md",
+          "version": "repo-file-v1:sha256:4de88de27a63d15a1687efce0013b1b88e380030f66ca1e6d0def5e1cb4fc87c"
+        }
+      ]
+    },
+    {
+      "id": "claim_9d65dda4ac044317a8c43cfeac54cd76",
+      "statement": "ADR-0097 adds an execution layer for oracle traceability: a repo-localized .agents/skills/code-review/SKILL.md blocking on Oracle check and Test strength, the T0.5 format gate scripts/verify-agent-skills.mjs, and T0 mechanical gates passWithNoTests:false plus oxlint expect-expect:error.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0097-agent-skill-repo-localization.md",
+          "version": "repo-file-v1:sha256:32ea09d5520d87241d0813b5e120ea74cddbd160c47a545791cf069eec545605"
+        },
+        {
+          "resource": "repo://packages/android-host/vitest.config.ts",
+          "version": "repo-file-v1:sha256:0b7a5c721ad4d3da6180c05199a513e01d7b273e296fe2584728bed71a5c5c90"
+        }
+      ]
+    },
+    {
+      "id": "claim_4c3c4e9686c247db80ca60af73018c57",
+      "statement": "ADR-0163 establishes three QA defense lines — the @release-gate transition matrix, the BookmarkButton.host-matrix.test.ts host-matrix contract test, and the PlatformCheck.vue platform-consistency self-check page — plus a code-review platform/host contract audit axis, demoting happy-dom from the Lynx-runtime oracle to a browser-semantics reference.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0163-qa-defense-lines.md",
+          "version": "repo-file-v1:sha256:bf934b4dc00f4618492da6e443a1f4ee7fc3205e0e97ea0cefefde653c232461"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts",
+          "version": "repo-file-v1:sha256:91592ae49e7ae549adc939d610136dfd2989331974ffef80983eff272ff45d55"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/PlatformCheck.vue",
+          "version": "repo-file-v1:sha256:ff53cf15ec49f568cff182cb97ce8c1a1d46b05f75abf88b03c60f39e66b008f"
+        }
+      ]
+    },
+    {
+      "id": "claim_482b3cb4c9b94a2aaafbcea1372a95b2",
+      "statement": "ADR-0084 removed the agent-browser E2E job from CI because it needed a real Pixiv network path plus PIXIV_REFRESH_TOKEN that GitHub runners cannot reproduce; PIXIV_REFRESH_TOKEN is loaded only from a local .env and never enters GitHub Secrets or CI logs, and Android emulator E2E is therefore a manual, non-CI tier.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml",
+          "version": "repo-file-v1:sha256:37ec086171a6a2702f95497a33a4d67cf376aaaa254505cb35b9369deaea5279"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0084-e2e-testing-localization.md",
+          "version": "repo-file-v1:sha256:1798b715b93cc23b4700bce6a01eb2768a0575cfb90ad2f9811901a74fd93245"
+        }
+      ]
+    },
+    {
+      "id": "claim_b8121d5cba09468abba1814299fd4dc6",
+      "statement": "After ADR-0203 the dual-engine differential suites were reshaped into single-engine behavior baselines under packages/app-lynx/tests/contract/ (shared restriction/URL-rewrite/OAuth/illust-badge truth tables), and truthTableFixtureIntegrity.test.ts now guards fixture coverage completeness and zero-framework-dependency instead of cross-engine byte equality.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/truthTableFixtureIntegrity.test.ts",
+          "version": "repo-file-v1:sha256:c486abdfed630d69a19cd07ed6823404cf13afa940ded9595d55bb00a1efdca8"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}

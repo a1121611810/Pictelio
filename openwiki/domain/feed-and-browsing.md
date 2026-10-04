@@ -1,340 +1,267 @@
 ---
 type: Concept
 title: Feed & Browsing
-description: The illust and novel browsing system — a C-shell home page (SideNavShell side nav + single-column fixed L5 layout) backed by six TanStack Query feed stores, unified FeedList with pull-to-refresh and adaptive tag chips, plus secondary virtualized feeds, search (with advanced filters), ranking, related-works injection, bookmarks (with tag panel), browsing history, R18 and AI-work filtering (SolidJS) / overlay masking (app-lynx).
-tags: [feed, browsing, virtual-scroll, pixiv, side-nav, a2-cardization]
+description: The app-lynx browsing system — the recommended single-card carousel and waterfall/list feeds unified behind createMixFeed pagination, plus global search (advanced filters via search-core), ranking (ranking-core), bookmarks/watchlist, related-works injection, tag neighbors, and content control (R18/R18G/AI overlays, tag mute, account-scoped settings).
+tags: [feed, browsing, app-lynx, virtual-scroll, pixiv, search, ranking, tag-mute]
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-04T18:40:18.128Z
+sources:
+  - id: openwiki-source-f9cfb243e2af63b22910dffd
+    resource: repo://CONTEXT-MAP.md
+  - id: openwiki-source-4f66c0fd51a4a4295a8d7730
+    resource: repo://docs/adr/ADR-0104-app-lynx-feed-pagination-convergence.md
+  - id: openwiki-source-dafbc3b21aafd7cac1ef1ceb
+    resource: repo://docs/adr/ADR-0155-ai-artwork-three-state-filter.md
+  - id: openwiki-source-10c4c5b76340cc64353a9586
+    resource: repo://docs/adr/ADR-0187-tag-mute.md
+  - id: openwiki-source-b8b29749071d0ca772b5aced
+    resource: repo://docs/adr/ADR-0197-app-lynx-tag-neighbors.md
+  - id: openwiki-source-638aca70ff0d5527fe48d664
+    resource: repo://docs/adr/ADR-0203-webview-client-source-removal.md
+  - id: openwiki-source-02014b553ee4777c79c004f3
+    resource: repo://packages/app-lynx/CONTEXT.md
+  - id: openwiki-source-d245f632fe29d448c0be5f0a
+    resource: repo://packages/app-lynx/src/api/search.ts
+  - id: openwiki-source-871647d1c0ab7f469450de57
+    resource: repo://packages/app-lynx/src/pages/IllustList.vue
+  - id: openwiki-source-dffcb5151a2af982990aaaf2
+    resource: repo://packages/app-lynx/src/pages/Ranking.vue
+  - id: openwiki-source-1bfa4045456e94d4f6f6836e
+    resource: repo://packages/app-lynx/src/pages/Recommended.vue
+  - id: openwiki-source-7c9d47ea75e7dbdaf38b3456
+    resource: repo://packages/app-lynx/src/pages/WatchLater.vue
+  - id: openwiki-source-1d4c6ca96fab543aad88545b
+    resource: repo://packages/app-lynx/src/primitives/createMixFeed.ts
+  - id: openwiki-source-ee468827e144234638ba1b58
+    resource: repo://packages/app-lynx/src/primitives/createRankingFeed.ts
+  - id: openwiki-source-d894f6c0100c877ce2acba8b
+    resource: repo://packages/app-lynx/src/primitives/useSearch.ts
+  - id: openwiki-source-63579df5d75a607c486a121c
+    resource: repo://packages/app-lynx/src/stores/relatedInjection.ts
+  - id: openwiki-source-3199afccad60bead0cc5aed1
+    resource: repo://packages/app-lynx/src/stores/searchHistoryStore.ts
+  - id: openwiki-source-87e9d4e16190a80d492c8853
+    resource: repo://packages/app-lynx/src/stores/settingsStore.ts
+  - id: openwiki-source-16c20ec47e74af6a78409ed5
+    resource: repo://packages/ranking-core/src/buildRequest.ts
+  - id: openwiki-source-d7abd8218a7cb82e4769ee5b
+    resource: repo://packages/ranking-core/src/modes.ts
+  - id: openwiki-source-15a74c1ebf690b0d3e05e515
+    resource: repo://packages/search-core/src/buildParams.ts
+  - id: openwiki-source-f69aefbfb13195aff41fde45
+    resource: repo://packages/search-core/src/cacheKey.ts
+  - id: openwiki-source-87ca10132f02dd8ee926de92
+    resource: repo://packages/search-core/src/fallback.ts
+  - id: openwiki-source-4ca28633b64ea4586893310e
+    resource: repo://packages/search-core/src/filters.ts
+generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 ---
 
 # Feed & Browsing
 
-The feed and browsing system covers the primary user experience: discovering and viewing Pixiv illusts and novels.
+This page documents how the Pictelio **app-lynx** client discovers and browses Pixiv illusts and novels. app-lynx is the repository's **only runtime client**: the former SolidJS + Capacitor webview client (`packages/app`) was deleted in [ADR-0203](../../docs/adr/ADR-0203-webview-client-source-removal.md) (its Android host moved to `packages/android-host`, and its OAuth credentials/version facts moved to app-lynx). See [CONTEXT-MAP.md](../../../CONTEXT-MAP.md) and [`packages/app-lynx/CONTEXT.md`](../../../packages/app-lynx/CONTEXT.md) for the client-level domain language.
 
-## Feed Architecture
+Consequently the webview-era home C-shell ([ADR-0075](../../docs/adr/ADR-0075-home-c-shell-fixed-layout.md)) and self-built → TanStack Virtual migration ([ADR-0096](../../docs/adr/ADR-0096-virtual-scroll-migration.md)) are historical. Their surviving decisions are: **fixed layouts with no user-configurable layout mode**, and **engine virtualization instead of a self-built JS virtualizer** — lynx realizes these with a native `<list>` waterfall for illust lists, single-column lists for novels, and a hand-rolled swipe carousel for the discover page.
 
-The home feed is rendered by **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at `/home`, now structured as a **C shell + L5 fixed layout** (ADR-0075): a `SideNavShell` left icon rail drives navigation between the four content tabs (推荐/关注/收藏/历史), and a single-column content panel renders either illust or novel cards. The bottom `NavBar` is no longer rendered on the home page — navigation moved to `SideNavShell` — though `NavBar` remains in use on secondary pages (`UserIllusts`, `FollowListPage`).
+## Navigation & feed surfaces
 
-Six feed stores back the six panel variants (3 tabs × illust/novel), all built on the shared `createTQFeedStore` factory:
+Navigation is a global **radial FAB** (ADR-0120), not a bottom navigation bar. It opens a double-ring menu: the outer ring carries the four top-level tabs, the inner ring carries the active page's refresh/back-to-top actions. After the [ADR-0218](../../docs/adr/ADR-0218-app-lynx-top-nav-user-question-dimension.md) dimension rework the four tabs are **发现 / 更新 / 书架 / 我的** (`/discover`, `/updates`, `/shelf`, `/me`); illust/novel became in-page secondary tabs rather than top-level destinations.
 
-| Tab | Illust store | Novel store | Card component |
-|-----|-------------|-------------|----------------|
-| recommended | `recommendedStore.ts` | `novelRecommendedStore.ts` | `IllustSingleCard` / `NovelRowCard` |
-| follow | `followStore.ts` | `novelFollowStore.ts` | `IllustSingleCard` / `NovelRowCard` |
-| bookmarks | `bookmarkStore.ts` | `novelBookmarkStore.ts` | `IllustSingleCard` / `NovelRowCard` |
-| history | (built into `SideNavShell`) | — | `HistoryRowCard` |
+The browsing routes relevant to this page:
 
-> **Data activation:** `ensureLoaded` is the single data-loading entry point (queries default `enabled: false` per ADR-0042). `activate` only sets a subscription flag — calling `activate` alone previously left the bookmarks/follow tabs empty (regression fixed by always running `ensureLoaded` + `activate` together in `useFeedActivation`).
->
-> **FeedList unification (ADR-0078):** All six panels render through the shared `FeedList` container, which splits `refreshing` (pull-to-refresh) from `loadingMore` (pagination append). The skeleton overlay only triggers on `pullPhase === "refreshing"`, so pagination no longer flashes the skeleton.
->
-> **Illust stores — integrated:** `recommendedStore.ts` and `followStore.ts` power the home illust panels; the legacy monolithic `feedStore.ts` was deleted. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) live in `feedHelpers.ts`.
->
-> **Novel store split — integrated:** `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` power the home novel panels; the legacy monolithic `novelStore.ts` was deleted. Shared helpers (`adaptNovelResponse`, `dedupNovels`) live in `novelHelpers.ts`.
+| Route | Page | Content |
+|-------|------|---------|
+| `/discover` | `pages/Recommended.vue` | Mixed illust+novel single-card carousel, in-page `all/illust/novel` tabs |
+| `/illusts` | `pages/IllustList.vue` | Illust waterfall, `recommend/follow` sub-tabs |
+| `/novels` | `pages/NovelList.vue` | Novel single-column list, `recommend/follow` sub-tabs |
+| `/following` | `pages/Following.vue` | Followed users |
+| `/user/:id` | `pages/UserHome.vue` | User profile + works |
+| `/bookmarks` | `pages/Bookmarks.vue` | Own bookmarks, `illust/novel` tabs |
+| `/ranking` | `pages/Ranking.vue` | Ranking page (mode + date) |
+| `/illust/:id/tag-neighbors` | `pages/TagNeighbors.vue` | Explainable similar-works search |
+| `/mute-tags` | `pages/MuteTags.vue` | Tag-mute management |
+| `/watchlist` | `pages/Watchlist.vue` | Series watchlist |
+| `/later` | `pages/WatchLater.vue` | Watch-later local snapshots |
+| `/shelf` | `pages/Shelf.vue` | Aggregated bookmarks / watch-later / continue-reading |
 
-### HomePage (C Shell + L5)
+All list pages render through the shared `RefreshableList` container (the only legal refresh/back-to-top FAB carrier), `FeedListFooter` (three-state footer), and a page-level first-load skeleton driven by `deriveFirstLoadView` (ADR-0150): the skeleton shows while the first source has not yet *settled* (success — even 0 items — counts as settled; failure does not).
 
-`/packages/app/src/routes/HomePage.tsx` — the home page is now a thin shell delegating to `SideNavShell`:
+## Unified pagination: `createMixFeed`
 
-- **`SideNavShell`** (`/packages/app/src/components/home/SideNavShell.tsx`) provides a 56px sticky left icon rail (search entry + 推荐/关注/收藏/历史 tabs + settings/me avatar), a sticky page title + username subtitle, and the `ContentTypeToggle`. The history tab is built into the shell (`HistoryRowCard` list + clear button) rather than passed through `renderPanel`.
-- **Content panels** (`IllustFeedPanel` / `NovelFeedPanel`) map a tab to its feed store via `illustSource()` / `novelSource()`, then render a `FeedList` of `IllustSingleCard` (single-column large image) or `NovelRowCard` (56px row cards). `contentType()` from `uiStore` switches between illust and novel panels.
-- **Pagination** is driven by `nextUrl` + `fetchMore` through `FeedPaginationSentinel` (infinite-scroll sentinel), not a "Load more" button.
-- **Pull-to-refresh** (ADR-0076) is wired through `FeedList`'s `refreshMode="overlay"` → `store.refresh()` (refetch first page).
-- **Splash dismiss:** simple `onMount` → `markContentReady()`; skeleton guarantee via ADR-0042 (`enabled: false`) + ADR-0043 (`setTimeout(0)`).
-- **No per-tab scroll preservation** — cross-navigation scroll restore is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop (sessionStorage keyed by history depth). Tab switches within `/home` do not restore scroll position.
+The single deep module `packages/app-lynx/src/primitives/createMixFeed.ts` owns pagination for **all list feeds and the discover carousel** (IllustList / NovelList / Following / UserHome / Bookmarks, plus discover). [ADR-0104](../../docs/adr/ADR-0104-app-lynx-feed-pagination-convergence.md) migrated five hand-written `loadMore` implementations onto it and fixed the native "double-host URL" 404 (`rewriteUrl` now strips the domain from absolute Pixiv `next_url` before the native module prepends `apiBase`).
 
-### Feed Store Factory
+A `createMixFeed` instance hides the following coordination from pages:
 
-All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/createTQFeedStore.ts`), a shared factory that provides:
-- TanStack Query-based data fetching with pagination
-- Illust deduplication (`dedupIllusts` by illust ID)
-- R18/R18G content filtering
-- Sub-tab adapter functions converting between feed-store and factory naming conventions
-- A `paginationError` accessor distinguishing pagination (`fetchNextPage`) failures from first-load/refresh failures (ADR-0082, see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082))
+- **Sources**: an array of `MixFeedSource { name, fetchPage(signal, nextUrl) }`; `fetchPage` returns `{ items, nextUrl }` (`nextUrl === null` = exhausted). `nextUrl` is the offset pagination cursor.
+- **Merge modes**: default `ratio` (fixed-ratio alternation, `ratio=[4,1]` illust:novel); `time-merge` (global `create_date` descending interleave) used only by discover (ADR-0115).
+- **Batch rendering**: first load and each `fetchMore` expose at most `pageSize=20` items to the render stream, buffering the rest in a `pending` queue (ADR-0060, avoids image-load storms).
+- **Double debounce**: `throttleMs=800` + `cooldownMs=3000`, plus a one-shot retry timer that re-fires a `fetchMore` swallowed by the debounce — native `<list>` emits `scrolltolower` as a single low-frequency event, so a swallowed event would otherwise dead-lock the list. Retries notify the page via `onUpdate`.
+- **Race protection (generation gate)**: `refresh()` bumps a `generation`; in-flight first-load/pagination responses whose generation no longer matches are dropped. A T6 change (ADR-0141 revision) adds an `AbortController` pool so `generation++`/`dispose()` also call `abort()` and the cancellation reaches `apiClient`/OkHttp, not just the JS state write.
+- **Dedupe**: a `seen` key set drops duplicate keys across sources and pages.
+- **Page-turn priority**: `pickSourceToFetch` chooses among non-exhausted sources by the gap between the target ratio share and the current rendered share ("fetch whichever kind is under-represented"), breaking ties by source order.
+- **Error-slot separation**: `error()` is the first-load/refresh error (rendered as a full-page error state); `pageError()` is the pagination error (rendered inline at the list bottom, keeping loaded items and retaining `nextUrl` for scroll retry). `settled()` is the first-load settle flag for the skeleton↔empty-state switch.
+- **Timeout and empty-page guards**: each page request is wrapped in a 15s `withTimeout`; a malformed (non-array) `items` response is treated as failure rather than silently rendering blank.
 
-**Concrete store instances (illusts):**
-
-| Store | File | Sub-tabs | Tab adapter needed? |
-|-------|------|----------|---------------------|
-| Recommended (active) | `recommendedStore.ts` | mixed/illust/manga | Yes (mixed → factory "all") |
-| Follow (active) | `followStore.ts` | all/public/private | No (maps 1:1) |
-| Legacy monolithic | `feedStore.ts` | — | **Deleted** (commit `b30366f`) |
-
-**Concrete store instances (novels):**
-
-| Store | File | Sub-tabs | Tab adapter needed? |
-|-------|------|----------|---------------------|
-| Recommended (active) | `novelRecommendedStore.ts` | (single) | No |
-| Follow (active) | `novelFollowStore.ts` | all/public/private | No (maps 1:1) |
-| Bookmarks (active) | `novelBookmarkStore.ts` | (single with restrict) | No |
-| Legacy monolithic | `novelStore.ts` | — | **Deleted** (commit `b30366f`) |
-
-Shared helpers migrated from `feedStore.ts` to `feedHelpers.ts`:
-
-- **`dedupIllusts`** — Deduplicates illusts by `illust.id`. Used by the factory's `dedupFn` option in merge-all mode.
-- **`nextPageOrLoad`** — Routes paginated API calls: if `pageParam` is set, calls `apiClient.get(nextUrl)`; otherwise calls the initial loader function. Both paths normalize the response to `{ items, next_url }`.
-
-Shared helpers migrated from `novelStore.ts` to `novelHelpers.ts`:
-
-- **`adaptNovelResponse`** — Novel-specific pagination adapter that normalizes `{ novels, next_url }` API responses to `{ items, next_url }`. Works like `nextPageOrLoad` from `feedHelpers.ts` but handles the `novels` key used by novel API endpoints.
-- **`dedupNovels`** — Deduplicates novels by `novel.id`. Used by the factory's `dedupFn` option in merge mode (e.g. `novelFollowStore`'s all/private merge).
-
-```mermaid
-flowchart LR
-    HP[HomePage /home] --> SS[SideNavShell]
-    SS --> IP[IllustFeedPanel]
-    SS --> NP[NovelFeedPanel]
-    IP --> FL1[FeedList]
-    NP --> FL2[FeedList]
-    FL1 --> IC[IllustSingleCard]
-    FL2 --> NC[NovelRowCard]
-    IP --> RS[recommendedStore / followStore / bookmarkStore]
-    NP --> NS[novelRecommendedStore / novelFollowStore / novelBookmarkStore]
-    RS --> TQ[createTQFeedStore]
-    NS --> TQ
-    TQ --> QC[queryClient.ts]
-    QC --> API[api/client.ts]
-    API --> P[Pixiv API]
-```
-
-## Feed Query Persistence (T4, v4.32.0)
-
-The home feed's TanStack Query state is now persisted across cold starts by [`feedQueryPersist.ts`](/packages/app/src/api/feedQueryPersist.ts) (spec: [`docs/specs/webview-perf-round2.md`](/docs/specs/webview-perf-round2.md)). A hand-written TanStack `Persister` (using only `@tanstack/query-persist-client-core`, deliberately not `PersistQueryClientProvider`/`sync-storage-persister`) restores and subscribes the six home feed stores:
-
-- **Scope:** only `["feed",…]`, `["bookmarks",…]`, and `["novel", recommended|follow_public|follow_private|bookmarks, …]` keys in `success` state (`persistableFeedQuery`); userWorks/followList/search are excluded.
-- **Storage:** `localStorage` under `pictelio:feed-query-cache`, trailing-debounced 5s on subscribe plus an immediate flush on `visibilitychange`/`pagehide`; 7-day `maxAge` with buster `tq-feed-v1`; a quota ladder truncates pages past 4.5MB before `removeItem` as a last resort. All failure modes `console.warn` (no silent degradation).
-- **Wiring:** `restoreFeedCache()` runs in `main.tsx` after render (parallel with `initializeAuth()`); `authStore.logout()` calls `clearPersistedFeeds()` before `queryClient.clear()`. Restored data is always stale (`staleTime 30s`), so `ensureLoaded` re-validates in the background (SWR).
-
-The round-2 measured effect: cold-start first-screen card-ready P50 dropped 4261→2124ms (−50.2%) by moving the feed API RTT off the critical path; the floor is the auth RTT.
-
-### Nav Components & Adaptive Tags
-
-- **`SideNavShell`** — the home page's primary navigation (left icon rail). The selected tab highlights with a `BrandBackground2` rounded block. It reads/writes `currentTab` from `uiStore`, so entries from `PersonalCenter` ("我的收藏" → bookmarks) preset the initial tab.
-- **`ContentTypeToggle`** (`/packages/app/src/components/home/ContentTypeToggle.tsx`) — the 插画/小说 switch in the page header, hidden on the history tab.
-- **`NavBar`** (`/packages/app/src/components/NavBar.tsx`) — still used on secondary pages (`UserIllusts`, `FollowListPage`) but no longer on `/home`.
-- **`GlassTabBar`** (`/packages/app/src/components/ui/GlassTabBar.tsx`) is no longer wired into the home page after the C-shell refactor (glass-tab adoption was rolled back to global nav only, #84; it now survives only as a test-referenced component per ADR-0083). The standalone `RecommendedFeed`/`FollowFeed` components were **deleted** in the ADR-0083 dead-code cleanup.
-- **`AdaptiveTags`** (`/packages/app/src/components/home/AdaptiveTags.tsx`) + `adaptiveTagFit.ts` — renders an illust/novel's tag chips on a card and **imperatively truncates** them to one line: overflow chips collapse into a "+N" chip via a measured `max-width`. Built on `useContainerWidth` and the new [`viewportWidth`](/packages/app/src/primitives/viewportWidth.ts) primitive; the `adaptive-tags-240.test.ts` E2E regression guards narrow-viewport (240px) truncation.
-
-## Virtual Scrolling & Layout
-
-The home page renders **fixed single-column layouts** via `FeedList` (no masonry/grid mode switcher):
-
-| Content type | Card | Layout |
-|--------------|------|--------|
-| Illust | `IllustSingleCard` | Single-column large image, original aspect ratio (corrected per ADR-0073) |
-| Novel | `NovelRowCard` | Single-column 56px row cards |
-| History | `HistoryRowCard` | Single-column A2 row card list |
-
-**`FeedList`** (`/packages/app/src/components/home/FeedList.tsx`, ADR-0078) is the unified home-feed container: it accepts a generic `FeedSource` (`items`/`loading`/`refreshing`/`loadingMore`/`nextUrl`/`fetchMore`/`refresh`, plus optional `error`/`paginationError`), renders skeleton on refresh, an empty hint when done, a `FeedPaginationSentinel` for infinite scroll, and a pull-to-refresh overlay (`createPullToRefresh`). Since ADR-0082 it also renders a full-page `ErrorDisplay` on first-load failure (instead of misreporting an empty state) and a bottom `InlineRetryBar` on pagination failure — see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082).
-
-**`createPullToRefresh`** (`/packages/app/src/primitives/createPullToRefresh.ts`, ADR-0076) provides the home page's six-panel pull-to-refresh with an A1 overlay mask; `createFastScrollbar` serves the novel detail page (see [Novel Reader](/openwiki/domain/novel-reader.md)).
-
-**Secondary virtualized feeds** use `VirtualFeed` + `createFeedVirtualizer` with three layout modes (waterfall/single/grid): only `UserWorksFeed` (user illusts + user novels) remains, rendered via `VirtualFeed`/`NovelVirtualFeed`. The standalone `IllustBookmarks`/`NovelBookmarks`/`NovelRecommendedFeed`/`NovelFollowFeed` route panels were **deleted** in the ADR-0083 dead-code cleanup (they were already unwired — see [Bookmarks](#bookmarks)). The home feed itself no longer uses `createFeedVirtualizer`.
-
-> **Virtualizer internals (ADR-0096):** the `createFeedVirtualizer` primitive still bears its original name but its core was **replaced by `@tanstack/solid-virtual` v3** — the self-built `createVirtualScroll`/`computeMasonryLayout`/`createMasonryWorker`/`masonryWorker`/`createScrollRestoration`/`createTextListLayout` files were deleted. Lane assignment now uses TanStack lanes with `estimateSize` (lazy, per-item), and scroll restoration uses `takeSnapshot` + `initialMeasurementsCache` instead of RAF polling.
-
-**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`paginationError`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). The `paginationError` prop (ADR-0082) switches pagination failure from the above-list `ErrorDisplay` to a bottom `InlineRetryBar`. Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
-
-`ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button). The like indicator was deduplicated into a shared [`HeartIcon`](/packages/app/src/components/ui/HeartIcon.tsx) (ADR-0091) — previously `ImageCard` and `NovelCard` each inlined an identical 28-line `HeartSvg`; `GridCard`'s Unicode `♥/♡` is intentionally left as-is.
-
-**Webview performance (v4.32.0, #355–#360):** the `scroll`/`pointermove` handlers in `createFeedVirtualizer`/`createNovelVirtualLayout`/`createFastScrollbar` are now rAF-coalesced — multiple events within one frame trigger a single recompute (T2), eliminating the input-queue delay that dominated scroll jank. Home `FeedList` also prefetches the next `FEED_PREFETCH_COUNT=12` card images via `pickUnprefetchedUrls` (prefetch key byte-identical to the card display URL, B5), and the home cards render progressive thumb→original via `createProgressiveImage` (T1) — see [Image Loading Pipeline](/openwiki/architecture/image-pipeline.md#webview-performance-round-v4320-355360).
-
-## Pagination Failure Inline Retry (ADR-0082)
-
-Before ADR-0082, pagination ("load more") failures were conflated with first-load failures across every list surface: `SearchResults` hid all loaded results behind `ErrorDisplay`, `VirtualFeed`/`NovelVirtualFeed` showed `ErrorDisplay` above the list and bound retry to full-page `onRefresh`, and the home `FeedList` had no error UI (a first-load failure fell into the empty state, a pagination failure failed silently). [ADR-0082](/docs/adr/ADR-0082-feed-pagination-inline-retry.md) separates the two failure modes with a store-level `paginationError` signal and a bottom-of-list inline retry bar.
-
-- **`paginationError` signal:** `searchStore`, the `createTQFeedStore` factory, and `userIllustsStore` expose a `paginationError()` accessor that is `true` only when the most recent failure came from pagination (`fetchNextPage`/`loadMore`) and `false` for first-load/refresh failures. Pagination failure never clears already-loaded data; a successful pagination, refresh, or new search resets the flag.
-- **`InlineRetryBar`** (`/packages/app/src/components/ui/InlineRetryBar.tsx`): a bottom-of-list "加载更多失败" message + 重试 button. Retry re-requests only the failed page by calling `fetchMore`/`loadMore` (which reuses `next_url`) — never `onRefresh`, which would drop the already-loaded later pages.
-- **Full-page vs inline:** first-load/refresh failure (no results to preserve) still renders the full-page `ErrorDisplay` bound to `onRefresh`; pagination failure keeps the list and appends `InlineRetryBar`.
-- **Sentinel pause:** on pagination error the infinite-scroll sentinels stop firing to prevent a no-backoff retry loop — `SearchResults`'s `createSentinel` `enabled` gate, `createFeedVirtualizer`'s built-in sentinel, and `home/FeedPaginationSentinel`'s new `disabled` prop all incorporate the `paginationError` gate. A successful retry re-arms the sentinel.
+Pages are **thin ref-snapshot bridges**: they hold local `ref`s, call `feed.fetchMore()`/`feed.refresh()` from event handlers, and re-copy `items()/loading()/settled()/error()/pageError()/nextUrl()` in a `sync()`. Mode/tab switches (recommend↔follow, all↔illust↔novel, illust↔novel bookmarks) **dispose the old instance and rebuild** rather than mutating state — the old instance's in-flight requests and timers must be released so they cannot write stale data into shared refs.
 
 ```mermaid
 flowchart TD
-    S["Sentinel triggers loadMore"] --> R{"Request succeeds?"}
-    R -->|yes| A["Append page and reset paginationError"] --> S
-    R -->|no| P["Set paginationError true"]
-    P --> K["Keep loaded results"]
-    P --> B["Render InlineRetryBar at bottom"]
-    P --> D["Pause sentinel"]
-    B --> U["User taps retry"]
-    U --> M["fetchMore reuses next_url"] --> R
+    P["scrolltolower or page loadMore"] --> FB["feed.fetchMore"]
+    FB --> D{"throttle, cooldown, or in-flight?"}
+    D -->|yes| R1["scheduleRetry once"] --> FB
+    D -->|no| PEND{"pending queue non-empty?"}
+    PEND -->|yes| APPEND["append next pageSize batch"] --> UPD["onUpdate then page sync"]
+    PEND -->|no| HAS{"any source has nextUrl?"}
+    HAS -->|no| NOP["no-op, end of feed"]
+    HAS -->|yes| PICK["pickSourceToFetch gap-based"]
+    PICK --> FETCH["fetchPage(signal, nextUrl)"]
+    FETCH --> G{"generation still current?"}
+    G -->|no| STALE["drop stale response"]
+    G -->|yes| OK{"response valid?"}
+    OK -->|no| PE["set pageError, keep nextUrl"] --> UPD
+    OK -->|yes| M["dedupe and merge, advance cursor"] --> CLR["clear pageError"] --> UPD
 ```
 
-Pagination failure keeps loaded results, shows an inline retry bar, and pauses the sentinel until a successful retry.
+*`createMixFeed` pagination: debounce/re-entry gates, generation-gated fetch, and the split first-load vs pagination error slots.*
 
-The mechanism is wired into three surfaces, all threading the store's `paginationError` accessor into a `paginationError` prop/field:
+The `createRankingFeed` wrapper reuses `createMixFeed` with a **single source** and adds `setQuery()` (dispose + rebuild) so the ranking page can switch `(mode, date)` with the same generation-gate semantics — see [Ranking](#ranking).
 
-- **Home `FeedList`** (`home/FeedList.tsx`) — `FeedSource` gains `error`/`paginationError`; `FeedList` renders `ErrorDisplay` for first-load failure and `InlineRetryBar` for pagination failure, and passes `disabled` to `FeedPaginationSentinel`. The six home stores (`recommendedStore`, `followStore`, `bookmarkStore`, `novelRecommendedStore`, `novelFollowStore`, `novelBookmarkStore`) each re-export `paginationError = store.paginationError`, and `HomePage`'s `illustSource`/`novelSource` map them into the source.
-- **`VirtualFeed` / `NovelVirtualFeed`** — accept a `paginationError` prop (now threaded only through `UserWorksFeed`, the sole remaining secondary feed), swapping the above-list `ErrorDisplay` for a bottom `InlineRetryBar` when set.
-- **`SearchResults`** — derives `isFullError` (first-load) vs `isPaginationError` and swaps `ErrorDisplay` for `InlineRetryBar`; its `createSentinel` pauses while `paginationError` is set.
+## Discover: the recommended carousel
 
-Contract tests cover the new behavior: `tests/unit/components/SearchResults.test.tsx` asserts that pagination failure preserves loaded results and retries via `onLoadMore` (not `onRefresh`), and `tests/unit/stores/searchExecution.test.ts` covers the `paginationError` set/reset signals.
+`pages/Recommended.vue` (`/discover`) renders the mixed illust+novel feed as a **single-card swipe carousel** (ADR-0115), not a waterfall. `createMixFeed` is used with `merge: 'time-merge'` over two sources (illust `/v1/illust/recommended`, novel `/v1/novel/recommended`).
 
-## R18 Filtering & Age Confirmation
+- **Hand-rolled swipe** (`components/CarouselSwiper.vue`): background-thread `@touchstart/@touchmove/@touchend` + a Vue reactive `:style` `translateX`, with px-based slide width and a `requestAnimationFrame` snap on release. The official vue-lynx "main-thread script" swiper tutorial renders blank on this project's native LynxView, so it is not used (ADR-0115 T5 revision). Snap uses a **1/3 screen-width threshold plus fling detection** (ADR-0118), replacing the earlier round-to-50% rule.
+- **Infinite slide stream**: sliding near the end triggers `feed.fetchMore()`; there are no prev/next buttons. Refresh is a single M3 FAB action registered on the global radial FAB (not a pull-to-refresh gesture).
+- **Cover proportional display**: covers fill width and keep their original aspect ratio (illust `width/height`, novel square 1:1); very tall covers fall back to `aspectFill` clipping. Viewport height is derived from `SystemInfo` minus the top bar/secondary tab bar, with a `__HOME_BLEED_HEADER__` variant zeroing the top-bar deduction (ticket #906).
+- **Page-level scrim**: the title/author/tags/bookmark scrim is a single fixed overlay that reads the current slide index, **not** one scrim per slide — on native LynxView, `<text>` inside a translated flex-row is never rendered for non-first slides (a documented platform fact).
+- **Restricted/AI/tag-mute filtering is render-layer**: `visibleItems` filters the data-layer stream with `isRestricted`, `shouldHideByAi`, and `isTagMuted`. The data is still loaded, so flipping a settings switch re-runs the `computed` without re-fetching (unlike list pages, restricted items are **skipped** here rather than shown as restricted cards).
+- **Immersive skeleton**: when the render stream is empty and the source has not settled, the page shows a slide-shaped `CarouselSkeleton` (page-level first-load placeholder), never a bare loading label.
+- A `refreshEpoch` bump remounts `CarouselSwiper` after refresh so it resets to the first slide (its internal offset/index are persistent refs).
 
-`/packages/app/src/utils/r18Filter.ts` — Filters illusts and novels by `xRestrict` values:
-- `xRestrict = 0` — Safe
-- `xRestrict = 1` — R18 (adult content)
-- `xRestrict = 2` — R18G (extreme content)
+## List feeds & virtualization
 
-User settings control visibility of each tier. Per [ADR-0103](/docs/adr/ADR-0103-account-scoped-content-settings.md), these switches are now **account-scoped** (`show_r18_${uid}` / `show_r18g_${uid}` in shared `CapacitorStorage`) and the first-launch **age confirmation gate was removed**.
+Illust and novel lists use native `<list>` engine virtualization (`list-type="waterfall"` for illusts, `list-type="single"` for novels), **not** a JavaScript virtualizer — there is no `@tanstack/solid-virtual`/`createFeedVirtualizer` in the lynx client. Two platform constraints shape every list page:
 
-**app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, account-scoped `show_r18_${uid}` keys persisted in shared `CapacitorStorage` per ADR-0103) and `isRestricted(item)` — a pure reactive function that drives a glass overlay (`RestrictOverlay.vue`) instead of removing items from the list. All feed pages render the full list; restricted entries show an R-18 / R-18G badge with "该内容已在设置中隐藏" and no click-through. Toggling a switch in settings makes the overlay disappear instantly without re-fetching. `filterByRestrict` has been deleted. Also adds `SkeletonNovel.vue` for novel list/detail loading states. Switches live on the Me page. Spec: [app-lynx R18 overlay + skeleton](/docs/specs/app-lynx-r18-overlay-skeleton.md), originating from [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
+- **Epoch rebuild**: native `<list>` mis-handles structural in-place patches (mid-list insert = silently dropped, single remove = hole left behind, whole replace = index misalignment, per ADR-0107/ADR-0162). Pages therefore bump a `refreshEpoch` ref in the same tick data lands and bind it as `<list :key>` so the whole tree is replaced instead of patched. The same rebuild is how "back to top" is implemented (no JS scroll-to-offset API exists).
+- **Full-list restricted rendering**: restricted entries are rendered in-flow as restricted cards (`RestrictOverlay` for lists, `RestrictedNovelCard` for novels) rather than filtered out; `pointer-events: none` does not work on native LynxView for full-screen overlays (ADR-0123), so overlays must be `v-if`-gated interactive surfaces or zero-size anchors.
 
-## AI Works Three-State Filter (ADR-0155, v5.0.0)
+A typical list page (`IllustList.vue`) combines:
 
-Pixiv responses carry `ai_type` (0/undefined = not AI, 1 = AI-assisted, 2 = pure AI). An account-level switch `ai_filter_mode_${uid}` (shared `CapacitorStorage` key, ADR-0103 contract) now controls AI works with three modes:
+- `createMixFeed` single source over `loadRecommended` / `loadFollow('public')` with `loadNext` for pagination.
+- `visibleIllusts = useTagMuteVisible(useAiOnlyVisible(illusts))` — a **data-layer** filter for AI-`only` and tag-mute (these are "remove from render", unlike R18's mask).
+- `RelatedInlineSection` rendered inside an anchor card via `related.rowFor(...)` (see [Related works injection](#related-works-injection)).
+- `RankingEntryCard` injected atop the recommend sub-tab (see [Ranking](#ranking)).
+- `RefreshableList` (FAB refresh + rebuild-to-top), `FeedListFooter` (loading / end-of-feed / inline pagination error), and `deriveFirstLoadView` for the skeleton/error/empty/content switch.
+- `useHeroSource` for the thumbnail→detail continuity transition (ADR-0211).
 
-- `show` (default) — no AI handling.
-- `mask` — app filters AI works out of the store-derived list (mirroring its R18 approach); app-lynx renders the full list with a non-interactive AI mask card (mirroring its R18 overlay).
-- `only` — both clients fully filter out non-AI works (the only mode that removes items on lynx).
+`pages/Bookmarks.vue` additionally keeps a `removedIllustIds` hide-set so an un-bookmark action removes the card from the render stream without mutating the feed's internal state.
 
-The AI judgment is `ai_type >= 1` (correcting a `> 1` badge guard that made the "AI-assisted" branch dead code); it converges in pure functions (`app/utils/aiFilter.ts` `getAiType`, lynx `settingsStore.isAiWork`). Coverage spans feed/search/detail/history; search AI handling is client-side only (Pixiv's search API has no `ai_type` param), with a per-search override that does not write back the account setting. History entries gained an `aiType` field. See [ADR-0155](/docs/adr/ADR-0155-ai-artwork-three-state-filter.md) and [spec](/docs/specs/ai-artwork-three-state-filter.md).
+## Content control (R18 / AI / tag mute)
+
+Content filtering is **account-scoped** and split into three predicates that live on `stores/settingsStore.ts` (pure functions over reactive refs, so toggling recomputes without refetch):
+
+- **R18/R18G**: `show_r18_${uid}` / `show_r18g_${uid}` (default off). `isRestricted(item) = (!showR18 && x_restrict === 1) || (!showR18G && x_restrict === 2)`. The first-launch age-confirmation gate was removed in [ADR-0103](../../docs/adr/ADR-0103-account-scoped-content-settings.md). Lists render the full item and overlay a restricted card; detail pages use an absolute `RestrictOverlay`. Toggling the switch makes the mask disappear instantly.
+- **AI three-state** ([ADR-0155](../../docs/adr/ADR-0155-ai-artwork-three-state-filter.md)): `ai_filter_mode_${uid}` ∈ `show | mask | only` (default `show`). `isAiWork` = `(illust_ai_type ?? novel_ai_type ?? 0) >= 1`. `mask` renders AI-restricted cards (`AiRestrictedIllustCard` / `AiRestrictedNovelCard`); `only` is the **only** AI state that removes items at the data layer (non-AI works are dropped); `show` does nothing.
+- **Tag mute** ([ADR-0187](../../docs/adr/ADR-0187-tag-mute.md)): account-scoped `mute_tags_${uid}` storing a `string[]` of trimmed original `tag.name` values. `isTagMuted(item)` is an exact `tag.name.trim()` set membership test — **no** case folding, normalization, or `translated_name` matching. It is applied as **data-layer removal** (mute = invisible, unlike R18's mask) at each assembly point (feeds, bookmarks, search rows, related rows). It reads a **non-reactive snapshot** of the muted set so toggling does not hot-recompute an already-assembled list (which would trip the native list mid-remove bug); changes take effect on the next refresh/page append.
+
+Account-scoped settings are written to the shared `CapacitorStorage` via `PictelioPrefs` (native) or `idbKV` (web-core), per the [ADR-0103](../../docs/adr/ADR-0103-account-scoped-content-settings.md) cross-engine contract. Logout resets the in-memory values to defaults without writing (ADR-0103 Q5).
 
 ## Search
 
-`/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels with a back button in the search bar. Backed by:
-- `/packages/app/src/api/search.ts` — API search endpoints
-- `/packages/app/src/stores/searchStore.ts` — Search state (query, history, results)
+Search is a **global bottom-sheet command palette** (`components/SearchSheet.vue`, 80vh panel) opened from the FAB and from tag-chip taps ([ADR-0132](../../docs/adr/ADR-0132-app-lynx-global-search.md), [ADR-0133](../../docs/adr/ADR-0133-app-lynx-tag-tap-search.md)) — there is no `/search` route. The state machine is `primitives/useSearch.ts`.
 
-**Popular sort routing:** When `sort=popular_desc` is selected, the search API routes to Pixiv's `/v1/search/popular-preview/illust` or `/v1/search/popular-preview/novel` endpoints instead of the standard `/v1/search/illust` or `/v1/search/novel` endpoints. These popular-preview endpoints return a single un-paginated page of popular results in that category without the `sort` parameter — the `popular_desc` sort mode is implicit in the endpoint choice.
+- **Debounce & race handling**: 300ms input debounce; every search trigger aborts the previous in-flight request and rotates a new `AbortController` (last-write-wins). Settled requests whose signal is aborted/disposed are silently dropped (no state write). IME composition is filtered out (`isComposing`).
+- **Scopes & sorts**: `all | illust | novel` × `date_desc | date_asc | popular_desc`. `scope=all` issues illust and novel requests **in parallel** and merges them into one `create_date`-descending timeline (illust wins same-millisecond ties); single-scope keeps server order. A partial failure (one of two classes) keeps the successful class with a visible `console.warn`.
+- **Pagination**: dual cursors (`nextIllustUrl` / `nextNovelUrl`); `loadMore` runs both in parallel for `all`. A failed page leaves `status='ready'`, keeps loaded results, sets `error` + `paginationError=true`, and does **not** advance the cursor — the UI shows an inline retry bar instead of a full error.
+- **History**: `stores/searchHistoryStore.ts` persists a device-level (not account-scoped) 10-item `search_history` list in `idbKV`; writes happen only at commit points (enter / history-chip tap / result-row tap), never on intermediate input.
+- **SSRF guard**: `api/search.ts` asserts a pagination `next_url` resolves to `app-api.pixiv.net` (or the local proxy prefix) before fetching; `rewriteUrl` normalization stays in `client.ts`.
 
-**Re-entrancy guard:** `executeSearch()` skips a duplicate in-flight search carrying the same `keyword_scope_sort` key (the first request owns result writing). This prevents a race where the search-box submit navigates (changing the URL) and the URL-sync effect re-triggers `executeSearch()` — without the guard the second call would abort the first, leaving both to fail silently and clearing results. The guard is cleared in a `finally` block.
+### Advanced filters & `@pictelio/search-core`
 
-**Auto-load via sentinel:** `SearchResults` (`/packages/app/src/components/SearchResults.tsx`) uses an IntersectionObserver sentinel (`createSentinel`) placed at the bottom of the results list. When the sentinel scrolls into view and `hasMore` is true, `onLoadMore` fires automatically — replacing the earlier manual "Load more" button UX. An end-of-results separator ("没有更多了") appears when `hasMore` becomes false. Since ADR-0082 the sentinel's `enabled` gate also includes a `paginationError` pause, and pagination failure renders a bottom `InlineRetryBar` instead of replacing all results with `ErrorDisplay` — see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082).
+Both clients share [`@pictelio/search-core`](../../../packages/search-core/) as the **zero-IO single source of truth** for search filter state and request construction (replacing ADR-0132's per-engine mirroring). The filter state `SearchFilters` has five dimensions: **period** (`any`/preset `1d|1w|1m|6m|1y`/custom range), **bookmark count band** (7 bands 10–29 … 1000+), **aspect ratio** (illust only), **min resolution** (illust only), and **AI override** (`follow | all | hide`, a per-search override that does **not** write back the account-level `ai_filter_mode_${uid}`).
 
-**app-lynx global search (ADR-0132/0133):** The vue-lynx client implements search as a **bottom-sheet command palette** (`SearchSheet.vue`) opened from a FAB dual-form entry, not a `/search` route. It mirrors the webview API contract exactly (scope all/illust/novel, sort latest/oldest/popular with `popular_desc` → `popular-preview` endpoints) but adds 300ms-debounced type-to-search with `AbortController` rotation, device-level `searchHistoryStore` (10-item idbKV, not account-scoped), and `next_url` Pixiv-domain validation ported from the webview SSRF guard. Tapping a tag chip prefills the sheet with the raw `tag.name` and auto-searches (ADR-0133). See [Architecture Overview > Global Search](/openwiki/architecture/overview.md#global-search--multi-image-detail-adr-0129--adr-0133-v4270).
+- `buildParams.ts` constructs the endpoint and request params. `popular_desc` routes to `/v1/search/popular-preview/{illust,novel}` with **no `sort`, no pagination, and no bookmark band** (the server ignores it). `search_target` differs by class: a single-word illust query **omits** the parameter (omitting ≡ partial + title hits), while novels always send it (`partial_match_for_tags`, or `exact_match_for_tags` for multi-word queries). Period maps to `start_date`/`end_date`; bookmark maps to `bookmark_num_min/max`; ratio and min-pixels are illust-only.
+- `filters.ts` normalizes untrusted URL input field-by-field (invalid → default) and exports `DEFAULT_SEARCH_FILTERS`, `BOOKMARK_BANDS`, `countActiveFilters`, `isDefaultFilters`.
+- `urlCodec.ts` round-trips filter state through webview URL query keys (`fp/fd/fb/fr/fw/fa`); `cacheKey.ts` builds the result-LRU key `word_scope_sort + filter segment`.
+- `ai.ts` `resolveAiMode(setting, override)` maps the per-search override to an effective `show|mask|only`; `fallback.ts` `filterByBookmarkBand` is the **client-side** bookmark-band fallback applied on non-popular paths (free accounts have the server-side interval silently ignored). lynx applies this in `useSearch.buildResults`, which also drops the band on the popular path (`#478`).
 
-### Search Advanced Filters (v5.0.0)
+```mermaid
+flowchart LR
+    UI["SearchSheet filter panel"] --> FS["SearchFilters state"]
+    FS --> UF["useSearch.setFilters 450ms debounce"]
+    UF --> BUILD["search-core buildIllustOrNovelSearchRequest"]
+    BUILD --> REQ["endpoint plus request params"]
+    REQ --> GET["apiClient.get"]
+    GET --> API["Pixiv search API"]
+    FS --> KEY["search-core buildCacheKey"]
+    KEY --> CK["word_scope_sort plus filter segment"]
+```
 
-Both clients gained an advanced-filter panel backed by the shared [`@pictelio/search-core`](/packages/search-core/) package (single source of truth, replacing ADR-0132's per-engine mirroring). The filter state (`SearchFilters`) covers five dimensions:
+*Search filter state fans out to two search-core derivations: request params (consumed by lynx `useSearch`) and the shared LRU cache key.*
 
-- **Period** (`period`) — preset `1d`/`1w`/`1m`/`6m`/`1y` or a custom start/end date range; mapped to Pixiv `start_date`/`end_date`.
-- **Bookmark count band** (`bookmark`) — one of 7 bands (10–29 … 1000+), encoded as the `blt`/`bgt` bookmark-range params.
-- **Aspect ratio** (`ratio`) — landscape/portrait/square (illust path only).
-- **Min resolution** (`minPixels`) — pixel lower bound (illust path only).
-- **AI override** (`aiOverride`) — `follow`/`all`/`hide`, a per-search override that does **not** write back the account-level AI setting (ADR-0155 revision #479).
+lynx `useSearch` consumes `buildIllust/NovelSearchRequest` directly and deliberately does **not** memoize results (spec D2), so `buildCacheKey` currently survives in search-core as the shared cache-key contract used by its own tests and the (removed) webview client.
 
-The package is zero-IO: `buildParams.ts` constructs the endpoint + request params (single-word tags omit `search_target`, novels always send it; popular → `popular-preview` endpoints with no `sort`/pagination/`bookmark` params), `filters.ts` normalizes untrusted URL input field-by-field (invalid values revert to default), and `urlCodec.ts` round-trips filter state through the URL. See [ADR-0155 revision](/docs/adr/ADR-0155-ai-artwork-three-state-filter.md) and [spec](/docs/specs/search-advanced-filters.md).
+## Ranking
 
-## Ranking (ADR-0158, v5.0.0)
+Ranking is a shared [`@pictelio/ranking-core`](../../../packages/ranking-core/) zero-IO package plus a thin page/wrapper in app-lynx.
 
-A ranking/leaderboard page (`/ranking`) closes the feature-gap P0-1 gap (present in 7/7 competitor clients). It reuses the official `/v1/illust/ranking` API (mode + date) and the existing auth/pagination/image pipeline:
-
-- **7 rank modes** — daily/weekly/monthly/rookie/original/R18/R18G, defined once in [`@pictelio/ranking-core`](/packages/ranking-core/) `modes.ts` (`RANK_MODES`); `id` is the client-stable identifier, `apiMode` the server mode string (`day`/`week`/`month`/`week_rookie`/`week_original`/`day_r18`/`week_r18g`).
-- **No new nav category** — the entry is injected into the feed (webview: horizontal scroll bar atop the recommended feed; lynx: a "榜首编辑大卡" atop the illust tab), and the full browsing capability lives in the `/ranking` route. The entry only carries "today's daily ranking" — mode/date state stays in the ranking page.
-- **`createRankingStore`** — a `(mode, date)`-keyed TanStack InfiniteQuery that flattens pages **strictly preserving page order × within-page order** (deliberately **not** the `createTQFeedStore` merge path, which sorts by `create_date` and would destroy rank order). Rank = `offset + index + 1`.
-- **Ranking gaps** — restricted items are filtered out but **not renumbered**, leaving rank holes (e.g. rank 4/5 missing while 6 still shows 6). This is a documented known behavior, not a bug (ADRs #7).
-
-See [ADR-0158](/docs/adr/ADR-0158-ranking-information-architecture.md) and [spec](/docs/specs/ranking.md).
-
-## Related Works Injection (v5.0.0)
-
-`/packages/app/src/stores/relatedInjectionStore.ts` injects a "related works" row after an anchor illust when browsing the recommended/follow/bookmarks feed tabs. Clicking an illust card records a one-shot `{tab, illustId}` anchor; a session-local row (max 3 anchors, 20 items each) is injected after the anchor card, with `loadRelated` fetching similar works (5-min stale time). Rows are cleared on pull-to-refresh or tab switch, dedupe against the anchor and already-shown IDs, and are gated by the `relatedInjection` settings switch. The webview client interleaves a full-span row; the lynx client reworked this in ADR-0162 to an **inline expanding section** (`RelatedInlineSection.vue`) rendered inside the anchor card's list-item — the v1 interleaved `displayItems` row was silently dropped by the vue-lynx patch (mid-list insertion discard), so the store now exposes a `rowFor(tab, anchorId)` render query and the list renders only the pure illust stream. Spec: [`docs/specs/related-injection.md`](/docs/specs/related-injection.md); see [ADR-0162](/docs/adr/ADR-0162-lynx-related-inline-section.md).
+- **Mode catalog** (`modes.ts`): 7 `RANK_MODES` — daily/weekly/monthly/rookie/original/R18/R18G — each with a client-stable `id` and a server `apiMode` string (`day`, `week`, `month`, `week_rookie`, `week_original`, `day_r18`, `week_r18g`). R18 uses `day_r18` and R18G uses `week_r18g` (server catalog asymmetry, not a typo).
+- **Request & cache key**: `buildRankingRequest` emits `/v1/illust/ranking` with `mode` + constant `filter=for_ios`, omitting `date` when "today" (`date=null`). `rankingCacheKey` normalizes `null` and an explicit JST-today to the same `ranking_<mode>_today` segment. Date helpers are hand-written UTC arithmetic (JST boundary, **no `Intl`**, no local-timezone `new Date(iso)` drift).
+- **Feed** (`primitives/createRankingFeed.ts`): a single-source `createMixFeed`; `setQuery()` disposes and rebuilds for a new `(mode, date)`. **Rank = render-stream index + 1**, because the single source is never re-sorted (no `create_date` merge path) — page order × within-page order is rank order.
+- **Restricted vs muted** (`pages/Ranking.vue`): restricted (R18/R18G/AI) items are **kept and masked with rank preserved**; tag-muted items are assigned rank **first** (pre-filter index + 1) and then dropped, leaving rank holes that do not renumber later entries (ADR-0158 order-preservation spirit). The R18/R18G modes show a guidance notice instead of a normal empty/error state when empty or failed, with a link to Pixiv's web viewing settings.
+- **Entry** (`components/RankingEntryCard.vue`): a "榜首编辑大卡" (top-3 editor card) injected atop the illust recommend tab. It carries only "today's daily ranking" and navigates to `/ranking`; mode/date state stays on the ranking page. No new top-level nav category exists for ranking (ADR-0158).
+- The page has no calendar: lynx `input` supports only text/number/digit/password/tel/email, not `date`; date navigation is arrow-stepping bounded at "today".
 
 ## Bookmarks
 
-Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `IllustSingleCard`/`NovelRowCard` lists backed directly by `bookmarkStore` / `novelBookmarkStore` (via the `IllustFeedPanel`/`NovelFeedPanel` mapping). The legacy `BookmarksFeed` component and the `IllustBookmarks`/`NovelBookmarks` route components were **deleted** in the ADR-0083 dead-code cleanup (they were no longer embedded in the home page). The `PersonalCenter` "My Bookmarks" link navigates to `/home` with `setCurrentTab("bookmarks")`.
+`/bookmarks` renders own bookmarks with illust/novel sub-tabs, each a `createMixFeed` single source (`loadBookmarks(uid, 'public')` + `loadNext`). Un-bookmarking uses a local `removedIllustIds` hide-set rather than mutating feed state.
 
-Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts` (illusts) and `novelBookmarkStore.ts` (novels), which integrate with the Pixiv API and toggle bookmarks with optimistic UI updates.
+Bookmark toggling is `components/BookmarkButton.vue`: a **single tap is a fast bookmark** (zero decisions, optimistic with rollback), a **long-press opens `BookmarkPanel.vue`** (detail pages, both clients) for visibility + tags + inline tag creation ([ADR-0160](../../docs/adr/ADR-0160-illust-bookmark-tags.md)). Tags are space-joined into a single `tags[]` form field and re-sent with the full tag set via `bookmark/add` (no delete-then-add; no edit endpoint exists). Prefill combines `/v2/illust/bookmark/detail`, `/v1/user/bookmark-tags/illust`, and the work's own tags, capped at 10.
 
-### Bookmark + Tags Panel (ADR-0160, v5.0.0)
+## Related works injection
 
-Illust bookmarks gained **tagging**: a single tap on the heart stays fast-bookmark (zero decisions), while a **long-press** opens the bookmark panel (detail pages only, both clients) for visibility + tags + inline tag creation + save. Key contract points:
+`stores/relatedInjection.ts` injects Pixiv-official `/v2/illust/related` results after an anchor illust. Clicking a card records a one-shot `{tab, illustId}` pending anchor; on page re-activation (`onActivated`, KeepAlive) the page consumes it, fetches `loadRelated`, and renders an **inline expanding section inside the anchor card** (`components/RelatedInlineSection.vue`). This inline-in-card form (ADR-0162) replaces the v1 interleaved-row approach because native waterfall lists **silently drop mid-list insertions**. Constraints: max 3 anchors per tab, 20 items per row, 5-minute related cache (50-entry cap), dedupe against the anchor and already-shown IDs, and a filter chain of `isRestricted + isAiRestricted + isTagMuted`. The `relatedInjection` settings switch gates the whole feature.
 
-- **Wire format** — tags are space-joined into a single `tags[]` form field (the six-client consensus; no repeated-key arrays), and editing re-sends `bookmark/add` with the full tag set **without** delete-then-add (no edit endpoint exists).
-- **Data source triangle** — prefill (`/v2/illust/bookmark/detail`) + tag library (`/v1/user/bookmark-tags/illust`) + the work's own tags, capped at 10 tags.
-- **Behavior change** — the webview long-press "private quick-save" was upgraded to the full panel (visibility toggled inside); lynx `addBookmark` gained the `restrict` parameter it had been missing.
-- Scope is illusts only (novel tagging deferred). Backed by `bookmarkPanelStore.ts` / lynx `BookmarkButton` + panel. See [ADR-0160](/docs/adr/ADR-0160-illust-bookmark-tags.md), [glossary](/docs/adr/glossary-bookmark-tags.md), [spec](/docs/specs/bookmark-tags.md).
+## Tag neighbors (ADR-0197)
 
-## Author Click Navigation
+`/illust/:id/tag-neighbors` (`pages/TagNeighbors.vue`, `primitives/collectTagNeighbors.ts`, `stores/tagNeighbor.ts`) is the **explainable** in-Pixiv similar-works search — a complement to, not a replacement for, the black-box official `/v2/illust/related`. It uses the work's tag combination, progressively relaxing from the tail of the API's association-ordered `tags` array:
 
-Per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md), all card components now support clicking a third-party username to navigate to that user's personal center (`/user/${userId}`). The feature uses a uniform `onAuthorClick` prop chain:
+1. **Author-first**: pull the author's recent ≤300 illusts via `/v1/user/illusts` (items already carry tags — no per-illust detail requests), compute local **Jaccard ≥ 30%**, take top 20.
+2. **Global fallback**: only when phase 1 yields < 5 items, search Pixiv with the first `n`, then `n-1`, … tags until a layer returns ≥ 5; each layer is one request, results accumulate, and the strictest match is presented first.
 
-```
-Route Page (navigate) → VirtualFeed (prop pass-through)
-  → LazyImageCard/ImageCard/GridCard (prop pass-through)
-  → button onClick → e.stopPropagation() → onAuthorClick(user.id)
-```
+All queries use raw `tag.name` (never `translated_name`, which is frequently absent), never mix in author names (`/v1/search/illust`'s `word` only matches tags), and reuse `@pictelio/search-core`'s `buildIllustSearchRequest`. Results are de-duplicated across phases, exclude the current work, show a Jaccard + "common-tags/total-tags" + source attribution line, and pass the R18/R18G/AI/tag-mute gate with a **visible count** of hidden items rather than silent filtering (ADR-0197 correction 2). This replaced the off-site source-tracing direction (ADR-0196, superseded) because Pixiv's image host enforces Referer, making engine-side URL pulls non-viable.
 
-### Affected Components
+## Adjacent browsing surfaces
 
-| Component | Route / Usage | Change |
-|-----------|--------------|--------|
-| `ImageCard` | Feed (waterfall/single) | `onAuthorClick` prop, `@user.name` is now a clickable button |
-| `GridCard` | Feed (grid mode) | Same pattern as ImageCard |
-| `NovelCard` | Novel feed (list mode) | `onAuthorClick` prop added |
-| `NovelCoverCard` | Novel feed (cover wall) | `onAuthorClick` prop added |
-| `VirtualFeed` | All illust feeds | Passes `onAuthorClick` through to cards |
-| `NovelVirtualFeed` | Novel feeds | Passes `onAuthorClick` through to cards |
-| `SearchResults` | Search page | Author names are clickable |
-| `UserWorksFeed` | User profile / illusts | Author names are clickable |
-| `HistoryPage` / `HistoryEntry` | Browsing history | `authorId` field stored; old entries degrade gracefully to plain text |
+These local/aggregate surfaces sit next to the feed system (full store detail is out of scope here):
 
-### Key Implementation Details
+- **Shelf** (`/shelf`): an aggregated "书架" of three preview segments — Pixiv bookmarks, watch-later, and continue-reading + browsing history.
+- **Watch later** (`/later`, `stores/watchLaterStore.ts`): local snapshot items (illust + novel) under account-scoped `watch_later_${uid}`, 500-item cap, zero-network full render, no R18 overlay on snapshot cards (snapshots lack full work data).
+- **Series watchlist** (`/watchlist`, `stores/watchlistStore.ts` + `createWatchlistPrompt`): novel series follow state, with a back-key prompt and session-level dismissal memory.
+- **Continue reading & browsing history** (`/continue` and shelf segment 3): `continueReadingStore` (novel reading position) and `browsingHistoryStore` (illust-only behavior log, `browsing_history_${uid}`, 300-item cap, 30-day per-item expiry) are physically separate stores merged only for display.
 
-- **`e.stopPropagation()`** prevents the click from bubbling to the card container, which would trigger navigation to the illust/novel detail page
-- **Fluent-compliant touch targets:** all author buttons have `min-h-[40px]` for mobile usability
-- **`historyStore`** now stores an optional `authorId` field for history entries; entries without it render as plain text
-
-## Browsing History
-
-`/packages/app/src/stores/historyStore.ts` — Persists history in a **local `localStorage` collection** (ADR-0144 D2 replaced `@tanstack/solid-db`, which had no solid-js 2.0 adapter; the storage key and entry JSON shape were kept byte-compatible so old data survives):
-- L1 = in-memory `Map` collection
-- L2 = full serialization to localStorage (`pictelio-browsing-history`)
-- Composite key: `${userId}_${type}_${id}` for user isolation
-- Lazy expiry: entries older than 30 days cleared on write
-- `historyVersion` signal acts as a non-reactive invalidation token
-- Entries carry an `aiType` field (ADR-0155) for AI-mode history filtering
-
-**History tab:** The history tab is now built into `SideNavShell` (`SideNavShell.tsx` `HistoryPanel`) rather than rendered via a separate `HistoryFeed` route component. It renders an A2 `HistoryRowCard` list (sorted by `visitedAt` descending) with a clear-all button and empty state, reading `historyCollection` filtered by `userId`. The legacy `HistoryFeed` component was **deleted** in the ADR-0083 dead-code cleanup. History entries retain author click navigation per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text.
-
-The `contentType()` toggle from `uiStore` is hidden on the history tab — history is displayed as a single unified timeline regardless of content type.
-
-## User Pages
-
-| Route | Component | Data |
-|-------|-----------|------|
-| `/user/:id` | `PersonalCenter` | User profile + recent illusts |
-| `/user/:id/illusts` | `UserIllusts` | All illusts by user |
-| `/user/:id/following` | `FollowListPage` | Who the user follows |
-| `/user/:id/followers` | `FollowListPage` | User's followers |
-
-User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`. Follow/unfollow uses optimistic UI with rollback on error.
-
-## Key Source Files
+## Key source files
 
 | Purpose | Path |
 |---------|------|
-| Home page (C shell + L5) | `/packages/app/src/routes/HomePage.tsx` |
-| Side nav shell | `/packages/app/src/components/home/SideNavShell.tsx` |
-| Unified feed list | `/packages/app/src/components/home/FeedList.tsx` |
-| Illust single card | `/packages/app/src/components/home/IllustSingleCard.tsx` |
-| Novel row card | `/packages/app/src/components/home/NovelRowCard.tsx` |
-| History row card | `/packages/app/src/components/home/HistoryRowCard.tsx` |
-| Adaptive tags | `/packages/app/src/components/home/AdaptiveTags.tsx` |
-| Pagination sentinel | `/packages/app/src/components/home/FeedPaginationSentinel.tsx` |
-| Inline pagination retry bar | `/packages/app/src/components/ui/InlineRetryBar.tsx` |
-| Pull-to-refresh primitive | `/packages/app/src/primitives/createPullToRefresh.ts` |
-| Recommended store | `/packages/app/src/stores/recommendedStore.ts` |
-| Follow store | `/packages/app/src/stores/followStore.ts` |
-| TQ feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
-| Feed helpers | `/packages/app/src/stores/shared/feedHelpers.ts` |
-| Persisted-set factory (ADR-0092) | `/packages/app/src/stores/shared/createPersistedSet.ts` |
-| Virtual feed component (secondary feeds) | `/packages/app/src/components/VirtualFeed.tsx` |
-| Feed virtualizer (secondary feeds) | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
-| Image card (secondary feeds) | `/packages/app/src/components/ImageCard.tsx` |
-| Grid card (secondary feeds) | `/packages/app/src/components/GridCard.tsx` |
-| Nav bar (secondary pages) | `/packages/app/src/components/NavBar.tsx` |
-| User works feed (sole secondary feed) | `/packages/app/src/components/UserWorksFeed.tsx` |
-| Search page | `/packages/app/src/routes/Search.tsx` |
-| Search store | `/packages/app/src/stores/searchStore.ts` |
-| History store | `/packages/app/src/stores/historyStore.ts` |
-| Ranking store | `/packages/app/src/stores/rankingStore.ts` |
-| Related-works injection store | `/packages/app/src/stores/relatedInjectionStore.ts` |
-| Bookmark panel store | `/packages/app/src/stores/bookmarkPanelStore.ts` |
-| AI filter utility | `/packages/app/src/utils/aiFilter.ts` |
-| Bookmark store | `/packages/app/src/stores/bookmarkStore.ts` |
-| R18 filter utility | `/packages/app/src/utils/r18Filter.ts` |
-| Block/report store | `/packages/app/src/stores/blockStore.ts` |
-| User illusts | `/packages/app/src/routes/UserIllusts.tsx` |
-| Follow list page | `/packages/app/src/routes/FollowListPage.tsx` |
-| Personal center | `/packages/app/src/routes/PersonalCenter.tsx` |
+| Unified feed pagination deep module | `packages/app-lynx/src/primitives/createMixFeed.ts` |
+| Discover carousel page | `packages/app-lynx/src/pages/Recommended.vue` |
+| Illust list page | `packages/app-lynx/src/pages/IllustList.vue` |
+| Novel list page | `packages/app-lynx/src/pages/NovelList.vue` |
+| Bookmarks page | `packages/app-lynx/src/pages/Bookmarks.vue` |
+| Ranking page | `packages/app-lynx/src/pages/Ranking.vue` |
+| Ranking feed wrapper | `packages/app-lynx/src/primitives/createRankingFeed.ts` |
+| Global search sheet | `packages/app-lynx/src/components/SearchSheet.vue` |
+| Search state machine | `packages/app-lynx/src/primitives/useSearch.ts` |
+| Search API adapter / SSRF guard | `packages/app-lynx/src/api/search.ts` |
+| Content-control predicates + settings | `packages/app-lynx/src/stores/settingsStore.ts` |
+| Search history | `packages/app-lynx/src/stores/searchHistoryStore.ts` |
+| Related-works injection | `packages/app-lynx/src/stores/relatedInjection.ts` |
+| Related inline section | `packages/app-lynx/src/components/RelatedInlineSection.vue` |
+| Tag neighbors page / core | `packages/app-lynx/src/pages/TagNeighbors.vue`, `packages/app-lynx/src/primitives/collectTagNeighbors.ts` |
+| Shared search core | `packages/search-core/src/` |
+| Shared ranking core | `packages/ranking-core/src/` |
+| Refresh/back-to-top container | `packages/app-lynx/src/components/RefreshableList.vue` |
+| Three-state list footer | `packages/app-lynx/src/components/FeedListFooter.vue` |
+| First-load view derivation | `packages/app-lynx/src/utils/firstLoadView.ts` |

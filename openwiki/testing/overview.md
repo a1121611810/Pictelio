@@ -1,278 +1,205 @@
 ---
 type: Concept
 title: Testing Strategy
-description: Two testing tiers after the single-engine consolidation — unit tests (app-lynx + android-host Vitest/JVM) and Android emulator E2E (Appium + WebdriverIO). The agent-browser and Playwright/component suites were removed with the WebView client in ADR-0203.
-tags: [testing, vitest, e2e, unit-tests, android-host, app-lynx]
+description: The post-consolidation test pyramid — app-lynx Vitest unit/template suites, android-host Vitest contract gates (repo invariants, AGENTS.md contract, webview-removal invariants) and JVM/Robolectric units, manual Appium/WebdriverIO emulator E2E, and local Stryker mutation testing. The agent-browser and Playwright/component suites were removed with the WebView client (ADR-0203).
+tags: [testing, vitest, e2e, unit-tests, android-host, app-lynx, mutation-testing]
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-04T18:40:18.128Z
+sources:
+  - id: openwiki-source-164e2da859b5277df81c7d94
+    resource: repo://.github/workflows/ci.yml
+  - id: openwiki-source-8037e2358a2c4f9b2c722a11
+    resource: repo://AGENTS.md
+  - id: openwiki-source-ab7c178feca9fb517748c676
+    resource: repo://docs/adr/ADR-0084-e2e-testing-localization.md
+  - id: openwiki-source-d7a938f0dca6df3424b833e8
+    resource: repo://docs/adr/ADR-0097-agent-skill-repo-localization.md
+  - id: openwiki-source-1b85e54a01b9ad8ab01211f8
+    resource: repo://docs/adr/ADR-0101-stryker-mutation-trial.md
+  - id: openwiki-source-dc29c30e819cd77a4cbf3240
+    resource: repo://docs/adr/ADR-0163-qa-defense-lines.md
+  - id: openwiki-source-0c210ba19661f60e310f0831
+    resource: repo://docs/testing/conventions.md
+  - id: openwiki-source-5b54a58d1b51cd490b0e7162
+    resource: repo://package.json
+  - id: openwiki-source-84f2aea7538e7da16f17ce7a
+    resource: repo://packages/android-host/tests/android-e2e/README.md
+  - id: openwiki-source-001737abb4fa7ad0b456d341
+    resource: repo://packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts
+  - id: openwiki-source-acfefc8ed5ad27ba68fa2d6d
+    resource: repo://packages/android-host/tests/android-e2e/support/releaseGate.ts
+  - id: openwiki-source-183ea1f729c0b56a15bcd688
+    resource: repo://packages/android-host/tests/android-e2e/vitest.config.ts
+  - id: openwiki-source-0c986189d1217c3e6214fe46
+    resource: repo://packages/android-host/tests/unit/agentsMd.contract.test.ts
+  - id: openwiki-source-175a5213f7bab01e121e652b
+    resource: repo://packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts
+  - id: openwiki-source-5fbcc3c93036ba065cbd748d
+    resource: repo://packages/android-host/tests/unit/webviewRemovalInvariants.test.ts
+  - id: openwiki-source-76f42986ee5e8b672e9a9f62
+    resource: repo://packages/android-host/vitest.config.ts
+  - id: openwiki-source-27ad4aacc4aecfa67f873e90
+    resource: repo://packages/app-lynx/package.json
+  - id: openwiki-source-f1ce5803e8a050f3f0886f69
+    resource: repo://packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts
+  - id: openwiki-source-a6f2540112f5ac636d4cbc1e
+    resource: repo://packages/app-lynx/src/pages/PlatformCheck.vue
+  - id: openwiki-source-c4331ede7aeaadaf8c0cf85e
+    resource: repo://packages/app-lynx/tests/contract/truthTableFixtureIntegrity.test.ts
+  - id: openwiki-source-e36762d893af2b103b4f4d1d
+    resource: repo://packages/app-lynx/vitest.config.ts
+  - id: openwiki-source-5acbbfee5a91aebe82419dcb
+    resource: repo://packages/app-lynx/vitest.fallback.config.ts
+  - id: openwiki-source-912861904945ed33ae1c49df
+    resource: repo://packages/ugoira/stryker.config.ts
+  - id: openwiki-source-67b94b94647a43abc53a5f2b
+    resource: repo://packages/update-check/stryker.config.ts
+generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 ---
 
 # Testing Strategy
 
-Pictelio now has **two active testing tiers** after the single-engine consolidation ([ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md)): **unit tests** (`pictelio-app-lynx` Vitest + `@pictelio/android-host` Vitest/JVM) and **Android emulator E2E** (Appium + WebdriverIO under `packages/android-host/tests/android-e2e/`). The former agent-browser (AI-driven browser E2E) suite and the Playwright/component suites were removed with the WebView client (`packages/app`) — the section below documenting them is retained as history.
+Pictelio is a **Lynx single-engine** client since the WebView client was removed in [ADR-0203](../../docs/adr/ADR-0203-webview-client-source-removal.md). The test pyramid is therefore built around one client package (`pictelio-app-lynx`), one build host (`@pictelio/android-host`), and a set of shared pure-logic packages. The active tiers are:
 
-The `app-lynx` package has its own separate unit test suite — ~260 cases covering image URL rewriting, error classification, OAuth error recognition, novel body extraction (incl. `requestRaw`), route matching, `isRestricted` R18/R18G mask logic, `createMixFeed` merging, comment primitives, and error presentation (Vitest, run via `pnpm test`).
+- **Vitest unit/template/contract tests** — `pictelio-app-lynx` (`pnpm test`) and `@pictelio/android-host` (`pnpm test:android-host`).
+- **JVM/Robolectric unit tests** — `@pictelio/android-host` Gradle `testDebugUnitTest` (`pnpm test:android-host:unit`).
+- **Android emulator E2E** — Appium + WebdriverIO under `packages/android-host/tests/android-e2e/` (`pnpm test:android-host:e2e`, manual, not in CI).
+- **Mutation testing** — local, non-CI StrykerJS over `@pictelio/ugoira` and `@pictelio/update-check` (`pnpm test:mutation`).
 
-```mermaid
-flowchart TD
-    U["Unit Tests (app-lynx + android-host Vitest)"] --> S["Pure logic: API, utils, stores, router"]
-    E["Android E2E Tests (android-host)"] --> EMU["Appium + WebdriverIO on Android emulator / physical device"]
-```
-- [`lynx-device-check.sh`](/packages/app-lynx/scripts/lynx-device-check.sh) — automated login→recommended page→image ratio check via adb
-- [`lynx-flow-check.sh`](/packages/app-lynx/scripts/lynx-flow-check.sh) — comprehensive full-process device flow check: login → feed scroll → bookmark → illust detail → novel list/reader → Me/R18 toggle → settings page scroll (issue #90). Features resolution-adaptive coordinate scaling and `SETTINGS_ONLY=1` for targeted regression.
-- [`lynx-screen-analyze.py`](/packages/app-lynx/scripts/lynx-screen-analyze.py) — PNG screenshot analyzer with `classify` (page-state identification), `login-elements` (input/button detection), and `topbar-nav` (dynamic top-bar text block detection for resolution-independent tab targeting) modes
-- [`settingsStore.test.ts`](/packages/app-lynx/src/stores/settingsStore.test.ts) — 12-case `isRestricted` matrix (x_restrict × showR18 × showR18G) + pseudo-glass token contract test against the real `tokens.css` source (issue #97); validates `--glassBgMuted`, `--glassHighlight`, `--glassEdge`, `--glassBorder` tokens and asserts no `backdrop-filter` or `@supports` in the `RestrictOverlay` style block
+The former **agent-browser** (AI-driven browser E2E), **Playwright** E2E, and **Vitest browser component** suites were removed with the WebView client (`packages/app`); see [Removed suites](#removed-suites-history).
 
 ```mermaid
 flowchart TD
-    U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]
-    A["Agent-Browser Tests (vitest.agent-browser.config.ts)"] --> AI["AI-driven user flow verification"]
-    E["Android E2E Tests (vitest.config.ts)"] --> EMU["Appium + WebdriverIO on Android emulator / physical device"]
+    U["Unit & contract tests (Vitest)"] --> S["Pure logic, stores, utils, template/contract gates"]
+    J["JVM/Robolectric (Gradle testDebugUnitTest)"] --> JAVA["Android host Java units"]
+    E["Android emulator E2E (manual)"] --> EMU["Appium + WebdriverIO on AVD / physical device"]
+    M["Mutation testing (local)"] --> PURE["ugoira + update-check pure functions"]
 ```
 
-## Test Tiers
+## CI gate boundaries
 
-### 1. Unit Tests (app-lynx + android-host)
+The authoritative gate boundary is `.github/workflows/ci.yml` plus the [AGENTS.md](../../AGENTS.md) "测试" section:
 
-- **Runners:** `pnpm test` (app-lynx Vitest, co-located `tests/**/*.test.ts` + `src/**/*.test.ts`), `pnpm test:android-host` (android-host Vitest), and `pnpm test:android-host:unit` (android-host JVM/Gradle `testDebugUnitTest`).
-- **Scope:** Pure logic — API layer, utilities, stores, router definitions, services, primitives
-- **No DOM required** — tests run in Node.js (plus Robolectric/JVM for android-host Java unit tests)
-- Runs via: `pnpm test` (app-lynx) / `pnpm test:android-host` / `pnpm test:android-host:unit`
+| CI job | Command | Scope |
+|--------|---------|-------|
+| `check` | `pnpm check:all` + `pnpm lint:all` | Type check (`vue-tsc` for app-lynx) + lint across packages |
+| `test` | `pnpm test:all` | Vitest unit tests only — **Android E2E never enters CI** |
+| `android-unit-test` | `./gradlew testDebugUnitTest --no-daemon` (after `sync:credentials`) | JVM/Robolectric Java units |
 
-### 2. Agent-Browser E2E Tests — REMOVED (ADR-0203)
+- **E2E is manual and not in CI.** This follows [ADR-0084](../../docs/adr/ADR-0084-e2e-testing-localization.md): the old agent-browser E2E job needed a real Pixiv network path plus `PIXIV_REFRESH_TOKEN`, which GitHub runners cannot reproduce, so the job was an empty shell (42/43 skipped) that produced false confidence. `PIXIV_REFRESH_TOKEN` is loaded only from a local `.env` and **never** enters GitHub Secrets or CI logs.
+- **Task-cache scoping.** `pnpm check:all` runs with `--cache`; `pnpm test:all` deliberately does **not**. A cache hit on the test gate would mean the tests never actually ran — replaying logs and producing the same fake green that ADR-0084 eliminated. The cache flag lives on the command line because `vp`'s `run.cache = { scripts: false, tasks: true }` makes package.json scripts uncached by default and `run.cache.scripts` is all-or-nothing, so "cache only `check`" cannot be expressed in config (see [AGENTS.md](../../AGENTS.md) and root [package.json](../../package.json)).
+- **Gate freeze line.** AGENTS.md also caps gate growth: a single gate file must not exceed ~30% of the size of the object it guards, "fake green is worse than no gate" (known blind spots must be registered, not just wins), and a gate's only proof of value is an external re-check, not a self-authored "N/N caught".
 
-> **Removed** with the WebView client (`packages/app/tests/agent-browser/`, 16 spec files) in [ADR-0203](/docs/adr/ADR-0203-webview-client-source-removal.md). The `pnpm test:agent-browser` script no longer exists. The detailed documentation below is retained for history only.
+## Test tiers
 
-- **Runner:** Vitest (`vitest.agent-browser.config.ts`)
-- **Scope:** AI-driven user flow verification — covers core user flows, UI component behavior, page navigation, and settings
-- **Infrastructure:**
-  - **AgentBrowserDriver** (`driver.ts`) — spawns `agent-browser` CLI via `spawnSync` (migrated from `execSync`/`shell:true` for better error handling and security). Declared as `agent-browser ^0.31.1` devDependency with `pnpm-workspace.yaml` `allowBuilds: agent-browser: true`
-  - **Daemon cleanup (`setup.ts`, 5aef5a7)** — the daemon is now killed via `lsof -t <daemon socket>` and `kill -9`. The previous `pkill -f 'agent-browser.*daemon'` matched neither the real binary name (`agent-browser-darwin-arm64`) nor sibling suites, letting 4 daemons accumulate — the root cause of flaky consecutive runs
-  - **`evaluate(js)`** — executes a raw JS expression via `ab("eval", js)`. **Contract:** pass the expression directly (no extra wrapping quotes — the CLI `JSON.stringify`s the result); injected JS must be a **single line** (the CLI does not support multi-line arguments); callers `JSON.parse` the returned string
-  - **`mockFetch(urlContains, responseJson)`** — page-level fetch mock: intercepts any `fetch` whose URL contains the given fragment and returns the fixed JSON; all other requests pass through to the real fetch. Multiple calls **accumulate** rules (each call appends, later calls never overwrite earlier patterns); payloads are embedded as `JSON.stringify` literals so escapes (e.g. `\n` in JSON) survive the injection path (7a0a5f5). Used to construct states E2E cannot reach naturally (e.g., the update dialog; the translation flow mocks DeepSeek + novel detail + novel body simultaneously). **Injection timing:** page navigation clears injected JS, so inject after the target page has loaded
-  - **`spyOnWindowOpen()` / `getWindowOpenCalls()`** — replaces `window.open` with a recorder so tests can assert a navigation "really happened" without opening tabs, then read back the recorded URLs (results come back JSON-encoded; `JSON.parse`)
-  - **`clickFirst`** — targets clickable elements; `skipCount` parameter skips top UI elements (avatar, title) to land on content cards. Since 5aef5a7 it has an evaluate-injected fallback so off-viewport cards are clickable (white-screen race fix, Issue #19 T3)
-  - **`clickReliable`** — fallback chain: `@e` ref → aria-label → direct text → CSS selector → evaluate-injected `el.click()` (5th fallback added in 1edb316: the agent-browser CLI click is unreliable on `fluent-button` custom elements, which silently failed age-confirmation/login clicks; the fallback finds `button, fluent-button, [role="button"]` by text content and calls `el.click()` directly via `evaluate`). Since 5aef5a7 it also accepts a `scopeSelector` that locates the button inside a given container via evaluate, eliminating duplicate-text ambiguity (e.g. the bottom-nav 关注 tab vs a card's 关注 button, Issue #19 T5)
-  - **`navigateSpa(path)`** — SPA-internal navigation via `window.history.pushState` + a dispatched `popstate` event. Unlike full-page `navigate()`, it does not re-run the startup flow, so it bypasses the `__root.tsx` startup-navigation override that would force a sub-route back to `/home` (11 call sites migrated in 5aef5a7, Issue #19 T2)
-  - **`waitForPageContent(timeoutMs)` / `waitForSelector(selector, timeoutMs)`** — poll until the page has substantive text / a CSS selector appears. Guards against white-screen races where an AI assertion would misreport "page text empty" during route/data loading (Issue #19 T3)
-  - **`getAttribute`/`getComputedStyle`** — bridge methods for precise DOM property assertions via `evaluate()`; results are JSON-encoded and parsed with `JSON.parse` (fallback to raw string)
-  - **`aiAssert`** (`tests/ai-shared/assertion.ts`) — sends page state (accessibility tree + page text) to DeepSeek Flash for semantic validation. Since [ADR-0085](/docs/adr/ADR-0085-ai-assertion-reposition.md) it is used for only one true semantic assertion (s48); the other 63 broad assertions were converted to deterministic `evaluate` + `expect` DOM checks
-- **File structure:**
-  - `main-flow.test.ts` — single long-chain test covering end-to-end user journey
-  - `sub-flows.test.ts` — medium-chain tests organized by feature (discovery, artwork, reading, personal, login, settings, navigation)
-  - `update-flow.test.ts` — regression spec for the v3.21.7 update-dialog fix: "check update → update dialog → go to download" using `mockFetch` + `spyOnWindowOpen` to simulate a newer remote version without a real release; guards `updateService.ts` `latestReleaseUrl` (parsed from version.json `url` field)
-  - `translation-flow.test.ts` — E2E regression guard for the [AI translation](/openwiki/domain/novel-reader.md#ai-translation) chain (S1–S7): settings key config → mock novel detail → translate → mock DeepSeek response injected into the body → toggle back to 原文. Self-contained via `mockFetch` (DeepSeek `/chat/completions` + `novel/detail` + `webview/v2/novel`), so it needs no real `DEEPSEEK_API_KEY` and incurs no token cost
-  - `route-switch-instant.spec.ts` — asserts shell chrome (floating-nav, sticky header) renders before API data
-- **E2E state construction:** paths that depend on external state (e.g., the update dialog requiring a *newer* remote version) are covered by page-level injection rather than real networks — `driver.mockFetch()` for the version.json response and `driver.spyOnWindowOpen()`/`getWindowOpenCalls()` to assert the download navigation fires. Reference: `update-flow.test.ts`. Injection must happen **after** the target page navigates (navigation clears injected JS).
-- **Login-state E2E:** settings page and similar routes sit behind the login guard (`__root.tsx` startup navigation forces `/home`). These specs need `PIXIV_REFRESH_TOKEN` (loaded from a local `.env`; per [ADR-0084](/docs/adr/ADR-0084-e2e-testing-localization.md) it never goes to CI). Since 1edb316, **all 16 agent-browser describes** in `main-flow.test.ts` and `sub-flows.test.ts` (plus `update-flow.test.ts` and, since e9b8399, `translation-flow.test.ts`) are wrapped in `describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)` — previously only update-flow had the guard and the rest threw instead of skipping. Without a token, 42/43 cases skip (the remaining one fails only due to a missing `DEEPSEEK_API_KEY`, which is expected). The invalid-token login case also retries `clickReliable("已满")` until the login page (fluent-textarea) is ready in `beforeAll`. Because direct `navigate` to a sub-route gets overridden by startup navigation, the spec must reach the route through the UI path (`/home` top user name → `/me` → "设置" row → `/settings`).
-- **Logged-in session setup (5aef5a7, Issue #19):** `createLoggedInDriver` in `fixtures.ts` was rebuilt as a **4-phase looped wait** — (1) age-confirmation popup dismissed in a loop, (2) wait for login page or auto-login via leftover token, (3) fill `PIXIV_REFRESH_TOKEN` into `fluent-textarea`, (4) wait for main UI markers — with **up to 3 launch retries** so one daemon hiccup cannot sink the suite. Login markers no longer include "插画" (the login page's brand copy contains that word and caused false already-logged-in detection). The invalid-token case cleans `localStorage` precisely (keeping `ageConfirmed`) and retries on `SecurityError`. Suite status after the fix: **42/42 passing** (was 19/42); the suite has since grown to 43 token-guarded cases with `translation-flow.test.ts` (latest full run: 40 passed / 3 skipped / 1 flaky — the sub-flows card-click flake passes on rerun).
-- Runs via: `pnpm test:agent-browser`
+### 1. app-lynx Vitest — unit, template, and contract gates
 
-### Migration History
+- **Config:** [packages/app-lynx/vitest.config.ts](../../packages/app-lynx/vitest.config.ts) — `environment: "node"`, includes `tests/**/*.test.ts` and `src/**/*.test.ts`, excludes `**/*.fallback.test.ts`, and injects the same compile-time constants as `lynx.config.ts` (`__APP_VERSION__` from the package `version`, `__HOME_BLEED_HEADER__: 'true'`, `__PUBLIC_CONFIG__`, `__CREDENTIALS__`). A `setupFiles` script pins the i18n locale so Node ≥22's `navigator.language` does not skew tests.
+- **Fallback config:** [packages/app-lynx/vitest.fallback.config.ts](../../packages/app-lynx/vitest.fallback.config.ts) flips `__HOME_BLEED_HEADER__` to `'false'` and collects only `src/**/*.fallback.test.ts`. The home-top-bar build flag is a compile-time macro, so the default (new header) and fallback (bleed → self, ticket #920/#906) paths each need their own run; `pnpm test` runs **both** configs.
+- **Layout:** classic logic tests under `tests/unit/` (`api/`, `composables/`, `i18n/`, `primitives/`, `stores/`, `utils/`), single-engine behavior-baseline fixtures under `tests/contract/` (shared truth tables for R18/R18G restriction, URL rewrite, OAuth error classification, illust-type badges, tag mute, AI filter), and a large set of source-text/template gates at `tests/*.test.ts` (MD3 token/hardcode gates, icon consumption, motion contract, top-inset metrics, route transition wiring, etc.). Co-located `src/**/*.test.ts` files cover components and utils such as `BookmarkButton.host-matrix.test.ts`, `settingsStore.test.ts`, and `safeAreaJavaContract.test.ts`.
+- **`check`** runs `vue-tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.node.json`, so `.vue` template expressions and `defineProps`/slot inference are actually type-checked (closing the blind spot pure `tsc` silently skipped).
 
-Previously Pictelio had:
-- **Playwright E2E tests** (11 spec files) — migrated to agent-browser per ADR-0034
-- **Vitest browser component tests** (29 files, `@vitest/browser-playwright`) — migrated to agent-browser E2E or removed per ADR-0035
+### 2. android-host Vitest — contract gates and repo invariants
 
-Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
+- **Config:** [packages/android-host/vitest.config.ts](../../packages/android-host/vitest.config.ts) — `environment: "node"`, `passWithNoTests: false`, includes **two globs listed separately** (`tests/unit/**/*.test.ts` and `tests/android-e2e/unit/**/*.test.ts`) and excludes `tests/android-e2e/specs/**` (emulator specs must never leak into CI). The second glob is a deliberate gate fix from issue #818: those contract tools' pure-function tests were previously only collected by the emulator config and silently went unrun for months.
+- **[webviewRemovalInvariants.test.ts](../../packages/android-host/tests/unit/webviewRemovalInvariants.test.ts)** — the authoritative "WebView client fully removed" gate: **10 invariant groups** (no `packages/app`; Capacitor dependency declarations zeroed; host assets present; persisted-format literals still intact; app-lynx does not cross-read the deleted dir; root command table points at the single client; facade wording converged; client-switch capability gone; Gradle entry generation present; pnpm call sites resolve), plus **19 counterfactual positive controls** (a compliant tree is built in `os.tmpdir()` and each violation is injected back to prove the same `evaluateInvariants` turns red) and **2 scan-coverage assertions** pinning the scan root/exclude list itself.
+- **[agentsMd.contract.test.ts](../../packages/android-host/tests/unit/agentsMd.contract.test.ts)** — the AGENTS.md contract gate: a ≤30 KiB volume hard gate (reset after ADR-0203), Fluent-spec verbatim assertions now pointing at the archive file plus an entry pointer in AGENTS.md, hard-constraint anchor survival, single-engine facade wording (`LynxActivity`, no `MainActivity`/`registerPlugin`, "Lynx 单引擎" present and "双引擎" absent), OPENWIKI marker-pair survival, stale-phrase zeroing, and root command-table reachability (every command in the AGENTS.md table must exist in root `package.json` scripts).
+- **[e2eContractSuiteCollected.test.ts](../../packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts)** — guards that the 8 `tests/android-e2e/unit/**` contract tests are both on disk and matched by the host `vitest.config.ts` include globs, so they reach `pnpm test` → `test:all` → CI. This exists because `passWithNoTests: false` can detect "nothing collected" but not "one directory dropped".
+- **Release-script units** under `tests/unit/scripts/` cover the publish tooling (`release-preflight`, `release-build-steps`, `release-notes-ai`, `upload-release-assets`, `changelog`, `check-push-refs`, `git-refs`, `proxy-probe`, etc.); `tests/unit/android/proguardRulesConsistency.test.ts` guards ProGuard config vs source constants.
 
-### 3. Android E2E Tests (`packages/android-host/tests/android-e2e/`)
+### 3. android-host JVM/Robolectric
 
-- **Runner:** Vitest via `pnpm test:android-host:e2e` (or `pnpm --filter @pictelio/android-host exec vitest run -c tests/android-e2e/vitest.config.ts`).
-- **Scope:** On-device testing via Appium + WebdriverIO on an Android emulator (or physical device) — APK build → install → Activity assertion. Single-engine: `LynxActivity` is the only entry (`MainActivity`/`MainActivityWebview` removed with the WebView client), so there is no WebView↔native context switching.
-- **Manual:** [`packages/android-host/tests/android-e2e/README.md`](/packages/android-host/tests/android-e2e/README.md) — AVD setup (`pictelio_ui`/`pictelio_low`), env vars (`ANDROID_E2E_AVD`, `ANDROID_E2E_SKIP_BUILD`, …), and the `BENCH_NAV=1` deep-link hook.
-- **Infrastructure:** [ADR-0061](/docs/adr/ADR-0061-android-emulator-e2e-gate.md), specs at `/docs/specs/android-emulator-e2e-gate.md`
-- **Key specs (10):**
-  - `smoke.spec.ts` — APK install + `LynxActivity` assertion
-  - `background-resume.spec.ts` — 缩小恢复 (liveness) guard: background → tap icon → still the same `LynxActivity` task-root instance (no stacking, no new JS runtime, PID unchanged; ADR-0102)
-  - `transition-matrix.spec.ts` — `@release-gate` content-comparison matrix (list surface × user action × engine × assertion; ADR-0163)
-  - `webdav-backup-lynx.spec.ts` — lynx WebDAV backup chain, default-skipped (`WEBDAV_E2E_ENABLED=1`)
-  - `fab-hit-testing-regression.spec.ts`, `lynx-bookmark-tags.spec.ts`, `lynx-boot-renders.spec.ts`, `lynx-detail-image-probe.spec.ts`, `lynx-network-check.spec.ts`, `settings-sync-contract.spec.ts`
-- **Removed specs:** `client-kind-contract.spec.ts` and the `switch-client-*` family were deleted with the client-switch capability (ADR-0203 decision 7).
-- **APK path:** `build.gradle` no longer has product flavors — the single flavor produces `app-debug.apk` / `app-release.apk`.
-- **Physical device support:** set `ANDROID_E2E_SERIAL` (plus `ANDROID_E2E_AVD`) to target a connected physical device; physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs.
-- **System bars acceptance workflow (ADR-0168, v5.3.0):** a separate manual [`sysbars-acceptance.yml`](/.github/workflows/sysbars-acceptance.yml) runs the lynx system-bars acceptance matrix on a GitHub runner (KVM emulator, API 35/36 input) — the escape hatch when the local network to `dl.google.com` is blocked. It is **assertion-based** (any failing assertion red-lights the job, not a passive recorder) and covers the API 36 gap that the local T4 matrix could not run. The local matrix lives in [`docs/research/lynx-systembars-t4-acceptance.md`](/docs/research/lynx-systembars-t4-acceptance.md).
+- **Gate:** `./gradlew testDebugUnitTest --no-daemon`, run from `packages/android-host/android` after `sync:credentials` (CI's `android-unit-test` job). After the WebView client removal there are **no product flavors**, so the old per-flavor `testFullDebugUnitTest` variant gate ([ADR-0177](../../docs/adr/ADR-0177-android-gradle-test-variant-gate.md), now archived) collapsed to the single build-type task.
+- **Source set:** `packages/android-host/android/app/src/test/java/io/pictelio/app/` — Robolectric/JVM units for native modules (`PictelioApiModuleTest`, `PictelioPrefsModuleTest`, `PictelioWebDavModuleTest`, `LynxSystemBarsTest`, `LynxStatusBarAppearanceTest`, `LynxDarkModeTest`), encoders/exporters (`Mp4EncoderTest`, `WebpEncoderTest`, `NovelEpubEncoderTest`, `UgoiraExporter*Test`, `BackupCryptoTest`), image pipeline (`PixivImageLoaderTest`, `ImageMemoryCacheTest`), and shared core (`SecureStorageCompatTest`, `WebDavClientTest`, `ImageHostConfigTest`).
 
-## CI & E2E Drift Prevention (ADR-0084, ADR-0085)
+### 4. Android emulator E2E (manual)
 
-Two adjacent ADRs (both 2026-08-14) reshaped the E2E posture after the suite drifted ~6 days unnoticed while the CI `test` job was silently skipping.
+- **Config:** [packages/android-host/tests/android-e2e/vitest.config.ts](../../packages/android-host/tests/android-e2e/vitest.config.ts) — `root` points at the directory, includes `specs/**/*.spec.ts` + `unit/**/*.test.ts`, serial execution (`fileParallelism: false`), `testTimeout: 300_000`, `hookTimeout: 1_500_000`, `retry: 0`, and a light `globalSetup` that injects `packages/app-lynx/.env` into `process.env` (never overwriting an already-exported value).
+- **Orchestration:** `setup.ts` → `setupAndroidE2e()` chains AVD detection/start, Chromedriver provisioning, APK build/install (`pnpm build:android-host`), Appium server, and a WebdriverIO session. Support modules: `appium.ts`, `avd.ts`, `chromedriver.ts`, `build-install.ts`, `driver.ts`, plus shared `pixel.ts` screenshot/color/region utilities and `env.ts` SDK/subprocess/timeout helpers. See [README.md](../../packages/android-host/tests/android-e2e/README.md) for AVD setup, env vars (`ANDROID_E2E_AVD`, `ANDROID_E2E_SKIP_BUILD`, `ANDROID_E2E_HTTP_PROXY`, …), and the `BENCH_NAV=1` deep-link hook.
+- **11 specs**, all under `specs/`: `smoke`, `background-resume`, `transition-matrix`, `webdav-backup-lynx`, `fab-hit-testing-regression`, `lynx-bookmark-tags`, `lynx-boot-renders`, `lynx-detail-image-probe`, `lynx-network-check`, `settings-sync-contract`, and `md3-visual-tokens` (the only spec that skips login and Appium session — screenshot sampling only, not release-gated).
+- **Assertion reality:** Lynx 4.0.1's `LynxView` accessibility tree does **not** expose view/text nodes, and `uiautomator dump` is SIGKILLed on the reference AVD, so interaction is driven by adb taps/swipes and content is asserted via **screenshot + pixel analysis** (region-scoped frame diffs), not text reads.
+- **Removed specs:** the `client-kind-contract.spec.ts` and `switch-client-*` family were deleted with the client-switch capability (ADR-0203 decision 7); `MainActivity`/`MainActivityWebview` are gone, so there is no WebView↔native context switching and `LynxActivity` is the only entry.
 
-### CI localization (ADR-0084)
+### 5. Mutation testing (local)
 
-The agent-browser E2E CI `test` job was **removed** — that suite needed a real Pixiv network path plus `PIXIV_REFRESH_TOKEN`, which GitHub Runners cannot reproduce, so the old job was an empty shell (42/43 cases skipped via `skipIf`) that created false confidence. [`.github/workflows/ci.yml`](/.github/workflows/ci.yml) now runs three jobs: **`check`** (`pnpm check:all` type-check + `pnpm lint:all`), **`test`** (`pnpm test:all`, vitest unit tests only — E2E never enters CI), and **`android-unit-test`** (Robolectric Java unit tests). `PIXIV_REFRESH_TOKEN` is loaded only from a local `.env` and **never** enters GitHub Secrets or CI logs. E2E drift is instead caught by the fast [static anchor validation](#static-anchor-validation) plus manual device runs.
+StrykerJS (with the official Vitest runner) is a **local, non-CI** sensitivity gate over the two in-process pure packages `@pictelio/ugoira` and `@pictelio/update-check`; `pnpm test:mutation` runs both and writes HTML/JSON reports to gitignored local dirs (configs at [packages/ugoira/stryker.config.ts](../../packages/ugoira/stryker.config.ts) and [packages/update-check/stryker.config.ts](../../packages/update-check/stryker.config.ts)). Mutation score is explicitly a **weak-assertion detector, never correctness evidence** — complementary to the oracle check (which catches wrong expectations). See [ADR-0101](../../docs/adr/ADR-0101-stryker-mutation-trial.md).
 
-Since ADR-0144 (v4.37.0), `check:all` type-checks `packages/app-lynx` with **`vue-tsc`** rather than `tsc` — the lynx `check` script switched to `vue-tsc --noEmit -p src/tsconfig.json` (reusing the `vue-lynx` volar plugin) so `.vue` template expressions and `defineProps`/slot inference are actually checked, closing the blind spot pure `tsc` silently skips. See [ADR-0144](/docs/adr/ADR-0144-app-lynx-vue-tsc.md).
+## QA defense lines (ADR-0163)
 
-**Task-cache scoping (2026-09-30):** `pnpm check:all` runs with `--cache`; `pnpm test:all` deliberately does not. `vp` defaults to `run.cache = { scripts: false, tasks: true }`, so package.json scripts are uncached by default; `run.tasks` cannot coexist with a same-named package.json script (it errors), and `run.cache.scripts` is all-or-nothing — so "cache only `check`" is impossible via config and must be scoped on the command line. With `--cache`, `check:all`'s 7 `tsc` tasks hit 100% (~5s saved); `test:all`'s vitest tasks stay `cache disabled` on purpose, because a cache hit on the test gate would mean the tests never actually ran — replaying logs and producing the same fake green ADR-0084 eliminated. See the gate-boundary notes in [AGENTS.md](/AGENTS.md).
+Four real-device defects (2026-09-15/16) all lived in state transitions and in two layers code review plus happy-dom unit tests structurally cannot see — the **Lynx runtime-semantics layer** (`URL` polyfill `.hostname === undefined` broke search pagination) and the **cross-component contract layer** (init-only props froze the bookmark count across carousel slides). [ADR-0163](../../docs/adr/ADR-0163-qa-defense-lines.md) erects three defense lines reusing existing infra:
 
-### Assertion repositioning (ADR-0085)
+- **Transition matrix** — [`transition-matrix.spec.ts`](../../packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts), an `@release-gate` android-e2e spec parameterizing `list surface × user action × engine × content assertion`. After single-engine consolidation it runs **3 rows** (R1 detail-return related-works + scroll preservation; R2 search pagination + scope switch; R3 carousel card-swipe bookmark-count change). Assertions must be **content comparison** (region-scoped frame diffs), not single-frame existence — revising the old #374 existence-check doctrine. It runs before release and on big-PR manual trigger, not per-PR CI (#539).
+- **Host-matrix contract test** — [`BookmarkButton.host-matrix.test.ts`](../../packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts) compiles the real `BookmarkButton.vue` (vue/compiler-sfc + a custom `createRenderer` nodeOps) to lock the init-only-props lifecycle contract across host forms: a reused carousel host must remount per work (`:key`) or state freezes on the first card.
+- **Platform consistency self-check page** — [`PlatformCheck.vue`](../../packages/app-lynx/src/pages/PlatformCheck.vue) (benchNav-only `/platform-check` route, no nav entry) renders a spec-derived PASS/FAIL matrix for the platform APIs the project depends on (URL parsing, `URLSearchParams` round-trip, bridge callback quote contract) on the **real Lynx runtime**, backed by the [`safeParseUrl.ts`](../../packages/app-lynx/src/utils/safeParseUrl.ts) consolidation (`extractHostname`/`extractAuthority`) guarded by a template test forbidding bare `new URL(`.
+- **Third code-review audit axis** — `.agents/skills/code-review/SKILL.md` adds platform/host contract checks (native `<list>` structure changes require epoch defense/spike; new Lynx global-API usage requires device probe + source guard; init-only components into a new host require a host-matrix test).
 
-An audit ([`agent-browser-e2e-perf-direction-c-feasibility.md`](/docs/agent-browser-e2e-perf-direction-c-feasibility.md)) found 55 of 64 `aiAssert` calls were broad "is the page okay?" DOM checks and only one (s48) was a true semantic judgment. ADR-0085 converted the 63 broad/determinizable assertions to deterministic DOM assertions (`evaluate` + `expect`), cutting LLM calls 64 → 1 (−98.4%). `assertion.ts`/`aiAssert` survives as the semantic-judgment facility (used only by s48); the suite still requires a local `DEEPSEEK_API_KEY` for that one assertion.
+Net effect: happy-dom unit tests are **demoted from the oracle for Lynx runtime behavior** to a "browser-semantics reference", and the release checklist gains a "transition matrix must pass" step (GitHub Releases pre-release ≥3 days before stable).
 
-### Static anchor validation
+## Hard constraints
 
-> **Post-ADR-0203:** the WebView E2E-anchor domain (`packages/app` → `check-e2e-anchors.mjs`) was **removed** with the WebView client; its `data-testid`/`aria-label`/route hard checks are historical. The remaining pre-push gates are the app-lynx anchor check and the `.agents/` skill check (see below).
+The testing conventions in [docs/testing/conventions.md](../../docs/testing/conventions.md) (verbatim-promoted from the deleted `packages/app/tests/TESTING.md`) are the detailed source of truth; [AGENTS.md](../../AGENTS.md) carries the summary. Violations count as architecture violations.
 
-The `.husky/pre-push` hook delegates to [`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) (ADR-0142), which previously ran [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touched `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracted anchors referenced in the specs and verified them against `src/`:
+The **six hard constraints** (AGENTS.md summary numbers):
 
-- **Hard checks (failure blocks push):** `data-testid` references, `aria-label` / `placeholder` attribute selectors, route paths (segment-matched against `src/router.tsx`, with a `KNOWN_CATCH_ALL_PATHS` whitelist), and element tag selectors.
-- **Soft checks (warning only):** CSS class selectors (UnoCSS builds classes dynamically) and `clickReliable`/`clickButtonByText` key text.
-- **Dynamic-anchor exemptions:** template placeholders containing `${` (e.g. `navTabActiveJs`'s `${label}`) and dynamically generated `data-testid` values from `data-testid={`…`}` templates (e.g. `ContentTypeToggle`'s `content-type-${opt.key}` renders `content-type-novel`/`content-type-illust`) are exempt from the static match — they are verified by the real browser regression instead.
-- Manual run: `node packages/app/scripts/check-e2e-anchors.mjs`; false positives can be bypassed with `git push --no-verify`.
+1. **IO dual-path coverage** — every function reading an external source (fetch/HTTP, Preferences, native bridge, JSON parsing) must have both success-path and failure/degradation-path unit tests.
+2. **Real-sample contracts** — mocks for cross-file/cross-platform data contracts must come from real sources (live files, plugin source constants, real response snapshots), never hand-written "self-consistent" fields (the `backupRulesConsistency` pattern is the reference).
+3. **No silent degradation** — every fallback path (`?? ""`, `?? null`, catch → default) must emit `console.warn` (with a module prefix) or expose an error state.
+4. **Refactor invariance** — refactors touching field names, constants, config values, or defaults must check for a corresponding contract test (add one if missing) and note behavior-change points in the commit message.
+5. **E2E reachability** — user-reachable interaction paths should have E2E coverage; external-state paths are covered by state construction. The constraint's named WebView-era mechanism (`driver.mockFetch()` + `driver.spyOnWindowOpen()`) was removed with the agent-browser client; today's state construction is benchNav deep links (`BENCH_NAV=1`) plus `loginViaDevIntent`.
+6. **Oracle traceability** — every test expectation must trace to an independent source (spec / acceptance sample / real data snapshot / property invariant); implementation-reverse-derived expectations, self-consistent mocks, and tautologies are suspect.
 
-### Pre-push orchestration & app-lynx gate (ADR-0141 F4, ADR-0142)
+> **Numbering offset.** The detailed doc numbers the oracle constraint as **#5** (= AGENTS #6) and adds a **detail-only #6, async-test determinism**, not yet mirrored in the AGENTS summary: unit tests must wait on the condition (`vi.waitFor(() => expect(...))`), never on a fixed wall-clock sleep; failure paths must finish in-flight async via `try/finally`; concurrent-mock count assertions must be keyed by business identifier (e.g. `chapterId`), never call ordinal. The defense precedent is `novelTranslateStore.test.ts`'s `describe.each` timing table.
 
-[`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) is the pre-push orchestration layer: `.husky/pre-push` is now only a thin shell passing the pre-push protocol through. It runs a **format gate** (ADR-0195) plus **two domain checks** based on the touched paths — **app-lynx** ([`check-app-lynx-anchors.mjs`](/packages/app-lynx/scripts/check-app-lynx-anchors.mjs), running `pnpm test` over `packages/app-lynx`; closes the ADR-0141 F4 gap where app-lynx test failures passed silently) and `.agents/` (`verify-agent-skills.mjs`). The WebView E2E-anchor domain was removed in ADR-0203. It also handles the remote ref: a locally-missing `remote_sha` triggers a precise `git fetch` retry (then fail-open with a warn if fetch fails), and true divergence fails closed with a human-readable rebase/force-push hint — the fix for the `fatal: Invalid revision range` failure that broke `pnpm release` before the OpenWiki CI merged a docs commit (ADR-0142). Shared git primitives (`hasCommitObject`/`fetchRemoteRef`/`isAncestor`/`diffNames`/`mergeBase`/`diffTreeNames`) live in [`packages/android-host/scripts/lib/git-refs.mjs`](/packages/android-host/scripts/lib/git-refs.mjs) (moved from `packages/app` in ADR-0203).
+## Oracle provenance & test quality
 
-## AI-Generated Test Quality & Cross-Engine Consistency (ADR-0097, ADR-0098, ADR-0101)
+- **Repo-localized code-review skill** ([.agents/skills/code-review/SKILL.md](../../.agents/skills/code-review/SKILL.md), ADR-0097) shadows the global skill; its Spec axis blocks on **Oracle check** (per-test expectation provenance) and **Test strength** (assertions must observe behavior and name the intended regression).
+- **T0 mechanical gates** — `passWithNoTests: false` (rejects empty/leaked test files) and oxlint `expect-expect: error` (tests must contain assertions).
+- **T0.5 format gate** — [`scripts/verify-agent-skills.mjs`](../../scripts/verify-agent-skills.mjs) validates `.agents/skills/` frontmatter, name↔directory consistency, and required markers; wired into pre-push when a push touches `.agents/`.
+- **Differential/property tests after ADR-0203** — the old dual-engine differential suites (WebView↔Lynx byte-identical assertions) lost their peer and were reshaped into **single-engine behavior baselines** under `tests/contract/` (`sharedRestrictionTruthTable.ts`, `sharedUrlRewriteCases.ts`, `sharedOAuthErrorCases.ts`, `sharedIllustTypeBadgeCases.ts`, …). [`truthTableFixtureIntegrity.test.ts`](../../packages/app-lynx/tests/contract/truthTableFixtureIntegrity.test.ts) now guards fixture coverage completeness and zero-framework-dependency instead of cross-engine byte equality. Property tests with fast-check remain over pure functions (`r18Filter`, `novelBlocks`, `searchMerger`, `isNewer`).
 
-Three adjacent ADRs (2026-08) harden the test oracle and conformance dimensions.
+## Removed suites (history)
 
-### Oracle provenance & repo-localized code-review skill (ADR-0097)
+- **Agent-browser E2E** (`packages/app/tests/agent-browser/`, 16 spec files, `pnpm test:agent-browser`) — removed with the WebView client. It drove flows through an agent-browser CLI (`evaluate`, `mockFetch`, `spyOnWindowOpen`, `aiAssert`) and required a local Vite dev server on port 5173 plus `PIXIV_REFRESH_TOKEN`; no replacement exists (ADR-0203 consequence 4).
+- **Playwright E2E** (11 spec files) had already migrated to agent-browser (ADR-0034), and **Vitest browser component tests** (29 files, `@vitest/browser-playwright`) were migrated or removed (ADR-0035); both `playwright` and `@vitest/browser-playwright` dependencies are gone.
+- **WebView static anchor validation** (`packages/app/scripts/check-e2e-anchors.mjs`) was removed with the client; the remaining pre-push domains are the app-lynx anchor check ([`check-app-lynx-anchors.mjs`](../../packages/app-lynx/scripts/check-app-lynx-anchors.mjs)) and the `.agents/` skill check, orchestrated by [`scripts/check-push-refs.mjs`](../../scripts/check-push-refs.mjs).
 
-AI-generated tests carry two systematic defects: **conformance** (expectations reverse-derived from the implementation — self-consistent mocks, tautological assertions) and **oracle error** (the expectation itself is wrong, so the red/green loop produces wrong software with high confidence). The pre-existing hard constraints lived only in `AGENTS.md` (prompt self-constraint — probabilistic execution), and code-review's Spec axis did not check expectation provenance. ADR-0097 adds an execution layer:
+## Running tests
 
-- **Repo-localized `code-review` skill** at [`.agents/skills/code-review/SKILL.md`](/.agents/skills/code-review/SKILL.md) — project-level load shadows the global skill (verified by probe). Its Spec axis blocks on **Oracle check** (per-test expectation provenance: spec / acceptance sample / real data / property are legal; implementation-derived / self-consistent mock / tautology are suspect) and **Test strength** (assertions must observe behavior and name the intended regression).
-- **T0.5 format gate** — [`scripts/verify-agent-skills.mjs`](/scripts/verify-agent-skills.mjs) validates `.agents/skills/` frontmatter, name↔directory consistency, and key-section markers; wired into `.husky/pre-push` when a push touches `.agents/`.
-- **T0 mechanical gates** — `passWithNoTests: false` (rejects empty test files) and oxlint `expect-expect: error` (tests must contain assertions). The latter only guarantees "has assertions"; the Oracle check guarantees "assertions are trustworthy" — complementary.
-- **6th hard constraint** — expectation-source traceability (see [Hard Constraints](#hard-constraints-enforced-in-agentsmd--testingmd)).
+| Command | What it runs |
+|---------|--------------|
+| `pnpm test` / `pnpm test:app-lynx` | app-lynx Vitest (main config + fallback config) |
+| `pnpm test:android-host` | android-host Vitest (repo invariants + contract gates) |
+| `pnpm test:android-host:unit` | android-host JVM/Robolectric `testDebugUnitTest` |
+| `pnpm test:android-host:e2e` | Android emulator E2E (manual, Appium + WebdriverIO) |
+| `pnpm test:all` | all packages' Vitest unit tests (bounded concurrency; CI `test` job) |
+| `pnpm test:ugoira` / `:update-check` / `:novel-export` / `:net-diagnostics` | individual shared-package unit tests |
+| `pnpm test:mutation` | Stryker mutation over `@pictelio/ugoira` + `@pictelio/update-check` (local, non-CI) |
+| `pnpm check:all` | type check (vue-tsc for app-lynx) + `tsc` across packages, with task cache |
+| `pnpm lint:all` | oxlint across packages |
 
-### Cross-engine differential & property testing (ADR-0098)
+`pnpm test:agent-browser` no longer exists.
 
-Pictelio is a dual-engine monorepo (webview `packages/app` / lynx `packages/app-lynx`) sharing one Pixiv data source and OAuth credential system; several same-semantics dual implementations showed **real behavior divergence**. ADR-0098:
-
-- **Fixes the app OAuth 400 bug** — `isOAuthTokenErrorResponse` now recognizes the string form `{ error: "invalid_grant" }` (the standard refresh_token-expired response), aligning with lynx; the old app test that asserted `false` for this form was corrected to a real-body snapshot contract test.
-- **Differential test suites** where the two engines act as each other's oracle — shared contract tables / fixtures + per-side assertions (the peer implementation can't be imported into either vitest due to vue/solid isolation). Shared fixtures live in `tests/unit/differential/` (app) and `tests/differential/` (lynx): `sharedRestrictionTruthTable.ts`, `sharedUrlRewriteCases.ts`, `sharedOAuthErrorCases.ts`, `sharedIllustTypeBadgeCases.ts`. The 12-case R18 truth table is guarded by `restrictionTruthTableConsistency.test.ts` (byte-compares both copies to prevent drift).
-- **Property tests with fast-check** (devDep) over pure functions — `r18Filter.property.test.ts`, `novelBlocks.property.test.ts`, `searchMerger.property.test.ts`, and `@pictelio/update-check`'s `isNewer.property.test.ts` — asserting idempotence / round-trip / length-conservation invariants.
-- **`ApiErrorType` enum case unification** (lynx lowercase → uppercase, aligned with app) and a CI-gate gap fix (`test:all`/`check:all` now include `@pictelio/update-check`).
-
-### Mutation-testing pilot (ADR-0101)
-
-StrykerJS (with the official vitest runner) is a **local, non-CI** sensitivity gate over the two in-process pure packages (`@pictelio/ugoira`, `@pictelio/update-check`): injected mutants that tests fail to kill signal weak or absent assertions. `pnpm test:mutation` runs both packages; HTML/JSON reports land in gitignored local dirs. Mutation score is explicitly a **weak-assertion detector, never correctness evidence** — complementary to the Oracle check (which catches wrong expectations).
-
-## QA Defense Lines (ADR-0163)
-
-Four real-device interaction defects (2026-09-15/16) exposed a shared blind spot: **unit tests green + code review passed, yet the defect only surfaced on-device during a state transition** (back / scope switch / page-turn / card-swipe). All four sat in two layers code review and state-level unit tests structurally cannot see — the **Lynx runtime-semantics layer** (`URL` polyfill `.hostname`=undefined broke search pagination) and the **cross-component contract layer** (`BookmarkButton` init-only props froze the bookmark count across carousel slides). [ADR-0163](/docs/adr/ADR-0163-qa-defense-lines.md) ([spec](/docs/specs/qa-defense-lines.md)) erects three defense lines reusing existing infra, plus one review discipline:
-
-- **Transition matrix (real-device conversion matrix)** — [`transition-matrix.spec.ts`](/packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts), a `@release-gate` android-e2e spec parameterizing `list surface × user action × engine × content assertion`. Its first four rows each regression one of the closed defects (R1 detail-return related-works section + scroll preservation; R2 search pagination + scope switch; R3 carousel card-swipe bookmark-count change; R4 webview search as baseline control — R4 now historical post-ADR-0203). **Assertions must be content comparison, not single-frame existence** (revising the #374 existence-check doctrine); lynx-side assertions are region-scoped frame diffs because native LynxView exposes no accessibility tree. Not in per-PR CI (#539) — release-gate plus big-PR manual trigger.
-- **Host-matrix contract test** — [`BookmarkButton.host-matrix.test.ts`](/packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts) compiles the real `BookmarkButton.vue` (vue/compiler-sfc + a custom `createRenderer` nodeOps) to assert the init-only-props contract across host forms: a reused carousel host must remount per work (`:key`) or the state freezes on the first card — locking the ADR-0163 contract so a future silent semantics change fails.
-- **Platform consistency self-check page** — [`PlatformCheck.vue`](/packages/app-lynx/src/pages/PlatformCheck.vue) (benchNav-only `/platform-check` route, no nav entry) renders a spec-derived PASS/FAIL matrix for the platform APIs the project depends on (URL parsing, `URLSearchParams` round-trip, bridge callback quote contract) on the **real Lynx runtime**. Backed by the [`safeParseUrl.ts`](/packages/app-lynx/src/utils/safeParseUrl.ts) consolidation (`extractHostname`/`extractAuthority`) — the single URL-domain-parse entry for new lynx code, guarded by a template test forbidding bare `new URL(`.
-- **code-review third audit axis** — `.agents/skills/code-review/SKILL.md` adds platform & host contract checks: native `<list>` structure changes require epoch defense / spike; new Lynx global-API usage requires device probe + source guard; init-only components into a new host require a host-matrix test.
-
-Net effect: **happy-dom unit tests are demoted from being the oracle for Lynx runtime behavior** to a "browser-semantics reference", and the release checklist gains a "transition matrix must pass" step (GitHub Releases pre-release ≥3 days before stable).
-
-## Hard Constraints (enforced in AGENTS.md & TESTING.md)
-
-The testing conventions in `/packages/app/tests/TESTING.md` (mirrored in `AGENTS.md` "测试硬约束") treat violations as architecture violations:
-
-1. **IO-boundary coverage is mandatory** — every function that reads from an external source (fetch/HTTP, Preferences, native bridge, JSON parsing) must have both success-path and failure/degradation-path unit tests. Testing only pure functions is not enough; E2E cannot construct states that depend on external publishing or network timing, so function-level tests backstop those.
-2. **Contract tests must use real samples** — mocks for cross-file/cross-platform data contracts (JSON field names, storage keys, native bridge params) must come from real data sources (live files, plugin source constants, real response snapshots), never hand-written "self-consistent" mock fields. The `backupRulesConsistency.test.ts` pattern (extracting constants from plugin source) is the reference.
-3. **No silent degradation** — every fallback path (`?? ""`, `?? null`, catch → default value) must emit `console.warn` (with a module prefix) or explicitly expose an error state. A missing field is a contract break and must be visible.
-4. **Refactor behavior-unchanged constraint** — refactor commits that touch field names, constants, config values, or defaults must check whether a corresponding contract test exists (add one if missing) and note the behavior-change points in the commit message. "Tests pass" alone is not sufficient evidence of no regression.
-5. **E2E coverage principle** — user-reachable interaction paths should have E2E coverage; paths depending on external state are covered via `driver.mockFetch()` + `driver.spyOnWindowOpen()` state construction.
-6. **Expectation provenance (ADR-0097)** — every test expectation must trace to an independent source (spec / acceptance sample / real data snapshot / property invariant). Expectations reverse-derived from the implementation, self-consistent mocks, and tautological assertions are treated as suspect.
-7. **Async test determinism (timing-flake defense, applies to both `app` and `app-lynx`)** — added to the `TESTING.md` detail list only (not yet mirrored in the `AGENTS.md` summary; note the existing numbering offset where detail #5 = summary #6). Unit tests must never synchronize on a fixed wall-clock sleep (`await new Promise((r) => setTimeout(r, N))`): "sleep then assert" collapses under CI runner oversubscription because real I/O ordering is unpredictable. Three hard requirements:
-   - **Wait on the condition, not on time** — use `vi.waitFor(() => expect(...))` to await the observed fact (in-repo patterns: `notificationStore.test.ts`, `settingsStore.test.ts`). Negative assertions ("must not write / must not call") must hang off an event that *has definitely occurred* (e.g. the consumer requests the next frame, state has converged) — otherwise they assert "not yet reached", not "never happens".
-   - **Failure paths must finish in-flight async** — cases touching in-flight async must end suspended iterators and `await` pending promises via `try/finally`. A failed assertion that leaks an invocation keeps running in the *next* case's window, producing failures unrelated to the code under test — the generic cause of cross-case pollution flakiness.
-   - **Count assertions keyed by business identifier** — concurrent mock dispatch must map by identifier (e.g. `chapterId`), never by call ordinal. Ordinal mapping ("1st call → A, rest → B") silently routes a surplus Nth call to the last branch, hiding "called once too many" as an unattributable count delta.
-   - **Defense precedent** — `packages/app-lynx/tests/unit/stores/novelTranslateStore.test.ts` runs a `describe.each` timing table (normal + a "250ms slow I/O before provider" malicious case) so the above rules become a deterministic red light rather than a CI occasional failure. Diagnosis/reproduction: [`docs/research/flaky-novel-translate-store-diagnosis.md`](/docs/research/flaky-novel-translate-store-diagnosis.md); out-of-scope fixed wall-clock waits are tracked under #761.
-
-> **Note:** `@vitest/coverage-v8` (4.1.10) appears in `pnpm-lock.yaml` only as a **transitive peer** of `vite-plus`/`vitest` — it is **not** a declared devDependency in `packages/app/package.json`, and there is no `coverage` npm script, `coverage` block in `vitest.config.ts`, or CI coverage step. Coverage reporting is not wired up.
-
-## File Naming Conventions
-
-Per `TESTING.md`:
-
-| Pattern | Test Tier | Purpose |
-|---------|-----------|---------|
-| `*.test.ts`  | Unit | Pure logic tests (no DOM) |
-| `*.test.ts` (in agent-browser/) | Agent-browser E2E | AI-driven flow tests |
-
-## Test Infrastructure
-
-### `createManualFetch`
-
-Located at `/packages/app/src/primitives/createManualFetch.ts`. This primitive is critical for all API-level testability:
-
-- Wraps the Pixiv API client to intercept requests
-- Returns mock responses defined inline in the test
-- Supports simulating error states (401, 400, network failure)
-- Works in both unit and browser test environments
-
-### TQ Query Mock Pattern (Store Tests)
-
-`tests/unit/stores/followStore.test.ts` and `recommendedStore.test.ts` introduce a complementary pattern for testing TanStack Query-based stores: they mock `@tanstack/solid-query`'s `createInfiniteQuery` directly, returning configurable mock data per query key (e.g. `"follow_public"`, `"recommended_illust"`). This allows testing sub-tab routing and merge behavior at the store level without API calls:
-
-- `getQ(key)` returns a `QueryMock` with controllable `data`, `isFetching`, `error`, `hasNextPage`, `fetchNextPage`, and `refetch`
-- `setQueryData(key, illusts, next_url)` populates paginated mock data
-- `resetQueryMocks()` clears state between tests
-- The mock respects `enabled: false` by returning `undefined` data
-
-This pattern is lighter than `createManualFetch` when the goal is to verify store-level signal derivation and action delegation rather than HTTP behavior.
-
-The same pattern is also used for the novel-side store tests (`novelRecommendedStore.test.ts`, `novelFollowStore.test.ts`, `novelBookmarkStore.test.ts`), with a variation: the novel bookmark test uses a hardcoded `"bookmarks"` key lookup (single-tab store), while the novel follow test uses dynamic `queryKeyToLookupKey` routing matching its merge-mode sub-tabs (`"follow_public"`, `"follow_private"`).
-
-### Memory Store
-
-`/packages/app/src/stores/db.ts` exports `createMemoryStore` — a TanStack DB collection backed by in-memory storage instead of IndexedDB. This allows testing browsing history, bookmarks, and other persisted stores without side effects:
-
-```typescript
-// Unit test setup for historyStore
-import { createMemoryStore } from "../stores/db";
-jest.mock("../stores/db", () => ({
-  ...jest.requireActual("../stores/db"),
-  getCollection: () => createMemoryStore({ key: "test-history" }),
-}));
-```
-
-### Config Consistency Anti-Drift Tests
-
-`tests/unit/utils/backupRulesConsistency.test.ts` (added in v3.21.6) guards the [backup exclusion XML files](/openwiki/integrations/android-native.md#backup-rules--token-storage-exclusions-adr-0003) from silent drift. Because Android backup `exclude path` entries are exact filename matches, the rules previously pointed at a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml` — ciphertext was exported with backups. The test:
-
-- Extracts the real SharedPreferences filename constant from the `@aparajita/capacitor-secure-storage` plugin source (`node_modules/.../SecureStorage.java`) instead of hardcoding it
-- Asserts `data_extraction_rules.xml` (`cloud-backup` + `device-transfer`) and `backup_rules.xml` (`full-backup-content`) all exclude `WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`
-- Asserts the three XML sections stay identical to each other
-
-This is a reusable pattern for config-vs-source consistency: parse the constant from source, compare against the config, fail loudly on drift.
-
-The same JS↔Java literal-drift pattern was applied to the lynx system-bars contract (ADR-0168): [`safeAreaJavaContract.test.ts`](/packages/app-lynx/src/utils/safeAreaJavaContract.test.ts) pins the three anchors — the `settings_fullscreen_mode` key (settingsStore ↔ `LynxActivity`), the `pictelioInsets` event name + `[top, bottom]` payload order (safeArea.ts ↔ `LynxActivity`), and the `getSafeAreaInsets` method name. The Java side is covered by [`LynxSystemBarsTest.java`](/packages/app/android/app/src/test/java/io/pictelio/app/LynxSystemBarsTest.java) (Robolectric: insets→contentSize computation, fullscreen key read, `applySystemBarsHidden` static core).
-
-### AI-Shared Test Utilities (`tests/ai-shared/`)
-
-Shared infrastructure for AI-driven E2E tests:
-- **`assertion.ts`** — The `aiAssert` function that sends the page accessibility tree + innerText to DeepSeek Flash (`DEEPSEEK_API_KEY` env var required) and returns a structured `{passed, reason}` result with automatic retries
-- **`globalSetup.ts`** — Loads `.env`, checks `PIXIV_REFRESH_TOKEN`, manages the agent-browser daemon socket, and starts/reuses the Vite dev server on port 5173
-- **`globalTeardown.ts`** — Kills the Vite dev server if started by globalSetup
-
-## Running Tests
-
-| Command | Tests |
-|---------|-------|
-| `pnpm test` | Unit tests (Vitest) |
-| `pnpm test:watch` | Unit tests in watch mode |
-| `pnpm test:agent-browser` | Agent-browser E2E tests |
-| `pnpm test:all` | Unit + agent-browser E2E combined |
-| `pnpm test:update-check` | `@pictelio/update-check` unit tests |
-| `pnpm test:mutation` | Stryker mutation run for `@pictelio/ugoira` + `@pictelio/update-check` (local, non-CI) |
-
-## Key Source Files
+## Key source files
 
 | Purpose | Path |
 |---------|------|
-| Testing conventions doc | `/packages/app/tests/TESTING.md` |
-| Unit test config | `/packages/app/vitest.config.ts` |
-| Agent-browser test config | `/packages/app/vitest.agent-browser.config.ts` |
-| Test helpers | `/packages/app/tests/helpers.ts` |
-| Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
-| Memory store | `/packages/app/src/stores/db.ts` |
-| Backup rules consistency test | `/packages/app/tests/unit/utils/backupRulesConsistency.test.ts` |
-| Unit tests | `/packages/app/tests/unit/` |
-| Unit component tests (migrated from browser/) | `/packages/app/tests/unit/components/` |
-| Agent-browser tests | `/packages/app/tests/agent-browser/` |
-| Agent-browser conventions | `/packages/app/tests/agent-browser/TESTING.md` |
-| AI shared utilities | `/packages/app/tests/ai-shared/` |
-| Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
-| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
-| Static anchor validation | `/packages/app/scripts/check-e2e-anchors.mjs` |
-| Differential test fixtures (app) | `/packages/app/tests/unit/differential/` |
-| Differential test fixtures (lynx) | `/packages/app-lynx/tests/differential/` |
-| Agent-skills format gate | `/scripts/verify-agent-skills.mjs` |
-| Repo-localized code-review skill | `/.agents/skills/code-review/SKILL.md` |
+| Testing conventions (detailed) | `docs/testing/conventions.md` |
+| Gate boundary + hard constraints summary | `AGENTS.md` |
+| CI workflow | `.github/workflows/ci.yml` |
+| app-lynx Vitest config | `packages/app-lynx/vitest.config.ts` |
+| app-lynx fallback Vitest config | `packages/app-lynx/vitest.fallback.config.ts` |
+| android-host Vitest config | `packages/android-host/vitest.config.ts` |
+| android-e2e Vitest config | `packages/android-host/tests/android-e2e/vitest.config.ts` |
+| Repo invariants gate | `packages/android-host/tests/unit/webviewRemovalInvariants.test.ts` |
+| AGENTS.md contract gate | `packages/android-host/tests/unit/agentsMd.contract.test.ts` |
+| E2E contract-suite collection gate | `packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts` |
+| Release-gate transition matrix | `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts` |
+| Release-gate three-state classifier | `packages/android-host/tests/android-e2e/support/releaseGate.ts` |
+| Host-matrix contract test | `packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts` |
+| Platform consistency self-check | `packages/app-lynx/src/pages/PlatformCheck.vue` |
+| URL-domain-parse consolidation | `packages/app-lynx/src/utils/safeParseUrl.ts` |
+| Behavior-baseline fixtures | `packages/app-lynx/tests/contract/` |
+| Repo-localized code-review skill | `.agents/skills/code-review/SKILL.md` |
+| Agent-skills format gate | `scripts/verify-agent-skills.mjs` |
+| Mutation configs | `packages/ugoira/stryker.config.ts`, `packages/update-check/stryker.config.ts` |

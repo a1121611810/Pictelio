@@ -1,57 +1,137 @@
 ---
 type: Concept
 title: Architecture Overview
-description: High-level architecture of Pictelio — a single Lynx (vue-lynx) client packaged into an APK by the @pictelio/android-host build host. Covers monorepo layout, Lynx boot sequence, routing, build tooling, and design system.
+description: High-level architecture of Pictelio — a single Lynx (vue-lynx) client packaged into an APK by the @pictelio/android-host build host. Covers the pnpm monorepo, rspeedy/vite-plus tooling, Lynx boot sequence, and the app-lynx layer map (api / stores / pages+components / primitives / composables / router).
 tags: [architecture, pictelio, lynx, vue-lynx, monorepo]
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-04T18:40:18.128Z
+sources:
+  - id: openwiki-source-8026bb482f86818c760c09c2
+    resource: repo://docs/adr/ADR-0138-app-lynx-vue-router.md
+  - id: openwiki-source-45636227f00f7f4787268a16
+    resource: repo://docs/adr/ADR-0139-app-lynx-pinia-migration.md
+  - id: openwiki-source-ccb57f0f1f9a80a73d056d5a
+    resource: repo://docs/adr/ADR-0141-app-lynx-vue-query-migration.md
+  - id: openwiki-source-af98b36e6440cac152de8efd
+    resource: repo://docs/adr/ADR-0185-vite-plus-1rc-toolchain.md
+  - id: openwiki-source-638aca70ff0d5527fe48d664
+    resource: repo://docs/adr/ADR-0203-webview-client-source-removal.md
+  - id: openwiki-source-37a3826cac55e1a6765ded76
+    resource: repo://docs/adr/ADR-0204-root-command-naming.md
+  - id: openwiki-source-f7450381c200d6ec4a205ffa
+    resource: repo://docs/adr/ADR-0205-md3-baseline-and-scope.md
+  - id: openwiki-source-5b54a58d1b51cd490b0e7162
+    resource: repo://package.json
+  - id: openwiki-source-f30385b29088dcfec96689b0
+    resource: repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java
+  - id: openwiki-source-7f3058d7ffb09ba613ce5aca
+    resource: repo://packages/android-host/package.json
+  - id: openwiki-source-1a2f2bb2203c560331e95f34
+    resource: repo://packages/app-lynx/lynx.config.ts
+  - id: openwiki-source-27ad4aacc4aecfa67f873e90
+    resource: repo://packages/app-lynx/package.json
+  - id: openwiki-source-918bba1cfbc15400a7909164
+    resource: repo://packages/app-lynx/src/api/client.ts
+  - id: openwiki-source-c61ff29522a37a9952976bcf
+    resource: repo://packages/app-lynx/src/api/queryClient.ts
+  - id: openwiki-source-af5ed6908757179faa783708
+    resource: repo://packages/app-lynx/src/api/queryKeys.ts
+  - id: openwiki-source-84ec2415687db8fd5556bb3c
+    resource: repo://packages/app-lynx/src/App.vue
+  - id: openwiki-source-9a7546e555231e8fc1e25e02
+    resource: repo://packages/app-lynx/src/i18n/index.ts
+  - id: openwiki-source-17611863f75e9c8d04ac723a
+    resource: repo://packages/app-lynx/src/index.ts
+  - id: openwiki-source-5bb607428cf5f02e3b918f21
+    resource: repo://packages/app-lynx/src/router.ts
+  - id: openwiki-source-56207443bb39adc11b58fceb
+    resource: repo://packages/app-lynx/src/stores/pinia.ts
+  - id: openwiki-source-0fceb73a785c8a69b2eb9876
+    resource: repo://packages/app-lynx/src/styles/tokens.css
+  - id: openwiki-source-40275cb92c3610938f16ade3
+    resource: repo://pnpm-workspace.yaml
+  - id: openwiki-source-5e1b077422a94ae165e88e4e
+    resource: repo://vite.config.ts
+generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 ---
 
 # Architecture Overview
 
-> **Single-engine (ADR-0203/0204, 2026-09-29):** the SolidJS + Capacitor WebView client (`pictelio-app` / `packages/app`) was **deleted** and the Android host moved to `packages/android-host`. Pictelio is now a single Lynx engine. Sections below that still describe the removed SolidJS/Capacitor stack (boot sequence, Fluent/UnoCSS design system) are **historical** and pending rewrite — see the quickstart backlog.
+Pictelio is a **single-engine Lynx client**: `pictelio-app-lynx` (`packages/app-lynx/`), a Vue 3 application running on the [ReactLynx](https://lynxjs.org/) runtime via the `vue-lynx` custom renderer. The client is packaged into an Android APK by `@pictelio/android-host` (`packages/android-host/`), a Gradle build host that also carries the Java native modules the Lynx client talks to. There is no WebView engine anymore.
+
+> **Single-engine (ADR-0203 / ADR-0204, 2026-09-29).** The SolidJS + Capacitor WebView client (`pictelio-app` / `packages/app`) was **deleted**, and its Android Gradle host moved to `packages/android-host`. Root bare commands `dev` / `build` / `check` / `test` / `preview` now all delegate to `pictelio-app-lynx`; the build host only has explicitly named `:android-host` commands. Client switching and the OTA web-bundle channel were removed with it (ADR-0202 / ADR-0203 decisions 4 & 7).
 
 ## Monorepo Layout
 
-`pixivizer/` is a **pnpm workspace** monorepo:
+The repository is a **pnpm workspace** (`pnpm-workspace.yaml`: root + `packages/*`). There is one application client and a set of shared pure-logic packages consumed by it.
 
-| Package | Location | Purpose |
-|---------|----------|---------|
-| `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx client (Vue 3.5 on ReactLynx runtime) — the only application client |
-| `@pictelio/android-host` | `/packages/android-host/` | Android build host — Gradle project, Java native modules, release scripts, android-e2e + JVM tests |
-| `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
-| `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `isBelowMin` / `checkForUpdate`) consumed by the client (ADR-0089); APK update check survives, OTA web-bundle API removed (ADR-0202/0204) |
-| `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (animated illust) shared package |
-| `@pictelio/ranking-core` | `/packages/ranking-core/` | Ranking shared pure logic — 7 rank modes, `mode`→API mode mapping, cache keys, date handling (ADR-0158) |
-| `@pictelio/search-core` | `/packages/search-core/` | Search advanced-filter shared pure logic — period/bookmark-band/ratio/resolution/AI-override state + request building + URL codec |
-| `@pictelio/net-diagnostics` | `/packages/net-diagnostics/` | Network self-check pure logic — check plan, per-probe judgment/attribution, report formatting (consumed by `/network-check`) |
-| `@pictelio/novel-export` | `/packages/novel-export/` | Novel export shared pure logic — 9-format whitelist/MIME/ext, Pixiv HTML extraction, block parsing, export payload building (ADR-0154) |
+| Package | Location | Role |
+|---------|----------|------|
+| `pictelio-app-lynx` | `packages/app-lynx/` | The **only** application client — `vue-lynx` (Vue 3.5 on ReactLynx). Version `6.x` is the product version source. |
+| `@pictelio/android-host` | `packages/android-host/` | Android **build host** — Gradle project, Lynx native modules, release/sync scripts, android-e2e and JVM/Robolectric tests. Not a client. |
+| `pictelio-website` | `packages/website/` | Astro landing page (GitHub Pages). |
+| `@pictelio/update-check` | `packages/update-check/` | APK update-check pure logic (`checkForUpdate` / `isNewer` / `isBelowMin`). OTA web-bundle API was removed with the WebView client (ADR-0202/0203). |
+| `@pictelio/ugoira` | `packages/ugoira/` | Ugoira (animated illust) shared logic. |
+| `@pictelio/ranking-core` | `packages/ranking-core/` | Ranking pure logic — rank modes, `mode`→API mapping, cache keys, date handling. |
+| `@pictelio/search-core` | `packages/search-core/` | Search advanced-filter pure logic — filter state, request building, URL codec. |
+| `@pictelio/net-diagnostics` | `packages/net-diagnostics/` | Network self-check pure logic (consumed by `/network-check`). |
+| `@pictelio/novel-export` | `packages/novel-export/` | Novel export pure logic — format whitelist/MIME/ext, Pixiv HTML extraction, payload building. |
 
-Root `package.json` delegates commands via `vp run --filter` (vite-plus). The client itself builds with **rspeedy** (`@lynx-js/rspeedy`); the root `vp` CLI wraps oxlint, oxfmt, and vitest.
+`pictelio-app-lynx` depends on the six `@pictelio/*` workspace packages above (`packages/app-lynx/package.json`). Cross-engine shared state (the encrypted `refresh_token`) still follows the shared-storage contract described in [Android Native & Build](../integrations/android-native.md).
 
-**Mobile target:**
-- **Android** — single-engine Lynx client built into an APK by `@pictelio/android-host`. Java native modules (Pixiv API, auth, image loading, translation, download/export, WebDAV, net-diagnostics) live under `/packages/android-host/android/app/src/main/java/io/pictelio/app/`. See [Android Native & Build](/openwiki/integrations/android-native.md).
-- **iOS** — Removed in v3.19.1; the project is **Android-only**.
+## Build & Command Tooling
+
+There are **two** tooling layers, with different jobs:
+
+- **Client bundling — rspeedy.** `packages/app-lynx` builds with [`@lynx-js/rspeedy`](https://github.com/lynx-family/rspeedy) (Rsbuild-based, Lynx-optimized). Its config is `packages/app-lynx/lynx.config.ts`.
+- **Workspace orchestration & lint/fmt — vite-plus.** The root `vite-plus@1.0.0-rc.0` CLI (`vp run --filter`) fans commands out to workspace packages (ADR-0185). Root `vite.config.ts` is the **single source** for repository-wide `oxlint`/`oxfmt` rules.
+
+```mermaid
+flowchart TD
+    subgraph Root package.json
+      A["pnpm dev / build / check / test"] --> B["vp run --filter pictelio-app-lynx ..."]
+      C["pnpm build:android-host"] --> D["vp run --filter @pictelio/android-host build:android"]
+      E["pnpm lint / fmt"] --> F["pnpm vp lint / vp fmt --write"]
+    end
+    B --> G["pictelio-app-lynx: rspeedy dev / build; vue-tsc + tsc; vitest x2"]
+    D --> H["sync version + credentials + lynx build + sync assets + gradlew assembleDebug"]
+    F --> I["root vite.config.ts lint/fmt rules (ADR-0185)"]
+```
+
+*Bare root commands delegate to the Lynx client; the Android host is only reachable via explicit `:android-host` commands; lint/fmt resolve at the repo root.*
+
+Key facts about the client build (`packages/app-lynx/lynx.config.ts`):
+
+- **Credentials are fail-closed.** `credentials.json5` lives inside `packages/app-lynx` (the single source of truth after ADR-0203). `__DEV__` is true only when `NODE_ENV !== 'production'` **and** `PICTELIO_LYNX_DEV=1`; otherwise `__CREDENTIALS__` is compiled to an empty placeholder, never relying on minifier DCE to strip secrets.
+- **Build-time constants** are injected via `source.define`: `__CREDENTIALS__`, `__PUBLIC_CONFIG__`, `__APP_VERSION__` (read from `packages/app-lynx/package.json`), `__DEV__`, `__DISABLE_UPDATE_CHECK__`, `__BENCH_NAV__`, and `__HOME_BLEED_HEADER__`.
+- **vue-lynx plugin options**: `enableCSSSelector: true` (so web-core preview matches class selectors) and `enableIFR: true` (instant first-frame rendering). Tailwind v3 is wired through `rsbuild-plugin-tailwindcss` with `@lynx-js/tailwind-preset`.
+- **Dev proxy**: `/pixiv-img`, `/pixiv-api`, `/pixiv-oauth` are proxied through an HTTPS proxy agent (default `http://127.0.0.1:7897`), with the dev server bound to `127.0.0.1` only.
+- **Web preview** is multi-entry in dev (`main` / `error-preview` / `login-preview`); production keeps only `main`.
+
+Root `package.json` script names follow ADR-0204: `dev`/`build`/`check`/`test`/`preview` → the client, `*:android-host` → the host, and `lint`/`fmt` → `pnpm vp lint`/`fmt`. The Android build chain runs `sync:android-version` + `sync:credentials` (both read from `packages/app-lynx`), then the rspeedy build, `sync-android-assets.mjs`, and `gradlew assembleDebug`/`assembleRelease`.
 
 ## Boot Sequence
 
-The client boots in `packages/app-lynx/src/index.ts`:
+The client boots in `packages/app-lynx/src/index.ts`. Import order matters: side-effect wiring happens at module load, and Tailwind must be a standalone CSS entry (inline `@tailwind` in a `.vue` `<style>` block is not processed by the rsbuild CSS chain).
 
-1. **Vue app creation** — `createApp(App)` from `vue-lynx`.
-2. **Side-effect wiring** — `downloadExecutor` and `downloadSharer` register on module load.
-3. **Tailwind CSS** — imported from `styles/tailwind.css` (must be a standalone CSS entry; inline `@tailwind` in a `.vue` `<style>` block is not processed by the rsbuild CSS chain).
-4. **Pinia** — `app.use(pinia)` (singleton seam, ADR-0139).
-5. **Vue Query** — `app.use(VueQueryPlugin, { queryClient })` (ADR-0141).
-6. **vue-router** — `app.use(router)` (ADR-0138).
+1. **Side-effect wiring** — `downloadExecutor` and `downloadSharer` register on module load.
+2. **Tailwind CSS** — imported from `styles/tailwind.css`.
+3. **Vue app creation** — `createApp(App)` from `vue-lynx`.
+4. **Pinia** — `app.use(pinia)` with the shared singleton from `stores/pinia.ts` (ADR-0139).
+5. **Vue Query** — `app.use(VueQueryPlugin, { queryClient })` with the global client from `api/queryClient.ts` (ADR-0141).
+6. **vue-router** — `app.use(router)` (ADR-0138). Omitting it yields an empty route area.
 7. **Mount** — `app.mount()`.
 
 ```mermaid
 sequenceDiagram
     participant I as index.ts
-    participant A as App.vue
     participant P as pinia (stores/pinia.ts)
     participant Q as queryClient (api/queryClient.ts)
     participant R as router (router.ts)
+    participant A as App.vue
 
-    I->>I: import downloadExecutor/downloadSharer (side-effect wiring)
+    I->>I: import downloadExecutor / downloadSharer (side-effect wiring)
     I->>I: import styles/tailwind.css
     I->>I: createApp(App)
     I->>P: app.use(pinia)
@@ -60,432 +140,107 @@ sequenceDiagram
     I->>A: app.mount()
 ```
 
-> The former SolidJS boot sequence (`packages/app/src/main.tsx`, Fluent web components, `initializeStartupPreferences`) was removed with the WebView client (ADR-0203).
+*The four framework plugins are installed before mount; the router's module-level `router.replace('/discover')` sets the memory-history starting point.*
 
 ## Application Shell
 
-`App.tsx` wraps everything in the QueryClient provider and the router:
+`packages/app-lynx/src/App.vue` is the single root component. It renders:
 
-```typescript
-<QueryClientProvider client={queryClient}>
-  <Router scrollRestoration>{routes}</Router>
-</QueryClientProvider>
-```
+- A root `<page class="Root">` whose class binding is `appearanceClasses(settings.themeColor, settings.resolvedDark)` (theme + dark-mode) and whose inline style carries only `paddingBottom: safeBottom` plus the `--shimmer-motion` reduced-motion gate.
+- `<RouterView v-slot>` wrapped in a route-transition container, with a `<KeepAlive :include="['discover', 'updates', 'shelf', 'me', 'ranking', 'mypixiv']">` so returning to those pages preserves instance/scroll state (ADR-0049). Detail pages are deliberately not cached.
+- Global overlays mounted once: `GlobalFab` (radial navigation FAB, ADR-0120), `SearchSheet` (global bottom-sheet search, ADR-0132), the engine-fallback notice, and the exit-hint / tag-mute snackbars.
+- Startup side effects in `onMounted`: `initRouter()` (auth restore + first route), `runStartupUpdateCheck()`, `initSafeArea()`, the engine-fallback check, notification unread-badge prefetch, and usage-metrics hydration. A dev-only `useApiQuery` health probe exercises the real data path without blocking startup.
 
-- **`queryClient`** (`/packages/app/src/api/queryClient.ts`) — TanStack Query client with custom error normalization
-- **`routes`** (`/packages/app/src/router.tsx`) — `@solidjs/router` `RouteDefinition[]` array (migrated from `@tanstack/solid-router`). See [Routing](#routing).
+## app-lynx Layer Map
 
-## Internationalization (i18n, ADR-0157, v5.0.0)
+The client is organized as **owned layers**, not a flat directory tree:
 
-Both clients were fully hardcoded to Simplified Chinese before v5.0.0 (~321 files with CJK literals). [ADR-0157](/docs/adr/ADR-0157-i18n-selection-and-loading.md) introduced dual-language support (zh-CN source + English):
+- **`api/`** — the Pixiv gateway and server-state layer. `client.ts` (dual-mode transport, 401 single-flight, rate-limit backoff), `types.ts`, `auth.ts`, `illust.ts`, `novel.ts`, `comment.ts`, `search.ts`, `ranking.ts`, `notification.ts`, `ugoira.ts`, `translate.ts` / `nativeTranslate.ts`, `id.ts`, plus `queryClient.ts` and `queryKeys.ts`.
+- **`stores/`** — Pinia client state (see [State Management](#state-management-pinia)).
+- **`pages/` + `components/`** — page components (one per route) and reusable visual components (cards, sheets, overlays, skeletons, the FAB).
+- **`primitives/`** — logic-only factories and hooks with their own lifecycle, kept **outside** Pinia: `createMixFeed`, `useSearch`, `useComments`, `useApiQuery`/`useApiInfiniteQuery`, `createGlobalFab`, `createFabMenu`, plus pure helpers (`generationGate`, `mergeByTime`, ranking/novel-layout utilities).
+- **`composables/`** — Vue-composition behavior units: `useBookmarkMutation`, `useBookmarkPanel`, `useReducedMotion`, `useSheetDismiss`, `useRouteTransition`, `useTextSelection`, `useLongPress`, motion/hero-transition helpers, etc.
+- **`router.ts` + `routerCore.ts`** — the routing shim and its pure-function core (see [Routing](#routing)).
+- **`services/`, `utils/`, `i18n/`, `styles/`** — cross-cutting wiring (backup), pure utilities (download/image/safe-area/appearance/top-inset), the hand-written i18n module, and `tokens.css` + `tailwind.css`.
 
-- **App** — [`@solid-primitives/i18n`](/packages/app/src/i18n/index.ts) (1.09 kB gzip, peer-pinned to solid 2.0 RC). zh-CN dictionary is statically inlined (zero first-frame flicker); `en` is a dynamic `import()` chunk prefetched at module load. `t(key, vars)` always returns a string with a fallback chain `rawT(key) ?? zhCN[key] ?? key` (fallback also interpolates — never leaks raw `{{var}}` templates).
-- **app-lynx** — a hand-written message module (`packages/app-lynx/src/i18n/`, module `ref` + pure `t(key, vars)`), zero `Intl` dependency (Lynx has no `Intl`).
-- **Language preference** — `settings_language` (`""` = follow system / `"zh-CN"` / `"en"`), a cross-engine key. Manual override > system; system locale is only read through an explicit injection point (`ClientInfo.getLocale()` bridge / `navigator.language` dev fallback) because Chromium asynchronously resets the WebView locale (Google #37113860).
-- **Error copy** — `ApiError` gained `messageKey` + `params`; `classifyError`/`toApiError` produce both a Chinese `message` snapshot (logs/tests) and a `messageKey` (rendered via `apiErrorMessage()`). `{{detail}}` server text is data, not translated.
-
-## Server State Management (TanStack Query)
-
-Per [ADR-0093](/docs/adr/ADR-0093-tanstack-query-adoption.md), server state was migrated from hand-written `createStore`/`createResource`/`createSignal`+try-catch patterns to TanStack Query via **thin-store wrappers** (the store files' public API is unchanged; only the internals swapped to TanStack Query hooks). The SolidJS 2.0 migration ([ADR-0144-solidjs-2](/docs/adr/ADR-0144-solidjs-2-migration.md)) moved the client to `@tanstack/solid-query` **6.0.0-rc.3** (v5's peer was solid 1.x-only):
-
-- **Key factory** — [`queryKeys.ts`](/packages/app/src/api/queryKeys.ts) returns `as const` tuples (`["illust", "bookmarks", userId, restrict]`, `["illust", "feed", tab, subTab]`, `["search", "illust", word, sort, target]`, …) so keys are precise and prefix-invalidatable (`invalidateQueries({ queryKey: ["illust"] })` clears all illust caches on logout).
-- **Pagination** — `createInfiniteQuery` with Pixiv's `next_url` cursor; `select` flatMaps `data.pages` into a single render array (`structuralSharing: false` is hardcoded by the Solid adapter, safe because item references stay identical and `<For>` reconciliation skips unchanged elements).
-- **Error normalization** — [`normalizeQueryError`](/packages/app/src/api/normalizeQueryError.ts) collapses TanStack `Error` and `client.ts` `ApiError` into one `ApiError` shape.
-- **Defaults** — [`queryClient.ts`](/packages/app/src/api/queryClient.ts): `staleTime 5min`, `gcTime 30min`, `retry: 2` with full-jitter backoff (`random(0, min(cap, 2^attempt * base))`, AWS-style anti-thundering-herd), `refetchOnWindowFocus: false` (Capacitor focus is unreliable; foreground resume is handled by `authStore`'s `appStateChange` listener).
-
-The store factory `createTQFeedStore` and the six per-tab feed stores sit on top of this layer (see [Feed & Browsing](/openwiki/domain/feed-and-browsing.md#feed-store-factory)).
-
-## Immediate Navigation Pattern
-
-Since v3.20.0, the project adopted the **immediate navigation pattern**: routes render chrome + skeleton screens instantly, and data loads in the component after mount. With the migration to `@solidjs/router` (v3.22.0, see [spec](/docs/spec/routing-migration.md)), this is now the **only** option — `@solidjs/router` does not have loader/Suspense concepts, so route transitions are synchronous by nature.
-
-```
-用户点击链接
-  → 路由匹配（纯 Signal，零 async）
-  → 组件即时挂载，无 Suspense 过渡
-  → 渲染页面 chrome + 骨架屏
-  → onMount / createEffect 发起数据请求
-  → 数据到达 → 骨架屏替换为真实内容
-```
+The dependency direction is: **pages/components → primitives/composables → stores + api/client → native modules or fetch**. Pages own their data-loading lifecycle; stores own global client state; `api/` owns the transport and cache.
 
 ## Routing
 
-Routes are defined in `/packages/app/src/router.tsx` as a `@solidjs/router` `RouteDefinition[]` array (migrated from `@tanstack/solid-router` in v3.22.0). See [spec](/docs/spec/routing-migration.md).
-
-Key differences from TanStack Router:
-- **No loaders:** `@solidjs/router` does not have a loader concept. All data loading happens in component `onMount`/`createEffect`.
-- **No Suspense transitions:** Route matching uses pure Signal + `createMemo`, no pending/Suspense state. Route switches are synchronous — no white flash.
-- **Simpler API:** `path + component` only. No `createRoute()`, `asRoute()`, route tree construction, or `declare module` type registration.
-- **Path syntax:** `$id` → `:id`, catch-all `$` → `*all`.
-- **Outlet:** Child routes pass as `props.children` rather than TanStack `<Outlet>`.
-- **History/navigate:** `navigate("/path")` with optional options as second argument.
-
-| Route | Component | Data Loading |
-|-------|-----------|-------------|
-| `/login` | `Login` | — |
-| `/home` | `HomePage` | C-shell `SideNavShell` + 6 feed stores (recommended/follow/bookmarks × illust/novel); data loads via `ensureLoaded` in `useFeedActivation` |
-| `/illust/:id` | `IllustDetail` | `createEffect` on mount |
-| `/novel/:id` | `NovelDetail` | `createEffect` on mount |
-| `/me` | `PersonalCenter` | — |
-| `/user/:id` | `PersonalCenter` | — |
-| `/user/:id/illusts` | `UserIllusts` | `onMount` → `load(uid, contentType())` |
-| `/user/:id/following` | `FollowListPage` | `onMount` → `load()` |
-| `/user/:id/followers` | `FollowListPage` | `onMount` → `load()` |
-| `/my/followers` | `FollowListPage` | `onMount` → `load()` |
-| `/search` | `Search` | — |
-| `/ranking` | `Ranking` | `createRankingStore` per `(mode, date)` InfiniteQuery, page-order-preserving flatten (ADR-0158) |
-| `/downloads` | `DownloadManager` | `downloadStore` (Solid shell over `utils/downloadManager`) |
-| `/network-check` | `NetworkCheck` | `@pictelio/net-diagnostics` `evaluate()` over `collectNetDiagInput` |
-| `/about` | `About` | — |
-| `/debug` | `DebugImage` | — |
-| `/client-switch` | `ClientSwitch` | Engine-switch info page (engine diff, warnings, loading mask); triggers restart via `ClientInfoPlugin` |
-| `/settings` | `Settings` | — |
-| `/scroll-restoration-confirm` | `ScrollRestorationConfirm` | Second-confirmation page before enabling persistent scroll restoration |
-| `/image-host` | `ImageHostSettings` | — |
-| `/image-cache` | `ImageCacheSettings` | — |
-| `/*all` | `HomePage` | Redirected to `/login` if unauthenticated via auth guard |
-
-> **v3.21.5+ (commit `9aba13f`):** All 17 route components were converted from `lazy(() => import(...))` to **top-level static imports**. In a local APK, lazy loading provides no network benefit — it only added 17 extra chunk requests. Routes are resolved synchronously from the single JS bundle. **v3.22.0:** With the migration to `@solidjs/router`, there are no route-level loaders or pending states at all — the framework is inherently synchronous.
-
-## Splash Screen Lifecycle (v3.21.0)
-
-The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with dismiss controlled from JavaScript via a custom Capacitor plugin bridge:
-
-1. **Native setup**: `MainActivity.onCreate()` calls `SplashScreen.installSplashScreen(this)` with `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The `keepSplashVisible` `AtomicBoolean` starts as `true`.
-2. **JS bridge**: `splashBridge.ts` exports `markContentReady()`, which calls `AuthPlugin.hideSplash()`. The native method sets `keepSplashVisible` to `false`, triggering the SplashScreen exit.
-3. **Idempotent**: `markContentReady()` guards with a module-level `contentReady` flag; subsequent calls are no-ops.
-4. **No `@capacitor/splash-screen` dependency**: The bridge uses the existing `AuthPlugin` Capacitor plugin, avoiding an additional npm dependency.
-
-**Close decision matrix:**
-
-| Route | Who closes splash | When |
-|-------|-------------------|------|
-| `/login` | `Login.tsx` `onMount` | Login page renders (user needs to authenticate) |
-| `/home` | `HomePage.tsx` `onMount` | **Immediate on mount** — `markContentReady()` called directly in `onMount`. Splash exit animation (120ms scale+fade) runs from `MainActivity`. Skeleton is guaranteed visible because `createTQFeedStore` now uses `enabled: false` (ADR-0042) and data loading is deferred via `setTimeout(0)` (ADR-0043). |
-| Other routes (about, settings, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
-
-> **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was made invisible — the native Splash handled the full loading indicator lifecycle, eliminating a redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.
-
-> **Current (loading overlay re-introduced):** The `__root.tsx` loading overlay has been re-introduced as a full-screen `LoadingSpinner` wrapper (`<Show when={!isLoading()}>`) shown during the auth initialization phase — from app render until `initializeAuth()` resolves (`setIsLoading(false)`). After auth completes, the real route content renders. This provides visual feedback during the auth-boot window without router-level lazy loading indicators. The catch-all route `/*all` was also changed from `Login` to `HomePage`, so unknown paths now render the home page (which redirects to `/login` if unauthenticated via the auth guard in `__root.tsx`).
->
-> **v3.21.6+ (commit `6ff2c6d`):** TabFeedPage splash dismiss refined from immediate `onMount` → `markContentReady()` to a **loading-triggered strategy**: a `createEffect` watches `loading()` (TanStack Query fetch start signal), and when `loading()` becomes `true`, it calls `markContentReady()` inside `requestAnimationFrame` — ensuring the skeleton screen has been painted to the display before the native Splash exits. A 100ms `setTimeout` fallback (reduced from 500ms) guarantees the splash is never left visible indefinitely. Splash exit animation duration reduced from 280ms to 100ms.
->
-> **v3.21.7+ (commit `fa2015c`):** Loading-triggered strategy reverted back to simple `onMount` → `markContentReady()`. The `createEffect` watching `loading()` and the 100ms fallback timeout were both removed. This simplification is safe because the native splash exit animation was also removed — the splash now disappears immediately rather than animating, so there is no need to delay dismissal for animation synchronization. `MainActivity` no longer applies scale+fade to the splash icon view; it calls `splashScreenView.remove()` directly.
->
-> **v3.21.8+ (committed, loading-triggered + exit animation):** TabFeedPage splash dismiss changed from a simple 400ms `onMount` timeout back to a **loading-triggered strategy**: a `createEffect` watches `loading()` (TanStack Query fetch start signal), and when `loading()` becomes `true`, it sets a 350ms `setTimeout` for `markContentReady()` — ensuring the skeleton screen has been painted to display before the native Splash exits. An 800ms `onMount` fallback guarantees the splash is never left visible indefinitely. The exit animation was **reintroduced** in `MainActivity` (`setOnExitAnimationListener`): the splash icon scales to 1.8x, fades to 0 over 120ms with `DecelerateInterpolator(2f)`, then the view is removed. This combines the skeleton-show guarantee of v3.21.6 (via `loading()` signal) with the visual polish of the original ADR-0040 animation.
->
-> **Current (v3.22.0, simplified):** The loading-triggered strategy was replaced by a simple `onMount` → `markContentReady()` in HomePage. The skeleton guarantee is now achieved through **ADR-0042** (all queries `enabled: false`, data only loads on explicit `ensureLoaded`) and **ADR-0043** (data load deferred via `setTimeout(0)` to ensure skeleton paints before fetch). Splash exit animation retained.
+Routing uses the official **vue-router** with `createMemoryHistory()` ([ADR-0138](../../docs/adr/ADR-0138-app-lynx-vue-router.md)). The earlier hand-rolled in-memory router was dropped after the empty-render root cause was found to be a template-compiler trap: kebab-case `<router-view>` compiles as a native custom element; the template must use PascalCase `<RouterView />`.
 
-This ensures the splash screen is dismissed at the earliest meaningful point — either when login UI is ready, feed content is visible, or the app has finished loading for non-feed pages. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge) for full details.
+`packages/app-lynx/src/router.ts` is a thin shim keeping the page call surface stable (`navigate` / `goBack` / `requestBack` / `registerBackGuard` / `ensureAuth` / `resetHistory` / `routeState` / `currentParams` / `exitHint`); `routerCore.ts` holds the pure back-route adjudication and matching logic under unit test.
 
-**Root layout** (`/packages/app/src/routes/__root.tsx`) provides:
-- **Auth-loading wrapper** — Full-screen `LoadingSpinner` via `<Show when={!isLoading()}>` shown during the auth initialization phase (from app render until `initializeAuth()` resolves)
-- NavBar component (auto-hiding on scroll)
-- Bottom navigation bar
-- Pull-to-refresh behavior
-- Update dialog (startup check)
-- Error boundary
-- Page transition wrapper
+Key routing facts:
 
-## Design System
+- **Route meta** drives guard behavior: `requiresAuth` (business pages only), `backBehavior: 'exit'` (`/update`, `/error`), and a **required** `topInset: 'self' | 'bleed'` (`#900`).
+- **Initial route is `/discover`** (rendered by `Recommended.vue`) — first-frame content: authenticated users see the feed skeleton immediately; unauthenticated users are `replace`d to `/login`.
+- **Auth is a synchronous `beforeEach` guard** that does not await the network. During bootstrap (`restoreToken` not yet resolved) navigation is allowed through; after `markBootstrapDone()` the guard redirects unauthenticated business-page access to `/login` with replace semantics.
+- **"Can go back" = session mirror stack ∧ queue watchdog.** `memory history` cannot be physically cleared and retains stale session entries across logout→re-login, so a `_sessionStack` mirror carries the clear-stack semantics, with `hasBackEntryIn(history)` as a drift watchdog.
+- **System back** (`pictelioBack` global event) runs the `evaluateBackRoute` chain in `routerCore.ts`: close modal → back-guards → history → `backBehavior: 'exit'` → root double-tap exit hint.
+- **benchNav deep links** (`__BENCH_NAV__`-gated) let native `am start --es benchNav <scenario>` reach any page for device verification.
 
-Pictelio enforces **Microsoft Fluent Design System 2**:
+Top-level destinations are `/discover`, `/updates`, `/shelf`, `/advanced` (the four FAB tabs), with media/list/detail routes (`/illusts`, `/illust/:id`, `/novels`, `/novel/:id`, `/novel/:id/intro`), user/social routes (`/user/:id`, `/following`, `/mypixiv`, …), and utility pages (`/ranking`, `/downloads`, `/me`, `/network-check`, `/platform-check`, `/notifications`, `/mute-tags`, `/later`, `/continue`, …). `/update` and `/error` are deliberately not `requiresAuth` and always exit on back.
 
-- **Tokens:** Colors, spacing, border-radius, shadows as CSS variables in `/packages/app/src/styles/tokens.css` (derived from `@fluentui/tokens`)
-- **Animation:** Only Fluent-authorized curves (decelerate, standard, accelerate, linear) and durations (100/150/200/300/500ms)
-- **States:** All interactive elements must cover hover, active, and focus-visible
-- **Touch targets:** Minimum 40×40px
-- **Web Components:** Fluent badge, button, checkbox, dialog, divider, drawer, message-bar, radio, spinner, switch, textarea
+## State Management (Pinia)
 
-### Fluent Dialog Slot Contract (ADR-0087)
+Client state migrated from hand-written module-level `ref` singletons to **Pinia setup stores** ([ADR-0139](../../docs/adr/ADR-0139-app-lynx-pinia-migration.md), ADR-0140). `stores/pinia.ts` exports a single `pinia = createPinia()` shared by `index.ts`, router guards, and tests so a second instance can't split the store space.
 
-`@fluentui/web-components@3`'s `<fluent-dialog>` shadow root contains only an anonymous `<slot>`; the named slots (`title`, `action`) live on the child `<fluent-dialog-body>`. Early code used a stale contract (`slot="content"`, `slot="actions"` plural, or no body wrapper), so the title/body/buttons failed to project and dialogs degraded into a full-width mask-less bar. The shared [`FluentDialog`](/packages/app/src/components/ui/FluentDialog.tsx) wrapper now:
+Stores expose one `useXStore()` accessor each: `authStore`, `settingsStore`, `searchSheetStore`, `searchHistoryStore`, `modalStack`, `updateStore`, `globalFab`, `downloadStore`, `engineFallbackStore`, `notificationStore`, `novelTranslateStore`, `tagNeighbor`, `usageMetrics`, `watchLaterStore`, `watchlistStore`, `continueReadingStore`, `browsingHistoryStore`, `relatedInjection`, `navMigrationNotice`.
 
-1. Always wraps children in `<fluent-dialog-body>`.
-2. Remaps `slot="actions"` → `slot="action"` and strips `slot="content"` (falls into the body's default `.content` slot); `slot="title"` and un-slotted children pass through.
-3. Keeps the `open` → `show()`/`hide()` conversion (the host element has no `open` property binding) and adds `showWhenReady` — a rAF poll (120-frame cap + unmount guard) that waits for the async custom-element upgrade to bind the inner `<dialog>` before calling `show()`, re-checking `props.open` to avoid re-opening a quickly-closed dialog.
+- **`watchlistStore` stays outside Pinia** (non-reactive `Set`/`Map` cache), and **instance-level primitives** (`useSearch`, `createMixFeed`, `useComments`, `createGlobalFab`) are deliberately not stores — their lifecycle is page/component-scoped.
+- Tests isolate each case with `setActivePinia(createPinia())`; the old `resetXxxForTest` hooks were deleted.
 
-This is the real root cause of the "dynamically-created `<fluent-dialog>` never opens" symptom previously worked around by the pure-CSS `StartupUpdateDialog` overlay. The race is not reproducible under happy-dom (synchronous `<dialog>`/rAF mocks), so it is verified in a real browser, not unit tests.
+## Data Fetching (TanStack Vue Query)
 
-### A2 Cardization (ADR-0069 → ADR-0074)
+Server state uses **TanStack Vue Query v5** ([ADR-0141](../../docs/adr/ADR-0141-app-lynx-vue-query-migration.md)). It layers over the unchanged `apiClient` seam — the 401 single-flight lock stays in `apiClient` (not Vue Query) to preserve the Java `PixivApiCore.synchronized + isRefreshing` contract.
 
-Since v4.x the app has rolled out a unified **"A2" card visual language** across the main client, then corrected it to the real Windows 11 / Fluent 2 spec (ADR-0074):
+- **`api/queryKeys.ts`** — a centralized `as const` key factory (`illusts`/`novels`/`users`/`search`/`watchlist`/`notifications`/`settings` namespaces) enabling prefix-based `invalidateQueries`.
+- **`api/queryClient.ts`** — the global `QueryClient` singleton: `staleTime 0` (pessimistic refresh), `gcTime 30s`, `retry false`, `refetchOnWindowFocus false` (Lynx has no focus event), `refetchOnReconnect true`, `placeholderData keepPreviousData`, `structuralSharing true`. Per-prefix `gcTime` overrides: 5 minutes for stable data (detail / users / novels), 0 for feeds/search.
+- **`primitives/useApiQuery.ts` / `useApiInfiniteQuery.ts`** — helpers wrapping `useQuery`/`useInfiniteQuery` with a `withGenerationGate` to drop stale responses (still needed because `cancelQueries` aborts but does not cancel the in-flight fetch).
+- **`composables/useBookmarkMutation.ts`** — a `useMutation`-backed optimistic bookmark toggle with rollback and the 350 ms animation contract.
+- **`createMixFeed`** remains a factory (multi-source 4:1 merge plus throttle/generation-gate orchestration can't be expressed in Vue Query), but gained an internal `AbortController` for real cancellation.
 
-| Dimension | Value (post-ADR-0074) |
-|-----------|-----------------------|
-| Card radius | 8px (`--borderRadiusXLarge`) |
-| Card border | 1px `--colorNeutralStroke1` |
-| Shadow | none (border + background layering instead) |
-| Card surface | `--colorNeutralBackground1` on `--colorNeutralBackground2` page |
-| Overlays/drawers | 16px (`--borderRadius3XLarge`) |
+## API Client & Dual-Mode Transport
 
-The glass `NavBar` capsule remains a deliberately separate visual family (ADR-0044) and is **not** cardized. Canonical glossary: `docs/adr/glossary-ui-cards.md`.
+`packages/app-lynx/src/api/client.ts` is the Pixiv gateway seam. It exposes `get` / `post` / `requestRaw` and runs in two modes:
 
-The parallel **app-lynx** client instead aligns to **Material Design 3** (M3) tokens/components (see [app-lynx](#app-lynx-vue-lynx-client)).
+- **Web-core (dev preview)** — `fetch` via `fetchWrapper` (`globalThis.fetch`; the Lynx worker shadows bare `fetch`), with `rewriteUrl` mapping paths to the rspeedy `/pixiv-*` proxies and Bearer tokens attached to those prefixed paths.
+- **Native LynxView** — detected by `isNativeMode()` (checking for actual `Pictelio*` native modules, not bare `NativeModules` existence). Requests forward to `PictelioApiModule` in Java, which attaches the Bearer header and performs the 401 refresh; **JS is zero-knowledge for the access token**.
 
-Style is enforced via code review and documented in the CI linting pipeline.
+Both modes share the 401 single-flight `refreshPromise`, an auth-ready gate (`authReadyProvider`, so first-frame requests wait for `restoreToken` instead of racing into 401), and 429 rate-limit backoff (`rateLimitBackoff.ts`, configurable via `settingsStore`).
 
-## CSS Architecture
+## Design System (Material Design 3)
 
-CSS loads in strict order via `main.tsx` imports:
+The Lynx client aligns to **Material Design 3** (ADR-0205–0212), replacing the deleted WebView client's Fluent/UnoCSS stack:
 
-1. **`reset.css`** — `modern-css-reset`, normalizes browser defaults
-2. **`tokens.css`** — Fluent design tokens as CSS custom properties (~500 lines)
-3. **`base.css`** — Typography, layout utilities, prose styles (~300 lines)
-4. **`virtual:uno.css`** — UnoCSS-generated utility classes (on-demand scanning)
-5. **`novel-reader.css`** — Novel-specific reading layout styles
+- **Tokens** are M3 `--md-*` CSS variables in `styles/tokens.css`; the root `<page>` surface color and shapes/typography come from this token set.
+- **Theme color & dark mode** use **static pre-generated palettes** (6 themes × light/dark via `scripts/generate-theme-palettes.mjs`) — zero runtime color math. `appearanceClasses(themeColorId, resolvedDark)` binds the root class; `utils/themeColor.ts` and `utils/darkMode.ts` are the id/class/validation single sources of truth.
+- **M3 components** are consolidated where geometry matters (`M3Switch.vue`, `M3SegmentedButton.vue`, M3 snackbar/sheet shapes).
+- **Styling** is Tailwind v3 with `@lynx-js/tailwind-preset`: spacing in `vw` and font sizes in `rpx` (viewport/Responsive-pixel units per the Lynx unit glossary).
 
-Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packages/app/uno.config.ts`.
+## Internationalization (i18n)
 
-## Build Tooling
+The client uses a **hand-written message module** (`packages/app-lynx/src/i18n/index.ts`) rather than `vue-i18n`, because the Lynx runtime has no `Intl`/DOM. It provides:
 
-| Tool | Config | Purpose |
-|------|--------|---------|
-| vite-plus / Rolldown | `vite.config.ts` | Wraps Rolldown bundler with Oxc minifier (production), dev mode uses Vite dev server; integrates oxlint, oxfmt, vitest |
-| Rolldown + Oxc | (via vite-plus) | Production bundler and Rust-based minifier (replaced terser in v3.18.0) |
-| UnoCSS | `uno.config.ts` | On-demand atomic CSS generation |
-| TypeScript | `tsconfig.json` | Strict mode, path aliases (`@/`) |
-| oxlint | `.oxlintrc.json` | Fast Rust-based linter |
-| oxfmt | (oxlint config) | Opinionated formatter |
+- `zh-CN` (source) + `en` dictionaries under `i18n/locales/`, a module-level `locale` ref, `setLocale()` / `followSystemLocale()`, and `t(key, vars)` with interpolation.
+- `apiErrorMessage()` rendering `messageKey` + `params` with a raw `message` snapshot fallback, so server text (`{{detail}}`) stays data.
+- The `Accept-Language` header for web-mode requests derives from the same `locale` (ADR-0200).
 
-**Credentials injection:** Pixiv API credentials are stored in `credentials.json5` (gitignored). `vite.config.ts` splits them into `__CREDENTIALS__` (full, for native plugins) and `__PUBLIC_CONFIG__` (non-sensitive, for module code). Sensitive fields are never inlined into the production JS bundle.
+## Native Side (Android Host)
 
-**Proxy:** Web dev mode uses a Vite proxy for `/pixiv-img` to Pixiv's image CDN. Proxy URL is read from `https_proxy`/`HTTP_PROXY` env vars or defaults to `http://127.0.0.1:10808`.
+`packages/android-host` is the build host, not a second client. Its `android/` Gradle project contains:
 
-## app-lynx (vue-lynx Client)
+- **Lynx native modules** under `android/app/src/lynx/java/io/pictelio/app/`: `LynxActivity` + `LynxRuntimeInitializer` (the runtime host), `PictelioApiModule`, `PictelioAuthModule`, `PictelioAppModule`, `PictelioSecureStorageModule`, `PictelioImageService`, `PictelioDownloaderModule`, `PictelioGalleryModule`, `PictelioTranslateModule`, `PictelioTranslateCacheModule`, `PictelioWebDavModule`, `PictelioShareModule`, `PictelioClipboardModule`, `PictelioPrefsModule`, `NetDiagModule`, `UgoiraStreamEngine`.
+- **Core Java services** under `android/app/src/main/java/io/pictelio/app/`: `PixivApiCore`, `SecureStorageCompat`, `ImageHostConfig`, `WebDavClient`, `NovelExporter` + encoders, `PictelioDownloader`, `ShareHelper`, etc.
 
-`packages/app-lynx/` is a **parallel rendering client** — a Vue 3 app running on the [ReactLynx](https://lynxjs.org/) runtime via `vue-lynx` (a Vue 3 custom renderer). It shares the same Pixiv backend credentials and API format as the main SolidJS app but targets Lynx's native rendering pipeline rather than a WebView. Status: **MVP pre-alpha**, now running inside the main Android app via [Lynx Brownfield Integration](/openwiki/integrations/android-native.md#lynx-brownfield-integration-51) with cross-client login sharing (same Keystore-backed token storage).
-
-### Build & Styling
-
-- **Bundler:** [Rspeedy](https://github.com/lynx-family/rspeedy) (`@lynx-js/rspeedy`), a Lynx-optimized build tool
-- **CSS:** [Tailwind CSS v3](/packages/app-lynx/tailwind.config.ts) with `@lynx-js/tailwind-preset`, configured with `spacing` in `vw` and `fontSize` in `rpx` (see [ADR-0046](/docs/adr/ADR-0046-app-lynx-tailwind.md)). All 6 pages migrated from scoped CSS to Tailwind utilities (T2–T8).
-- **Design tokens:** Color palette adapted to Tailwind's semantic color scale; components were systematically aligned to **Material Design 3** (M3) — FAB, chips, dialogs, snackbar, segmented buttons, pressed-state layers, and the official switch `handle-container` geometry (commit `bf3c4fb` and follow-ups)
-- **Theme color (ADR-0152, v5.0.0):** user-selectable theme color via **static pre-generated M3 palettes** — each non-default theme is a `.theme-*` class in `tokens.css` overriding the full `--md-*` role set (seed → `SchemeTonalSpot`), switched by a root `<page>` class binding; default `sky` reuses `.theme-sky`. Persisted device-level as `settings_theme_color` (`utils/themeColor.ts` is the id/class/validation single source of truth). Chosen over runtime `@material/material-color-utilities` because Lynx's dynamic CSS-variable writes are unproven.
-- **Dark mode (ADR-0180, v5.4.0):** a three-state `light | dark | system` appearance (default `system`, persisted device-level as `settings_dark_mode` via `PictelioPrefs`/idbKV). 12 static pre-generated M3 palettes — **6 themes × light/dark** via `.theme-X.dark` compound selectors (specificity (0,2,0) > the light single-class) — come from `scripts/generate-theme-palettes.mjs` at build time (zero runtime color math, continuing ADR-0152). `utils/darkMode.ts` is the id/class/validation single source of truth (mirroring `themeColor.ts`), and `settingsStore.resolvedDark` is the single normalized output all consumers read, bound to the root `<page>` via the pure `appearanceClasses(themeColorId, resolvedDark)`. Detection uses a **self-built native channel** (`PictelioAppModule.getDarkMode(cb)` subscribe-then-pull + `pictelioDarkMode` global event, mirroring ADR-0168's insets pattern; web-core falls back to `matchMedia`) because the official host channel is unwired in vue-lynx and JS `matchMedia`/`@media` are unavailable. Status-bar icon color and the splash theme sync with `resolvedDark` — revising ADR-0168 D4's pinned-light icons. See [ADR-0180](/docs/adr/ADR-0180-lynx-dark-mode.md) and [spec](/docs/specs/lynx-night-mode.md).
-- **M3 switch component (ADR-0179, v5.4.0):** the 12 inline M3 switch markups (10 in `Me.vue`, 2 in `SettingsEndpoint.vue`) were consolidated into a single [`M3Switch.vue`](/packages/app-lynx/src/components/M3Switch.vue) — the single source of truth for the M3 v0.192 switch geometry (track/thumb/handle sizes) + 4 color tokens + 2 motion tokens. It exposes only a `checked` prop (controlled state); the a11y binding and `@tap` toggle stay on the parent row to preserve the "tap anywhere on the row" UX and avoid double TalkBack announcement. See [ADR-0179](/docs/adr/ADR-0179-app-lynx-m3-switch-component.md).
-- **Responsive strategy:** Width/spacing/padding use `vw` (viewport-relative), font sizes use `rpx` (Lynx responsive pixels). Rationale in [ADR-0086](/docs/adr/ADR-0086-lynx-responsive-units.md) and [glossary-lynx-units](/docs/adr/glossary-lynx-units.md).
-
-### Routing
-
-Migrated to the official **vue-router** (`vue-router@4.6.4`, upgraded to `5.3.1` in the ADR-0184 dependency batch, + `createMemoryHistory()`) in [ADR-0138](/docs/adr/ADR-0138-app-lynx-vue-router.md). The prior hand-rolled in-memory router was a workaround for a misdiagnosed bug: `RouterView` rendered empty because the **kebab-case `<router-view>` tag was compiled as a native custom element** by the vue-lynx template compiler — PascalCase `<RouterView />` works on vue-lynx 0.5.1 + web-core 0.23.1 (verified on both web-core preview and native emulator). [`router.ts`](/packages/app-lynx/src/router.ts) is now a thin shim that keeps the page call surface unchanged (`navigate`/`goBack`/`requestBack`/`registerBackGuard`/`ensureAuth`/`resetHistory`/`routeState`/`currentParams`/`exitHint`); [`routerCore.ts`](/packages/app-lynx/src/routerCore.ts) is retained as the pure-function back-route adjudication + matching anchor for unit tests. Auth is enforced by a global `router.beforeEach` guard + `meta.requiresAuth` (business pages only — `/update`, `/error`, `/login` are deliberately unmarked).
-
-Routes: `/login`, `/recommended`, `/illusts`, `/illust/:id`, `/novels`, `/novel/:id`, `/user/:id`, `/user/:id/following`, `/user/:id/followers`, `/following`, `/bookmarks`, `/me`, `/update`, `/error`.
-
-The four global tabs (推荐 / 插画 / 小说 / 我的) are defined once in [`navTabs.ts`](/packages/app-lynx/src/components/navTabs.ts). Since [ADR-0120](/docs/adr/ADR-0120-app-lynx-radial-nav-fab.md) they are rendered by a radial double-ring FAB ([`GlobalFab.vue`](/packages/app-lynx/src/components/GlobalFab.vue) + the [`createGlobalFab`](/packages/app-lynx/src/primitives/createGlobalFab.ts) deep module) that replaced the old [`NavigationBar.vue`](/packages/app-lynx/src/components/NavigationBar.vue) and per-page FABs — outer ring = 4 navigation tabs, inner ring = page actions (refresh / back-to-top). The 插画 tab routes to the new `/illusts` page (`IllustList.vue`, recommended/following sub-tabs + waterfall). `/following` is retained as a route but is no longer reachable from the nav. `/update` (forced-update page) and `/error` (session-expiry page) both use `backBehavior: 'exit'` — the back key exits the app with no return path.
-
-**Initial route: `/recommended`** (first-frame content pattern, issues [#61](https://github.com/user/pixivizer/issues/61)/[#63](https://github.com/user/pixivizer/issues/63)). The default route was changed from `/login` to `/recommended` so that already-authenticated users see the recommended feed skeleton immediately on startup, eliminating the login-page flash. Unauthenticated users are redirected to `/login` by `initRouter`'s auth guard with replace semantics (no history push, preserving [ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) semantics).
-
-> **IFR note:** IFR (Instant First-Frame Rendering, `enableIFR: true`) was evaluated via 32 benchmark runs on real devices and **rejected** — it is an FCP lever, not an interaction lever, and carries a gzip ×2.2, TTI ×1.36 cost. See [`docs/research/vue-lynx-benchmark-ifr.md`](/docs/research/vue-lynx-benchmark-ifr.md).
-
-### State Management (Pinia)
-
-app-lynx state management migrated from **hand-written module-level `ref` singleton stores** to **Pinia setup stores** ([ADR-0139](/docs/adr/ADR-0139-app-lynx-pinia-migration.md), [ADR-0140](/docs/adr/ADR-0140-globalfab-pinia-migration.md), [glossary](/docs/adr/glossary-app-lynx-pinia.md)) — a pure refactor with zero behavior change. Eight stores in [`src/stores/`](/packages/app-lynx/src/stores/) are now `defineStore(id, () => {...})` setup stores, each exposing a single `useXStore()` accessor: `useAuthStore`, `useSettingsStore`, `useSearchSheetStore`, `useSearchHistoryStore`, `useModalStack`, `useClientSwitchStore`, `useUpdateStore`, and `useGlobalFabStore` (the last replacing the deleted `getGlobalFab()` API). [`stores/pinia.ts`](/packages/app-lynx/src/stores/pinia.ts) exports a single `pinia = createPinia()` that [`index.ts`](/packages/app-lynx/src/index.ts) installs via `app.use(pinia)` — shared by router guards and tests so a second `createPinia()` can't split the store space. `watchlistStore.ts` is **not** migrated (non-reactive `Set`/`Map` cache), and instance-level primitives (`useSearch`, `createMixFeed`, `useComments`, `createGlobalFab`) stay outside Pinia. Tests isolate each case with `setActivePinia(createPinia())`; the old `resetXxxForTest` hooks were deleted. New dependency: `pinia@^4.0.3` (+ `@vue/devtools-api` peer).
-
-### Data Fetching (TanStack Vue Query)
-
-app-lynx adopted **TanStack Vue Query v5** ([`@tanstack/vue-query@5.102.8`](https://tanstack.com/query/latest/docs/framework/vue/overview)) as its server-state layer in [ADR-0141](/docs/adr/ADR-0141-app-lynx-vue-query-migration.md) — spike-validated by a 6-scenario browser POC plus on-device probes that overturned several doc-based assumptions (lynx `AbortSignal` *is* honored; DNS failures `resolve` with `res.ok === false` rather than reject). It layers over the unchanged [`apiClient`](#api-client) seam: the 401 single-flight lock stays in `apiClient` (not vue-query) to preserve the Java `PixivApiCore.synchronized + isRefreshing` contract.
-
-- **[`api/queryKeys.ts`](/packages/app-lynx/src/api/queryKeys.ts)** — a centralized query-key factory (`illusts`/`novels`/`users`/`search`/`watchlist`/`settings` namespaces, plus `mutationKeys` and `invalidateKeys`) enabling prefix-based `invalidateQueries`.
-- **[`api/queryClient.ts`](/packages/app-lynx/src/api/queryClient.ts)** — a global `QueryClient` singleton with `staleTime 0` (pessimistic refresh), `gcTime 30s`, `retry false`, `refetchOnWindowFocus false` (lynx has no focus event), `placeholderData keepPreviousData`, `structuralSharing true`; 5-minute `gcTime` overrides for stable data (detail/user/ugoira) and `gcTime 0` for feeds/search.
-- **[`primitives/useApiQuery.ts`](/packages/app-lynx/src/primitives/useApiQuery.ts)** / **`useApiInfiniteQuery.ts`** — helpers wrapping `useQuery`/`useInfiniteQuery` with a shared `withGenerationGate` helper (drop stale responses that resolve after a newer query — still necessary because vue-query's `cancelQueries` aborts but does not cancel the in-flight fetch).
-- **[`composables/useBookmarkMutation.ts`](/packages/app-lynx/src/composables/useBookmarkMutation.ts)** — a `useMutation`-backed bookmark toggle replacing the `createBookmarkToggle` primitive (optimistic flip in `onMutate`, rollback on `onError`, 350ms `onChange`), with the `bookmarked`/`count`/`busy`/`errorMsg`/`toggle` getter surface unchanged so `BookmarkButton.vue` templates didn't move.
-- **`createMixFeed`** stays a factory (multi-source 4:1 merge + throttle/generation-gate orchestration can't be expressed in vue-query) but gained an internal `AbortController` whose signal is passed to each source for real cancellation. `useWatchlistMutation` and `useApiCommentsQuery` were deleted as zero-consumer code; `useApiInfiniteQuery` is retained as the future migration template.
-
-Cost: **+180.5 KB** raw bundle (758.9 → 939.4 KB; lynx TASM binary is not gzipped). The migration also added the app-lynx pre-push machine gate — see [Testing Strategy](/openwiki/testing/overview.md).
-
-### Page Instance Caching & Navigation History
-
-[ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) introduced two mechanisms to achieve "back without reload" (matching the main SolidJS app's feedStore caching + scroll restoration):
-
-**KeepAlive page caching** (`App.vue`): `<KeepAlive :include="['recommended', 'novels', 'me']">` wraps the dynamic `<component :is>`. When navigating away from and back to a cached page, the component instance is **preserved** — `onMounted` does not re-run, so data, list DOM, scroll position, and image loading state are all retained. Detail pages are **not cached** (excluded from the include list) because they load data by `:id` — caching an old id's instance would show incorrect content.
-
-**Navigation history stack** (`router.ts`): `navigate(path)` pushes the current path onto a history stack before switching. `goBack()` pops the previous path and navigates there; when the stack is empty (refresh/deep-link boundary), it falls back to `/recommended`. Login-related navigation (`/login`, login success → `/recommended`, `initRouter` first route) uses **replace semantics** (`{ replace: true }`) — these paths are not pushed onto the stack, so the login page is never reachable via back navigation. `resetHistory()` clears the stack on login/logout to start a fresh session.
-
-Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for KeepAlive's `include` to match them.
-
-**First-frame content compensatory re-fetch** ([#63](https://github.com/user/pixivizer/issues/63)): Because the initial route is now `/recommended`, the `Recommended.vue` component may mount before `restoreToken()` completes — causing the initial fetch to 401. Two idempotent compensatory paths ensure data is fetched once auth is ready:
-
-1. **`watch(isLoggedIn)`** — when `isLoggedIn` transitions `false→true` and illust data is still empty, triggers `fetchFirstPage()`. Does not check `loading` state because `restoreToken` may resolve while the initial 401 fetch is still in-flight (no subsequent trigger would fire otherwise).
-2. **`onActivated`** — when returning from `/login` via a KeepAlive-cached instance (where `onMounted` does not re-run), re-fetches if data is empty, not loading, and logged in.
-
-Both paths are idempotent: if data is already present (successful first fetch), neither triggers a redundant request.
-
-### Auth & Security
-
-- **Credential source:** `lynx.config.ts` reads from `../app/credentials.json5` (single source of truth with the main app)
-- **Token storage:** [ADR-0050](/docs/adr/ADR-0050-lynx-login-persistence.md) — dual-path persistence in [`tokenStorage.ts`](/packages/app-lynx/src/utils/tokenStorage.ts): **web-core** (lynx-bg Worker, no `localStorage`) uses IndexedDB via the generic KV layer ([`idbKV.ts`](/packages/app-lynx/src/utils/idbKV.ts), DB `pictelio_lynx` v2); **native LynxView** (#52) uses `NativeModules.PictelioSecureStorage` — a [Lynx Native Module](/openwiki/integrations/android-native.md#lynx-native-module-picteliosecurestorage) backed by [`SecureStorageCompat`](/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java), an AES/GCM encryption layer byte-compatible with the main project's `@aparajita/capacitor-secure-storage` (same Keystore alias + `WSSecureStorageSharedPreferences` ciphertext). This enables cross-client login sharing: the lynx client reads/writes the same encrypted `refresh_token` as the webview client.
-- **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`). [`authStore.restoreToken()`](/packages/app-lynx/src/stores/authStore.ts) now actually restores from IndexedDB on startup; `saveRefreshToken`/`clearRefreshToken` keep the persisted token in sync.
-- **Settings persistence & R18 masking:** [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md) (superseded: filtering replaced by overlay masking per issue #91) — [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) manages `showR18`/`showR18G` switches (default `false`, account-scoped `show_r18_${uid}` keys persisted in shared `CapacitorStorage` per [ADR-0103](/docs/adr/ADR-0103-account-scoped-content-settings.md)) and exposes `isRestricted(item)` — a pure reactive function that drives `RestrictOverlay.vue` (pseudo-glass mask, issue #97) instead of filtering. All feed pages render the full list; restricted entries get an R-18/R-18G badge with no click-through. `filterByRestrict` has been deleted. `initRouter()` calls `loadSettings()` on startup to restore settings. **Two overlay modes (ADR-0088):** detail pages use the default absolute `overlay` (covers content); list cards use `overlay=false` — a pure in-stream badge block wrapped in a `bg-scrim` card — because real LynxView counts absolute children into single-list-item height measurement (a full-screen scrim on novel feeds).
-- **Client switching:** Both clients can initiate the switch by writing `pictelio_client_kind` to `SharedPreferences("CapacitorStorage")` — the native `MainActivity` routing gate reads this on next launch (see [Main Activity & Application](/openwiki/integrations/android-native.md#main-activity--application)). The **Lynx side** uses `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`), which in native LynxView mode calls [`PictelioAppModule`](/openwiki/integrations/android-native.md#pictelioappmodule) to persist and restart, or `localStorage` + `location.reload()` in web mode. The **WebView side** mirrors this with [`clientSwitch.ts`](/packages/app/src/utils/clientSwitch.ts) (read/write the same preference via `@capacitor/preferences`) and a [`SettingsClient`](/packages/app/src/components/settings/SettingsClient.tsx) row ("切换渲染引擎") on the Settings page — confirming triggers `handleSwitchClient()` in [`Settings.tsx`](/packages/app/src/routes/Settings.tsx), which persists the switch and calls `App.exitApp()` for the native restart. Since **ADR-0164** (v5.2.0) the *default* (a missing/never-written `pictelio_client_kind`) resolves to **`lynx`**, and engine availability is decided centrally by the [`io.pictelio.app.engine`](/packages/app/android/app/src/main/java/io/pictelio/app/engine/) module with bidirectional fallback — see [Android Native & Build](/openwiki/integrations/android-native.md#engine-availability-fallback-adr-0153--adr-0164).
-- **Security hardening:** Proxy URL log redaction ([`proxyRedact.ts`](/packages/app-lynx/src/utils/proxyRedact.ts)), `__DEV__` double-condition guards, host boundary tightening on `rewriteUrl`
-
-### API Client
-
-Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`).
-
-**Dual-mode transport (#53):** `client.ts` exports `isNativeMode()`, which detects the LynxView native environment by checking for actual Pictelio-specific Lynx Native Modules (`PictelioAuth`, `PictelioApi`, `PictelioSecureStorage`, `PictelioApp`) — not just `NativeModules` existence. This was tightened in #64 (E2E fix): web-core's worker environment injects an empty-shell `NativeModules` global, so checking bare-existence alone falsely detected native mode and caused "原生认证模块不可用" errors during login. In native mode, API requests and OAuth exchange are forwarded to Java-side Lynx Native Modules ([`PictelioApiModule`](/openwiki/integrations/android-native.md#pictelioapimodule) and [`PictelioAuthModule`](/openwiki/integrations/android-native.md#pictelioauthmodule)) — `access_token` stays in Java heap, JS is zero-knowledge. URL rewriting differs per mode:
-
-| Mode | `rewriteUrl(path)` | OAuth URL | Bearer token |
-|------|--------------------|-----------|-------------|
-| **Web-core** (dev preview) | Rewrites to Vite proxy (`/pixiv-api/...`, `/pixiv-oauth/...`, `/pixiv-img/...`) | `/pixiv-oauth/auth/token` (proxied) | Attached to `/pixiv-` prefixed paths |
-| **Native LynxView** | Absolute Pixiv URLs (`https://app-api.pixiv.net/...`); `/pixiv-img/` paths pass through for native `PictelioImageService` | `PIXIV_AUTH_BASE` (direct `oauth.secure.pixiv.net`) | Attached to all `http`-prefixed URLs |
-
-In native mode, `execute()` dispatches to `PictelioApi.request()` (Java-side Bearer injection + 401 refresh) instead of `fetch`. OAuth login flows through `PictelioAuth.loginWithRefreshToken()` — the returned `userInfo` JSON includes user profile data and a rotated `refresh_token`, but **no `access_token`**, which is written directly into `PixivApiPlugin.accessToken` in the Java heap. JS never sees or stores the access token in native mode.
-
-The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
-
-### Novel Body, Comments, Error & Update (v4.x)
-
-- **Mixed feed (`createMixFeed`):** [`createMixFeed.ts`](/packages/app-lynx/src/primitives/createMixFeed.ts) merges two remote paginated sources (illust 4:1 novel) into a single render stream with the same interface as single-source feeds. `Recommended.vue` no longer consumes it (the recommended page became a carousel in ADR-0115), but `createMixFeed` still serves the remaining list pages (插画 / 小说 / 关注 / 收藏 / user home / watchlist). Since ADR-0141 it holds an internal `AbortController` and passes its signal to each source so stale fetches are genuinely cancelled (see [Data Fetching](#data-fetching-tanstack-vue-query)).
-- **Novel body `requestRaw` gateway:** [`api/novel.ts`](/packages/app-lynx/src/api/novel.ts) fetches novel HTML through a new `apiClient.requestRaw` — web reuses `rewriteUrl`/Bearer logic, native routes through `PictelioApi` (Java attaches Bearer + 401 refresh), fixing build-mode failures where the JS heap has zero-knowledge `access_token` and relative proxy paths can't resolve.
-- **Comment module:** [`api/comment.ts`](/packages/app-lynx/src/api/comment.ts) + [`useComments.ts`](/packages/app-lynx/src/primitives/useComments.ts) + `CommentOverlay.vue`/`CommentInputBar.vue`/`CommentItem.vue` — a bottom-sheet comment UI with two entry points (illust + novel detail), backed by [`modalStack.ts`](/packages/app-lynx/src/stores/modalStack.ts) for modal stacking/close.
-- **Error presentation:** [`utils/errorPresentation.ts`](/packages/app-lynx/src/utils/errorPresentation.ts) provides in-page graded copy plus a full-screen session-expiry [`ErrorPage.vue`](/packages/app-lynx/src/pages/ErrorPage.vue) at `/error` (`backBehavior: 'exit'`).
-- **Update check:** [`stores/updateStore.ts`](/packages/app-lynx/src/stores/updateStore.ts) + [`UpdatePage.vue`](/packages/app-lynx/src/pages/UpdatePage.vue) implement the forced-update flow (shared `@pictelio/update-check` logic, native HTTP via `PictelioAppModule.httpGet`). The disable switch is dev-only — production builds always run the real check.
-- **Image quality & layout:** [`utils/imageQuality.ts`](/packages/app-lynx/src/utils/imageQuality.ts) (detail quality tiers, default `medium`) and [`utils/imageLayout.ts`](/packages/app-lynx/src/utils/imageLayout.ts) drive adaptive image sizing.
-
-### Global Search & Multi-Image Detail (ADR-0129 → ADR-0133, v4.27.0)
-
-- **Global search (ADR-0132):** [`SearchSheet.vue`](/packages/app-lynx/src/components/SearchSheet.vue) is a **bottom-sheet command palette** (mask + 80vh panel) rather than a `/search` route — it closes issue #60 gap #1, the largest remaining webview/lynx feature gap. It reuses the comment bottom-sheet paradigm (`CommentOverlay.vue` + `modalStack.ts` for back-key close) and is mounted once in `App.vue`. Entry is a **FAB dual-form**: on the 4 top-level tab pages the radial FAB (ADR-0120) gains a built-in search item (inner-ring first slot); on all other content pages the FAB's default form *is* the search button. Search is **type-to-search** (300ms debounce) with `AbortController` rotation for in-flight cancellation (the `useComments` paradigm). Backing modules: [`api/search.ts`](/packages/app-lynx/src/api/search.ts) (`searchIllust`/`searchNovel` + `searchIllustNext`/`searchNovelNext`, with `next_url` Pixiv-domain validation mirroring the webview SSRF guard), [`useSearch.ts`](/packages/app-lynx/src/primitives/useSearch.ts) (state primitive with an injectable `SearchTransport` seam + five-state machine), [`searchHistoryStore.ts`](/packages/app-lynx/src/stores/searchHistoryStore.ts) (device-level idbKV, 10-item dedup), and [`searchSheetStore.ts`](/packages/app-lynx/src/stores/searchSheetStore.ts) (global single-instance open/close). API contract is identical to the webview `search.ts` (scope all/illust/novel, sort latest/oldest/popular, `popular_desc` → `popular-preview` endpoints). See [Feed & Browsing > Search](/openwiki/domain/feed-and-browsing.md#search).
-
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant Sheet as SearchSheet.vue
-    participant Prim as useSearch primitive
-    participant Api as api/search.ts
-    participant Pixiv as Pixiv API
-    User->>Sheet: open (FAB or tag tap)
-    Sheet->>Prim: search(keyword)
-    Prim->>Prim: debounce 300ms
-    Prim->>Api: searchIllust / searchNovel
-    Api->>Pixiv: fetch (Bearer via fetchWrapper / PictelioApi)
-    Pixiv-->>Api: results
-    Api-->>Prim: results
-    Prim-->>Sheet: render result rows
-    User->>Sheet: type again
-    Prim->>Prim: abort prior in-flight request
-```
-
-*Global search type-to-search flow — a 300ms debounce gate plus AbortController rotation cancel the previous request on every keystroke.*
-- **Tag tap search (ADR-0133):** Tapping a tag chip (recommended-carousel `TagChipRow.vue` or `IllustDetail.vue` tag row) opens the search sheet prefilled with the raw `tag.name` and auto-searches — the `openSearch(initialKeyword?)` extension of `searchSheetStore`, consumed in `onMounted` and cleared after. `resolveTagChips` was upgraded to return `{ text, name }` (display text vs raw tag), aligning the webview `SearchableTag` click-to-search semantics without a `/search` route.
-- **Multi-image detail list (ADR-0129):** `IllustDetail.vue` multi-image works (`meta_pages.length > 1`) moved from button paging (`currentPage`/`nextPage`/`prevPage`) to a **full-width continuous vertical list** — all pages stacked in the `scroll-view`, each sized to its own aspect ratio, with a floating `n / N` corner badge per image. Per-page ratio correction uses the `<image>` `@load` event's width/height (available across Android/iOS/Clay and web-core), because Pixiv `meta_pages` carries no per-page dimensions and `auto-size` is unimplemented in web-core 0.23.1. The correction is folded into the [`CoverImage`](/packages/app-lynx/src/components/CoverImage.vue) deep module as an opt-in capability (first-image ratio placeholder, then per-page height fix on load), keeping existing callers unchanged.
-- **Viewport-size contract (ADR-0131):** The radial FAB previously computed bottom geometry from full-screen `SystemInfo`, which ignored gesture-nav insets — on an Android 14 gesture-nav emulator the content area was 96px shorter than the screen, clipping the FAB. [`LynxActivity`](/openwiki/integrations/android-native.md#lynxactivity) now records the LynxView content-area size via `OnLayoutChangeListener` and exposes it through `PictelioAppModule.getViewportSize(cb)`; [`GlobalFab.vue`](/packages/app-lynx/src/components/GlobalFab.vue) reads it on mount and re-derives geometry via a pure `screenHeightVw` helper (content-area > `SystemInfo` > web-core fallback). See [Android Native & Build > PictelioAppModule](/openwiki/integrations/android-native.md#pictelioappmodule).
-- **System bars & safe area (ADR-0168, v5.3.0):** With targetSdk 36, Android 15+ forces edge-to-edge, so `LynxActivity` now makes edge-to-edge the explicit base (`EdgeToEdge.enable`) and exposes an insets pipeline: native `onApplyWindowInsetsListener` → `pictelioInsets` global event + subscribe-then-pull `getSafeAreaInsets`. The JS side ([`safeArea.ts`](/packages/app-lynx/src/utils/safeArea.ts)) holds `safeTop`/`safeBottom` refs, which `App.vue` applies as Root padding (status-bar region paints surface color = the platform-correct "coloring") and bottom sheets consume as a trailing spacer. A `settings_fullscreen_mode` opt-in toggle (default off) hides/shows the system bars at runtime via `setSystemBarsHidden`. `getViewportSize` keeps its "visible content area" contract (now = LynxView bounds − visible insets), so `GlobalFab`/popup geometry needed zero changes. See [Android Native & Build > LynxActivity](/openwiki/integrations/android-native.md#lynxactivity).
-
-### Image Rendering & Loading States
-
-The Lynx MVP has evolved specific patterns for image display and loading UX that differ from the main SolidJS app due to web-core rendering quirks (see [ADR-0048](/docs/adr/ADR-0048-lynx-recommended-card-layout.md) and [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md)):
-
-- **Image display:** Lynx's `<image>` component does not support `widthFix` mode (silently falls back to `fill`, causing zero-height or stretched images). Two approaches are used depending on context:
-  - **[`SkeletonImage`](/packages/app-lynx/src/components/SkeletonImage.vue)** — a wrapper that applies `aspectFill` mode with an explicit `aspect-ratio` container plus an optional `minH` vw fallback to prevent height collapse (ADR-0045). Since ADR-0117 it is a thin `layout="box"` adapter over the [`CoverImage`](/packages/app-lynx/src/components/CoverImage.vue) deep module, used in list-page cards. **Does not work inside `scroll-view`** on real LynxView devices (style-based `aspect-ratio`/`minHeight` collapses to 0), so `IllustDetail.vue` uses a fixed-height container instead.
-  - **Fixed-height container** (`IllustDetail.vue`): `<view class="h-[100vw]">` + bare `<image>` with `aspectFill` mode — avoids the scroll-view style resolution bug entirely. No shimmer skeleton for detail images in this mode; the shimmer overlay is omitted since the `aspect-ratio` container that enabled it doesn't render inside scroll-view.
-- **Waterfall card layout:** Waterfall list cards (e.g. `IllustList.vue`) **must not use `w-full`** (web-core resolves percentage widths against the viewport, not the parent column). Width is left to the list engine's column constraint. Card spacing uses `<list>`'s `list-main-axis-gap` / `list-cross-axis-gap` attributes (not margin/padding on items, which do not participate in waterfall layout in web-core).
-- **Two-layer shimmer skeleton:** A global `.shimmer` CSS class with `@keyframes shimmer` animation is defined in `App.vue` (uses `linear-gradient` + `background-position` — confirmed working in web-core; native LynxView support pending [#41](https://github.com/user/pixivizer/issues/41)). The skeleton strategy has two layers:
-  - **Data layer:** 8 [`SkeletonCard`](/packages/app-lynx/src/components/SkeletonCard.vue) components render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during initial API fetch in list pages — the carousel `Recommended.vue` instead shows a single immersive-card skeleton (ADR-0118); `IllustDetail.vue` shows a square shimmer image + three text bars inline. These hide when API data arrives.
-  - **Image layer:** [`SkeletonImage.vue`](/packages/app-lynx/src/components/SkeletonImage.vue) wraps each `<image>` with its own shimmer overlay that hides on image `@load` (not API response). Used in list-page cards where the `aspect-ratio` container renders correctly. **Not used in `IllustDetail.vue`** — inside `scroll-view` on real devices, the style-based container collapses to 0 height, so detail images use a fixed-height container without shimmer (see [Image display](#image-rendering--loading-states)).
-
-- **Bookmark interaction:** The [`BookmarkButton.vue`](/packages/app-lynx/src/components/BookmarkButton.vue) component (ADR-0052) provides a reusable ♥ toggle shared between `IllustDetail.vue` and the `Recommended.vue` carousel (its page-level scrim bookmark). Its toggle is backed by the [`useBookmarkMutation`](/packages/app-lynx/src/composables/useBookmarkMutation.ts) composable (ADR-0141) — a `useMutation` wrapping `addBookmark`/`deleteBookmark` from [`illust.ts`](/packages/app-lynx/src/api/illust.ts) (default `restrict: public`) — and uses `@tap.stop` to prevent card-tap navigation when toggling. Optimistic flip on mutate, rollback on error; failure displays "操作失败" inline.
-
-### Known MVP Limitations
-
-- **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
-- **No canvas/measureText:** novel body renders as whole text blocks (Pretext library's line-level measurement cannot be ported)
-- **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
-- **Native token persistence:** Implemented via [PictelioSecureStorageModule](#auth--security) (LynxModule backed by [`SecureStorageCompat`](/openwiki/integrations/android-native.md#securestoragecompat), same Keystore alias + ciphertext as the webview client). Enables cross-client login sharing.
-- **`@tap` on native `<text>` broken (real device):** On real LynxView devices, `@tap` handlers on native `<text>` elements do not fire. Workaround: wrap `<text>` in a `<view>` and bind `@tap` to the view (verified working on device). Applied to back buttons (`‹ 返回`) and navigation links across all pages.
-- **`@tap` on `<list-item>` root broken (fiber):** On real devices, `@tap` bound directly to `<list-item>` does not trigger (fiber event system). Workaround: wrap all item content in a `<view>` and bind `@tap` there instead. Applied to list-page cards (e.g. `IllustList.vue`). Inner elements like `BookmarkButton` use `@tap.stop` to prevent card navigation.
-
-See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
-
-## Over-The-Air (OTA) Web Bundle Updates
-
-Since v4.22.0 ([ADR-0122](/docs/adr/ADR-0122-ota-self-built-switching.md), [spec](/docs/specs/ota-web-bundle.md)), web-layer fixes are decoupled from the APK via **L1 web-bundle OTA**: the web build is zipped, Ed25519-signed, and distributed through GitHub Releases, checked at startup and applied on the next launch. The mechanism is self-built on Capacitor's official `setServerBasePath`/`setServerAssetPath` primitives (rather than `@capgo/capacitor-updater`), with a layered update model:
-
-- **L1 web bundle OTA** (high-frequency, silent): startup check → silent download → verify → unzip → `pending` pointer → applied on next launch → `notifyReady` health handshake with 10s timeout rollback.
-- **L2 APK full update** (low-frequency, explicit): the existing `updateService` + dismissible `StartupUpdateDialog` is unchanged.
-- **G1 forced floor** (`minWebVersion`): below-floor bundles self-heal via a full-screen transition page, or fall back to a block state with retry/download exits.
-
-**Shared layer** ([`@pictelio/update-check`](/packages/update-check/)): `CheckResult` gained `minWebVersion?` / `webBundle?` fields plus the `isBelowMin(local, floor?)` pure function (fail-open when the floor is absent). `packages/website/version.json` is the single fact source with a **dual-coordinate** schema — `version` (APK coordinate, drives the update dialog) vs `webBundle.version` (bundle coordinate, drives OTA + floor comparison); `checksum`/`minApkVersion` live only in the signed `manifest`, never in the unsigned version.json.
-
-**JS orchestration** ([`otaService.ts`](/packages/app/src/services/otaService.ts)): `runOtaCheck()` issues a **single `checkForUpdate()` fetch that is triple-consumed** — APK dialog signals (via `settingsStore`), `minWebVersion` floor evaluation, and OTA metadata — preserving the existing 500ms cold-start check timing. It also drives the `notifyWebBundleReady()` first-frame hook, ≥4h foreground-resume throttled re-check, and exponential backoff. The `autoCheckUpdate` switch gates only the APK dialog; a separate "auto-download web bundle" switch gates the T0 prewarm, while the floor gate + self-heal are never switch-suppressed. The `GateOverlay.tsx` full-screen transition page is driven by `gateActive`/`gateHealing`/`gateError` signals.
-
-```mermaid
-sequenceDiagram
-    participant R as __root startup
-    participant S as otaService
-    participant O as OtaPlugin native
-    participant W as OtaWorker
-
-    R->>S: runOtaCheck()
-    S->>S: checkForUpdate + floor evaluation
-    alt below minWebVersion floor
-        S->>O: install (foreground self-heal)
-        O-->>S: installed
-        S->>O: applyNow
-        O-->>S: reload into new bundle
-    else newer bundle available
-        S->>O: prewarm (silent)
-        O->>W: enqueue download
-        W-->>O: pending written
-    end
-    Note over S: first frame rendered
-    S->>O: notifyReady(APP_VERSION)
-    O-->>S: ok or rollback to lastGood
-```
-
-*Cold-start OTA check: one fetch drives the APK dialog, the floor gate (self-heal), and the silent prewarm; `notifyReady` later confirms health or rolls back.*
-
-**Native side** ([`OtaPlugin`](/packages/app/android/app/src/webview/java/io/pictelio/app/OtaPlugin.java), [TS wrapper](/packages/app/src/native/Ota.ts)): `install` (foreground, G1 self-heal fast path) and `prewarm` (WorkManager slow channel via `OtaWorker`/`OtaInstaller`, `CONNECTED` + backoff + unique work) share one `OtaInstaller` pipeline; `applyNow` + `status` + `notifyReady` round out the surface. Immutable version directories + three pointers (`current`/`lastGood`/`pending`) in SharedPreferences give atomic switch; APK upgrade resets OTA state (`resetWhenUpdate` semantics). See [Android Native & Build](/openwiki/integrations/android-native.md#otaplugin).
-
-**Release pipeline** ([`release-bundle.mjs`](/packages/app/scripts/release-bundle.mjs)): bundles + signs the zip (root = `index.html`), and a `pnpm release --web-only` mode ships a web-only hotfix in minutes without building/signing an APK (version.json keeps the APK `version` field pinned to the last published APK and only advances `webBundle`).
-
-## Component Architecture
-
-The app has four key component layers:
-
-1. **Route components** (`/packages/app/src/routes/`) — Page-level components, compose primitives and stores
-2. **Skeleton components** (`/packages/app/src/components/skeletons/`) — Full-page shimmer placeholders matching each data route's layout (FeedSkeleton, IllustDetailSkeleton, NovelDetailSkeleton, ProfileSkeleton, ListSkeleton, GridSkeleton). Introduced by ADR-0038 for immediate navigation.
-3. **UI components** (`/packages/app/src/components/`) — Reusable visual components (cards, overlays, dialogs)
-4. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, novel layout). The self-built virtual-scroll core (`createVirtualScroll`, `computeMasonryLayout`, `createMasonryWorker`/`masonryWorker`, `createScrollRestoration`, `createTextListLayout`) was **replaced by `@tanstack/solid-virtual` v3** per [ADR-0096](/docs/adr/ADR-0096-virtual-scroll-migration.md): `createFeedVirtualizer` and `createNovelVirtualLayout` now wrap TanStack's `Virtualizer`, and scroll restoration uses `takeSnapshot`/`initialMeasurementsCache` instead of RAF polling. Custom `@solidjs/router` scroll-restoration primitives (`createScrollRestore`, `createVirtualScrollRestore`, `createFeedScrollStore`) were also deleted — router-level scroll restoration is handled by `<Router scrollRestoration>`.
-
-Key relationship: Routes → Skeletons/Components + Primitives → Stores → API Client
-
-## Error Handling Pattern
-
-[ADR-0036](/docs/adr/ADR-0036-error-tuple-pattern.md) introduced the **error tuple pattern** as a project-wide replacement for try-catch:
-
-```typescript
-// Before: try-catch blocks block V8 TurboFan happy-path optimization
-try { const data = await fetch(); return data; }
-catch (e) { handle(e); return fallback; }
-
-// After: error tuple, V8-friendly
-const [err, data] = await tryAsync(fetch());
-if (err) { handle(err); return fallback; }
-```
-
-**Key mechanism:**
-
-- **`tryAsync`** (`src/utils/tryAsync.ts`) — wraps `Promise<T>` to return `[null, T] | [Error, undefined]`. Replaces `try { await ... } catch` without blocking V8 TurboFan optimization on the calling function.
-- **`trySync`** (`src/utils/tryAsync.ts`) — wraps a factory `() => T` for synchronous operations (`JSON.parse`, DOM reads). Keeps the throwing code lazily evaluated inside the factory.
-- **`unplugin-auto-import`** — automatically injects commonly-used APIs at build time, eliminating ~50 explicit import statements per source file across the project. Configured in both `vite.config.ts` (dev) and `vitest.config.ts` (test), the plugin auto-imports:
-  - **All of `solid-js`** (createSignal, createEffect, createMemo, onMount, Show, For, etc. — 32 core APIs)
-  - **`solid-js/store`** (createStore, produce, reconcile, createMutable)
-  - **`solid-js/web`** (Dynamic, render, Portal, isServer, etc.)
-  - **`@solidjs/router`** (useNavigate, useNavigate, Outlet, etc. — core APIs)
-  - **`@/utils/tryAsync`** (`tryAsync`, `trySync` — from the error tuple pattern)
-- All auto-imported APIs are declared as `readonly` globals in `.oxlintrc.json`. The generated `auto-imports.d.ts` (written to `src/auto-imports.d.ts` by both `vite.config.ts` and `vitest.config.ts`) is **committed to git**, not gitignored — `pnpm check` runs `tsc --noEmit` over `src/`, so the file must exist in fresh CI checkouts (previously gitignored, which caused TS2304 failures).
-- A cleanup script at `scripts/cleanup-auto-imports.mjs` was provided for the one-time migration to scan all `.ts`/`.tsx` source files, remove redundant explicit imports now covered by auto-import, and rewrite multi-line import statements to single-line where applicable. This script was **deleted** in the ADR-0083 dead-code cleanup (it was an unwired one-time migration tool).
-
-**Unified cleanup:** finally-block logic (`loading.set(false)`, `clearTimeout()`) moves after the `tryAsync` call and before the `err` check, written once instead of duplicated across try/catch/finally branches.
-
-**Scope:** ~45 source files across API layer, stores, routes, components, primitives, services, and utils (110+ try-catch/try-finally blocks replaced).
+The host's `build:android` / `build:android:release` scripts sync version and credentials from `packages/app-lynx`, build the rspeedy bundle, copy it into assets via `sync-android-assets.mjs`, then invoke Gradle. Full native-module and splash/insets details live in [Android Native & Build](../integrations/android-native.md).
 
 ## Related Pages
 
-- [API Layer & Authentication](/openwiki/architecture/api-layer.md) — Pixiv HTTP client, OAuth, request dedup
-- [Image Loading Pipeline](/openwiki/architecture/image-pipeline.md) — Three-layer cache, image host selection, WebView proxy
-- [Feed Store Factory](/openwiki/domain/feed-and-browsing.md#feed-store-factory) — TanStack Query factory pattern
-- [Android Native & Build](/openwiki/integrations/android-native.md) — Capacitor plugins, Gradle, signing
-- [Testing Strategy](/openwiki/testing/overview.md) — Four test layers
+- [API Layer & Authentication](api-layer.md) — Pixiv HTTP client, OAuth, request dedup
+- [Image Loading Pipeline](image-pipeline.md) — image host selection, cache, proxy
+- [Android Native & Build](../integrations/android-native.md) — Lynx native modules, Gradle, splash/insets
+- [Release & Deploy](../operations/release-and-deploy.md) — APK build and release chain
+- [Quickstart](../quickstart.md) — running dev/build/check/test
+- [Testing Strategy](../testing/overview.md) — test layers and gates

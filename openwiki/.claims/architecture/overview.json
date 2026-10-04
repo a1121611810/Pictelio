@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:b69d5e923a60fa7f843973e8922abf532d5d15413133e42e377eca0717d04574",
+  "claims": [
+    {
+      "id": "claim_0c597c5fda3d4962ba46b74ba904b8ad",
+      "statement": "Pictelio is a single-engine Lynx client: the SolidJS + Capacitor WebView client (packages/app) was deleted and its Android Gradle host moved to packages/android-host (ADR-0203), and root bare commands dev/build/check/test/preview now all delegate to pictelio-app-lynx (ADR-0204).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0204-root-command-naming.md",
+          "version": "repo-file-v1:sha256:390c24b0443336d9a8541d36017a31a7e9d4beeeb4a982854bee039dade11b42"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        },
+        {
+          "resource": "repo://packages/android-host/package.json",
+          "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
+        }
+      ]
+    },
+    {
+      "id": "claim_e5d762394da54d95b231d7aa717cf6bb",
+      "statement": "The repository is a pnpm workspace (root plus packages/*); pictelio-app-lynx is the only application client and depends on six shared pure-logic workspace packages (@pictelio/update-check, ugoira, ranking-core, search-core, net-diagnostics, novel-export).",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/package.json",
+          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+        },
+        {
+          "resource": "repo://pnpm-workspace.yaml",
+          "version": "repo-file-v1:sha256:1b990a860b23ced37defc27f294b5798e14bd80e6dcc6a23e95c10fe6911bdb5"
+        }
+      ]
+    },
+    {
+      "id": "claim_9134d0b31c9b496597aef22279bde0dc",
+      "statement": "packages/app-lynx builds with @lynx-js/rspeedy via lynx.config.ts, which reads credentials.json5 fail-closed (__DEV__ requires PICTELIO_LYNX_DEV=1) and injects build-time constants (__CREDENTIALS__, __PUBLIC_CONFIG__, __APP_VERSION__, __BENCH_NAV__, __HOME_BLEED_HEADER__) plus the vue-lynx plugin options enableCSSSelector and enableIFR.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts",
+          "version": "repo-file-v1:sha256:a73b7b9fc034bdee13b7c805cb8882b2f7852eee2f0dec5e053bbe17f03648d7"
+        },
+        {
+          "resource": "repo://packages/app-lynx/package.json",
+          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+        }
+      ]
+    },
+    {
+      "id": "claim_015327750ac84c71a4e3612966613826",
+      "statement": "Workspace task orchestration and repository-wide lint/fmt are centralized on vite-plus 1.0.0-rc.0: root vite.config.ts is the single source for oxlint/oxfmt rules, and packages/app-lynx and packages/website are currently exempt from root lint/fmt (ADR-0185).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0185-vite-plus-1rc-toolchain.md",
+          "version": "repo-file-v1:sha256:b2c322ee5c545f91882e8148bfeff0f5aa5c9a9367f4a5c24468cb3dcca4cbbc"
+        },
+        {
+          "resource": "repo://vite.config.ts",
+          "version": "repo-file-v1:sha256:ad5b4fe75be91855fd63eb4dde8a8bd470c30ba4fd9d1f458ae13fc13fa5dede"
+        }
+      ]
+    },
+    {
+      "id": "claim_f9065efb865e40f3b30ee3efebae5a27",
+      "statement": "The Lynx boot sequence in index.ts is: import downloadExecutor/downloadSharer side-effect wiring, import styles/tailwind.css, createApp(App), then app.use(pinia), app.use(VueQueryPlugin, { queryClient }), app.use(router), and app.mount().",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/index.ts",
+          "version": "repo-file-v1:sha256:91f413c12a662f686115b2c4b72bb14d4c758fe3c52fb22d6364c0493a03077a"
+        }
+      ]
+    },
+    {
+      "id": "claim_01b35eeaa331485aab5133ac5bd947d3",
+      "statement": "Routing uses official vue-router with createMemoryHistory (ADR-0138); routes declare meta.requiresAuth/backBehavior/topInset, the initial route is /discover for first-frame content, and 'can go back' is decided by a session mirror stack (_sessionStack) combined with a history-queue watchdog.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0138-app-lynx-vue-router.md",
+          "version": "repo-file-v1:sha256:a4ce666230d4b9f5d380c597ac19d899e5e0d61372b1839c0d1845068b3b0703"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts",
+          "version": "repo-file-v1:sha256:890b45555a0c95dc96fa7b73de1380166e4651a1fc2a39348083343d02297f07"
+        }
+      ]
+    },
+    {
+      "id": "claim_56058801bdb74622a21b8c68f8a6ca1b",
+      "statement": "Client state uses Pinia setup stores behind a single createPinia() seam exported by stores/pinia.ts and installed in index.ts; the non-reactive watchlistStore and instance-level primitives (useSearch, createMixFeed, useComments, createGlobalFab) remain outside Pinia (ADR-0139/0140).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0139-app-lynx-pinia-migration.md",
+          "version": "repo-file-v1:sha256:f70577b48ea8ca74fc77c81acc5c1c4708a626bcfdeb9c8f7722b456e2062360"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/pinia.ts",
+          "version": "repo-file-v1:sha256:4847be2cc7c7b75a52685c4c7af4116cd731b874b21e7983f4d7c1f019b97c0f"
+        }
+      ]
+    },
+    {
+      "id": "claim_3f1475fe60834e5baedc460bfa716b19",
+      "statement": "Server state uses TanStack Vue Query v5 with a global QueryClient (staleTime 0, gcTime 30s, retry false, keepPreviousData), a centralized queryKeys factory, and useApiQuery/useApiInfiniteQuery helpers with a generation-gate; the apiClient seam and its 401 single-flight lock stay unchanged (ADR-0141).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0141-app-lynx-vue-query-migration.md",
+          "version": "repo-file-v1:sha256:3bebc99f01f3c7ecfa89feaf2b360d63347ee1fc83b933c7003d0f82604aa2a5"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/queryClient.ts",
+          "version": "repo-file-v1:sha256:878e07c0e110bf438b45a2ca6e0eab0bef5a9053369fd2de92d868d7719f122a"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/queryKeys.ts",
+          "version": "repo-file-v1:sha256:5c811e48fe5aac2c941292c89f2742af20df8aeb5d79649eeac3bea70d776836"
+        }
+      ]
+    },
+    {
+      "id": "claim_12e9c4bc7acb4a049f7c78c6490c019a",
+      "statement": "The Pixiv API client is dual-mode: web-core uses fetch plus the rspeedy proxy, while native LynxView forwards requests to the Java PictelioApiModule so JS never holds the access_token; both modes share the 401 single-flight lock, an auth-ready gate, and 429 rate-limit backoff.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts",
+          "version": "repo-file-v1:sha256:25b41af9f6baac7a3dc15f0bafaecaec361acd5ce3dd260bc5761b3840d4ded0"
+        }
+      ]
+    },
+    {
+      "id": "claim_14003bb8634f4bd4a3cd8631ccb9e15b",
+      "statement": "The Lynx client follows Material Design 3 (static pre-generated palettes, appearanceClasses theme/dark-mode binding, and consolidated M3 components) instead of the deleted WebView client's Fluent/UnoCSS design system (ADR-0205-0212).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0205-md3-baseline-and-scope.md",
+          "version": "repo-file-v1:sha256:11682a219450239a79ebf00da18270b64e38b22bcd6984c8a9e482a512029068"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:4887656a9f11942268a74d3393ea8e3d9830ce568b467e5dea1e27dca1719894"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/styles/tokens.css",
+          "version": "repo-file-v1:sha256:64905261e6044c25695e236ea61002696e592724b961ae3513bae0eada70a1c1"
+        }
+      ]
+    },
+    {
+      "id": "claim_3ab088c0c07e47a98407a6122d893241",
+      "statement": "Internationalization is a hand-written message module (zh-CN source plus en) with a module-level locale ref and t(key, vars), chosen because the Lynx runtime has no Intl/vue-i18n support; apiErrorMessage renders messageKey with a raw message snapshot fallback.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts",
+          "version": "repo-file-v1:sha256:25b41af9f6baac7a3dc15f0bafaecaec361acd5ce3dd260bc5761b3840d4ded0"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/i18n/index.ts",
+          "version": "repo-file-v1:sha256:8b8f52cbcb99711d461961a2a460b99d49cf1fe43e689783f344b9d1f8e3113d"
+        }
+      ]
+    },
+    {
+      "id": "claim_cd4e5c06a5654b2bbb6c23a307695bc5",
+      "statement": "packages/android-host is the Gradle build host that packages the rspeedy bundle into an APK and hosts the Lynx native modules (LynxActivity plus PictelioApi/Auth/App/SecureStorage/ImageService/Translate/WebDav/etc.) under android/app/src/lynx/java, with core Java services under android/app/src/main/java.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+        },
+        {
+          "resource": "repo://packages/android-host/package.json",
+          "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}
