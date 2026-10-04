@@ -154,12 +154,15 @@ openNovel(id, { resume: true })   // resume ⇒ 无论 novelIntroFirst 如何都
 
 ### 2.6 度量：接现成本地读点，不新增设施
 
-**段 3 与段 4 各接一次** `recordSectionObserved(name, empty)`，键名分别为
-`'continueReading'` 与 `'browsingHistory'`
+**段 3 接一次** `recordSectionObserved('continueReading', empty)`
 （`stores/usageMetrics.ts:111` 已有同族方法，签名 `(name, empty?)` 与分段形态严丝合缝；
 `sectionSeen` / `sectionEmpty` 本就是通用字典，不限单一页面）。
 
-`Shelf.vue` 当前对 usageMetrics 的引用数为 **0**——三段全部无读点，本 ADR 为段 3/4 补上。
+📌 因两轴**同段**，只记一个「该段本次是否为空」，**不按类型分记**——
+分类型计数在本仓无消费方（`AdvancedSettings` 的度量面板只读三个 rate 函数），
+加一个没人看的字段是给自己造维护负担。
+
+`Shelf.vue` 当前对 usageMetrics 的引用数为 **0**——三段全部无读点，本 ADR 为段 3 补上。
 该方法**零新增设施**且**无网络出口**（`usageMetrics` 隐私决策 5 = A：只存本地计数与时间戳）。
 
 ⚠️ **刻意不加**「续读条目被点击次数」：那需要给纯逻辑状态机加字段/方法/单测，
