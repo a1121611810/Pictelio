@@ -16,7 +16,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 | 任务涉及 | 第一步必须 | 依据 |
 |----------|-----------|------|
-| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 读取 `openwiki/` 对应页面 | 「OpenWiki 查询规范」决策链 |
+| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | `openwiki_search` 取 section → `openwiki_read` 读该节（工具不可用时直接读 `openwiki/` 对应页面） | 「OpenWiki 查询规范」决策链 |
 | 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（pi 原生工具 `codegraph_explore` 或 bash `codegraph` CLI） | 「代码智能规范」速查表 |
 | 第三方库/框架文档 | Context7（`mcp__context7__*`） | 「文档查询规范」决策链 |
 | 浏览器标准 API | MDN（`mcp__mdn__*`） | 「文档查询规范」决策链 |
@@ -38,7 +38,7 @@ CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· �
 
 ## 代码智能规范（Code Intelligence）
 
-本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（**无 MCP**，MCP 配置已随 `reasonix.toml` / `.mcp.json` 一并移除）：
+本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（无 MCP，直连 CLI）：
 
 **pi agent** 由全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`；
 **其他 agent** 直接用 bash 调 `codegraph` CLI（输出逐字等价）。
@@ -110,16 +110,18 @@ OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体�
 
 ## 命令
 
-项目根目录执行，pnpm workspace 委托（裸名指向见 ADR-0204，取代 ADR-0059 的委托部分；权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；五条裸命令（`dev` / `build` / `check` / `test` / `preview`）→ `pictelio-app-lynx`；**宿主包动作一律显式命名**，不占用裸名（`pnpm <命令>:android-host`）；`<命令>:<包名>` → 对应包；`:all` → **有界并发**（`--concurrency-limit 4`）跑完全部包：
+项目根目录执行，pnpm workspace 委托。裸名指向见 ADR-0204（取代 ADR-0059 的委托部分）：
 
 | 命令 | 说明 |
 | --- | --- |
-| `pnpm dev` / `build` / `check` / `test` | 唯一客户端 app-lynx：开发服务器 / 构建 / vue-tsc / Vitest |
-| `pnpm lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
-| `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 有界并发跑完全部包 |
-| `pnpm dev:android-host` / `build:android-host(:release)` | 宿主：安装调试包 / Debug 或签名 Release APK（需密码环境变量） |
-| `pnpm test:android-host` / `:unit` / `:e2e` | 宿主单测 / JVM(Robolectric) 单测 / 模拟器 E2E（手动按需） |
-| `pnpm release:android-host` / `deploy(:dry)` | 交互式发布 / 落地页预览 |
+| `dev` / `build` / `check` / `test` / `preview` | 裸名 → pictelio-app-lynx（唯一客户端） |
+| `lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
+| `dev:android-host` / `build:android-host` / `build:android-host:release` | 宿主：装调试包 / 构建 APK（release 需密码环境变量） |
+| `test:android-host` / `test:android-host:unit` / `test:android-host:e2e` | 宿主单测 / JVM(Robolectric) / 模拟器 E2E（手动按需） |
+| `release:android-host` / `deploy` / `deploy:dry` | 交互式发布 / 落地页预览 |
+| `check:all` / `lint:all` / `test:all` / `fmt:all` | 全部包（`:all` = **有界并发**，concurrency-limit 4） |
+
+**宿主包动作一律显式命名**，不占用裸名。CI 门禁 = `check:all` + `lint:all` + `test:all`（见「门禁边界」）。
 
 ## Monorepo 结构
 
@@ -144,10 +146,9 @@ monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monor
 - **PixivApiPlugin 网关** → `openwiki/architecture/api-layer.md` + ADR-0037
 - **图片流水线三层缓存** → `openwiki/architecture/image-pipeline.md` + ADR-0090
 - **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、Java 原生模块）→ `openwiki/integrations/android-native.md`
-- **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳 → `openwiki/integrations/android-native.md` §Engine Availability Fallback + ADR-0164
-- **安全存储**（refresh_token 走 Keystore，首启迁移）→ `openwiki/integrations/android-native.md`
-- **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）→ `openwiki/domain/feed-and-browsing.md`
-- **年龄限制与内容过滤** → `openwiki/domain/feed-and-browsing.md`
+- **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳 → 同上页 §Engine Availability Fallback
+- **安全存储**（refresh_token 走 Keystore，首启迁移）→ 同上页
+- **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `openwiki/domain/feed-and-browsing.md`
 - **更新检查**（GitHub API + `/github-api` 代理）→ `openwiki/architecture/overview.md`
 
 ## 即时导航硬约束
@@ -212,11 +213,10 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 - **TS / 组件 / 状态**：`strict: true`（+ noUnusedLocals 等 4 项，ESNext / bundler）；Vue 3 SFC + `<script setup lang="ts">`；Pinia store 顶层导出
 - **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 样式**默认优先 Tailwind utility**（`tailwind.config.ts`：spacing=vw / fontSize=rpx / M3 色板）；禁止手写 scoped CSS；特殊语义用 arbitrary utility（`min-h-[40vw]`、`[max-line:1]`）；web-core 预览禁 rem
 - **注释 / 命名**：中文注释为主（API 层与类型定义偏英文）；组件 PascalCase、工具/API/primitives camelCase
-- **Lint / 格式化**：vite-plus 内置 oxlint / oxfmt，唯一配置源 = 仓库根 `vite.config.ts`（correctness=error；app-lynx / website / docs / `**/*.md` 等豁免 → ADR-0185）
-- **Android**：`minSdkVersion = 28`（`variables.gradle`）；`SplashScreen.installSplashScreen()` **必须在 `super.onCreate()` 之前**（AndroidX 要求，见 `LynxActivity.java`）；平台要求 → `docs/platform-compatibility.md`
-- **发布签名**：Release 用 `@pictelio/android-host/android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
-- **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`
-- **Node**：22.22.2+（ADR-0080），pnpm 11.9.0（`devEngines` 强制校验）
+- **Lint / 格式化**：vite-plus 内置 oxlint / oxfmt，唯一配置源 = 仓库根 `vite.config.ts`（豁免清单见该文件 → ADR-0185）
+- **Android**：`SplashScreen.installSplashScreen()` **必须在 `super.onCreate()` 之前**（AndroidX 要求，见 `LynxActivity.java`）；minSdk 与平台要求 → `docs/platform-compatibility.md`
+- **发布签名**：keystore 路径与密码环境变量名见 `docs/release-signing.md`；**keystore 禁止提交**
+- **Node / pnpm 版本**：以根 `package.json` 的 `devEngines` 为准（ADR-0080）
 
 ### app-lynx 的 MD3 约定
 
@@ -307,15 +307,11 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 
 ## 任务完成前自检
 
-- **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）
-- **代码理解优先性**：涉及代码结构、调用链、影响范围分析时，是否优先使用了 CodeGraph？（工具选择见上方速查表）
-- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索）
-- **索引健康**：CodeGraph 返回异常时，是否运行 `codegraph status` 检查了节点/边计数（边数归零 = 腐化，提示用户重建）？
-- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循「文档查询规范」的优先级链？（优先 Context7 或 MDN）
-- **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
-- **OpenWiki 同步**：改 `src/` / `packages/` 后**不得**本地跑 `pnpm openwiki:update`、**不得**手改 `openwiki/`
-- **测试纪律核对**：见「测试硬约束」第 1/2/3 条（IO 双路径、契约用真实样例、禁静默降级）——本次改动逐条自查
-- **Conventional Commits**：commit message 是否符合 `type(scope): description`？commitlint 强制校验。
+- **工具路由**：本次工具选择是否按「工具触发协议」执行？（代码结构/调用链/影响面 → CodeGraph；架构/领域/集成/测试 → OpenWiki；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
+- **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）
+- **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
+- **生成物归属**：`openwiki/` 由 CI 定时重生成（见「OpenWiki 维护规则」），提交前不手改
+- **提交信息**：`type(scope): description`，type 取值见「Notes」
 
 ## Notes
 
