@@ -25,9 +25,14 @@ const ENTRIES: Array<{ file: string }> = [
   { file: 'src/pages/Watchlist.vue' },
   { file: 'src/pages/Recommended.vue' },
   { file: 'src/components/SearchSheet.vue' },
+  // 📌 票 #926 新增第七、八个消费方：书架段 3 点行（openContinue）与 /continue 列表点行
+  //   （openItem）。⚠️ 漏登记 = 有人在这两处内联 `/novel/${id}` 导航串时本守卫**不会转红**——
+  //   而这正是本守卫存在的唯一理由。
+  { file: 'src/pages/Shelf.vue' },
+  { file: 'src/pages/ContinueReading.vue' },
 ]
 
-describe('六入口小说导航缝隙（openNovel 单点，ADR-0183 / 票 #713）', () => {
+describe('小说导航缝隙的全量消费方（openNovel 单点，ADR-0183 / 票 #713 / 票 #926）', () => {
   for (const entry of ENTRIES) {
     it(`${entry.file}：小说分支经 openNovel 缝隙导航，/intro 导航串不回流内联`, () => {
       const source = readFileSync(resolve(pkgRoot, entry.file), 'utf-8')

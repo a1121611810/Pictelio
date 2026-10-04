@@ -14,6 +14,7 @@ import { prefs } from "./settingsStore"
 import {
   createUsageMetrics,
   emptySnapshot,
+  type AggregateSectionKey,
   type UsageMetrics,
   type UsageMetricsSnapshot,
 } from "../primitives/usageMetrics"
@@ -108,8 +109,12 @@ export const useUsageMetricsStore = defineStore("usageMetrics", () => {
   function recordSubTabUse(key: string): void {
     commit((m) => m.recordSubTabUse(key))
   }
-  /** 记录「更新」页某段被观察到（empty = 该段本次为空，「空段出现率」的分子/分母） */
-  function recordSectionObserved(name: string, empty: boolean): void {
+  /** 记录**聚合页**某段被观察到（empty = 该段本次为空，「空段出现率」的分子/分母）。
+   *  已接入：`Updates.vue` 的三段（`following`/`watchlist`/`notifications`）、
+   *  `Shelf.vue` 段 3（`continueReading`，ADR-0219 §2.6 / 票 #926）。
+   *  ⚠️ `name` 收窄为 `AggregateSectionKey`：新增段名必须同步登记进
+   *  `AGGREGATE_SECTION_METRIC_ROWS`（高级页面板消费），否则拼错在类型层就转红。 */
+  function recordSectionObserved(name: AggregateSectionKey, empty: boolean): void {
     commit((m) => m.recordSectionObserved(name, empty))
   }
 

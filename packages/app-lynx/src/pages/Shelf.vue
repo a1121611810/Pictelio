@@ -7,6 +7,9 @@ import { t } from '../i18n'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
+import { useContinueReadingStore } from '../stores/continueReadingStore'
+import ContinueRow from '../components/ContinueRow.vue'
+import { useUsageMetricsStore } from '../stores/usageMetrics'
 import { useHeroSource } from '../composables/heroTransition'
 import { loadBookmarks } from '../api/illust'
 import type { PixivIllust } from '../api/types'
@@ -102,27 +105,60 @@ function openLaterItem(item: { kind: 'illust' | 'novel'; id: number }): void {
   }
 }
 
-// ─── 段 3：继续读 —— 尚未实现 ──
-// ⚠️ 旧 WebView 客户端曾有 historyStore（ADR-0094），随 ADR-0203一并消失；
-//   本页**显式说明"即将上线"**而不是渲染一个空列表 —— 禁静默降级（测试硬约束 #3）：
-//   空列表会被读成"我没有阅读记录"，而真相是"这个功能还没做"。
+// ─── 段 3：继续读（ADR-0219 §2.1 / 票 #926）───
+// 本段与插画浏览历史**同段同页**（术语文档易混辨析 #2）：📌 **T1 只接小说侧**（阅读位置），
+//   T2 在同一段落同一页接入插画浏览历史（票 #927）——刻意不新开第 4 段。
+const continueStore = useContinueReadingStore()
+/** 段 3 首载骨架态：hydrate 未完成时**不得**渲染成「还没有内容」
+ *  （那是把「还不知道」说成「你没有」——与本文件段 1/2 同款纪律，各段独立表达） */
+const continueLoading = ref(false)
+const continuePreview = computed(() => continueStore.items.slice(0, PREVIEW_N))
+/** 段 3 观测读点（ADR-0219 §2.6）：本文件此前对 usageMetrics 零引用，本段是第一个读点 */
+const metrics = useUsageMetricsStore()
+
+/** 段 3 行点击 → 正文（无视介绍页开关，ADR-0219 §2.4，经 openNovel 单点缝隙） */
+function openContinue(item: { novelId: number }): void {
+  openNovel(item.novelId, { resume: true })
+}
 
 // ─── 刷新 ───
 async function refresh(): Promise<void> {
   const token = gate.next()
   loading.value = true
   laterLoading.value = true
+  // ⚠️ 段 3 的 loading 必须**在此置 true**，否则下面段 3 的装载一挂上，
+  //    骨架的 v-if 恒假、`v-else-if` 空态在装载在飞时就命中 —— 「还不知道」被渲染成
+  //    「还没有阅读记录」。此前漏置，源级守卫只匹配标识符存在 ⇒ 守卫是同义反复（已修）。
+  continueLoading.value = true
   // ⚠️ hydrate 是 async 且可能 reject：必须 await + 收尾，否则 laterLoading 永远为 true
   //   （骨架卡死）或不 await（骨架一闪而过、把"还不知道"渲染成"你没有"）。
   const laterDone = laterStore.hydrate().finally(() => {
     laterLoading.value = false
   })
+  // 段 3 同理：hydrate 是 async，冷启动 + 慢 prefs 时此刻确实为 0
+  const continueDone = continueStore
+    .hydrate()
+    .finally(() => {
+      continueLoading.value = false
+      // 观测读点（旁路）：记录「本段被看到」与「本段为空」两个计数（本地，不外传）。
+      // ⚠️ 显式 try/catch：度量失败**不得**影响页面渲染，否则 `void continueDone` 变
+      //    unhandled rejection（照 Updates.vue noteSection 范式，测试硬约束 #3）
+      try {
+        metrics.recordSectionObserved('continueReading', continueStore.items.length === 0)
+      } catch (e) {
+        console.warn('[shelf] 段 3 空段度量记录失败（不影响渲染）', e)
+      }
+    })
+    .catch((e: unknown) => {
+      console.warn('[shelf] 续读数据装载失败（不影响渲染）', e)
+    })
   try {
     await loadBookmarksPreview(token)
   } finally {
     if (gate.isCurrent(token)) loading.value = false
   }
   void laterDone
+  void continueDone
 }
 
 // ─── 全局放射 FAB 桥（ADR-0120）───
@@ -259,16 +295,36 @@ onActivated(() => {
         </view>
       </view>
 
-      <!-- ══ 段 3：继续读（未实现，显式说明而非空列表）══ -->
+      <!-- ══ 段 3：继续读（ADR-0219 §2.1 / 票 #926）══ -->
       <view class="w-full">
         <view class="flex flex-row items-center justify-between px-3 mt-3 mb-1.5" :style="listItemStyle(2)">
           <text class="text-title-small font-medium text-surface-on">
             {{ t('shelf.section.continueReading') }}
           </text>
+          <view
+            v-if="!continueLoading && continuePreview.length > 0"
+            class="h-[8vw] px-2.5 flex items-center justify-center"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="SHELF_A11Y_LABELS.viewAllContinueReading"
+            @tap="navigate('/continue')"
+          >
+            <text class="text-label-large text-primary">{{ t('shelf.viewAll') }}</text>
+            <AppIcon name="arrow_forward" :size="3.2" class="text-primary" />
+          </view>
         </view>
       </view>
-      <view class="w-full">
-        <view class="mx-3 mb-1.5 px-3 py-4 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+      <view v-for="item in continuePreview" :key="`c-${item.novelId}`" class="w-full">
+        <ContinueRow :item="item" @open="openContinue" />
+      </view>
+      <!-- 首载骨架：hydrate 在飞时长度确实为 0；不加骨架会把「还在请求」渲染成「还没有内容」 -->
+      <view v-if="continueLoading && continueStore.items.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low">
+          <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
+          <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
+        </view>
+      </view>
+      <view v-else-if="continueStore.items.length === 0" class="w-full">
+        <view class="mx-3 mb-1.5 px-2.5 py-4 rounded-[var(--md-shape-medium)] bg-surface-container-low">
           <view class="flex flex-row items-center">
             <AppIcon name="schedule" :size="5.33" class="text-surface-on-variant" />
             <text class="text-body-medium text-surface-on ml-2">

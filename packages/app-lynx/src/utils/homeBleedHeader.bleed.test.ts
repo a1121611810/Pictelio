@@ -63,6 +63,7 @@ vi.mock('../pages/Me.vue', () => ({ default: {} }))
 // [维度重构 2026-10-03] 三个新页补桩（本配置无 vue 插件，漏桩即 import 期解析失败）
 vi.mock('../pages/Updates.vue', () => ({ default: {} }))
 vi.mock('../pages/Shelf.vue', () => ({ default: {} }))
+vi.mock('../pages/ContinueReading.vue', () => ({ default: {} }))
 vi.mock('../pages/AdvancedSettings.vue', () => ({ default: {} }))
 vi.mock('../pages/Watchlist.vue', () => ({ default: {} }))
 vi.mock('../pages/WatchLater.vue', () => ({ default: {} }))
@@ -101,9 +102,9 @@ describe('B 变体 · 默认路径（宏 = true = 生产缺省，真实执行该
     expect(routes.find((r) => r.name === 'discover')?.meta?.topInset).toBe('bleed')
   })
 
-  it('其余 27 条路由仍是 self（bleed 只作用于首页一处）', () => {
+  it('其余 28 条路由仍是 self（bleed 只作用于首页一处）', () => {
     const others = routes.filter((r) => r.name !== 'discover')
-    expect(others).toHaveLength(27)
+    expect(others).toHaveLength(28)
     for (const r of others) expect(r.meta?.topInset, String(r.name) + ' 不应是 bleed').toBe('self')
   })
 

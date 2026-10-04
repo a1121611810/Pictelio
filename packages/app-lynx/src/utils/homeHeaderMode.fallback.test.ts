@@ -47,6 +47,8 @@ vi.mock('../pages/Recommended.vue', () => stub)
 // [维度重构 2026-10-03] 三个新页补桩（无 vue 插件，漏桩即 import 期解析失败）
 vi.mock('../pages/Updates.vue', () => stub)
 vi.mock('../pages/Shelf.vue', () => stub)
+// 票 #926 新增 /continue 页面：无 vue 插件，漏桩即 import 期解析失败
+vi.mock('../pages/ContinueReading.vue', () => stub)
 vi.mock('../pages/AdvancedSettings.vue', () => stub)
 vi.mock('../pages/IllustList.vue', () => stub)
 vi.mock('../pages/IllustDetail.vue', () => stub)
@@ -85,8 +87,8 @@ describe('首页顶栏 · 旧顶栏回退路径（宏 = false，非生产缺省�
     expect(routes.find((r) => r.name === 'discover')?.meta?.topInset).toBe('self')
   })
 
-  it('回退时 28 条路由全是 self —— 没有任何页面处于 bleed', () => {
-    expect(routes).toHaveLength(28)
+  it('回退时 29 条路由全是 self —— 没有任何页面处于 bleed', () => {
+    expect(routes).toHaveLength(29)
     for (const r of routes) {
       expect(r.meta?.topInset, `${String(r.name)} 在回退路径下应是 self`).toBe('self')
     }

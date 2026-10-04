@@ -150,6 +150,7 @@ export const SHELF_A11Y_LABELS = {
   viewAllLater: '查看全部稍后看',
   openBookmark: '打开收藏作品',
   openLater: '打开稍后看条目',
+  viewAllContinueReading: '查看全部继续读',
 } as const
 
 /** 「高级」页 accessibility 标注（/advanced，[维度重构 2026-10-03] 新建页） */

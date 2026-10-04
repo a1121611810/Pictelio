@@ -480,10 +480,21 @@ const zhPages = {
   "shelf.empty": "还没有内容",
   // 书架自有的「查看全部」——分段头跳转，键属 shelf 命名空间（禁跨命名空间借用更新页的键）。
   "shelf.viewAll": "查看全部",
-  // 继续读尚未实现——
-  // 文案说明「即将上线」而非伪装成空列表（禁静默降级：测试硬约束 #3）。
-  "shelf.continueReading.empty": "阅读记录即将上线",
-  "shelf.continueReading.hint": "上线后可从这里直接回到上次读到的位置",
+  // 继续读已由 ADR-0219 / 票 #926 落地；「即将上线」占位文案随之作废。
+  "shelf.continueReading.empty": "还没有阅读记录",
+  "shelf.continueReading.hint": "打开任意小说的正文后，即可从这里回到上次读到的那一话",
+
+  // ─── 继续读完整列表（/continue）───
+  "continue.title": "继续读",
+  "continue.empty.title": "还没有阅读记录",
+  "continue.empty.hint": "打开任意小说的正文后，这里会记住你读到的那一话",
+  "continue.remove": "移除",
+  "continue.open": "打开续读条目",
+  "continue.restricted": "该作品受浏览限制",
+  "continue.back": "返回",
+  "continue.unavailable": "该作品已不可用",
+  "continue.label.chapter": "上次读到 第{n}话",
+  "continue.completed.title": "已读完",
 
   /** 高级设置（承接原「我的」里的调试/自检项，使业务行与调试行不再平级混排） */
   "advanced.title": "高级",

@@ -21,6 +21,7 @@ import { isNativeMode, getNativeModules } from './api/client'
 import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useWatchLaterStore } from './stores/watchLaterStore'
+import { useContinueReadingStore } from './stores/continueReadingStore'
 import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 import { runStartupAutoBackup } from './services/backupWiring'
@@ -60,6 +61,7 @@ import Login from './pages/Login.vue'
 import Recommended from './pages/Recommended.vue'
 import Updates from './pages/Updates.vue'
 import Shelf from './pages/Shelf.vue'
+import ContinueReading from './pages/ContinueReading.vue'
 import AdvancedSettings from './pages/AdvancedSettings.vue'
 import IllustList from './pages/IllustList.vue'
 import IllustDetail from './pages/IllustDetail.vue'
@@ -106,7 +108,8 @@ export const routes: RouteRecordRaw[] = [
   //   此前 /following 零用户入口（仅 benchNav 深链）、追更与通知各只有 Me.vue 单入口 ——
   //   三件回答同一问题的事分散三处，本条把它们收进一个顶层位置。
   { path: '/updates', name: 'updates', component: Updates, meta: { requiresAuth: true, topInset: 'self' } },
-  // 「书架」：三段聚合面（我的收藏 / 稍后看 / 继续读）。继续读尚未实现，页内显式说明"即将上线"而非伪装成空列表。
+  // 「书架」：三段聚合面（我的收藏 / 稍后看 / 继续读）。继续读已由 ADR-0219 / 票 #926 落地；
+  // 段 3 的「即将上线」占位文案随之作废（真实空态是「还没有阅读记录」）。
   { path: '/shelf', name: 'shelf', component: Shelf, meta: { requiresAuth: true, topInset: 'self' } },
   // 「高级」：承接原「我的」里的调试/自检项（网络自检 / 限流退避调参 / 平台一致性自检），
   //   使业务入口行与调试行不再平级混排（决策 4 = B：只搬调试项，账号区与外观区不动）。
@@ -130,6 +133,9 @@ export const routes: RouteRecordRaw[] = [
   // 稍后看列表页（ADR-0191 D5 / #753 T4）：本地快照全量渲染，requiresAuth（先例 = /watchlist）。
   // 术语红线（glossary 易混辨析 #1）：路由 /later + name watchLater，与追更 watchlist 物理隔离
   { path: '/later', name: 'watchLater', component: WatchLater, meta: { requiresAuth: true, topInset: 'self' } },
+  // 继续读完整列表（ADR-0219 §2.1 / 票 #926）：小说阅读位置 + （T2 起）插画浏览历史同页混排。
+  // 层级 /shelf → /continue → 详情 = 2 层，不破 NN/g 2 层上限。requiresAuth（先例 = /later）。
+  { path: '/continue', name: 'continueReading', component: ContinueReading, meta: { requiresAuth: true, topInset: 'self' } },
   // 通知中心（ADR-0188 D7 / #728）：次级业务页（非 NAV_TABS 外环 tab），Me 入口行进入
   { path: '/notifications', name: 'notifications', component: Notifications, meta: { requiresAuth: true, topInset: 'self' } },
   // 好P友列表页（ADR-0193 D2 / #754 T7）：次级业务页，Me 入口行进入；好P友是双向关系
@@ -547,6 +553,9 @@ export async function initRouter(): Promise<void> {
   // 登录/登出的 uid 变化由 store 内部 watch 重载。非阻塞（void）——首个路由恒为
   // 推荐页/登录页，不含稍后看入口，毫秒级读盘不阻塞首帧。
   void useWatchLaterStore().hydrate()
+  // 续读同款预热（ADR-0219 / 票 #926）：深链直达 /continue 时若不预热，首帧会是空列表
+  // ——「还不知道」被渲染成「你没有」。毫秒级读盘，同样不阻塞首帧。
+  void useContinueReadingStore().hydrate()
   // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
   // 失败仅 warn，不阻塞启动（spec §7）
   void runStartupAutoBackup()

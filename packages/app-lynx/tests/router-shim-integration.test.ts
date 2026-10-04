@@ -40,6 +40,11 @@ vi.mock('../src/stores/watchLaterStore', () => ({
     hydrate: async () => {},
   }),
 }))
+// 续读 store 同款：票 #926 把它加进了 initRouter 启动预热路径，
+// 未打桩时 useContinueReadingStore() 会触发 getActivePinia() 无 active Pinia（initRouter 是裸调用）
+vi.mock('../src/stores/continueReadingStore', () => ({
+  useContinueReadingStore: () => ({ hydrate: () => Promise.resolve() }),
+}))
 vi.mock('../src/stores/modalStack', () => ({
   useModalStack: () => ({
     hasOpenModal: () => false,
@@ -67,6 +72,7 @@ vi.mock('../src/pages/Me.vue', () => ({ default: {} }))
 //    抛 "Failed to parse source for import analysis" —— 新增页面时**必须**同步补桩。
 vi.mock('../src/pages/Updates.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Shelf.vue', () => ({ default: {} }))
+vi.mock('../src/pages/ContinueReading.vue', () => ({ default: {} }))
 vi.mock('../src/pages/AdvancedSettings.vue', () => ({ default: {} }))
 vi.mock('../src/pages/UserHome.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Following.vue', () => ({ default: {} }))
@@ -99,9 +105,9 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('28 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('29 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(28)
+    expect(mod.routes).toHaveLength(29)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/discover')).toBe('discover')
@@ -117,6 +123,10 @@ describe('路由表完整性（spec D3）', () => {
     // 术语红线：路由名 watchLater，与追更 watchlist 物理隔离
     expect(nameOf('/later')).toBe('watchLater')
     expect(mod.routes.find((r) => r.path === '/later')?.meta?.requiresAuth).toBe(true)
+    // 继续读完整列表（ADR-0219 §2.1 / #926）：业务次级页，requiresAuth（先例 = /later）。
+    // 层级 /shelf → /continue → 详情 = 2 层（NN/g 2 层上限）
+    expect(nameOf('/continue')).toBe('continueReading')
+    expect(mod.routes.find((r) => r.path === '/continue')?.meta?.requiresAuth).toBe(true)
     // 好P友列表页（ADR-0193 D2 / #754 T7）：业务次级页，requiresAuth 守卫鉴权；
     // 好P友是双向关系（/v1/user/mypixiv），与 following/follower 单向关系不同族
     expect(nameOf('/mypixiv')).toBe('mypixiv')

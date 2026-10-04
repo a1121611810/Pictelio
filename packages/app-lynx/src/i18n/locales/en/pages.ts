@@ -486,8 +486,20 @@ const enPages = {
   "shelf.viewAll": "View all",
   // Continue reading is not implemented yet (the old WebView client's historyStore
   // was removed with ADR-0203) — say so instead of faking an empty list.
-  "shelf.continueReading.empty": "Reading history is coming soon",
-  "shelf.continueReading.hint": "When it ships you can jump straight back to where you stopped.",
+  "shelf.continueReading.empty": "No reading history yet",
+  "shelf.continueReading.hint": "Open any novel and you can jump back to where you stopped",
+
+  // ─── Continue reading full list (/continue) ───
+  "continue.title": "Continue Reading",
+  "continue.empty.title": "No reading history yet",
+  "continue.empty.hint": "Open any novel and this list will remember the chapter you stopped at",
+  "continue.remove": "Remove",
+  "continue.open": "Open continue-reading entry",
+  "continue.restricted": "Restricted by browser settings",
+  "continue.back": "Back",
+  "continue.unavailable": "This work is no longer available",
+  "continue.label.chapter": "Stopped at chapter {n}",
+  "continue.completed.title": "Finished",
 
   /** Advanced settings (absorbs the debug/self-check rows previously in Me) */
   "advanced.title": "Advanced",

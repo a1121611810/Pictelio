@@ -29,9 +29,10 @@ export interface UsageMetricsSnapshot {
   tabHits: Record<string, number>
   /** 「发现」页二级 tab 被选次数 */
   subTabHits: Record<string, number>
-  /** 「更新」页各段**被观察到**的次数（分母） */
+  /** **聚合页各段**被观察到的次数（分母）。已接入：`updates`（更新页三段）、
+   *  `shelf` 的 `continueReading`（书架段 3，ADR-0219 §2.6 / 票 #926） */
   sectionSeen: Record<string, number>
-  /** 「更新」页各段**为空**的次数（分子） */
+  /** **聚合页各段为空**的次数（分子） */
   sectionEmpty: Record<string, number>
 }
 
@@ -162,12 +163,30 @@ export const DISCOVER_SUB_TAB_METRIC_ROWS: ReadonlyArray<{
 /** 「更新」页三段的度量键（= 段 id） */
 export type UpdateSectionKey = 'following' | 'watchlist' | 'notifications'
 
-/** 空段出现率的行定义：键（落库用）+ 展示 label（i18n） */
+
+/**
+ * **聚合页分段度量键**（票 #926 / ADR-0219 §2.6 收口）。
+ *
+ * ⚠️ 为什么收窄成联合类型：此前 `recordSectionObserved(name: string, …)` 接受任意
+ * 字符串，于是「写进一个没人看的桶」不会有任何编译期或运行期信号 —— 把
+ * `'continueReading'` 拼错，`pnpm check` 不红、面板不变、数据照写
+ * （possible silent misconfiguration，docs/research/review-data-flow-blindspot.md §1/§4）。
+ * 收窄后新增段名必须同步登记进 `UPDATE_SECTION_METRIC_ROWS`（有消费面），否则拼错在类型层转红。
+ */
+export type AggregateSectionKey = UpdateSectionKey | 'continueReading'
+
+/**
+ * 聚合页分段度量面板行（`AdvancedSettings.vue`「本地使用度量」面板消费）。
+ * ⚠️ 新增段名**必须**在此登记，否则桶无消费面（数据照写、永不可见）。
+ */
 export const UPDATE_SECTION_METRIC_ROWS: ReadonlyArray<{
-  key: UpdateSectionKey
-  labelKey: 'updates.section.following' | 'updates.section.watchlist' | 'updates.section.notifications'
+  key: AggregateSectionKey
+  labelKey: 'updates.section.following' | 'updates.section.watchlist' | 'updates.section.notifications' | 'shelf.section.continueReading'
 }> = [
   { key: 'following', labelKey: 'updates.section.following' },
   { key: 'watchlist', labelKey: 'updates.section.watchlist' },
   { key: 'notifications', labelKey: 'updates.section.notifications' },
+  // 书架段 3「继续读」（票 #926）：小说阅读位置 + （#927 起）插画浏览历史同段混排。
+  // 复用已有的 `shelf.section.continueReading` 段标题键，面板不新造文案。
+  { key: 'continueReading', labelKey: 'shelf.section.continueReading' },
 ]

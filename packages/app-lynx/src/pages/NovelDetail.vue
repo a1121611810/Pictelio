@@ -4,11 +4,12 @@ import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, navigate, requestBack, registerBackGuard } from '../router'
-import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist, loadNovelSeriesChapters } from '../api/novel'
 import { toNovelId, toSeriesId } from '../api/id'
 import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
+import { useContinueReadingStore, toNovelContinueSnapshot } from '../stores/continueReadingStore'
 import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -337,6 +338,56 @@ function onSelectionAction(key: 'copy' | 'search'): void {
 // generation-gate：章节内跳转（watch novelId 触发重载）后旧响应不得覆盖新数据
 let loadGeneration = 0
 
+// ─── 续读记录（ADR-0219 §2.2 会话末位置 / 票 #926）───
+const continueStore = useContinueReadingStore()
+
+/** 系列章节序号补齐的 warn 去重：一本只吵一次（先例 onNovelScrollMT 的 mtHeightWarned） */
+let chapterNoWarned = false
+
+/**
+ * 记录本话为续读位置（**会话末语义**：位置可往回拨，重读时回重读到的那话）。
+ * 无系列（含单本小说）时只有 novelId，不做章节序号推断。
+ */
+function recordContinueReading(target: PixivNovel, gen: number): void {
+  continueStore.record(toNovelContinueSnapshot(target))
+  // 📌 先捕获到 const：下面的 .then 闭包里 TS 收不回 `target.series` 的窄化
+  //   （target 是可变形参，闭包内被视为可能已被改写）
+  const seriesId = target.series?.id
+  if (seriesId == null) return
+  // 📌 后台补章节序号：让行内能显示「第N话」。**不 await**——正文渲染优先（硬约束 #1）。
+  //   补不到不降级功能本身（位置已记），只是标签缺失；此时不静默，warn 一次。
+  void loadNovelSeriesChapters(toSeriesId(seriesId))
+    .then((res) => {
+      if (gen !== loadGeneration) return // 章节已切换 → 旧响应作废
+      const idx = res.novels.findIndex((n) => Number(n.id) === Number(target.id))
+      // ⚠️ 章节不在服务端首页返回范围内（如第 30 话 / 共 50 话）⇒ 序号不可确定。
+      //   **不得静默 return**（测试硬约束 #3）：用户会看到行内凭空少了「第N话」而无从得知。
+      //   warn 一次后按「不显示坐标」降级（decideContinueLabel 返回 null），功能本身不受影响。
+      if (idx < 0) {
+        if (!chapterNoWarned) {
+          chapterNoWarned = true
+          console.warn(
+            '[novel-detail] 本话不在系列首页返回范围内，行内不显示「第N话」（召回不受影响）',
+          )
+        }
+        return
+      }
+      continueStore.record(
+        toNovelContinueSnapshot(target, Date.now(), {
+          id: Number(seriesId),
+          chapterNo: idx + 1,
+          chapterTotal: res.novel_series_detail.content_count,
+        }),
+      )
+    })
+    .catch((err: unknown) => {
+      if (gen !== loadGeneration) return
+      if (chapterNoWarned) return
+      chapterNoWarned = true
+      console.warn('[novel-detail] 章节序号补齐失败（行内不显示「第N话」，召回不受影响）', err)
+    })
+}
+
 async function loadNovel(): Promise<void> {
   const gen = ++loadGeneration
   loading.value = true
@@ -345,12 +396,18 @@ async function loadNovel(): Promise<void> {
   text.value = ''
   novelImages.value = {}
   reachedBottom.value = false
+  chapterNoWarned = false
   teardownPrompt()
   try {
     // 先取详情判定受限态：受限小说不再拉正文（遮罩是内容不可达而非仅视觉遮挡）
     const detailRes = await loadNovelDetail(toNovelId(novelId.value))
     if (gen !== loadGeneration) return
     novel.value = detailRes.novel
+    // 续读记录（ADR-0219 §2.3 / 票 #926）：**进入正文即记录，零门槛**——
+    // 不依赖停留时长或滚动百分比（段内滚动信号在当前构建不可得，见上方 onNovelScrollMT 注释）。
+    // 先用详情已有的数据落一条（不阻塞渲染，守「先渲染后加载」硬约束），
+    // 章节序号随后在后台补齐——补不到也不影响召回，只是行内不显示「第N话」。
+    recordContinueReading(detailRes.novel, gen)
     // prompt 在详情落地后创建：getSeries 此时已知，系列预取才能发起；
     // 停留计时（dwellMs）从详情就绪起算，语义上更贴近「实质阅读时长」
     setupPrompt()
@@ -366,6 +423,10 @@ async function loadNovel(): Promise<void> {
   } catch (err) {
     if (gen !== loadGeneration) return
     errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
+    // 📌 作品失效标记（票 #926 AC #9）：点开失败 = 该作品很可能已被删除/下架。
+    //   在此标记（而不是列表批量探活）——批量探活会让每行都发一次请求，
+    //   且受限行本就不该发请求。列表据此显式标注「已不可用」并保留移除入口。
+    continueStore.markUnavailable(Number(novelId.value))
   } finally {
     if (gen === loadGeneration) loading.value = false
   }

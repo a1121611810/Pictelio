@@ -56,6 +56,9 @@ vi.mock('../../src/pages/Login.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/Recommended.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/Updates.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/Shelf.vue', () => ({ default: {} }))
+// 票 #926 新增 /continue 页面：本门禁桩列表机械生成于 router.ts 的 import，
+// 新增页面**必须**同步补桩，否则 import 期整文件收集失败（不是少测一个，是测不了）
+vi.mock('../../src/pages/ContinueReading.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/AdvancedSettings.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/IllustList.vue', () => ({ default: {} }))
 vi.mock('../../src/pages/IllustDetail.vue', () => ({ default: {} }))

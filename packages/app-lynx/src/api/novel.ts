@@ -88,17 +88,47 @@ export function loadBookmarks(
 // ─── 小说系列追更（issue #220 / spec app-lynx-novel-series-watchlist §US1） ───
 // 端点与字段逐字对齐 Pixiv-Shaft：AppApi.kt（add/delete）+ loxia/API.kt（列表）+ Models.kt（字段）。
 
+// ─── 系列端点的请求级去重（AGENTS.md 即时导航硬约束 #4 数据层分流）───
+// 📌 **为什么需要**：`loadNovelSeries`（追更预取，`createWatchlistPrompt` 触发）与
+//   `loadNovelSeriesChapters`（续读章节序号，`NovelDetail` 触发）打的是**同一端点、
+//   同一参数**（lastOrder 未传 ⇒ query 字节相同）。正文页同时用到两者 ⇒ 同一系列
+//   会被请求两次。去重按「同 seriesId + 同 lastOrder」合并**在飞**请求；已完成的响应
+//   **不缓存**——系列会更新，缓存章节列表等于把「追更状态」的时效性一起冻住。
+const seriesInFlight = new Map<string, Promise<NovelSeriesDetailResponse>>()
+
+/**
+ * 系列端点的**唯一**发起点：`loadNovelSeries`（追更预取）与
+ * `loadNovelSeriesChapters`（续读章节序号）共用，保证同参数在飞请求只发一次。
+ */
+function loadSeriesOnce(
+  seriesId: SeriesId,
+  lastOrder?: number,
+  signal?: AbortSignal,
+): Promise<NovelSeriesDetailResponse> {
+  const key = `${String(seriesId)}:${lastOrder == null ? '' : String(lastOrder)}`
+  const inFlight = seriesInFlight.get(key)
+  if (inFlight) return inFlight
+  const params: Record<string, string> = { series_id: String(seriesId) }
+  if (lastOrder != null) {
+    params.last_order = String(lastOrder)
+  }
+  const req = apiClient
+    .get<NovelSeriesDetailResponse>("/v2/novel/series", params, signal)
+    .finally(() => seriesInFlight.delete(key))
+  seriesInFlight.set(key, req)
+  return req
+}
+
 /** 系列详情（含追更状态 watchlist_added、是否完结 is_concluded） */
 export function loadNovelSeries(
   seriesId: SeriesId,
   signal?: AbortSignal,
 ): Promise<NovelSeriesDetailResponse> {
-  return apiClient.get<NovelSeriesDetailResponse>(
-    "/v2/novel/series",
-    { series_id: String(seriesId) },
-    signal,
-  )
+  return loadSeriesOnce(seriesId, undefined, signal)
 }
+
+
+
 
 /**
  * 加载系列章节列表（spec app-lynx-novel-intro-action-row §3.2 / US1）。
@@ -118,11 +148,7 @@ export function loadNovelSeriesChapters(
   lastOrder?: number,
   signal?: AbortSignal,
 ): Promise<NovelSeriesDetailResponse> {
-  const params: Record<string, string> = { series_id: String(seriesId) }
-  if (lastOrder != null) {
-    params.last_order = String(lastOrder)
-  }
-  return apiClient.get<NovelSeriesDetailResponse>("/v2/novel/series", params, signal)
+  return loadSeriesOnce(seriesId, lastOrder, signal)
 }
 
 /**
