@@ -156,6 +156,41 @@ export function decideContinueLabel(
   return { chapterNo }
 }
 
+/** 完成判定输入（ADR-0219 §2.3，票 #928） */
+export interface NovelCompletionInput {
+  /** `@scrolltolower` 是否已触发（**触底是权威信号**：段内滚动在当前构建不可观测） */
+  reachedBottom: boolean
+  /** 系列 id；**单本小说（无系列）为 null** —— 触底即完成 */
+  seriesId: number | null
+  /** 本话在系列中的序号（1-based）；章节不在服务端首页返回范围内时不可确定 */
+  chapterNo?: number
+  /** 系列总话数（`novel_series_detail.content_count`）；不可确定时 undefined */
+  chapterTotal?: number
+}
+
+/**
+ * 完成判定（ADR-0219 §2.3 / 票 #928 AC #1/#2）：**只有两种情形**触发完成。
+ *  ① 单本小说（无系列）触底 —— Pixiv 上最常见形态，漏判则该场景永不离场；
+ *  ② 系列**末话**触底（`chapterNo === chapterTotal`）。
+ *
+ * ⚠️ **反例（票 #928 AC #2 钉死）**：系列**中间**话触底 ⇒ false。
+ *   判定刻意用严格相等而非「≥」或「已见末话」——放宽即会把读到一半的书误判为读完。
+ *
+ * ⚠️ **坐标不可确定 ⇒ 不完成**（`chapterNo` / `chapterTotal` 缺失）：宁可条目多留在列表里，
+ *   也不凭「大概是末话」把一本书软删。调用侧对这条降级 warn 一次（禁静默降级）。
+ *
+ * 📌 **不引入停留时长 / 滚动百分比门槛**（ADR-0219 §2.3）：可观测信号只有
+ *   「打开了哪本」与「是否触底」两个；`main-thread-bindscroll` 未确认派发，
+ *   段内进度拿不到可靠信号，凭空加门槛 = 造出依赖不存在信号的逻辑。
+ */
+export function decideNovelCompletion(input: NovelCompletionInput): boolean {
+  if (!input.reachedBottom) return false // 未触底：进入正文只记位置（§2.3「进入即记录」）
+  if (input.seriesId == null) return true // ① 单本小说读到底
+  const { chapterNo, chapterTotal } = input
+  if (chapterNo == null || chapterTotal == null) return false // 坐标不可确定 ⇒ 宁可不完成
+  return chapterNo === chapterTotal // ② 末话；中间话为 false（反例）
+}
+
 export const useContinueReadingStore = defineStore("continueReading", () => {
   const auth = useAuthStore()
   /** 当前账号 ID（未登录 null）——uid 变化由下方 watch 重载 */
@@ -169,8 +204,17 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
    * 缺它会把 hydrate 在飞渲染成空列表，正是测试硬约束 #3 禁的那类静默降级。
    */
   const ready = ref(false)
-  /** 未完成条目（已完成项由票 #928 移出主列表；本字段为 #928 的消费面预留） */
+  /**
+   * 未完成条目（**主列表的消费面**，票 #928）：书架段 3 与 `/continue` 主列表都吃本字段，
+   * 已完成的软删出列。与 `completed` 互为补集，两处页面不各写一遍谓词。
+   */
   const active = computed(() => _items.value.filter((it) => it.completedAt === undefined))
+  /**
+   * 已完成条目（软删组，票 #928）：与 `active` 同一谓词的两面——主列表吃 `active`，
+   * `/continue` 页的「已读完」分组吃本字段。**软删不是删除**：硬删后重读无任何入口
+   * = 吞掉用户数据（ADR-0219 §2.5 完成态行）。两处共用这一处定义，不各写一遍谓词。
+   */
+  const completed = computed(() => _items.value.filter((it) => it.completedAt !== undefined))
 
   /** hydrate 代闸：uid 连续切换时旧账号的在飞读取作废（竞态防护硬约束 #3） */
   let hydrateGeneration = 0
@@ -232,6 +276,23 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
     persist()
   }
 
+  /**
+   * 标记完成（**软删**，ADR-0219 §2.3 完成判定行 / 票 #928 AC #3）：
+   * 只置 `completedAt`，**不删除条目** —— 完成后 `/continue` 页「已读完」分组仍可见可清。
+   *
+   * 不在列表中才写（不为例外作品凭空建条目，与 `markUnavailable` 同纪律）；
+   * 已完成则 no-op（重复触底不刷新完成时刻——完成时刻是「读完了」的事实，不是退出时刻）。
+   * 📌 不复活：重开后 `record()` 刻意保留 `completedAt`（见上），本函数只在「判定成立」时调用，
+   *   而判定要求 `reachedBottom`，故「打开即复活」在结构上不成立。
+   */
+  function markCompleted(novelId: number, completedAt: number = Date.now()): void {
+    const hit = _items.value.find((it) => it.novelId === novelId)
+    if (!hit || hit.completedAt !== undefined) return
+    hit.completedAt = completedAt
+    _items.value = [..._items.value]
+    persist()
+  }
+
   /** 单条移除：不存在则 no-op 且不写盘（watchLaterStore.remove 同语义） */
   function remove(novelId: number): void {
     if (!has(novelId)) return
@@ -277,5 +338,16 @@ export const useContinueReadingStore = defineStore("continueReading", () => {
     },
   )
 
-  return { items, ready, active, has, record, markUnavailable, remove, hydrate }
+  return {
+    items,
+    ready,
+    active,
+    completed,
+    has,
+    record,
+    markCompleted,
+    markUnavailable,
+    remove,
+    hydrate,
+  }
 })

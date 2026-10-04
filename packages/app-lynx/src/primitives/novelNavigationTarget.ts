@@ -26,3 +26,26 @@ export interface NovelTargetInput {
 export function decideNovelTarget(input: NovelTargetInput): NovelTarget {
   return input.resume === true || !input.novelIntroFirst ? 'body' : 'intro'
 }
+
+/**
+ * 介绍页主 CTA 的动作（ADR-0219 §2.4 末段 / 票 #928 AC #6）：
+ * `'start'` = 「开始阅读」，`'continue'` = 「继续阅读」。
+ *
+ * 📌 **判定依据只是「有无位置」这一个布尔**：续读条目按 `novelId` 记，而
+ *   位置语义是**会话末**（ADR-0219 §2.2）——记录的 `novelId` **就是**上次读到的那话，
+ *   所以落点（`/novel/:id`）两个分支**完全相同**，差的只是这行文案。
+ *   不需要「记录话序号再让正文页跳过去」那套：那是把同一件事做两遍。
+ *
+ * ⚠️ **单按钮形态不变**（票 #734 定的「次级行 + 主 CTA 行」布局不动），
+ *   本函数只选文案，不引入第二颗按钮或新的视觉层级。
+ *
+ * 完成后重开**仍为 `'continue'`**：完成是软删、位置照常更新（ADR-0219 §2.3），
+ * 条目仍在存储里 ⇒ 「有位置」为真。调用侧传的是「该作品有无条目」，
+ * 而非「该作品是否未完成」。
+ */
+export type IntroReadAction = 'start' | 'continue'
+
+/** 纯判定：有位置 → 继续读，无位置 → 从头开始。 */
+export function decideIntroReadAction(hasPosition: boolean): IntroReadAction {
+  return hasPosition === true ? 'continue' : 'start'
+}

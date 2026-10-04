@@ -9,7 +9,7 @@ import { toNovelId, toSeriesId } from '../api/id'
 import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
-import { useContinueReadingStore, toNovelContinueSnapshot } from '../stores/continueReadingStore'
+import { useContinueReadingStore, toNovelContinueSnapshot, decideNovelCompletion } from '../stores/continueReadingStore'
 import { artworkTitle } from '../utils/artworkTitle'
 import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -187,6 +187,12 @@ function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: numb
 
 function onNovelToBottom(): void {
   reachedBottom.value = true
+  // 📌 完成判定挂在这里（ADR-0219 §2.3 触底行 / 票 #928）：`@scrolltolower` 是**唯一**的
+  //   触底权威信号。⚠️ 本函数**不得**出现任何写位置的调用——位置记录是「进入即记、零门槛」
+  //   （见 loadNovel 内），挂到这里会让「仅触底」也记位置，判定被放宽
+  //   （源级守卫 novelIntroEntryGuards / continueReadingWiring 的反例守卫钉住这一点）。
+  //   完成判定同时也要在章节坐标后台落地后再跑一次（见 evaluateCompletion）。
+  evaluateCompletion(loadGeneration)
   prompt.value?.notifyScroll(1, true)
 }
 
@@ -345,14 +351,63 @@ const continueStore = useContinueReadingStore()
 let chapterNoWarned = false
 
 /**
+ * 本次加载已解析出的章节坐标（**代闸内有效**，`loadNovel` 每次重载清空）：
+ * 完成判定需要的「是否末话」就在这里，**零新增网络请求**（`content_count` 与
+ * `novels[]` 已在 `loadNovelSeriesChapters` 的响应里，票 #926 已埋好这条线）。
+ * ⚠️ 章节可能在首页返回范围外 ⇒ 保持 null；`decideNovelCompletion` 遇 null 判「不完成」。
+ */
+let chapterPosition: { chapterNo: number; chapterTotal: number } | null = null
+/** 完成判定降级（系列章节坐标不可确定）的 warn 去重：一本只吵一次 */
+let completionWarned = false
+
+/**
+ * 完成判定落地（ADR-0219 §2.3 / 票 #928 AC #1/#2/#3）：成立则软删（置 `completedAt`）。
+ *
+ * 📌 **两个时机都要跑**：章节坐标是**后台**补的，可能晚于触底才落地。
+ *   只在触底时判一次 ⇒ 触底早于补齐的用户永远判不出末话；只在补齐时判 ⇒
+ *   补齐早于触底的用户同样漏判。故触底时判一次、坐标落地后再判一次（幂等：
+ *   `markCompleted` 对已完成的条目是 no-op）。
+ *
+ * 📌 降级不静默：坐标不可确定时**不**判完成（宁可留在列表里也不误软删），
+ *   并 warn 一次让用户可从日志看出「这本书不会被自动移出列表」。
+ */
+function evaluateCompletion(gen: number): void {
+  if (gen !== loadGeneration) return // 章节已切换 / 组件已卸载 → 旧判定作废（竞态防护 #3）
+  const seriesId = novel.value?.series?.id ?? null
+  const decision = decideNovelCompletion({
+    reachedBottom: reachedBottom.value,
+    seriesId: seriesId == null ? null : Number(seriesId),
+    chapterNo: chapterPosition?.chapterNo,
+    chapterTotal: chapterPosition?.chapterTotal,
+  })
+  if (decision) {
+    continueStore.markCompleted(Number(novelId.value))
+    return
+  }
+  // 只在「本可判定却判不出」时吵：触底 + 有系列 + 坐标缺失（禁静默降级）
+  if (reachedBottom.value && seriesId != null && chapterPosition === null && !completionWarned) {
+    completionWarned = true
+    console.warn('[novel-detail] 本话在系列中的序号不可确定，不标记完成（条目保留在继续读列表）')
+  }
+}
+
+/**
  * 记录本话为续读位置（**会话末语义**：位置可往回拨，重读时回重读到的那话）。
  * 无系列（含单本小说）时只有 novelId，不做章节序号推断。
+ *
+ * 📌 **完成判定在本函数内只挂在「坐标刚落地」这一个异步点**，另一个点在 `onNovelToBottom`。
+ *   中间这次是**必需的**：章节响应是后台补的，可能晚于用户触底才落地——只在触底时判一次，
+ *   触底早于补齐的用户永远判不出末话。
+ *   ⚠️ 本函数**开头不判**：此刻 `reachedBottom` 刚被 `loadNovel` 复位为 false、正文 `<list>`
+ *   尚未渲染，判定必然为 false ⇒ 写在那里只是两行恒不生效的死代码。
  */
 function recordContinueReading(target: PixivNovel, gen: number): void {
   continueStore.record(toNovelContinueSnapshot(target))
   // 📌 先捕获到 const：下面的 .then 闭包里 TS 收不回 `target.series` 的窄化
   //   （target 是可变形参，闭包内被视为可能已被改写）
   const seriesId = target.series?.id
+  // 单本小说（无系列）：没有坐标要补。完成判定**不依赖坐标**——`chapterPosition` 保持 null，
+  // 触底时即判「单本读到底」（ADR-0219 §2.3 情形 ①，票 #928 AC #1）。
   if (seriesId == null) return
   // 📌 后台补章节序号：让行内能显示「第N话」。**不 await**——正文渲染优先（硬约束 #1）。
   //   补不到不降级功能本身（位置已记），只是标签缺失；此时不静默，warn 一次。
@@ -363,6 +418,7 @@ function recordContinueReading(target: PixivNovel, gen: number): void {
       // ⚠️ 章节不在服务端首页返回范围内（如第 30 话 / 共 50 话）⇒ 序号不可确定。
       //   **不得静默 return**（测试硬约束 #3）：用户会看到行内凭空少了「第N话」而无从得知。
       //   warn 一次后按「不显示坐标」降级（decideContinueLabel 返回 null），功能本身不受影响。
+      //   📌 `chapterPosition` 保持 null ⇒ 完成判定据此判「不完成」（宁可留在列表里也不误软删）。
       if (idx < 0) {
         if (!chapterNoWarned) {
           chapterNoWarned = true
@@ -372,13 +428,19 @@ function recordContinueReading(target: PixivNovel, gen: number): void {
         }
         return
       }
+      chapterPosition = {
+        chapterNo: idx + 1,
+        chapterTotal: res.novel_series_detail.content_count,
+      }
       continueStore.record(
         toNovelContinueSnapshot(target, Date.now(), {
           id: Number(seriesId),
-          chapterNo: idx + 1,
-          chapterTotal: res.novel_series_detail.content_count,
+          chapterNo: chapterPosition.chapterNo,
+          chapterTotal: chapterPosition.chapterTotal,
         }),
       )
+      // 坐标刚落地 ⇒ 补判一次完成（触底可能早于本次响应，票 #928 闭环 AC #5）
+      evaluateCompletion(gen)
     })
     .catch((err: unknown) => {
       if (gen !== loadGeneration) return
@@ -397,6 +459,10 @@ async function loadNovel(): Promise<void> {
   novelImages.value = {}
   reachedBottom.value = false
   chapterNoWarned = false
+  // 📌 完成判定的本次加载态必须清空（与 reachedBottom 同批）：坐标与 warn 去重都是
+  //   **代闸内**的，章节内跳转后若残留上一次的坐标，新话会拿旧序号判末话。
+  chapterPosition = null
+  completionWarned = false
   teardownPrompt()
   try {
     // 先取详情判定受限态：受限小说不再拉正文（遮罩是内容不可达而非仅视觉遮挡）

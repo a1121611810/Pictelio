@@ -94,7 +94,13 @@ describe("源级守卫（票 #927 / ADR-0219 §2.1-§2.5）", () => {
 
   it("📌 /continue 页渲染**合并列表**，且移除分流到两条 store（AC #3 / #7）", () => {
     const s = src("../pages/ContinueReading.vue")
-    expect(s).toContain("mergeContinueEntries(continueStore.items, historyStore.items)")
+    // 📌 小说侧入参由 `items` 改为 `active`（票 #928，2026-10-04）：完成的作品**软删**出主列表
+    //   （ADR-0219 §2.5 完成态行 / 票 #928 AC #3），故 `items` 已不是本页主列表的正确输入。
+    //   **这条期望在被改之前是对的**：#927 交付时根本还没有完成态，混排就该吃全量。
+    //   混排本身（两轴、同一聚合函数）这条语义**未变**，变的只是小说侧取哪个派生量。
+    //   ⚠️ 防回退的那条（"不得再出现 items 版调用"）在 continueReadingCompletion.test.ts
+    //   里，本文件不重复钉——同一断言写两遍是给回归创造就业。
+    expect(s).toContain("mergeContinueEntries(continueStore.active, historyStore.items)")
     expect(s).toContain("continueStore.remove(entry.id)")
     expect(s).toContain("historyStore.remove(entry.id)")
     // 反事实：删掉 removeItem 的 else 分支 ⇒ 红

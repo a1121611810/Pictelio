@@ -76,6 +76,9 @@ const zhPages = {
   "novelIntro.retry": "重试",
   "novelIntro.startReading": "开始阅读",
   "novelIntro.startReadingA11y": "开始阅读",
+  // 票 #928 / ADR-0219 §2.4：有续读位置时的主 CTA 文案（单按钮形态不变，只换这行字）
+  "novelIntro.continueReading": "继续阅读",
+  "novelIntro.continueReadingA11y": "继续阅读",
   "novelIntro.authorA11y": "查看作者主页",
   "novelIntro.noCaption": "暂无简介",
   "novelIntro.captionTitle": "简介",

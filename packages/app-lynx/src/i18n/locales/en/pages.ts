@@ -73,6 +73,10 @@ const enPages = {
   "novelIntro.retry": "Retry",
   "novelIntro.startReading": "Start reading",
   "novelIntro.startReadingA11y": "Start reading",
+  // Ticket #928 / ADR-0219 §2.4: intro CTA when a continue-reading position exists
+  // (single-button shape unchanged — only this label branches)
+  "novelIntro.continueReading": "Continue reading",
+  "novelIntro.continueReadingA11y": "Continue reading",
   "novelIntro.authorA11y": "View author profile",
   "novelIntro.noCaption": "No description",
   "novelIntro.captionTitle": "Description",

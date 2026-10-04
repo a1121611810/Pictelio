@@ -35,6 +35,8 @@ import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { isDismissed, markDismissed, setWatchState, getWatchState } from '../stores/watchlistStore'
 import { useWatchLaterStore, toNovelSnapshot } from '../stores/watchLaterStore'
 import { createWatchlistPrompt, type WatchlistPromptController } from '../primitives/createWatchlistPrompt'
+import { decideIntroReadAction } from '../primitives/novelNavigationTarget'
+import { useContinueReadingStore } from '../stores/continueReadingStore'
 import { useNovelWatchlistToggle } from '../composables/useNovelWatchlistToggle'
 import CoverImage from '../components/CoverImage.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -186,11 +188,30 @@ function openCaption(): void {
   captionOpen.value = true
 }
 
-/** 「开始阅读」：进入正文页固定从头开始（票 #579）；受限态置灰不可点（票 #580） */
+/** 「开始阅读」/「继续阅读」：进入正文页（票 #579）；受限态置灰不可点（票 #580） */
 function startReading(): void {
   if (masked.value) return
   void navigate(`/novel/${novelId.value}`)
 }
+
+// ─── 主 CTA 文案分支（ADR-0219 §2.4 末段 / 票 #928 AC #6）───
+// 无位置 →「开始阅读」；有位置 →「继续阅读」。📌 **落点两分支相同**（都是 `/novel/:id`）：
+//   续读按 novelId 记、位置语义是会话末，记录的 novelId **就是**上次读到的那话
+//   ⇒ 不需要「记话序号再让正文页跳转」那套。变的只有这行文案。
+const continueStore = useContinueReadingStore()
+const readAction = computed(() => decideIntroReadAction(continueStore.has(novelId.value)))
+
+/**
+ * ⚠️ `hydrate` 未落定时按「无位置」渲染「开始阅读」：这是**安全默认**——
+ * 两个分支落点相同，最坏只是首帧文案少一个「继续」二字，**不会把用户带错话**。
+ * 不为此加骨架屏：CTA 是 scrim 内的单行文字，遮住它换一句更准的文案不划算（硬约束 #1）。
+ */
+const readActionLabel = computed(() =>
+  readAction.value === 'continue' ? t('novelIntro.continueReading') : t('novelIntro.startReading'),
+)
+const readActionA11yLabel = computed(() =>
+  readAction.value === 'continue' ? t('novelIntro.continueReadingA11y') : t('novelIntro.startReadingA11y'),
+)
 
 // ─── 底部动作行：Row 1 = 4 个次级按钮状态（spec #734 §US4 / §US5）───
 // 「已下载」派生自 downloads.state（Pinia setup store 状态自动解包），沿 ADR-0189 D3 / spec D1。
@@ -516,16 +537,18 @@ const topInsetSpacer = useTopInsetSpacer()
           </view>
         </view>
 
-        <!-- Row 2 全宽主 CTA「开始阅读」（沿用 #580 范式：masked 态 bg-white/20 + text-white/50） -->
+        <!-- Row 2 全宽主 CTA（沿用 #580 范式：masked 态 bg-white/20 + text-white/50）。
+             📌 票 #928：文案随「有无位置」分支（无位置=开始阅读 / 有位置=继续阅读），
+             **单按钮形态不变**——不新增视觉层级、不动 #734 定的「次级行 + 主 CTA 行」布局。 -->
         <view
           class="mt-3 w-full h-[12.8vw] rounded-[var(--md-shape-full)] flex items-center justify-center"
           :class="masked ? 'bg-white/20' : 'bg-primary active:opacity-80'"
           :style="{ transition: pressOpacity.transition }"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="t('novelIntro.startReadingA11y')"
+          :accessibility-label="readActionA11yLabel"
           @tap="startReading"
         >
-          <text class="text-label-large font-medium" :class="masked ? 'text-white/50' : 'text-primary-on'">{{ t('novelIntro.startReading') }}</text>
+          <text class="text-label-large font-medium" :class="masked ? 'text-white/50' : 'text-primary-on'">{{ readActionLabel }}</text>
         </view>
       </view>
     </view>

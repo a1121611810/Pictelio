@@ -121,8 +121,11 @@ const historyStore = useBrowsingHistoryStore()
  *  （那是把「还不知道」说成「你没有」——与本文件段 1/2 同款纪律，各段独立表达） */
 const continueLoading = ref(false)
 /** 段 3 全量条目（两轴混排，最近活动倒序）——空态判定的真值必须取自它，
- *  只看小说侧会把「我刷过的插画」渲染成「你什么都没有」 */
-const continueEntries = computed(() => mergeContinueEntries(continueStore.items, historyStore.items))
+ *  只看小说侧会把「我刷过的插画」渲染成「你什么都没有」。
+ *  📌 小说侧取 `active`（未完成，票 #928 AC #3）：读完了的**软删**出段 3，
+ *  但条目仍在存储里 ⇒ `/continue` 页「已读完」分组可见可清，不是吞掉用户数据。
+ *  插画侧取全量 `items`——浏览历史无「读完」概念（流水没有完成态）。 */
+const continueEntries = computed(() => mergeContinueEntries(continueStore.active, historyStore.items))
 const continuePreview = computed(() => continueEntries.value.slice(0, PREVIEW_N))
 /** 段 3 观测读点（ADR-0219 §2.6）：本文件此前对 usageMetrics 零引用，本段是第一个读点 */
 const metrics = useUsageMetricsStore()
