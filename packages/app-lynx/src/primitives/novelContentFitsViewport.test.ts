@@ -1,4 +1,4 @@
-// 正文「是否高于视口」的几何前置（票 #930 / ADR-0219 §2.3 触底前置）。
+// 正文「是否高于视口」的几何前置（ADR-0219 §2.3 触底前置）。
 //
 // 被测对象：`primitives/novelContentFitsViewport.ts`（纯几何）+ `stores/continueReadingStore.ts`
 // 的 `decideNovelCompletion` 前置分支。**接线面**（页面怎么把几何喂进去）在

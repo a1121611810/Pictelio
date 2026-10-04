@@ -198,12 +198,12 @@ export interface NovelCompletionInput {
  * ⚠️ **坐标不可确定 ⇒ 不完成**（`chapterNo` / `chapterTotal` 缺失）：宁可条目多留在列表里，
  *   也不凭「大概是末话」把一本书软删。调用侧对这条降级 warn 一次（禁静默降级）。
  *
- * 📌 **入参必填 `contentExceedsViewport`**（票 #930）：不设默认值/可选，
+ * 📌 **入参必填 `contentExceedsViewport`**（ADR-0219 §2.3）：不设默认值/可选，
  *   免得漏接的调用点在类型上「看起来对」而运行时恒取保守侧。
  */
 export function decideNovelCompletion(input: NovelCompletionInput): boolean {
   if (!input.reachedBottom) return false // 未触底：进入正文只记位置（§2.3「进入即记录」）
-  if (!input.contentExceedsViewport) return false // 📌 前置（票 #930）：没有可滚的内容 ⇒ 谈不上读到底
+  if (!input.contentExceedsViewport) return false // 📌 前置（ADR-0219 §2.3）：没有可滚的内容 ⇒ 谈不上读到底
   if (input.seriesId == null) return true // ① 单本小说读到底
   const { chapterNo, chapterTotal } = input
   if (chapterNo == null || chapterTotal == null) return false // 坐标不可确定 ⇒ 宁可不完成
