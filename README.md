@@ -15,11 +15,11 @@
   </p>
 </div>
 
-<a href="packages/website/public/screenshots/01_feed.png"><img src="packages/website/public/screenshots/01_feed.png" width="180" height="320" alt="Discover feed"></a>
-<a href="packages/website/public/screenshots/02_detail.png"><img src="packages/website/public/screenshots/02_detail.png" width="180" height="320" alt="Illustration detail"></a>
-<a href="packages/website/public/screenshots/03_novel.png"><img src="packages/website/public/screenshots/03_novel.png" width="180" height="320" alt="Novel reader"></a>
-<a href="packages/website/public/screenshots/06_settings.png"><img src="packages/website/public/screenshots/06_settings.png" width="180" height="320" alt="Settings"></a>
-<a href="packages/website/public/screenshots/07_login.png"><img src="packages/website/public/screenshots/07_login.png" width="180" height="320" alt="Login"></a>
+<a href="packages/website/public/screenshots/01_feed.png"><img src="packages/website/public/screenshots/01_feed.png" width="17%" alt="Discover feed"></a>
+<a href="packages/website/public/screenshots/02_detail.png"><img src="packages/website/public/screenshots/02_detail.png" width="17%" alt="Illustration detail"></a>
+<a href="packages/website/public/screenshots/03_novel.png"><img src="packages/website/public/screenshots/03_novel.png" width="17%" alt="Novel reader"></a>
+<a href="packages/website/public/screenshots/06_settings.png"><img src="packages/website/public/screenshots/06_settings.png" width="17%" alt="Settings"></a>
+<a href="packages/website/public/screenshots/07_login.png"><img src="packages/website/public/screenshots/07_login.png" width="17%" alt="Login"></a>
 
 ---
 
