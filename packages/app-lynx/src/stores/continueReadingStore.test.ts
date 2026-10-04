@@ -411,8 +411,13 @@ describe("源级守卫（票 #926 / ADR-0219 §4）", () => {
 
   it("段 3 骨架分支与空态分支互斥（v-else-if 链，不能同时命中）", () => {
     const s = src("../pages/Shelf.vue")
-    const iSkeleton = s.indexOf('v-if="continueLoading && continueStore.items.length === 0"')
-    const iEmpty = s.indexOf('v-else-if="continueStore.items.length === 0"')
+    // 📌 条件串在票 #927 起从 `continueStore.items` 换成合并列表 `continueEntries`：
+    //   段 3 现在两轴混排（小说阅读位置 + 插画浏览历史，ADR-0219 §2.1），
+    //   只看小说侧会把「我刷过的插画」渲染成「你什么都没有」。
+    //   本守卫的**意图**（骨架与空态互斥、不同时命中）不变，故只换条件串；
+    //   「不许退回单轴」的反事实守卫由 browsingHistoryStore.test.ts 承担。
+    const iSkeleton = s.indexOf('v-if="continueLoading && continueEntries.length === 0"')
+    const iEmpty = s.indexOf('v-else-if="continueEntries.length === 0"')
     expect(iSkeleton).toBeGreaterThan(-1)
     expect(iEmpty, "空态块必须排在骨架块之后").toBeGreaterThan(iSkeleton)
     // 关键是 else-if 而非独立 v-if：两个独立 v-if 会让骨架与空态同时渲染

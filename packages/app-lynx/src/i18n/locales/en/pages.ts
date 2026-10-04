@@ -486,19 +486,25 @@ const enPages = {
   "shelf.viewAll": "View all",
   // Continue reading is not implemented yet (the old WebView client's historyStore
   // was removed with ADR-0203) — say so instead of faking an empty list.
-  "shelf.continueReading.empty": "No reading history yet",
-  "shelf.continueReading.hint": "Open any novel and you can jump back to where you stopped",
+  "shelf.continueReading.empty": "Nothing here yet",
+  "shelf.continueReading.hint": "Open any novel or illustration to come back to where you left off",
 
   // ─── Continue reading full list (/continue) ───
+  // 小说阅读位置 + 插画浏览历史**同段同页**（ADR-0219 §2.1 / 票 #927）：空态与提示文案
+  // 刻意不提「哪一轴」——两轴对用户是同一种意图（「我上次在这儿」）。
   "continue.title": "Continue Reading",
-  "continue.empty.title": "No reading history yet",
-  "continue.empty.hint": "Open any novel and this list will remember the chapter you stopped at",
+  "continue.empty.title": "Nothing here yet",
+  "continue.empty.hint": "Open any novel or illustration and this list will remember where you left off",
   "continue.remove": "Remove",
-  "continue.open": "Open continue-reading entry",
+  // {type} = 类型徽章文案（小说 / 插画）。整行挂了 accessibility-label，
+  // 子文本不再被朗读 ⇒ 徽章不进标签的话，屏读用户分不出「在读」与「刷过」。
+  "continue.open": "Open {{type}} entry",
+  "continue.badge.novel": "Novel",
+  "continue.badge.illust": "Illustration",
   "continue.restricted": "Restricted by browser settings",
   "continue.back": "Back",
   "continue.unavailable": "This work is no longer available",
-  "continue.label.chapter": "Stopped at chapter {n}",
+  "continue.label.chapter": "Stopped at chapter {{n}}",
   "continue.completed.title": "Finished",
 
   /** Advanced settings (absorbs the debug/self-check rows previously in Me) */

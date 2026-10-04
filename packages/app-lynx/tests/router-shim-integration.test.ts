@@ -45,6 +45,11 @@ vi.mock('../src/stores/watchLaterStore', () => ({
 vi.mock('../src/stores/continueReadingStore', () => ({
   useContinueReadingStore: () => ({ hydrate: () => Promise.resolve() }),
 }))
+// 浏览历史（插画侧）同款：票 #927 把它加进了 initRouter 启动预热路径
+// （段 3 与 /continue 两轴混排 ⇒ 只预热小说侧会漏掉插画记录）
+vi.mock('../src/stores/browsingHistoryStore', () => ({
+  useBrowsingHistoryStore: () => ({ hydrate: () => Promise.resolve() }),
+}))
 vi.mock('../src/stores/modalStack', () => ({
   useModalStack: () => ({
     hasOpenModal: () => false,

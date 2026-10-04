@@ -8,6 +8,8 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { useContinueReadingStore } from '../stores/continueReadingStore'
+import { useBrowsingHistoryStore } from '../stores/browsingHistoryStore'
+import { mergeContinueEntries, type ContinueEntry } from '../primitives/continueEntries'
 import ContinueRow from '../components/ContinueRow.vue'
 import { useUsageMetricsStore } from '../stores/usageMetrics'
 import { useHeroSource } from '../composables/heroTransition'
@@ -79,14 +81,18 @@ async function loadBookmarksPreview(token: number): Promise<void> {
 //   与 Updates 页 `loading` 死状态是同一族缺陷（S-5），只是这里靠 laterLoading 独立表达。
 const laterPreview = computed(() => laterStore.items.slice(0, PREVIEW_N))
 
-// 缩略图 → 大图连续性转场（ADR-0211 决策 12）。resolveSrc 要同时认两个来源：
-// 收藏（服务端 PixivIllust）与稍后看（本地快照），因为两段各有自己的缩略图盒。
+// 缩略图 → 大图连续性转场（ADR-0211 决策 12）。resolveSrc 要同时认三个来源：
+// 收藏（服务端 PixivIllust）、稍后看（本地快照）、段 3 浏览历史（本地快照），
+// 因为三段各有自己的缩略图盒。漏掉段 3 ⇒ 点插画记录返回时拿不到 src，
+// heroTransition 内部降级为普通转场（不崩，但连续性白丢）。
 const heroTransition = useHeroSource({
   resolveSrc: (id: number) => {
     const b = bookmarks.value.find((i) => i.id === id)
     if (b) return proxyImageUrl(b.image_urls.large || b.image_urls.medium || '')
     const l = laterStore.items.find((i) => i.id === id)
-    return l ? proxyImageUrl(l.coverUrl) : ''
+    if (l) return proxyImageUrl(l.coverUrl)
+    const h = historyStore.items.find((i) => i.illustId === id)
+    return h ? proxyImageUrl(h.coverUrl) : ''
   },
 })
 
@@ -105,20 +111,34 @@ function openLaterItem(item: { kind: 'illust' | 'novel'; id: number }): void {
   }
 }
 
-// ─── 段 3：继续读（ADR-0219 §2.1 / 票 #926）───
-// 本段与插画浏览历史**同段同页**（术语文档易混辨析 #2）：📌 **T1 只接小说侧**（阅读位置），
-//   T2 在同一段落同一页接入插画浏览历史（票 #927）——刻意不新开第 4 段。
+// ─── 段 3：继续读（ADR-0219 §2.1 / 票 #926 + 票 #927）───
+// 本段与插画浏览历史**同段同页**（术语文档易混辨析 #2）：小说「阅读位置」+ 插画「浏览历史」
+//   混在**同一段落、同一 `/continue` 页**里，按最近活动统一倒序；刻意不新开第 4 段、不建 `/history`。
+// 两条轴的**数据层仍物理隔离**（两个 store、两个账号级键），本段只做展示聚合（primitives/continueEntries）。
 const continueStore = useContinueReadingStore()
+const historyStore = useBrowsingHistoryStore()
 /** 段 3 首载骨架态：hydrate 未完成时**不得**渲染成「还没有内容」
  *  （那是把「还不知道」说成「你没有」——与本文件段 1/2 同款纪律，各段独立表达） */
 const continueLoading = ref(false)
-const continuePreview = computed(() => continueStore.items.slice(0, PREVIEW_N))
+/** 段 3 全量条目（两轴混排，最近活动倒序）——空态判定的真值必须取自它，
+ *  只看小说侧会把「我刷过的插画」渲染成「你什么都没有」 */
+const continueEntries = computed(() => mergeContinueEntries(continueStore.items, historyStore.items))
+const continuePreview = computed(() => continueEntries.value.slice(0, PREVIEW_N))
 /** 段 3 观测读点（ADR-0219 §2.6）：本文件此前对 usageMetrics 零引用，本段是第一个读点 */
 const metrics = useUsageMetricsStore()
 
-/** 段 3 行点击 → 正文（无视介绍页开关，ADR-0219 §2.4，经 openNovel 单点缝隙） */
-function openContinue(item: { novelId: number }): void {
-  openNovel(item.novelId, { resume: true })
+/**
+ * 段 3 行点击分流：小说走 openNovel 的 resume 意图（无视介绍页开关直达正文，ADR-0219 §2.4）；
+ * 插画走既有插画详情路由。⚠️ 分流**必须**写在本页而不是塞进聚合层——小说落点只能经
+ *   openNovel 单点缝隙（介绍页路由串是 novelNavigation.ts 的专属，见 novelIntroEntryGuards 源级守卫）。
+ */
+function openContinue(entry: ContinueEntry): void {
+  if (entry.kind === 'novel') {
+    openNovel(entry.id, { resume: true })
+  } else {
+    heroTransition.begin(entry.id)
+    void navigate(`/illust/${entry.id}`)
+  }
 }
 
 // ─── 刷新 ───
@@ -135,23 +155,31 @@ async function refresh(): Promise<void> {
   const laterDone = laterStore.hydrate().finally(() => {
     laterLoading.value = false
   })
-  // 段 3 同理：hydrate 是 async，冷启动 + 慢 prefs 时此刻确实为 0
+  // 段 3 两轴各装各的（小说阅读位置 / 插画浏览历史，同段同页，ADR-0219 §2.1）
   const continueDone = continueStore
     .hydrate()
-    .finally(() => {
-      continueLoading.value = false
-      // 观测读点（旁路）：记录「本段被看到」与「本段为空」两个计数（本地，不外传）。
-      // ⚠️ 显式 try/catch：度量失败**不得**影响页面渲染，否则 `void continueDone` 变
-      //    unhandled rejection（照 Updates.vue noteSection 范式，测试硬约束 #3）
-      try {
-        metrics.recordSectionObserved('continueReading', continueStore.items.length === 0)
-      } catch (e) {
-        console.warn('[shelf] 段 3 空段度量记录失败（不影响渲染）', e)
-      }
-    })
     .catch((e: unknown) => {
       console.warn('[shelf] 续读数据装载失败（不影响渲染）', e)
     })
+  const historyDone = historyStore
+    .hydrate()
+    .catch((e: unknown) => {
+      console.warn('[shelf] 浏览历史装载失败（不影响渲染）', e)
+    })
+  // 📌 骨架旗标要等**两条轴都**落定才撤：只等小说侧就撤，会在「插画还在飞」时把段 3
+  //   渲染成「就这些」，那比晚撤更误导（它说的是一个不完整的答案）。
+  const continueSettled = Promise.all([continueDone, historyDone]).finally(() => {
+    continueLoading.value = false
+    // 观测读点（旁路）：记录「本段被看到」与「本段为空」两个计数（本地，不外传）。
+    // 📌 两轴同段 ⇒ 只记一个「该段本次是否为空」，不按类型分记（ADR-0219 §2.6 拍板）。
+    // ⚠️ 显式 try/catch：度量失败**不得**影响页面渲染，否则 `void continueSettled` 变
+    //    unhandled rejection（照 Updates.vue noteSection 范式，测试硬约束 #3）
+    try {
+      metrics.recordSectionObserved('continueReading', continueEntries.value.length === 0)
+    } catch (e) {
+      console.warn('[shelf] 段 3 空段度量记录失败（不影响渲染）', e)
+    }
+  })
   try {
     await loadBookmarksPreview(token)
   } finally {
@@ -159,6 +187,8 @@ async function refresh(): Promise<void> {
   }
   void laterDone
   void continueDone
+  void historyDone
+  void continueSettled
 }
 
 // ─── 全局放射 FAB 桥（ADR-0120）───
@@ -295,7 +325,7 @@ onActivated(() => {
         </view>
       </view>
 
-      <!-- ══ 段 3：继续读（ADR-0219 §2.1 / 票 #926）══ -->
+      <!-- ══ 段 3：继续读（小说阅读位置 + 插画浏览历史同段同页，ADR-0219 §2.1）══ -->
       <view class="w-full">
         <view class="flex flex-row items-center justify-between px-3 mt-3 mb-1.5" :style="listItemStyle(2)">
           <text class="text-title-small font-medium text-surface-on">
@@ -313,17 +343,19 @@ onActivated(() => {
           </view>
         </view>
       </view>
-      <view v-for="item in continuePreview" :key="`c-${item.novelId}`" class="w-full">
-        <ContinueRow :item="item" @open="openContinue" />
+      <!-- 📌 key 用聚合层给的 `entry.key`（带类型前缀）：小说 id 与插画 id 是两套 id 空间，
+           同号撞 key 会让行复用错内容。 -->
+      <view v-for="item in continuePreview" :key="item.key" class="w-full">
+        <ContinueRow :entry="item" :thumb-id="heroTransition.sourceId(item.id)" @open="openContinue" />
       </view>
-      <!-- 首载骨架：hydrate 在飞时长度确实为 0；不加骨架会把「还在请求」渲染成「还没有内容」 -->
-      <view v-if="continueLoading && continueStore.items.length === 0" class="w-full">
+      <!-- 首载骨架：两轴 hydrate 在飞时合并列表长度确实为 0；不加骨架会把「还在请求」渲染成「还没有内容」 -->
+      <view v-if="continueLoading && continueEntries.length === 0" class="w-full">
         <view class="mx-3 mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low">
           <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
           <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
         </view>
       </view>
-      <view v-else-if="continueStore.items.length === 0" class="w-full">
+      <view v-else-if="continueEntries.length === 0" class="w-full">
         <view class="mx-3 mb-1.5 px-2.5 py-4 rounded-[var(--md-shape-medium)] bg-surface-container-low">
           <view class="flex flex-row items-center">
             <AppIcon name="schedule" :size="5.33" class="text-surface-on-variant" />

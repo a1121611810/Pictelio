@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）；本页无缓存语义，不入 include
 defineOptions({ name: 'continueReading' })
-// ─── 继续读完整列表（/continue，ADR-0219 §2.1 / 票 #926）───
-// 📌 **与插画浏览历史同页混排**（术语文档易混辨析 #2）：本批 T1 只接小说侧（阅读位置），
-//   T2 在同一段落同一页接入插画浏览历史（票 #927）——刻意不新开 `/history`、不扩为第 4 段。
-// 列表数据是本地同步快照（store.items，新在前）：**全量渲染、零网络依赖、无分页、无列表尾**
+// ─── 继续读完整列表（/continue，ADR-0219 §2.1 / 票 #926 + 票 #927）───
+// 📌 **与插画浏览历史同页混排**（术语文档易混辨析 #2）：小说「续读条目」+ 插画「浏览记录条目」
+//   收在**这一个**列表里，按最近活动统一倒序——刻意不新开 `/history`、不扩为第 4 段。
+// 列表数据是本地同步快照（两 store 的 items 合并，新在前）：**全量渲染、零网络依赖、无分页、无列表尾**
 // ——秒开对齐「先渲染后加载」硬约束；快照可能陈旧可接受（列表不做逐条探活）。
 
 // ⚠️ **设备取证未做，显式挂账**（code-review 审计三 (a) 第 ② 项）。
@@ -14,10 +14,14 @@ defineOptions({ name: 'continueReading' })
 //   而非本批偏离，但仍不得当作已验证。
 //   挂账去向：**票 #929（T4 收口）的「真机手测 + 截图存证」验收项**，本批不单开 issue。
 //   需覆盖三场景：① 删除单条后整树重建 ② 删至空后 list → view 的节点替换 ③ full-span 尾项不塌陷。
+//   📌 票 #927 在**同一结构内**多插一种条目（`:key` 改带类型前缀），**未改 `<list>` 结构**
+//   ⇒ 沿用上面这份挂账，不构成新的取证缺口。
 import { ref, computed } from 'vue'
-import { goBack } from '../router'
+import { goBack, navigate } from '../router'
 import { openNovel } from '../utils/novelNavigation'
-import { useContinueReadingStore, type ContinueReadingItem } from '../stores/continueReadingStore'
+import { useContinueReadingStore } from '../stores/continueReadingStore'
+import { useBrowsingHistoryStore } from '../stores/browsingHistoryStore'
+import { mergeContinueEntries, type ContinueEntry } from '../primitives/continueEntries'
 import { useHeroSource } from '../composables/heroTransition'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -29,7 +33,11 @@ import { t } from '../i18n'
 import { useMotion } from '../composables/motion'
 import type { IconName } from '../utils/iconMap'
 
-const store = useContinueReadingStore()
+const continueStore = useContinueReadingStore()
+const historyStore = useBrowsingHistoryStore()
+
+/** 两轴混排（最近活动倒序）——本页与书架段 3 消费**同一个**聚合函数，形态不分叉 */
+const entries = computed(() => mergeContinueEntries(continueStore.items, historyStore.items))
 
 /**
  * 空态图标字形。⚠️ **刻意不复用 watchLater 的字形常量**（术语文档易混辨析 #1
@@ -44,28 +52,33 @@ const EMPTY_ICON: IconName = 'schedule'
 const refreshEpoch = ref(0)
 
 /**
- * 行点击 → 正文（**无视介绍页开关**，ADR-0219 §2.4）：续读召回的意图是「回到我读的位置」，
- * 不是「重新考虑要不要读」。落点经 openNovel 的 resume 意图参数走**单点缝隙**，
- * 不在此处内联拼 `/novel/:id`（源级守卫 novelIntroEntryGuards.test.ts 钉住）。
+ * 行点击分流：小说 → 正文（**无视介绍页开关**，ADR-0219 §2.4，续读召回的意图是「回到我读的
+ *   位置」而不是「重新考虑要不要读」，落点经 openNovel 的 resume 意图参数走**单点缝隙**，
+ *   不在此处内联拼 `/novel/:id`——源级守卫 novelIntroEntryGuards.test.ts 钉住）；
+ *   插画 → 既有插画详情路由。
  */
 // 缩略图 → 大图连续性转场（ADR-0211 决策 12）：本页**不在** KeepAlive 白名单内 ⇒
 // push 详情即卸载，返回时原缩略图已不存在 ⇒ 只做前进方向，返回由 heroTransition 自动降级。
 const heroTransition = useHeroSource()
 
-function openItem(item: ContinueReadingItem): void {
-  heroTransition.begin(item.novelId)
-  openNovel(item.novelId, { resume: true })
+function openItem(entry: ContinueEntry): void {
+  heroTransition.begin(entry.id)
+  if (entry.kind === 'novel') openNovel(entry.id, { resume: true })
+  else void navigate(`/illust/${entry.id}`)
 }
 
-function removeItem(item: ContinueReadingItem): void {
-  store.remove(item.novelId)
+function removeItem(entry: ContinueEntry): void {
+  if (entry.kind === 'novel') continueStore.remove(entry.id)
+  else historyStore.remove(entry.id)
   refreshEpoch.value++
 }
 
-// 首载三态：store.ready 区分「还不知道」与「确实没有」。⚠️ 与书架段 3 同纪律——
+// 首载三态：两轴**都** ready 才算「落定」。⚠️ 与书架段 3 同纪律——
 // 缺它会把 hydrate 在飞渲染成空态，把「还不知道」说成「你没有」（测试硬约束 #3）。
-const isEmpty = computed(() => store.ready && store.items.length === 0)
-const showSkeleton = computed(() => !store.ready && store.items.length === 0)
+// ⚠️ 两轴分两个标志位而不是共用一个：它们各自失败、各自表达，互不牵连。
+const settled = computed(() => continueStore.ready && historyStore.ready)
+const isEmpty = computed(() => settled.value && entries.value.length === 0)
+const showSkeleton = computed(() => !settled.value && entries.value.length === 0)
 </script>
 
 <template>
@@ -96,17 +109,17 @@ const showSkeleton = computed(() => !store.ready && store.items.length === 0)
 
     <list v-else :key="refreshEpoch" class="w-full flex-1" list-type="single" scroll-orientation="vertical">
       <list-item
-        v-for="item in store.items"
-        :key="`n-${item.novelId}`"
-        :item-key="`n-${item.novelId}`"
+        v-for="item in entries"
+        :key="item.key"
+        :item-key="item.key"
         class="w-full"
       >
         <!-- [lynx:fix] 单一稳定根 view（list-item 根不得承载条件分支/事件） -->
         <view class="w-full">
           <ContinueRow
-            :item="item"
+            :entry="item"
             detailed
-            :thumb-id="heroTransition.sourceId(item.novelId)"
+            :thumb-id="heroTransition.sourceId(item.id)"
             @open="openItem"
             @remove="removeItem"
           />

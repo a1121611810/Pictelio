@@ -22,6 +22,7 @@ import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useWatchLaterStore } from './stores/watchLaterStore'
 import { useContinueReadingStore } from './stores/continueReadingStore'
+import { useBrowsingHistoryStore } from './stores/browsingHistoryStore'
 import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 import { runStartupAutoBackup } from './services/backupWiring'
@@ -556,6 +557,9 @@ export async function initRouter(): Promise<void> {
   // 续读同款预热（ADR-0219 / 票 #926）：深链直达 /continue 时若不预热，首帧会是空列表
   // ——「还不知道」被渲染成「你没有」。毫秒级读盘，同样不阻塞首帧。
   void useContinueReadingStore().hydrate()
+  // 浏览历史（插画侧）同款预热（ADR-0219 / 票 #927）：段 3 与 /continue 现在**两轴混排**，
+  // 只预热小说侧会让「我刚刷过的插画」在冷启动首帧里不存在。
+  void useBrowsingHistoryStore().hydrate()
   // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
   // 失败仅 warn，不阻塞启动（spec §7）
   void runStartupAutoBackup()

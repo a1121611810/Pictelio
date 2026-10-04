@@ -27,6 +27,7 @@ import TagPressChip from '../components/TagPressChip.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
+import { useBrowsingHistoryStore, toIllustHistorySnapshot } from '../stores/browsingHistoryStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useDownloadStore } from '../stores/downloadStore'
@@ -303,6 +304,12 @@ const watchLater = useWatchLaterStore()
 /** 已加入态：高亮跟随 store.has()（按 (kind, id) 去重；读路由 id，路由复用换 id 即时重算） */
 const laterAdded = computed(() => watchLater.has('illust', illustId.value))
 
+// ─── 浏览历史（BrowsingHistory，ADR-0219 §2.5 / 票 #927）───
+// ⚠️ **与「稍后看」是两条独立轴**（术语文档易混辨析 #1）：稍后看是**用户主动**添加的待看清单，
+//   浏览历史是**系统从浏览行为里观察**到的流水。一个是「我决定看的」，一个是「我确实看过的」。
+//   与「继续读」（小说阅读位置）同样隔离：插画进本 store，小说不进（术语文档易混辨析 #2）。
+const historyStore = useBrowsingHistoryStore()
+
 /** toggle 稍后看：快照从页面已有 illust 构造（零新增请求，spec D2） */
 function toggleWatchLater(): void {
   const i = illust.value
@@ -410,6 +417,11 @@ onMounted(async () => {
   try {
     const res = await loadDetail(toIllustId(illustId.value))
     illust.value = res.illust
+    // 📌 浏览历史（票 #927 AC #1）：**打开详情页即产生/更新一条记录，零门槛**——
+    //   本栈拿不到停留时长/滚动信号，造门槛等于造依赖不存在信号的逻辑（ADR-0219 §2.3 同款纪律）。
+    //   快照从**本轮已落地的 res.illust** 构造 ⇒ 零新增网络请求（数据层分流硬约束）。
+    //   重复打开同一张图走 store.record 的累加分支：不新增条目、只更新时间戳 + 次数。
+    historyStore.record(toIllustHistorySnapshot(res.illust))
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed
     // T5：把服务端收藏真值写入页面持有的状态机（面板打开前的状态快照依据）
@@ -423,6 +435,10 @@ onMounted(async () => {
     // 不 await：本页渲染不因它阻塞（先渲染后加载），失败一律降级为普通转场。
     void playHeroForward()
   } catch (err) {
+    // 作品已删除 / 下架 / 不可访问（票 #927 AC #10）：浏览历史里已有的条目**显式标注不可用**，
+    //   列表照常渲染 + 保留移除入口，**不静默隐藏**（测试硬约束 #3）。
+    //   从没浏览过的作品是 no-op —— 不为没看过的图建条目。
+    historyStore.markUnavailable(illustId.value)
     errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
     loading.value = false

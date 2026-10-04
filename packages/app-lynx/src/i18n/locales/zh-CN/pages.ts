@@ -481,19 +481,25 @@ const zhPages = {
   // 书架自有的「查看全部」——分段头跳转，键属 shelf 命名空间（禁跨命名空间借用更新页的键）。
   "shelf.viewAll": "查看全部",
   // 继续读已由 ADR-0219 / 票 #926 落地；「即将上线」占位文案随之作废。
-  "shelf.continueReading.empty": "还没有阅读记录",
-  "shelf.continueReading.hint": "打开任意小说的正文后，即可从这里回到上次读到的那一话",
+  // 票 #927 起本段**两轴混排**（小说阅读位置 + 插画浏览历史），空态与提示文案
+  // 刻意不提「哪一轴」——两轴对用户是同一种意图（「我上次在这儿」）。
+  "shelf.continueReading.empty": "还没有记录",
+  "shelf.continueReading.hint": "打开任意小说正文或浏览任意插画，即可从这里回到上次的地方",
 
   // ─── 继续读完整列表（/continue）───
   "continue.title": "继续读",
-  "continue.empty.title": "还没有阅读记录",
-  "continue.empty.hint": "打开任意小说的正文后，这里会记住你读到的那一话",
+  "continue.empty.title": "还没有记录",
+  "continue.empty.hint": "打开任意小说正文或浏览任意插画，这里会记住你上次到的地方",
   "continue.remove": "移除",
-  "continue.open": "打开续读条目",
+  // {type} = 类型徽章文案（小说 / 插画）。整行挂了 accessibility-label，
+  // 子文本不再被朗读 ⇒ 徽章不进标签的话，屏读用户分不出「在读」与「刷过」。
+  "continue.open": "打开{{type}}条目",
+  "continue.badge.novel": "小说",
+  "continue.badge.illust": "插画",
   "continue.restricted": "该作品受浏览限制",
   "continue.back": "返回",
   "continue.unavailable": "该作品已不可用",
-  "continue.label.chapter": "上次读到 第{n}话",
+  "continue.label.chapter": "上次读到 第{{n}}话",
   "continue.completed.title": "已读完",
 
   /** 高级设置（承接原「我的」里的调试/自检项，使业务行与调试行不再平级混排） */
