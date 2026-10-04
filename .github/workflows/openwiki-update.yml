@@ -17,7 +17,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    # 防挂死：0.7.0 的 --print 仍是批量缓冲输出（#924 未修），长跑期间日志全白，
+    # 防挂死：0.7.0 的 --print 仍是批量缓冲输出（openwiki#924 未修），长跑期间日志全白，
     # 分不清"在跑"和"卡死"。用超时把挂死转成显式失败，而不是白烧 6 小时 runner。
     timeout-minutes: 90
     steps:
@@ -49,6 +49,11 @@ jobs:
 
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # 全量历史：`openwiki code --update` 拿 HEAD 与 .last-update.json 里记录的 gitHead
+          # 做 diff。默认浅克隆（depth=1）看不到那个 commit，update 只能拿到空的变更摘要。
+          # 0.7.0 官方生成模板明确要求 fetch-depth: 0。
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -57,18 +62,22 @@ jobs:
 
       - name: Install OpenWiki
         # mermaid + jsdom are optional; they add high-fidelity validation of Mermaid diagrams. Remove if your wiki has none.
-        # 0.2.5 → 0.7.0（2026-10-02）。升版拿到的、与本仓库直接相关的修复：
-        #   #817 updates 模式兼容 openai-compatible 的流式分片 · #861 规范化嵌套 text
-        #   content 数组让严格 vLLM 端点接受回放 tool output · #888 禁掉 agent 任意 shell
-        #   #901 检测根绝对内链 · #914 替换旧标记块而非追加重复 · #938 --debug 打最内层
-        #   失败原因 · #840 .last-update.json 改原子写 · #933 code 模式不再建 CLAUDE.md
+        # 0.2.5 → 0.7.0（2026-10-02）。与本仓库直接相关的上游修复：
+        #   #817 updates 模式兼容 openai-compatible 流式分片 · #861 规范化嵌套 text content
+        #   数组让严格 vLLM 端点接受回放 tool output · #888 禁 agent 任意 shell ·
+        #   #901 根绝对内链检测 · #914 替换旧标记块而非追加重复 · #938 --debug 打最内层
+        #   失败原因 · #840 状态文件原子写 · #933 code 模式不再建 CLAUDE.md ·
         #   #903 页面 worker 并行 · #905 MCP search/read/link
         # 0.5.2 起要求 Node ≥ 22.22.0（#863），本 workflow 用 setup-node "22" 满足。
         run: npm install --global openwiki@0.7.0 mermaid@11.16.0 jsdom@29.1.1
 
       - name: Run OpenWiki
-        # --print 是单次非交互模式（CI 必需：裸 `openwiki` 会起 Ink TUI，非 TTY 下报
-        # "Raw mode is not supported"）。--debug 仅在手动触发且显式勾选时加：仓库公开，
+        id: openwiki
+        # 官方模板的取舍：run 失败也走完后续流程，让已完成的页面以 PR 形式保留下来
+        # （一次跑批几十分钟，不能白费），最后由末尾两个步骤把 job 标红并拦住自动合并。
+        continue-on-error: true
+        # --print 是单次非交互模式，CI 必需：裸 `openwiki` 会起 Ink TUI，非 TTY 下报
+        # "Raw mode is not supported"。--debug 仅在手动触发且显式勾选时加：仓库公开，
         # 凭据诊断不该默认进公开日志。
         run: |
           if [ "${{ inputs.debug }}" = "true" ]; then
@@ -88,54 +97,76 @@ jobs:
           LANGCHAIN_PROJECT: openwiki
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
-      - name: Verify the update run actually completed
-        # 门禁（不可省）：被中断的 run 仍可能以 exit 0 结束（langchain-ai/openwiki#921），
-        # 唯一可信信号是 openwiki/.last-update.json 的 status。下面是 auto-merge，
-        # 少了这道断言，半成品 wiki 会被静默并进 main。
-        run: |
-          set -euo pipefail
-          FILE=openwiki/.last-update.json
-          if [ ! -f "$FILE" ]; then
-            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，拒绝建 PR"
-            exit 1
-          fi
-          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
-            echo "::error::$FILE 损坏或无法解析，拒绝建 PR"
-            exit 1
-          fi
-          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
-          echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
-          if [ "$STATUS" != "complete" ]; then
-            echo "::error::openwiki 本次 run 未完成（status=$STATUS），拒绝建 PR"
-            exit 1
-          fi
-          if [ -n "$GIT_HEAD" ] && [ "$GIT_HEAD" != "$(git rev-parse HEAD)" ]; then
-            echo "::warning::openwiki 分析的是 $GIT_HEAD，而本次 checkout 是 $(git rev-parse HEAD)"
-          fi
+      - name: Remove transient OpenWiki run state
+        # .run.json 是断点续跑用的临时状态（0.5.0 #720），不该进版本库：旧配置 add-paths
+        # 直接写 openwiki 目录，会把它一起 commit 进去。
+        if: ${{ !cancelled() }}
+        run: rm -f -- openwiki/.run.json
 
       - name: Remove deprecated CLAUDE.md
-        # AGENTS.md 为唯一 agent 指令载体，CLAUDE.md 已废弃。0.6.1 起 code 模式不再
-        # 创建该文件（#933），这一步降级为双保险；保留以防回退版本或旧状态残留。
+        # AGENTS.md 为唯一 agent 指令载体。0.6.1 起 code 模式不再创建该文件（#933），
+        # 这步是双保险。本仓库未跟踪 CLAUDE.md，因此只需本地清理，不进 add-paths。
         run: rm -f CLAUDE.md
 
+      - name: List OpenWiki update paths
+        id: paths
+        if: ${{ !cancelled() }}
+        run: |
+          echo "list=openwiki,AGENTS.md,.github/workflows/openwiki-update.yml" >> "$GITHUB_OUTPUT"
+
       - name: Create OpenWiki update pull request
+        id: create-pr
+        if: ${{ !cancelled() }}
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           # 用 PAT 而非 GITHUB_TOKEN：bot 身份创建/更新 PR 会让 CI 每次等待人工批准
           # （GitHub 对 github-actions[bot] 触发的 PR 事件 workflow 要求 maintainer 审批），
-          # PAT 身份使 CI 无需批准即可运行，auto-merge 才能按 CI 通过后合并
+          # PAT 身份使 CI 无需批准即可运行。
           token: ${{ secrets.OPENWIKI_PAT }}
-          add-paths: |
-            openwiki
-            AGENTS.md
-            .github/workflows/openwiki-update.yml
+          add-paths: ${{ steps.paths.outputs.list }}
           branch: openwiki/update
           commit-message: "docs: update OpenWiki"
           title: "docs: update OpenWiki"
           body: |
             Automated OpenWiki documentation update.
 
-            This PR was generated by the scheduled OpenWiki workflow.
+            OpenWiki result: ${{ steps.openwiki.outcome }}
+
+            When the result is `failure`, this PR intentionally preserves only the
+            pages completed before the failure. It is **not** auto-merged: the
+            auto-merge gate requires `openwiki/.last-update.json` to report
+            `status: complete`. Review it by hand and merge manually if the partial
+            progress is worth keeping as the baseline for the next run.
+
+      - name: Gate auto-merge on a complete run
+        # 门禁（不可省）。0.7.0 在 run **开始时**就把 .last-update.json 的 status 写成
+        # interrupted（崩溃守卫上膛），跑完才翻成 complete —— 实测确认。langchain-ai/openwiki#921
+        # 记录过被中断的 run 仍可能以 exit 0 结束，所以退出码不是可信信号，状态文件才是。
+        # 本步骤放在建 PR 之后：保留上游"失败也不丢已完成页面"的取舍，只拦住无人复核的合并。
+        run: |
+          set -euo pipefail
+          FILE=openwiki/.last-update.json
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，禁止自动合并"
+            exit 1
+          fi
+          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
+            echo "::error::$FILE 损坏或无法解析，禁止自动合并"
+            exit 1
+          fi
+          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
+          echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
+          if [ "$STATUS" != "complete" ]; then
+            echo "::error::openwiki 本次 run 未完成（status=$STATUS），禁止自动合并；PR 已保留已完成页面，请人工判断"
+            exit 1
+          fi
+          if [ -n "$GIT_HEAD" ] && [ "$GIT_HEAD" != "$(git rev-parse HEAD)" ]; then
+            echo "::warning::openwiki 分析的是 $GIT_HEAD，而本次 checkout 是 $(git rev-parse HEAD)"
+          fi
+
+      - name: Propagate OpenWiki failure
+        if: ${{ steps.openwiki.outcome == 'failure' }}
+        run: exit 1
 
       - name: Enable auto-merge on OpenWiki PR
         # PR 已存在（本 run 只是更新内容）时 create-pull-request 不输出 pull-request-number，
