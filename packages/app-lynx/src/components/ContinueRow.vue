@@ -87,6 +87,20 @@ const rowA11yLabel = computed(() => {
  * `var(--md-*)` 消费点）。段 3 改用 `<list-item item-key>` 只降低复现概率、不消除成因。
  *
  * 存证：`docs/research/screenshots-2026-10/29-`、`31-`、`33-continue-defect-shelf3-first-row-black-bg.png`。
+ * **已查官方（2026-10-04）结论：未发现我们漏点，属引擎侧。** 三条线索逐一核过：
+ *  ① Lynx 官方 CSS 变量文档明写「未定义时**从父元素继承**」，且 Android 3.2+
+ *     `custom-property` Full support ⇒ 本仓的用法（主题类挂根 `<page>` + 整树
+ *     `var(--md-*)` 级联）是官方文档规定的标准形态，**观察到的暗色解析与该规定矛盾**。
+ *  ② `enableCSSInvalidation`（4.0 文档，失效计算总闸）本仓**未配置** ⇒ 取默认
+ *     `true`；且该开关只对「后代 / 兄弟等组合选择器」相关，本仓 `tokens.css`
+ *     实测 **0 处组合选择器**（只有 `.theme-X.dark` 复合类选择器）⇒ 该线索不成立。
+ *  ③ 官方把 `getElementById().setProperty()` 描述为处理 CSS 变量的主 API，但其
+ *     主题示例自带告警「**用 JS 改过变量后就不能再靠 class 改**」⇒ 官方亦承认两条
+ *     机制混用脆弱；本仓**只用 class 路线**，未踩该冲突。
+ *  同类上游缺陷可佐证：`lynx-stack#3349`「元素连接时缓存了 fallback 样式，
+ *  样式表到达后不刷新」——计算值正确但缓存属性陈旧，与本案「令牌解析陈旧」同类。
+ *  ⇒ 结论：**不要**为此改我们的令牌/主题架构；正确处置是修 benchNav 的重复 replace。
+ *
  * 未闭合环节：充分性未反向确认（恢复该类后 benchNav 路径未取到黑底样本，被 carousel 竞态干扰）；
  * 「令牌为何被染成 dark 值」的 LynxView 内部路径未做到引擎级确证。
  */
