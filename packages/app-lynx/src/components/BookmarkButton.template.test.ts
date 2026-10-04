@@ -6,9 +6,8 @@
 // 期望值出处（Oracle 溯源）：
 // - 单击 = 快速收藏（乐观触发 + 爆发动效 + busy 锁）不变 = ADR-0112 + 本文件所在分支的
 //   既有实现（下方断言即既有语句的逐字锚定，属 characterization 防线）；
-// - 长按 500ms 唤出面板、同一次手势不得再走快速收藏 = spec D3 + webview
-//   packages/app/src/routes/IllustDetail.tsx onBookmarkPointerDown/Up（独立第二来源）；
-// - 面板保存的爆发动效 = webview handleBookmarkSaved（仅「新收藏」播，覆盖式编辑不播）。
+// - 长按 500ms 唤出面板、同一次手势不得再走快速收藏 = spec D3
+// - 面板保存的爆发动效：仅「新收藏」播，覆盖式编辑不播。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -34,7 +33,7 @@ describe('BookmarkButton 快速收藏路径保持不变（ADR-0112）', () => {
 })
 
 describe('BookmarkButton 长按通道（spec D3：长按开面板、吞掉同手势 tap）', () => {
-  it('长按时长口径 = useLongPress 的 500ms 常量（与 webview 一致，不散写字面量）', () => {
+  it('长按时长口径 = useLongPress 的 500ms 常量', () => {
     expect(LONG_PRESS_MS).toBe(500)
     expect(code).toContain("useLongPress({ onTrigger: () => emit('longPress') })")
   })

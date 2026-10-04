@@ -284,7 +284,7 @@ const routeTransition = useRouteTransition()
         <text class="text-body-medium text-surface-on">{{ t('engineFallback.legacyBanner') }}</text>
       </view>
     </view>
-    <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
+    <!-- 系统返回根路由提示（ADR-0066）：根路由双击退出的提示条。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角。
          [lynx:fix] 无全宽盒（ADR-0123）：原生 LynxView hit-testing 不识别 pointer-events，
          全宽 `left-0 right-0` 容器会吞底部整条点击（含 FAB 区域）；改为胶囊居中定位，
@@ -297,7 +297,7 @@ const routeTransition = useRouteTransition()
     <!-- 标签静音轻提示（ADR-0187 D5 / #732 + spec tag-mute 边界 #7）：与 exitHint 同形态
          （M3 snackbar：inverse-surface 底 + 胶囊居中定位，ADR-0123 无全宽盒）；载荷 =
          settings.muteTagHint（{kind,name} 纯数据，落盘成功/失败分流文案，2s 自动清除在
-         store 内），文案经 t() 渲染（store 不快照文案，webview MuteTagHint 同语义） -->
+         store 内），文案经 t() 渲染 -->
     <view v-if="settings.muteTagHint" class="absolute z-50" style="left: 50vw; bottom: 12vw; transform: translate(-50%, 0)">
       <view class="h-[12.8vw] bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 flex items-center shadow-[var(--md-elevation-3)]">
         <text class="text-base text-inverse-on-surface">{{ muteTagHintText() }}</text>

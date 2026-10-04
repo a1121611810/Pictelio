@@ -1,6 +1,6 @@
 // ─── app-lynx 小说翻译：类型 + Provider 抽象 + OpenAI Responses 适配层 ───
 // 范围限定在 app-lynx 端（spec docs/specs/app-lynx-novel-translation.md）；
-// 不复用 webview 端 createNovelTranslator / translationCache / translationStore
+// 本端自持 createNovelTranslator / translationCache / translationStore
 // / TranslateSheet / SettingsTranslate / prompts.ts（map #617 Q1 / Q3）。
 //
 // 设计依据：
@@ -132,7 +132,7 @@ export type TranslationErrorCode =
   | 'unknown'
 
 /**
- * 单章翻译状态机（spec §7；与 webview 端 translationStore 命名刻意区别）。
+ * 单章翻译状态机。
  * 8 状态包含 2 个「排队态」预留扩展点（背景模式 / 续翻队列）。
  */
 export type TranslationStatus =

@@ -140,7 +140,7 @@ describe("settingsStore.detailQuality（issue #146 T1）", () => {
     vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
   })
 
-  it("默认 medium（对齐 webview client settingsStore.ts:230）", () => {
+  it("默认 medium", () => {
     expect(store.detailQuality).toBe("medium")
   })
 
@@ -1680,8 +1680,7 @@ describe("settingsStore 引擎设备事实键备份域排除（ADR-0164）", () 
   })
 })
 
-// 标签静音（ADR-0187 / #732）：账号级集合键 mute_tags_${uid}（与 webview muteTagStore 逐字同键，
-// ADR-0103 契约）。IO 边界双路径（硬约束 #1）：装载成功 + 读失败/损坏降级 warn（禁静默）。
+// 标签静音（ADR-0187 / #732）：账号级集合键 mute_tags_${uid}。IO 边界双路径（硬约束 #1）：装载成功 + 读失败/损坏降级 warn（禁静默）。
 describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
   beforeEach(() => {
     userRef().value = null
@@ -1694,7 +1693,7 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
 
   // ── 键契约（ranking_entry 先例：exportRawValues/importRawValues 键清单断言）──
 
-  it("backupAccountKeys 含 mute_tags_42（双端逐字同键契约；webview muteTagStore PREF_KEY_MUTE_TAGS）", () => {
+  it("backupAccountKeys 含 mute_tags_42", () => {
     expect(backupAccountKeys(42)).toContain("mute_tags_42")
   })
 
@@ -1849,7 +1848,7 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
     await vi.waitFor(() => expect(written).toContain(`mute_tags_42=${JSON.stringify(["AI生成"])}`))
   })
 
-  it("未登录：muteTag/unmuteTag no-op（账号级语义，webview muteTagStore 同口径）", async () => {
+  it("未登录：muteTag/unmuteTag no-op", async () => {
     userRef().value = null
     store.muteTag("R-18G")
     store.unmuteTag("R-18G")

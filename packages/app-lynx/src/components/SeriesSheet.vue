@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // ─── 系列目录底部弹层（app-lynx，spec docs/specs/app-lynx-novel-intro-action-row §US3 / §5.3 / §6.3）───
-// 对齐 webview `packages/app/src/components/SeriesSheet.tsx` 行为：宿主以 modalStack 模式挂载
+// 宿主以 modalStack 模式挂载：
 // （v-if + absolute inset-0 + @tap 关闭 + @tap.stop 防穿透，与 CommentOverlay / NovelExportSheet 同款）。
 // 数据走本项目 US1 扩展的 `loadNovelSeriesChapters` / `loadNovelSeriesChaptersNext`
 //（端点 GET /v2/novel/series，含 novels[] 列表与 next_url 分页游标）。

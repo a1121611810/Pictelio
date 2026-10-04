@@ -1,6 +1,6 @@
 // 类型徽章判定纯函数（ADR-0113 / spec: docs/specs/work-type-badges.md）。
-// 与 app 端 packages/app/src/components/illustTypeBadges.ts 语义互镜像：
-// 独立判定、允许并存、动图在前。跨端等价由差分测试（Ticket #215）保证。
+// 判定语义：
+// 独立判定、允许并存、动图在前。
 // 术语见 CONTEXT.md「作品标识」节。
 
 /** 类型徽章项：ugoira = 动图；multi = 多图（携带页数） */

@@ -1,7 +1,6 @@
 // ─── useLongPress 单测（T5 / issue #534，spec docs/specs/bookmark-tags.md D3）───
 // 期望值出处（Oracle 溯源）：
 // - 500ms 时长与「到点即触发（不等松手）」= spec D3「新增长按 500ms 打开收藏面板，
-//   口径与 webview 一致」+ webview 实现 packages/app/src/routes/IllustDetail.tsx
 //   onBookmarkPointerDown（setTimeout 500）——独立于本实现的第二来源；
 // - 位移容差语义 = 触摸位移判定（滚动/拖拽不构成长按），阈值为本模块导出的命名常量
 //   （LONG_PRESS_MOVE_TOLERANCE_PX，边界用例手写字面量 10/11 交叉核对）；

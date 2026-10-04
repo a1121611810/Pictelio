@@ -1,7 +1,6 @@
 // 标签自适应折叠纯函数（ADR-0149 / spec docs/specs/app-lynx-adaptive-list-tags.md）。
-// 语义参照 webview packages/app/src/components/home/adaptiveTagFit.ts，但**有意分叉**（非差分等价）：
-// webview 贪心条件 used + gap + w + plusWidth <= width 少算了「最后一个完整 chip 与 +N 之间的 gap」，
-// 会多放一个导致溢出 gap 像素；此处补上。
+// **有意分叉**说明：朴素的贪心条件 `used + gap + w + plusWidth <= width` 少算了
+// 「最后一个完整 chip 与 +N 之间的 gap」，会多放一个 chip 导致溢出 gap 像素；此处补上该 gap。
 //
 // 布局语义（ADR-0149 决策 1）：
 // 1. 全部 chip 装得下 → 全显示、无 +N；
@@ -45,7 +44,7 @@ export function computeAdaptiveTagFit(
   let used = 0
   for (const w of chipWidths) {
     const g = visible > 0 ? gap : 0
-    // 末尾还要留一个 gap（与 +N 之间）——webview 版漏算此处
+    // 末尾还要留一个 gap（与 +N 之间）——朴素贪心条件漏算此处
     if (used + g + w + gap + plusWidth <= containerWidth) {
       used += w + g
       visible++

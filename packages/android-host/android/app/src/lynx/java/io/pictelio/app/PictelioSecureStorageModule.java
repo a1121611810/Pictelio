@@ -10,7 +10,7 @@ import com.lynx.tasm.behavior.LynxContext;
 
 /**
  * 登录存储 Native Module —— 对齐主项目 {@code @aparajita/capacitor-secure-storage}（ADR-0050），
- * 使 lynx client 与 webview client 登录态共享（同一 Keystore alias + SharedPreferences 密文）。
+ * 沿用既有 Keystore alias + SharedPreferences 密文格式（ADR-0050 契约，跨版本迁移后仍可解密）。
  *
  * <p>JS 侧访问：{@code NativeModules.PictelioSecureStorage}（Lynx 全局内置对象）。
  * 回调契约（{@link Callback#invoke} 多参，第二参区分错误）：

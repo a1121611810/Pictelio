@@ -107,7 +107,7 @@ export function loadNovelSeries(
  * 响应包含 `novels[]`（章节 PixivNovel 列表）与 `next_url`（下一页游标，null = 无更多）；
  * `novel_series_detail` 顶部元数据照旧携带，与 lynx 既有消费面（watchlist 预取）零冲突。
  *
- * 对齐 webview `packages/app/src/api/novel.ts:134-143` 的 `loadSeries` 形态（含参数拼接规则）。
+ * `loadSeries` 形态（含参数拼接规则），端点与参数形状取 Pixiv App API 契约。
  *
  * @param seriesId  系列 id
  * @param lastOrder 可选：服务端当前已加载最大 order（分页追加时传入，避免章节重复）
@@ -127,7 +127,7 @@ export function loadNovelSeriesChapters(
 
 /**
  * 章节列表翻页：透传服务端 next_url（保留 query，含 `last_order` 游标）。
- * 对齐 webview `packages/app/src/api/novel.ts:145-147` 的 `loadSeriesNext` 形态。
+ * `loadSeriesNext` 形态。
  */
 export function loadNovelSeriesChaptersNext(
   url: string,
@@ -160,7 +160,7 @@ export function loadWatchlistNovelsNext(
 }
 
 /**
- * 加载小说正文纯文本（/webview/v2/novel 返回 HTML 而非 JSON）。
+ * 加载小说正文纯文本。
  * 双模式由 apiClient.requestRaw 统一处理：
  * - web 模式：rewriteUrl → /pixiv-api 代理路径 + Bearer 头（fetch 返回原始文本）；
  * - 原生模式：NativeModules.PictelioApi.request 转发 Java（JS 零知 access_token，
@@ -187,7 +187,7 @@ export async function fetchNovelData(novelId: NovelId): Promise<{
 }
 
 // ─── 小说收藏（spec #585 / 票 #587：介绍页收藏） ───
-// 端点逐字对齐 webview 端 api/novel.ts addBookmark/deleteBookmark（仓库内 oracle）：
+// 端点取 Pixiv App API 契约 addBookmark/deleteBookmark：
 // POST /v2/novel/bookmark/add（novel_id + restrict）、POST /v1/novel/bookmark/delete（novel_id）。
 // 注意与插画收藏不同：小说 add 无 tags 载荷（Pixiv 端点差异，非省略）。
 

@@ -93,7 +93,7 @@ public class LynxActivity extends AppCompatActivity {
     // ── Dev intent hooks（BuildConfig.DEBUG 门禁；release 完全跳过；emulator 端到端测试用）──
     /**
      * 自动登录 refresh_token extra key：adb `am start --es pictelio_dev_refresh_token <token>` 直接登录。
-     * 与 webview 侧手动填 refresh_token 路径等价（持久化到 Keystore + OAuth token 交换）。
+     * 持久化到 Keystore + OAuth token 交换。
      */
     private static final String DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
     /** 强制开启 R18 过滤 extra key（任何非空值即触发）。
@@ -489,7 +489,7 @@ public class LynxActivity extends AppCompatActivity {
         builder.registerModule("NetDiag", NetDiagModule.class);
         lynxView = builder.build(this);
 
-        // Splash 退出时机：bundle 渲染成功/失败（替代 webview 分支 AuthPlugin.hideSplash 桥）
+        // Splash 退出时机：bundle 渲染成功/失败
         lynxView.addLynxViewClient(new LynxViewClient() {
             @Override
             public void onLoadSuccess() {
@@ -684,13 +684,13 @@ public class LynxActivity extends AppCompatActivity {
      * <ul>
      *   <li>{@code pictelio_dev_refresh_token}：非空时立即调 PictelioSecureStorage 持久化 +
      *       PictelioAuth.loginWithRefreshToken 完成 OAuth 交换（access_token 进 Java 堆，refresh_token
-     *       轮换后落 Keystore）。与 webview 侧手动粘贴 refresh_token 路径同语义。</li>
+     *       轮换后落 Keystore）。</li>
      *   <li>{@code pictelio_dev_force_r18}：任意值（任何非空字符串视为 true）时直接写
      *       {@link #DEV_FORCE_R18_PREFS_KEY} = "true" 到 SharedPreferences（{@link #DEV_FORCE_R18_PREFS_FILE}
      *       文件，与 JS 侧 nativePrefs 走的 PictelioPrefs.PREFS_FILE 同源）。JS 端
      *       settingsStore.loadSettings 读取该键，若 === "true" 则强制 _showR18 / _showR18G = true。
      *       取代之前 sendGlobalEvent("pictelioDevForceR18") + JS listener 置 globalThis.__FORCE_R18__
-     *       的事件总线方案——bundle 渲染竞态不再丢事件（loadSettings 总会读到），且与 webview 侧
+     *       的事件总线方案——bundle 渲染竞态不再丢事件（loadSettings 总会读到），
      *       SharedPreferences "CapacitorStorage" 写入路径完全一致（key 字符串与 native prefs adapter
      *       同契约，无 JS 端特殊处理）。</li>
      * </ul>

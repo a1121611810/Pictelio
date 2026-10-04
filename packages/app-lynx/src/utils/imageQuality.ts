@@ -1,8 +1,8 @@
 // ─── 详情页画质档位（issue #146 T1，JS 侧 prefactor） ───
-// 对齐主项目 settingsStore（packages/app/src/stores/settingsStore.ts:7/230）：
+// 与 settingsStore 的档位口径一致：
 // ImageQuality = "medium" | "large" | "original"，默认 medium。
 // resolveQualityUrl 为纯函数：优先精确档位，缺档时沿 fallback 链降级，
-// 与 webview client IllustDetail 的画质取值语义一致。
+// 画质取值语义见下方 ImageQuality 与 fallback 链。
 // resolvePageSrcs（ADR-0129 多图详情列表）为纯函数：逐页 apply resolveQualityUrl + proxyImageUrl。
 import { proxyImageUrl } from "./imageUrl"
 

@@ -1,6 +1,6 @@
 // ─── 内容设置（R18/R18G 开关，ADR-0051 + 动图播放方案 T6 + 详情页画质 T1） ───
 // ADR-0103：R18/R18G 改为账号级设置（键 show_r18_${uid}），经 PrefsStorage seam 读写
-// 共享 SharedPreferences "CapacitorStorage"（与 webview client 同契约，跨引擎同步）。
+// 共享 SharedPreferences "CapacitorStorage"。
 // - 原生 LynxView：NativeModules.PictelioPrefs（真实产品面，修复"每次启动重置"）
 // - web-core dev 预览：IndexedDB KV（无 NativeModules，仅开发环境）
 // ugoiraMode / detailQuality 仍走 idbKV（非账号级，不在本次范围）。
@@ -45,14 +45,14 @@ import {
 } from "../utils/darkMode"
 import { DEFAULT_DOWNLOAD_TEMPLATE, normalizeDownloadTemplate } from "../utils/galleryDownload"
 
-// ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
+// ── 跨 client 契约键──
 const r18Key = (uid: number) => `show_r18_${uid}`
 const r18gKey = (uid: number) => `show_r18g_${uid}`
 // 翻译授权（spec §9.7；ADR-0173）：**独立于内容显示开关** —— 「允许看见 R18 内容」
 // 与「允许把 R18 内容发给第三方 LLM」是两个不同的授权，前者不能替代后者。
 const translateR18Key = (uid: number) => `settings_translate_r18_${uid}`
 const translateR18gKey = (uid: number) => `settings_translate_r18g_${uid}`
-/** 老设备级键（webview 遗留，SharedPreferences）——native 环境迁移源 */
+/** 老设备级键——native 环境迁移源 */
 const LEGACY_R18 = "show_r18"
 const LEGACY_R18G = "show_r18g"
 /** lynx dev（web-core IndexedDB）遗留键 */
@@ -61,7 +61,7 @@ const DEV_LEGACY_R18G = "settings_show_r18g"
 /** AI 三态过滤（ADR-0155）：账号级共享键（与 app 同契约），无 legacy 键 */
 const aiFilterModeKey = (uid: number) => `ai_filter_mode_${uid}`
 /**
- * 标签静音（ADR-0187 / #732）：账号级集合键，键名与 webview muteTagStore 逐字一致
+ * 标签静音（ADR-0187 / #732）：账号级集合键（键名即备份契约，ADR-0203 前与 WebView 端共用）
  * （ADR-0103 契约，PictelioPrefs → SharedPreferences "CapacitorStorage" 跨引擎同步）。
  * 值 = JSON string[]，元素为 trim 后的原始标签名（存储态已 trim，匹配侧再 trim 容错）。
  */
@@ -89,10 +89,10 @@ const RELATED_INJECTION_KEY = "related_injection"
 const RANKING_ENTRY_KEY = "ranking_entry"
 /** 小说介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级布尔，默认开
  *  （介绍页先行 = ADR-0167 三段式现状，升级零感知）；关闭后六入口点击小说直达正文页。
- *  lynx 专属语义（webview 无介绍页概念），不跨引擎共享键。 */
+ *  lynx 专属语义，不跨引擎共享键。 */
 const NOVEL_INTRO_FIRST_KEY = "novel_intro_first"
 /** 引擎自动回退开关（ADR-0164 / spec engine-default-lynx §3）：设备级布尔，缺省开；
- *  只管 Lynx 运行时硬错误是否自动跳 WebView（不管预检降级）。键与 app 侧逐字一致，
+ *  只管 Lynx 运行时硬错误是否触发引擎降级（不管预检降级）。键为备份契约的一部分，
  *  唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，TS 侧镜像常量经一致性测试钉住 */
 const AUTO_FALLBACK_ENGINE_KEY = "pictelio_engine_auto_fallback"
 /** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级布尔，默认关；
@@ -186,7 +186,7 @@ interface PrefsStorage {
   remove(key: string): Promise<void>
 }
 
-/** 原生 adapter：NativeModules.PictelioPrefs → SharedPreferences "CapacitorStorage"（webview 同文件） */
+/** 原生 adapter：NativeModules.PictelioPrefs → SharedPreferences "CapacitorStorage" */
 function nativePrefs(): PrefsStorage {
   const mod = getNativeModules()?.PictelioPrefs as
     | {
@@ -467,7 +467,7 @@ export const useSettingsStore = defineStore("settings", () => {
     if (ugoira === "fflate" || ugoira === "range") _ugoiraMode.value = ugoira
     if (detailQ === "medium" || detailQ === "large" || detailQ === "original") _detailQuality.value = detailQ
 
-    // 全局动图下载格式：native 走共享 SharedPreferences（与 webview 同键），dev 走 idbKV
+    // 全局动图下载格式：native 走共享 SharedPreferences，dev 走 idbKV
     try {
       const raw = await prefs().get(UGOIRA_DOWNLOAD_FORMAT_KEY)
       if (raw !== null) {
@@ -913,7 +913,7 @@ export const useSettingsStore = defineStore("settings", () => {
     }, MUTE_TAG_HINT_MS)
   }
 
-  /** 静音标签并持久化（trim、幂等）；未登录 no-op（webview muteTagStore 同语义）。
+  /** 静音标签并持久化（trim、幂等）；未登录 no-op。
    *  轻提示时序（spec tag-mute 边界 #7）：**落盘成功后**才提示「已静音」；落盘失败提示
    *  「静音未生效」（+ setMuteTags 内既有 warn，禁静默降级）。重复静音（集合已含）
    *  内存态即生效 → 直接提示成功，不重写盘。连续提示重置计时，避免前一条提前消失。 */

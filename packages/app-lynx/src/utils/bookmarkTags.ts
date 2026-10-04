@@ -1,12 +1,12 @@
 // ─── 收藏标签选择 reducer 纯函数（T3 / issue #531，spec docs/specs/bookmark-tags.md D5）───
-// 与 webview 同语义、独立实现（spec D5：无双端共享包）。纯函数：不改变传入数组，
+// 纯函数（spec D5：不引入共享包）。不改变传入数组，
 // 返回新数组，便于 UI 层整体替换状态与 node 单测。
 // 10 个上限为官方 App 行为（docs/research/bookmark-tags-similar-clients.md §4）。
 
 /** 每作品收藏标签上限（官方双源） */
 export const BOOKMARK_TAG_LIMIT = 10
 
-/** toggleBookmarkTag 结果：rejected = "limit" 表示超限拒收且已选集未变（命名与 webview 同名对齐，便于双端差分） */
+/** toggleBookmarkTag 结果：rejected = "limit" 表示超限拒收且已选集未变 */
 export interface ToggleBookmarkTagResult {
   selected: string[];
   rejected?: "limit";

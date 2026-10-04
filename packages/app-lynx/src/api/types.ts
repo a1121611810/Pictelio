@@ -112,7 +112,7 @@ export interface PixivNovelDetailResponse {
  *   对齐 lynx 既有消费面 `loadNovelSeries`；兼容 NovelDetail / NovelIntro watchlist 预取，不破坏既有契约
  *   （验收 #5：NovelIntro.vue:76 读 `novel_series_detail.watchlist_added` 必须继续工作）
  * - `novels` / `next_url` = 章节列表与分页游标；同端点 `/v2/novel/series` 服务端一并返回，
- *   分页时 `last_order` 增量追加；与 webview 端 `packages/app/src/api/novel.ts:120-132` 同源 envelope
+ *   分页时 `last_order` 增量追加；envelope 取 Pixiv App API 真实响应形状
  */
 export interface NovelSeriesDetailResponse {
   novel_series_detail: {
@@ -124,7 +124,7 @@ export interface NovelSeriesDetailResponse {
     /** 是否已加入追更列表 */
     watchlist_added: boolean;
   };
-  /** 章节列表（分页返回时增量追加；类型 narrowing 与 webview 同源） */
+  /** 章节列表 */
   novels: PixivNovel[];
   /** 下一页 URL；null = 无更多 */
   next_url: string | null;
@@ -218,13 +218,13 @@ export interface PixivUserFollowingResponse {
 // ─── 收藏加标签（issue #531 / spec docs/specs/bookmark-tags.md D1/D4）───
 // 字段名与形状来源：docs/research/bookmark-tags-similar-clients.md §7.3/§7.4（六实现差分）。
 
-/** 收藏可见性（与 webview api/types.ts RestrictType 同源） */
+/** 收藏可见性 */
 export type RestrictType = "public" | "private";
 
 /**
  * GET /v2/illust/bookmark/detail 的 `bookmark_detail`。
  *
- * 响应形状（2026-09-14 真机 probe 实测，与 webview 侧同源）：**未收藏时并非 null**，
+ * 响应形状：**未收藏时并非 null**，
  * 而是返回对象且 `is_bookmarked:false` + 作品自身标签（`is_registered:false`）。
  * 字段 optional 宽容解析——缺字段由消费方显式暴露（不静默），不做服务端纠错。
  */
@@ -360,7 +360,7 @@ export interface PixivCommentReplyResponse {
   next_url: string | null;
 }
 
-// ─── 搜索（issue #291 / spec app-lynx-global-search；字段与现有 app 同源，SearchSort/SearchTarget 逐字对齐 webview api/types.ts） ───
+// ─── 搜索 ───
 
 export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
 

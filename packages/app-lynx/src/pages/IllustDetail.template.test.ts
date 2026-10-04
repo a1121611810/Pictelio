@@ -6,7 +6,7 @@
 // 期望值出处（Oracle 溯源）：
 // - 双轨入口与面板挂载 = spec D3/D8 + 用户故事 13（返回键先关面板）；
 // - 保存通道 = spec D2/D9（面板经 saveWith 覆盖式保存，宿主写状态）；
-// - 「仅新收藏播爆发动效」= webview handleBookmarkSaved（packages/app/src/routes/IllustDetail.tsx）。
+// - 「仅新收藏播爆发动效」= 面板保存后的行为契约。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -59,7 +59,7 @@ describe('IllustDetail 双轨收藏接线（spec D3/D8）', () => {
     expect(code).toContain('total_bookmarks 缺失（契约破坏）')
   })
 
-  it('作品标签建议取原形 name（与 webview 面板 workTags 同源）', () => {
+  it('作品标签建议取原形 name', () => {
     expect(code).toContain('illust.value?.tags?.map((tag) => tag.name) ?? []')
   })
 })

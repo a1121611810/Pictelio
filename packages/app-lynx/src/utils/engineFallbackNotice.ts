@@ -5,7 +5,7 @@
 // - 原生 LynxView：NativeModules.PictelioPrefs（真实产品面）
 // - web-core dev 预览：IndexedDB KV
 // 契约键 ENGINE_FALLBACK_NOTICE_KEY 与 Java EngineFallbackNotice.KEY 由
-// packages/app/tests/unit/utils/engineFallbackNoticeConsistency.test.ts 比对（防漂移）。
+// 与 locales 中的 engineFallback.reason.* 文案比对（防漂移）。
 import { getNativeModules, isNativeMode } from "../api/client"
 import { idbGet, idbRemove } from "./idbKV"
 import { unquoteNativeString } from "./tokenStorage"

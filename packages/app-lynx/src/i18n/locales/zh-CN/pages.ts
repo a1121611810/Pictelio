@@ -480,7 +480,7 @@ const zhPages = {
   "shelf.empty": "还没有内容",
   // 书架自有的「查看全部」——分段头跳转，键属 shelf 命名空间（禁跨命名空间借用更新页的键）。
   "shelf.viewAll": "查看全部",
-  // 继续读尚未实现（旧 WebView 客户端的 historyStore 随 ADR-0203 删除）——
+  // 继续读尚未实现——
   // 文案说明「即将上线」而非伪装成空列表（禁静默降级：测试硬约束 #3）。
   "shelf.continueReading.empty": "阅读记录即将上线",
   "shelf.continueReading.hint": "上线后可从这里直接回到上次读到的位置",

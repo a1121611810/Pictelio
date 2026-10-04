@@ -2,7 +2,7 @@
 // 期望值出处（oracle 溯源）：
 // - 布局语义 = ADR-0149 决策 1（装得下全显 / 预留 +N 贪心 / 剩余宽 >= minPartial 放截断 chip / 其余 +N）；
 // - 尺寸样例取自 ADR-0149 spike 真机实测（#R-18 w=46.33、#性别转换 w=67.67、plus w=34.33、container=330/350）；
-// - gap 修正点 = ADR-0149 决策 6（webview 版漏算末位 gap），断言独立于实现（手算）。
+// - gap 修正点 = ADR-0149 决策 6，断言独立于实现（手算）。
 import { describe, expect, it } from 'vitest'
 import { computeAdaptiveTagFit, MIN_PARTIAL_WIDTH } from './adaptiveTagFit'
 
@@ -42,7 +42,7 @@ describe('computeAdaptiveTagFit', () => {
     expect(fit.partialWidth).toBeCloseTo(31.34, 2)
   })
 
-  it('末位 gap 必须计入：漏算会多放一个导致溢出（本仓库对 webview 的修正点）', () => {
+  it('末位 gap 必须计入：漏算会多放一个导致溢出', () => {
     // 单 chip 46，plus 34，gap 4：装下 1 个完整 chip 需要 46 + 4(末位 gap) + 34 = 84。
     // container=84 → 恰好放 1 个；container=83 → 一个完整 chip 都放不下（若漏算末位 gap 会误判为能放 1 个 → 溢出 4px）。
     expect(computeAdaptiveTagFit([46, 46], 34, 84, 4)).toMatchObject({ visible: 1, partialWidth: null })

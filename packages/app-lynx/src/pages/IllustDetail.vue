@@ -87,10 +87,10 @@ const heartRef = ref<{ playBurst?: () => void } | null>(null)
 /** 收藏面板开合（T5：长按心形 500ms 打开；关闭 = 宿主 v-if 卸载 → 面板内部 dispose） */
 const showBookmarkPanel = ref(false)
 /** 打开面板时的收藏态快照：面板打开期间心形不可达（遮罩覆盖）→ 快照即保存前真值。
- * 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved */
+ * 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播） */
 const panelOpenedBookmarked = ref(false)
 
-/** 作品标签建议来源（原形 name，与 webview 面板 workTags 同源；spec D5） */
+/** 作品标签建议来源 */
 const workTags = computed(() => illust.value?.tags?.map((tag) => tag.name) ?? [])
 
 /** 标签长按静音（ADR-0187 D5 / #732）：加入词表 + 轻提示（App.vue 宿主消费 muteTagHint） */
@@ -113,7 +113,7 @@ function openBookmarkPanel(): void {
 function onBookmarkPanelSaved(): void {
   showBookmarkPanel.value = false
   if (panelOpenedBookmarked.value) return
-  // 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved
+  // 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播）
   if (heartRef.value?.playBurst) {
     heartRef.value.playBurst()
     return
@@ -464,12 +464,12 @@ onMounted(async () => {
       scroll-orientation="vertical"
       @scroll="onScroll"
     >
-      <!-- [spec] 详情大图：按原图宽高比撑开高度（显式 vw，不封顶，与 webview client 一致），
+      <!-- [spec] 详情大图：按原图宽高比撑开高度，
            原生 LynxView 不支持动态 aspect-ratio style（ADR-0055 §2），显式高度已验证（issue #138）。
            图片级骨架屏（SkeletonImage）：@load 前 shimmer、@error 显示「图片加载失败」。
            ADR-0129 多图列表：多页作品改**通栏连续大图列表**（全量渲染 + 首图 eager/其余 lazy-load），
            每图宽度盛满、高度按自身比例（占位=首图比例 detailImageHeight，@load 后 CoverImage correctHeightOnLoad 修正），
-           右上角「n / N」页角标（对齐 webview LazyDetailImage）；单页/ugoira 分支保持现状。 -->
+           右上角「n / N」页角标；单页/ugoira 分支保持现状。 -->
       <!-- ugoira 动图：播放器分支（多图列表不适用，page_count=1 语义保持）
            @tap = 沉浸切换（决策 2：绑**容器**而非图片元素——容器可覆盖「图未加载完成时点
            空位」，且 UgoiraViewer 自身零手势，不会与本绑定抢事件） -->
@@ -655,7 +655,7 @@ onMounted(async () => {
         </view>
         <view class="flex flex-row flex-wrap mt-3">
           <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
-               显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
+               显示仍 translated_name 优先）。
                长按静音（ADR-0187 D5 / #732）：TagPressChip 手势绑 view 层（原生 text 节点
                不收手势），长按 500ms → muteTag + 轻提示（App.vue 宿主渲染 muteTagHint），
                吞 tap 守卫保证长按后不触发搜索。

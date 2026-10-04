@@ -3,9 +3,7 @@
 // PixivIllustTag / PixivNovel.tags 字段兼容；折叠/前缀逻辑收敛于此（node 可测），
 // 组件只做渲染。translated_name 缺失/为空串 → 回落 name 为显式契约（非静默降级）。
 // 契约升级（ADR-0133 决策 3）：chips 由 string[] → { text, name }[]——text = 展示文本
-// （'#' 前缀、translated_name 非空优先），name = 原始标签（标签点击搜索用，对齐
-// webview SearchableTag 用 tag.name 的先例；caveat: text 可能因翻译名折叠出相同文本，
-// name 是唯一搜索标识）。
+// （'#' 前缀、translated_name 非空优先），name = 原始标签。
 
 /** 标签最小字段集（PixivIllustTag / PixivNovel.tags 结构兼容） */
 export interface TagChipSource {

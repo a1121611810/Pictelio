@@ -125,7 +125,7 @@ const sortTextCls = (active: boolean) =>
   active ? 'text-primary-on-container' : 'text-surface-on-variant'
 
 // ── 筛选折叠区（#474/#477：SearchSheet 内折叠筛选区，默认折叠；spec §4/§5） ──
-// 交互语义与 webview SearchFilterSheet 同规格（#476）：即改即搜（450ms debounce 在
+// 交互规格（#476）：即改即搜（450ms debounce 在
 // controller.setFilters）；再点已选回默认=逐维可清；scope=novel 比例/分辨率置灰不清值；
 // 热门排序收藏数置灰（popular-preview 忽略区间）；关闭弹层随 controller.dispose 重置（Q1）。
 const filterOpen = ref(false)
@@ -353,7 +353,7 @@ onMounted(() => {
   void searchHistory.loadHistory()
   // 预填词（ADR-0133 决策 2/5）：标签点击进入——一次性消费（读取即清），
   // 词入 keyword 后走同一 controller.search 链（即输即搜），且**不写搜索历史**
-  // （程序化唤起 ≠ 提交点；对齐 webview SearchableTag 的 hydration 路径行为）。
+  // 。
   const prefill = searchSheet.consumePrefillKeyword()
   if (prefill) {
     keyword.value = prefill

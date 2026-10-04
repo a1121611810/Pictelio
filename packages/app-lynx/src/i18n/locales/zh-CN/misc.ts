@@ -222,7 +222,7 @@ const zhMisc = {
   "useBookmarkMutation.actionFailed": "操作失败",
 
   // ─── components/BookmarkPanel.vue（收藏面板；spec docs/specs/bookmark-tags.md D8/D10 + ADR-0160）───
-  // 键面与文案对齐 webview 面板（packages/app/src/components/BookmarkPanel.tsx 的 t() 键名 +
+  // 键面与文案对齐收藏面板组件的 t() 键名 +
   // 其 zh 字典值逐字一致），双端同键名同语义（spec D10）。
   "bookmarkPanel.title": "收藏到…",
   "bookmarkPanel.closeAria": "关闭",

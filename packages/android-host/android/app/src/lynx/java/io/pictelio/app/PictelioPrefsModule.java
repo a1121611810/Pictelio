@@ -13,7 +13,7 @@ import com.lynx.tasm.behavior.LynxContext;
  * 共享设置 KV 桥（ADR-0103）—— 跨 client 设置契约的物理落点。
  *
  * <p>读写 SharedPreferences 文件 {@code "CapacitorStorage"}（@capacitor/preferences 默认
- * group）——webview client 经 {@code @capacitor/preferences} 读写同一文件，两 client
+ * group）——宿主侧经 preferences 读写同一文件，
  * 设置互通（契约键：{@code show_r18_${uid}} / {@code show_r18g_${uid}}）。
  *
  * <p>JS 侧访问：{@code NativeModules.PictelioPrefs}。回调契约（{@link Callback#invoke}，

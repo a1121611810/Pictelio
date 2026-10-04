@@ -20,7 +20,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * Pixiv API 网络核心 — 双 client（webview/lynx）共享，零 Capacitor 依赖。
+ * Pixiv API 网络核心 — 零 Capacitor 依赖。
  *
  * <p>从 PixivApiPlugin 提取（#114），包含：
  * <ul>
@@ -32,7 +32,7 @@ import okhttp3.Response;
  *
  * <p>调用方：
  * <ul>
- *   <li>webview → PixivApiPlugin（Capacitor 壳，委托本类）
+ *   <li>宿主插件层（委托本类）
  *   <li>lynx → PictelioApiModule / PictelioAuthModule（Lynx Native Module）
  * </ul>
  */
@@ -87,14 +87,14 @@ final class PixivApiCore {
 
     // ─── 401 刷新 + 重试核心 ─────────────────────────────────
 
-    /** #53：token 轮换回调（webview 用 notifyListeners；Lynx 传 null） */
+    /** #53：token 轮换回调（无监听方时传 null） */
     interface RefreshTokenRotationListener {
         void onRefreshTokenRotated(String newRefreshToken);
     }
 
     /**
      * 执行 HTTP 请求（旧 5 参签名，ADR-0200 变更③保留）：lynx 以外的全部调用方
-     * （webview {@code PixivApiPlugin}、诊断探针 {@code NetDiagProbe}；OAuth 端点走
+     * （诊断探针 {@code NetDiagProbe}；OAuth 端点走
      * PictelioAuth 自有通道不经本方法）一字不动——委托
      * {@link #executeRequest(String, String, String, String, boolean, RefreshTokenRotationListener)}
      * 时 acceptLanguage 传 null = 不加语言头，行为零变化（ADR-0200 D4 / E6）。
@@ -114,8 +114,8 @@ final class PixivApiCore {
      * 401 刷新重试递归透传同一头值（spec E4：重放请求语言头同样携带）。
      *
      * @param acceptLanguage Accept-Language 头值（可空参 = 不加头；null/"" 均不加，
-     *                       webview 旧签名委托即此路径）；头决定标签 translated_name 语言
-     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（webview 通知 JS；Lynx 传 null）
+     *                       旧签名委托即此路径）；头决定标签 translated_name 语言
+     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（无监听方传 null）
      */
     static JSONObject executeRequest(String method, String url, String body, String acceptLanguage,
             boolean isRetry, RefreshTokenRotationListener rotationListener)
@@ -125,7 +125,7 @@ final class PixivApiCore {
                 .addHeader("Authorization", "Bearer " + (accessToken != null ? accessToken : ""))
                 .addHeader("Referer", OAuthConfig.REFERER)
                 .addHeader("User-Agent", OAuthConfig.USER_AGENT);
-        // ADR-0200：Accept-Language 置于 User-Agent 之后；可空参 = 不加头（webview 旧签名委托）
+        // ADR-0200：Accept-Language 置于 User-Agent 之后；可空参 = 不加头（旧签名委托）
         if (acceptLanguage != null && !acceptLanguage.isEmpty()) {
             builder.addHeader("Accept-Language", acceptLanguage);
         }

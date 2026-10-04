@@ -2,12 +2,12 @@
 // 范围：仅做分块 + 并发池 + 对齐规则 + AbortSignal 静默退出。
 // Provider 解耦：deps.provider 注入，便于测试桩（spec Q4 + ADR-0169 D5）。
 //
-// 与 webview 端 packages/app/src/primitives/createNovelTranslator.ts 的关系：
+// 与 fflate 运行时层的关系：
 // **抽象边界参考**，**不复用代码**（map #617 Q1 + Q3 收敛「完全从零」）。
-// 设计差异（与 webview 端）：
+// 设计差异：
 // - 接口返回 `Promise<{ status, paragraphs }>`，status 沿用 8 状态枚举；
 // - chunked pipeline 在 chunk 完成后 emit `delta` chunk（按段落增量），由 caller
-//   store 写入 translatedParagraphs；webview 端是 onProgress 回调。
+//   store 写入 translatedParagraphs。
 // - 失败块静默回退原文（不写 chunk，让 consumer 自行 fallback）；
 // - abort 后不 emit 任何 chunk（store 通过 status='aborted' 感知，spec §7.2）。
 //
@@ -28,7 +28,7 @@ import type {
 
 /**
  * chunk 区间（沿段落边界，不拆段）。
- * start 含 / end 不含；与 webview 端 `ChunkRange` 语义一致。
+ * start 含 / end 不含（`ChunkRange` 语义）。
  */
 export interface ChunkRange {
   start: number
@@ -236,7 +236,7 @@ export async function runChunkPool<T>(
             // defined）；改判 name 即可，与 nativeTranslate.ts onAbort 的 polyfill 配套。
             if (err instanceof Error && err.name === 'AbortError') return
             if (attempt >= maxRetries) break
-            // 简化：固定 500ms 退避；与 webview 端 retryDelayMs 等价但简化为不依赖外部 import
+            // 简化：固定 500ms 退避，不依赖外部 import
             await sleep(500 * 2 ** attempt, signal)
           }
         }

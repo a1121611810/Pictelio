@@ -103,7 +103,7 @@ function openLaterItem(item: { kind: 'illust' | 'novel'; id: number }): void {
 }
 
 // ─── 段 3：继续读 —— 尚未实现 ──
-// ⚠️ 旧 WebView 客户端曾有 historyStore（ADR-0094），随 ADR-0203（WebView 源码删除）一并消失；
+// ⚠️ 旧 WebView 客户端曾有 historyStore（ADR-0094），随 ADR-0203一并消失；
 //   本页**显式说明"即将上线"**而不是渲染一个空列表 —— 禁静默降级（测试硬约束 #3）：
 //   空列表会被读成"我没有阅读记录"，而真相是"这个功能还没做"。
 

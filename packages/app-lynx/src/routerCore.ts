@@ -13,7 +13,7 @@ export interface RouteDefCore {
 /** 系统返回决策（ADR-0066）：JS 侧根据路由历史与双击窗口决定返回行为。 */
 export type SystemBackDecision = "navigate" | "hint" | "exit"
 
-/** 根路由双击退出窗口（ms），与 webview client backGestureService 的 EXIT_DOUBLE_TAP_MS 对齐 */
+/** 根路由双击退出窗口（ms） */
 export const SYSTEM_BACK_EXIT_WINDOW_MS = 2000
 
 /**

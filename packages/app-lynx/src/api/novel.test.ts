@@ -3,8 +3,8 @@
 // 测试硬约束：
 // 1. IO 边界双路径（成功 + 失败）—— loadNovelSeriesChapters / loadNovelSeriesChaptersNext 各覆盖
 // 2. 真实样例 mock —— 字段名取自 types.ts 注释中引用的 Pixiv-Shaft Models.kt NovelSeriesDetail
-//    与 PixivNovel；envelope 对齐 webview `packages/app/src/api/novel.ts:120-132`
-// 3. 期望值可追溯 —— 断言路径/参数/响应形状逐字对照 webview `loadSeries:138-141` / `loadSeriesNext:145-147`
+//    与 PixivNovel；envelope 取 Pixiv App API 真实响应形状
+// 3. 期望值可追溯 —— 断言路径/参数/响应形状对照 Pixiv App API 契约
 // 4. mock 风格跟随 notification.test.ts（vi.hoisted + vi.mock("./client")）
 
 import { describe, expect, it, vi, beforeEach } from "vitest"
@@ -85,7 +85,7 @@ describe("api/novel loadNovelSeriesChapters（GET /v2/novel/series，带可选 l
     expect(result.novel_series_detail.watchlist_added).toBe(true)
   })
 
-  it("成功（增量追加）：lastOrder 字符串化进 query，对齐 webview loadSeries:139-141", async () => {
+  it("成功（增量追加）：lastOrder 字符串化进 query（Pixiv App API 契约）", async () => {
     const fixture = makeResponse({
       novel_series_detail: {
         id: 3333333 as SeriesId,
@@ -125,7 +125,7 @@ describe("api/novel loadNovelSeriesChaptersNext（next_url 透传翻页）", () 
     getMock.mockReset()
   })
 
-  it("成功：next_url 原样下传（含 query 游标），对齐 webview loadSeriesNext:145-147", async () => {
+  it("成功：next_url 原样下传（含 query 游标）（Pixiv App API 契约）", async () => {
     const nextUrl =
       "https://app-api.pixiv.net/v2/novel/series?series_id=3333333&last_order=1"
     const fixture = makeResponse({

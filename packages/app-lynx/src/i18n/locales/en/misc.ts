@@ -227,7 +227,7 @@ const enMisc = {
   "useBookmarkMutation.actionFailed": "Action failed",
 
   // ─── components/BookmarkPanel.vue (bookmark panel; spec docs/specs/bookmark-tags.md D8/D10) ───
-  // Key surface and wording mirror the webview panel (packages/app/src/components/BookmarkPanel.tsx).
+  // Key surface and wording mirror the bookmark panel component.
   "bookmarkPanel.title": "Add to bookmarks",
   "bookmarkPanel.closeAria": "Close",
   "bookmarkPanel.closeScrimAria": "Close bookmark panel",

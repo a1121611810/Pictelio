@@ -1,7 +1,7 @@
 // ─── 收藏标签选择 reducer 纯函数单测（T3 / issue #531，spec docs/specs/bookmark-tags.md D5）───
 // oracle 溯源：spec D5 面板状态模型——toggle（勾/取消）、上限 10（拒绝第 11 个并反馈）、
 // 去重（勾选态幂等）、新建提交（空格提交 token、trim、非空校验、并入已选）。
-// 与 webview 同语义、独立实现（spec D5：无双端共享包）；10 上限双源为官方 App
+// 纯函数实现（spec D5：不引入共享包）；10 上限取自官方 App
 // （docs/research/bookmark-tags-similar-clients.md §4）。
 import { describe, expect, it } from "vitest"
 import { commitBookmarkTagToken, toggleBookmarkTag } from "./bookmarkTags"

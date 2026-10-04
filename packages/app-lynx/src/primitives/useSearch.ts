@@ -3,7 +3,7 @@
 // controller 是唯一写者）；state 通过 computed 聚合各 ref 生成符合 SearchState 接口
 // （字段普通值类型）的只读快照，getter 无 setter（测试/模板读 state.results 即数组本身）。
 //
-// 状态语义（对齐 webview searchStore + useComments）：
+// 状态语义：
 // - 首载失败 → status='error'（中文文案，toApiError 归一）；
 // - 分页失败 → status 保持 'ready'、已加载结果保留、error 置值 + paginationError=true
 //   （UI 显示「保留结果 + 底部内联重试」，next_url 不推进故重试可再次 loadMore）。
@@ -20,11 +20,9 @@
 //   （UI 顶部轻量指示），触发后由 status='loading' 承接。
 //
 // scope=all 混排：两类请求 **并行** 发起（同一 signal），settle 后按 create_date 降序
-//   混排为单一时间线（同日 illustrator 优先，语义逐字复刻 webview utils/searchMerger.ts，
-//   见下方 mergeSearchResults）；一类失败一类成功 = 部分降级（console.warn 可见，
+//   混排为单一时间线；一类失败一类成功 = 部分降级（console.warn 可见，
 //   失败侧清空，结果 = 成功类）—— 双类失败 = status='error'。
-//   scope=illust/novel：保留服务端顺序（date_asc / popular_desc 不被混排器重排；
-//   与 webview 无条件 merge 的偏离为有意为之：popular_desc 被重排成时间序是 webview 旧病）。
+//   scope=illust/novel：保留服务端顺序。
 //
 // 关注点分离：不写搜索历史（提交点由 SearchSheet 组件负责）；不做记忆化缓存（spec D2）。
 import { computed, ref } from "vue"
@@ -43,7 +41,7 @@ import {
 
 export type SearchStatus = "idle" | "loading" | "ready" | "error"
 
-/** 结果行类型：type/entity/date 与 webview api/types.ts SearchResultItem 逐字对齐 */
+/** 结果行类型：type/entity/date 三元组，字段取 Pixiv 搜索响应形状 */
 export type SearchResultItem =
   | { type: "illust"; entity: PixivIllust; date: string }
   | { type: "novel"; entity: PixivNovel; date: string }
@@ -70,7 +68,7 @@ export interface SearchController {
   readonly state: SearchState
   /** 输入变化即调用（@input 语义）：300ms debounce；空词立即清空回 idle */
   search(word: string): void
-  /** 切 scope：关键词非空时对当前词立即重搜（不 debounce，对齐 webview handleScopeChange） */
+  /** 切 scope：关键词非空时对当前词立即重搜 */
   setScope(scope: SearchScope): void
   /** 切排序：同上 */
   setSort(sort: SearchSort): void
@@ -94,7 +92,7 @@ export const FILTER_DEBOUNCE_MS = 450
 
 /**
  * 插画 + 小说按 create_date 降序混排为单一时间线（纯函数，仅 scope=all 使用）。
- * 语义复刻 webview `packages/app/src/utils/searchMerger.ts`（spec D2 要求）：
+ * 合并语义见 spec D2：
  * - ISO 日期字符串 localeCompare 降序；
  * - 同一 create_date 毫秒内 illust 优先（novel 居后）；
  * - 同类型返回 0（保持服务端相对顺序，依赖 V8 稳定排序，弱序反称性成立）。
@@ -179,7 +177,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
    * loading 期间保留旧结果（spec D5：顶部轻量指示，不闪空白），settle 后整表替换。
    * 游标语义（review P1-1）：settle 后原子落表时，未请求的异类游标随局部空值一并写为
    * null——scope 切换后不残留旧 scope 的 next_url，否则 hasMore 撒谎（「没有更多了」
-   * 永不出现）且 loadMore 空转（对齐 webview searchStore 起始清双游标的语义）。
+   * 永不出现）且 loadMore 空转。
    * 原子写入（review P2-1）：两侧响应先暂存局部变量，Promise.all 结束后一次性落表——
    * 避免「新词插画 + 旧词小说」的混拼窗口（loading 期间展示旧快照）。
    */
@@ -291,7 +289,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     void executeSearch(word)
   }
 
-  /** 切 scope：关键词非空时立即重搜（不 debounce，对齐 webview handleScopeChange）；空词只更新状态 */
+  /** 切 scope：关键词非空时立即重搜；空词只更新状态 */
   function setScope(scope: SearchScope): void {
     if (disposed) return
     if (scopeRef.value === scope) return

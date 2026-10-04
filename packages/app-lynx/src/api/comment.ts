@@ -1,5 +1,4 @@
 // ─── Pixiv 评论 API 端点适配层（app-lynx MVP，issue #162） ───
-// 端点映射与 webview 版（packages/app/src/api/comment.ts）逐行同构。
 import { apiClient } from "./client"
 import type { IllustId, NovelId } from "./id"
 import type { PixivCommentReplyResponse, PixivCommentRootResponse } from "./types"

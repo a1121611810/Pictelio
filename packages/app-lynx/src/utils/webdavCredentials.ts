@@ -2,7 +2,7 @@
 // 与 app utils/webdavCredentials.ts 同源同语义（双端差分对齐约定）：
 // 两个密码只存 secure storage，绝不进普通 prefs / 备份文件。
 // 双路径（同 utils/tokenStorage.ts）：web-core Worker → IndexedDB；
-// 原生 LynxView → NativeModules.PictelioSecureStorage（与 webview 同一加密存储）。
+// 原生 LynxView → NativeModules.PictelioSecureStorage。
 import { idbGet, idbSet, idbRemove } from "./idbKV"
 
 /** WebDAV 服务器登录密码（Basic Auth 用） */

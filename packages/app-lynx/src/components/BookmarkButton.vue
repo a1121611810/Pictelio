@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
 
 /**
  * 收藏爆发动效重播（T5 面板保存成功路径）：宿主（IllustDetail）在 saveWith 成功后经
- * 模板 ref 调用——与单击收藏播同一动效资产（webview handleBookmarkSaved 同语义）。
+ * 模板 ref 调用——与单击收藏播同一动效资产。
  */
 function playBurst(): void {
   startBurst(true)

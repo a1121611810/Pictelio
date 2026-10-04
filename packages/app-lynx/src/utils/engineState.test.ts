@@ -32,7 +32,7 @@ import zhDict from "../i18n/locales/zh-CN"
 import enDict from "../i18n/locales/en"
 
 describe("parseEngineState", () => {
-  it("解析合法快照行（预检降级：首选 lynx 生效 webview）", () => {
+  it("解析合法快照行", () => {
     expect(parseEngineState("preferred=lynx effective=webview reason=lynx_unavailable")).toEqual({
       preferred: "lynx",
       effective: "webview",
@@ -40,7 +40,7 @@ describe("parseEngineState", () => {
     })
   })
 
-  it("解析反向降级行（ADR-0153：首选 webview 生效 lynx）", () => {
+  it("解析反向降级行", () => {
     expect(parseEngineState("preferred=webview effective=lynx reason=webview_unavailable")).toEqual({
       preferred: "webview",
       effective: "lynx",

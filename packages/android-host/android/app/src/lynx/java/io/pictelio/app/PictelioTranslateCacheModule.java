@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  *
  * <p>在 {@code context.getCacheDir() + "/pictelio_translate_cache/"} 下存放每章翻译条目（独立 JSON 文件
  * + sha256 化的 key 作文件名）+ 独立 {@code manifest.json}（LRU 索引）。容量上限默认 10MB / 200 条
- * （与 ADR-0171 webview 端 LRU 200 同基线起步）；超限时按 manifest 头部（最旧 createdAt）淘汰。
+ * （沿用 ADR-0171 的 LRU 200 基线）；超限时按 manifest 头部（最旧 createdAt）淘汰。
  *
  * <p>线程模型：所有 manifest 写入走单线程 {@link #writeExecutor} 串行化，避免并发写坏。
  * 文件写本身用 temp + rename 原子化（POSIX rename 保证）。读路径（getItem）走调用线程，仅 touch
@@ -59,7 +59,7 @@ import java.util.concurrent.Executors;
  * <p>设计参考：
  * <ul>
  *   <li>ADR-0175 D1（filesystem cacheDir）+ D2（文件名 = sha256(key)）+ D3（manifest sort LRU）+
- *       D4（与 ADR-0171 webview 端字段级一致）+ D5（半成品不写、容量 200、provider 校验全部沿用）</li>
+ *       D4（与 ADR-0171 字段级一致）+ D5（半成品不写、容量 200、provider 校验全部沿用）</li>
  *   <li>ADR-0090（三层缓存 = ImageCachePlugin 独立文件 + manifest 先例）</li>
  *   <li>ADR-0170（{@code LynxMethod} + 回调去 null 单职责 NativeModule 范式）</li>
  *   <li>ADR-0174（{@code TestLynxContext} 子类化测试基础设施，本模块单测复用）</li>
@@ -79,7 +79,7 @@ public class PictelioTranslateCacheModule extends LynxModule {
     static final int MANIFEST_VERSION = 1;
     /** 默认容量上限（字节；10MB = 200 章 × ~50KB） */
     public static final long DEFAULT_MAX_BYTES = 10L * 1024L * 1024L;
-    /** 默认条目数上限（与 ADR-0171 webview 端 LRU 200 同基线起步） */
+    /** 默认条目数上限（沿用 ADR-0171 的 LRU 200 基线） */
     public static final int DEFAULT_MAX_ENTRIES = 200;
 
     /** 所有 manifest / 写入串行化的单线程 executor（manifest 并发写会破坏） */
