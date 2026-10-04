@@ -1,7 +1,6 @@
 // resolveIllustTypeBadges 单测（Ticket #212 / spec: docs/specs/work-type-badges.md / ADR-0113）。
 // 期望值出处（oracle）：spec 决策 1 判定语义——独立判定、允许并存、动图在前；
-// 与 app 端（packages/app/src/components/illustTypeBadges.ts）语义互镜像，
-// 跨端等价由差分测试（Ticket #215）保证。
+// 断言逐条覆盖 illustTypeBadges.ts 声明的三条语义：
 import { describe, expect, it } from 'vitest'
 import { resolveIllustTypeBadges } from './illustTypeBadges'
 

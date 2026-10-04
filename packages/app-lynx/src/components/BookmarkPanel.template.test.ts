@@ -6,9 +6,8 @@
 // 期望值出处（Oracle 溯源）：
 // - 全屏层规则 / 定位锚点 / modalStack = CONTEXT.md「覆盖层与命中测试」+ ADR-0123（真机实证，
 //   独立于本实现）+ spec D8；挂载契约 = CommentOverlay.vue / PagePickerSheet.vue（既有弹层同款）；
-// - i18n 键面与 zh 值 = webview 面板（packages/app/src/components/BookmarkPanel.tsx 的 t() 键名
-//   + packages/app/src/i18n/locales/zh-CN/components2.ts 的 zh 值）——下方 PREFILL_ZH 是逐字粘贴的
-//   快照 oracle（spec D10「同键名同语义」），不从被测模板反推；
+// - i18n 键面与 zh 值取 zh-CN locale 的当前值（spec D10「同键名同语义」），
+//   下方 PREFILL_ZH 是落盘快照，不从被测模板反推；
 // - 保存通道 = spec D2/D9：面板经宿主 saveWith（不直连 addBookmark）；saved 事件无参
 //   （FIX-3：宿主接线 `@saved="onBookmarkPanelSaved"` 不消费 restrict）+ 成败经 saveWith
 //   布尔返回值（FIX-2）；
@@ -26,7 +25,7 @@ const src = readFileSync(fileURLToPath(new URL('./BookmarkPanel.vue', import.met
 /** 去 HTML 注释与整行行注释（约束说明本身会提到被禁止的串，负向断言必须在代码本文上做） */
 const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
 
-/** webview 面板 key 面 + zh 文案快照（oracle：components2.ts / BookmarkPanel.tsx，spec D10） */
+/** 面板 key 面 + zh 文案快照（oracle：zh-CN locale 当前值，spec D10） */
 const PREFILL_ZH: Record<string, string> = {
   'bookmarkPanel.title': '收藏到…',
   'bookmarkPanel.closeAria': '关闭',
@@ -64,8 +63,8 @@ function usedKeys(): string[] {
   return [...new Set(hits.map((h) => h.slice(3, -1)))]
 }
 
-describe('BookmarkPanel i18n 键面（spec D10：与 webview 同键名同语义）', () => {
-  it('zh-CN 字典含全量键且值与 webview 面板快照逐字一致（oracle 溯源）', () => {
+describe('BookmarkPanel i18n 键面', () => {
+  it('zh-CN 字典含全量键且值与面板快照逐字一致（oracle 溯源）', () => {
     for (const [key, legacy] of Object.entries(PREFILL_ZH)) {
       expect(zhMisc[key as keyof typeof zhMisc], key).toBe(legacy)
     }

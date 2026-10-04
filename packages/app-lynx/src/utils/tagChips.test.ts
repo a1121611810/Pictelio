@@ -2,7 +2,7 @@
 // 期望值出处（oracle）：spec §2.4「最多 3 个，超出折叠为 +N（N = 未展示数）」「translated_name || name 带 # 前缀」；
 // ADR-0118 决策 4 同语义；输入结构取自 api/types.ts 的 PixivIllustTag / PixivNovel.tags（{ name, translated_name? } 真实字段）。
 // 契约升级（ADR-0133 决策 3）：chips 由 string[] → { text, name }[]——text=展示文本（# 前缀、translated_name 优先），
-// name=原始标签（点击搜索用，来源=webview SearchableTag 用 tag.name 的先例）。text 断言与旧的 string[] 语义等价。
+// name=原始标签。text 断言与旧的 string[] 语义等价。
 import { describe, expect, it } from 'vitest'
 import { resolveTagChips } from './tagChips'
 

@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config;
  * <p>契约断言（oracle = ADR-0103 / @capacitor/preferences 默认 group）：
  * <ul>
  *   <li>键：{@code show_r18_${uid}}（下划线，registry defineFactory 约定）</li>
- *   <li>介质：SharedPreferences 文件 {@code "CapacitorStorage"}（webview 侧
+ *   <li>介质：SharedPreferences 文件 {@code "CapacitorStorage"}（宿主侧
  *       {@code @capacitor/preferences} 默认 group，跨 client 互读）</li>
  *   <li>键不存在返回 ""（JS 契约映射为 null），永不为 null</li>
  * </ul>
@@ -51,8 +51,8 @@ public class PictelioPrefsModuleTest {
     }
 
     @Test
-    public void crossClient_webviewWritesSameFile_lynxReadsBack() {
-        // 模拟 webview 侧（@capacitor/preferences → 默认 group "CapacitorStorage"）写入，
+    public void hostWritesSameFile_lynxReadsBack() {
+        // 模拟宿主 preferences（默认 group "CapacitorStorage"）写入，
         // lynx 侧（本模块读同一文件）必须读到 —— 跨 client 同步契约的核心断言。
         Context ctx = ctx();
         ctx.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)

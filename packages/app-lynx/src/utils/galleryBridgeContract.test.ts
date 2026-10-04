@@ -35,7 +35,7 @@ const javaDeepModule = readFileSync(
   'utf8',
 )
 // #610：WebView/Capacitor 线整体下线，GallerySaverPlugin.java 随之删除。
-// 原 ADR-0192 D8 的「Capacitor 契约同形」断言（读 src/webview/java/…）失去被测对象，
+// 原 ADR-0192 D8 的「Capacitor 契约同形」断言失去被测对象，
 // 连同其源文件读取一并移除。Lynx 侧（①/③/⑤）断言不受影响，继续钉死。
 const tsAdapter = readFileSync(fileURLToPath(new URL('./gallerySaver.ts', import.meta.url)), 'utf8')
 const tsNaming = readFileSync(fileURLToPath(new URL('./galleryDownload.ts', import.meta.url)), 'utf8')
@@ -126,8 +126,8 @@ describe('下载队列桥 TS ⇄ Java 契约（ADR-0192 D4/D7）', () => {
     expect(javaDownloaderModule).toContain('PictelioDownloader.downloadNovel(app, PictelioGalleryModule.imageLoader(app),\n                            id, payloadJson, targetFormat, fileName, authorDir, listener)')
   })
 
-  it('深模块三入口：老签名保留（webview 老调用点兼容）+ dir 重载交 GallerySaver subPath', () => {
-    // 老签名委托空串 = 现行为字节不变（webview PictelioDownloaderPlugin 不改零回归）
+  it('深模块三入口：老签名保留+ dir 重载交 GallerySaver subPath', () => {
+    // 老签名委托空串 = 现行为字节不变
     expect(javaDownloaderDeep).toContain('return download(context, loader, id, sourceUrl, fileName, "", listener);')
     expect(javaDownloaderDeep).toContain('return downloadUgoira(context, loader, id, zipUrl, format, fileName, "", framesJson, listener);')
     expect(javaDownloaderDeep).toContain('return downloadNovel(context, loader, id, payloadJson, format, fileName, "", listener);')

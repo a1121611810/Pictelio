@@ -1,6 +1,6 @@
 // ─── Pixiv 搜索 API 端点适配层（app-lynx 全局搜索，issue #291） ───
 // 参数构建（端点路由 / search_target 规则 / 筛选映射）单点在 @pictelio/search-core
-// （#480 拍板；ADR-0132 第 8 条修订——原「与 webview 逐字对齐」升级为共享核心单点）。
+// 。
 // 本文件只做 GET 与 next_url 断言（传输层零加工，分页决策在控制器）。
 import { apiClient } from "./client"
 import {
@@ -27,7 +27,7 @@ function invalidNextUrlError(fnName: string, url: string): Error {
 }
 
 /**
- * 验证 next_url 只指向 Pixiv API 域名（防御 SSRF，webview assertPixivUrl 先例移植）。
+ * 验证 next_url 只指向 Pixiv API 域名。
  * 允许：本地代理路径（`/pixiv-api`，web 模式 rewriteUrl 后的形态）或绝对 URL
  * 且 hostname 精确等于 app-api.pixiv.net（精确比对天然防伪后缀域）。
  * 注意：此处只断言，不做 URL 重写 —— rewriteUrl 职责在 client（勿重复重写）。

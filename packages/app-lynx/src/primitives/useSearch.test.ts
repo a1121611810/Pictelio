@@ -3,11 +3,10 @@
 // 不测内部 ref 实现；fake timers 测 debounce。
 // 期望值出处（oracle 溯源）：
 // - debounce 300ms / 空词立即复位 / isSearching 窗口标记 → spec D2 定案；
-// - scope/sort 切换立即重搜、paginationError 语义、loadMore 双游标 → webview store/searchStore.ts；
-// - mergeSearchResults 混排（date 降序 + 同日 illust 优先）→ webview utils/searchMerger.ts 逐字语义；
+// - scope/sort 切换立即重搜、paginationError 语义、loadMore 双游标；
+// - mergeSearchResults 混排（date 降序 + 同日 illust 优先）；
 // - 实时响应 mock 数据结构来自真实契约：字段形状逐字对齐 lynx api/types.ts
-//   （PixivIllustListResponse / PixivNovelListResponse，与 webview app api/types.ts 同源，
-//   样例参照 api/search.test.ts 的 ILLUST_ITEM/NOVEL_ITEM）。
+//   。
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
 import type { SearchTransport } from "../api/search"
@@ -140,7 +139,7 @@ async function settle(): Promise<void> {
   }
 }
 
-describe("mergeSearchResults（oracle: webview utils/searchMerger.ts 逐字语义）", () => {
+describe("mergeSearchResults", () => {
   it("按 create_date 降序交叉混排（iso 字符串字典序）", () => {
     const i1 = makeIllust(1, "2026-08-10T00:00:00+09:00")
     const i2 = makeIllust(2, "2026-08-05T00:00:00+09:00")

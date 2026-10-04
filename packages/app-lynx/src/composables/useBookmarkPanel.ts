@@ -1,7 +1,7 @@
 // ─── 收藏面板状态机 composable（T5 / issue #534，spec docs/specs/bookmark-tags.md D5/D6/D8）───
 //
 // 面板的全部数据与交互状态收敛在此（组件 BookmarkPanel.vue 只做渲染与事件转接），
-// 与 webview 面板同语义（packages/app/src/components/BookmarkPanel.tsx）：
+// 面板行为契约：
 // - 预填（D6）：打开时 loadBookmarkDetail 取服务端真值 → 已选标签（detail.tags 中
 //   is_registered 的项，见 docs/research/bookmark-tags-similar-clients.md §7.3：detail.tags
 //   = 作品标签 + is_registered 标记「用户收藏标签库已有该标签」）+ 可见性；
@@ -40,10 +40,10 @@ export type BookmarkPanelFeedback = 'limit' | 'empty' | 'duplicate'
 /** 数据源加载态：loading / ready / error（idle = 尚未发起） */
 export type BookmarkPanelLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-/** 反馈文案保留时长（与 webview 面板同为瞬态 2.5s） */
+/** 反馈文案保留时长 */
 export const BOOKMARK_PANEL_FEEDBACK_MS = 2500
 
-/** 未登录（无 userId）时的标签库降级标记（与 webview 面板同字面量，双端差分可对齐） */
+/** 未登录（无 userId）时的标签库降级标记 */
 export const UNAUTHENTICATED_MARKER = 'unauthenticated'
 
 export interface UseBookmarkPanelOptions {
@@ -233,7 +233,7 @@ export function useBookmarkPanel(options: UseBookmarkPanelOptions): UseBookmarkP
     detailAc = controller
     const myGen = detailGen
     // 标签库与预填并行（D6）：先按当前可见性起拉；预填若为 private，restrict 变化经
-    // 上方 watch 重拉私密库（与 webview 的 restrict 依赖效应同语义）
+    // 上方 watch 重拉私密库
     void loadUniverse()
     try {
       const res = await loadBookmarkDetail(toIllustId(options.getIllustId()), controller.signal)

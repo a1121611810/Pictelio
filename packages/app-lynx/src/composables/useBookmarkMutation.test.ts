@@ -321,7 +321,7 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
   })
 
   // ─── 小说收藏（spec #585 / 票 #587：targetKind='novel' 端点分派）───
-  // Oracle：端点/载荷逐字对齐 webview api/novel.ts addBookmark/deleteBookmark
+  // Oracle：端点/载荷取 Pixiv App API 契约 addBookmark/deleteBookmark
   //（POST /v2/novel/bookmark/add {novel_id, restrict}、POST /v1/novel/bookmark/delete {novel_id}）。
   describe("targetKind='novel' 端点分派", () => {
     it('toggle add 走 /v2/novel/bookmark/add 且恒 public（同 D3 语义）', async () => {

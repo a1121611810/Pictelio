@@ -28,7 +28,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * 网络自检 Java 执行层（main 源集，webview / lynx 共用）。
+ * 网络自检 Java 执行层（main 源集）。
  *
  * <p>设计依据：docs/specs/network-self-check.md + docs/research/network-selfcheck-java-capability-audit.md（#440）。
  * 产出与 @pictelio/net-diagnostics 的 ProbeOutcome[] 契约一致（id / ok / latencyMs / errorClass / httpStatus / rawError），

@@ -50,7 +50,7 @@ import okhttp3.Response;
  *   <li>fastest-ip：内存探针结果 30s TTL 内用最快（TTL 判定 oracle = {@code getFastestHost}）；
  *       过期/缺失<b>立即</b>回退 weighted 不阻塞，同时惰性触发单飞探测；</li>
  *   <li>race：降级 weighted——<b>native 从未实现 race</b>，此为显式化而非行为缩减（ADR-0143 D3），
- *       设置页（webview）应标注「仅 Web」。</li>
+ *       设置页应标注「仅 Web」。</li>
  * </ul>
  *
  * <p><b>配置来源</b>：{@link RawProvider} 接缝（生产 = SharedPreferences {@code "CapacitorStorage"}

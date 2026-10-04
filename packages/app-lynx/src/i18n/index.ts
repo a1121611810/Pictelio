@@ -14,7 +14,7 @@ export const SUPPORTED_LOCALES: readonly Locale[] = ["zh-CN", "en"]
 
 function detectSystemLocale(): Locale {
   // LynxView 原生模式下 navigator 可能不存在（node/worker 环境同）；真实系统语言
-  // 须经原生桥注入（spec 项，主端同因 WebView 异步重置 locale 也走桥）。
+  // 须经原生桥注入。
   try {
     return navigator.language?.startsWith("en") ? "en" : SOURCE_LOCALE
   } catch {

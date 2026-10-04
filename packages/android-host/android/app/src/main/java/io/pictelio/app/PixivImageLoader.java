@@ -26,7 +26,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * 图片流水线公共核心（#57）——webview 拦截层与 Lynx 图片服务共用，单一事实源。
+ * 图片流水线公共核心（#57）——图片加载链路的单一事实源（URL 改写 / 磁盘缓存 / 下载）。
  *
  * <p>职责（均为唯一实现）：
  * <ul>
@@ -41,7 +41,7 @@ import okhttp3.Response;
  *       只认官方入参，不消费 resolve 返回值）</li>
  * </ul>
  *
- * <p>消费方（薄适配，不复制逻辑）：{@code MainActivity.interceptImage}（webview 流形态）、
+ * <p>消费方（薄适配，不复制逻辑）：图片拦截链路、
  * {@code PictelioImageService}（Lynx Bitmap 形态，见 #58/#59）。
  *
  * <p>非 final 是<b>测试缝</b>：{@link NovelExporter} 的取图注入要求测试可覆盖
@@ -74,7 +74,7 @@ public class PixivImageLoader {
     private final long maxCacheBytes;
     /** 图床下载源决策（ADR-0143 D1 深模块；resolve 不命中时行为与既有官方路径逐字节一致） */
     private final ImageHostConfig imageHostConfig;
-    /** per-URL 锁：并发同 URL 加载时避免截断写同一缓存文件（webview 拦截为多线程） */
+    /** per-URL 锁：并发同 URL 加载时避免截断写同一缓存文件（拦截链路为多线程） */
     private final ConcurrentHashMap<String, Object> urlLocks = new ConcurrentHashMap<>();
 
     public PixivImageLoader(Context context) {
@@ -365,7 +365,7 @@ public class PixivImageLoader {
      * 直接 FileOutputStream(目标) 时，prefetchImage 与拦截链路并发写同一文件可能
      * 交错产生截断文件，而 cachedFile 仅查 exists+length>0，截断文件会被当命中
      * 持久返回坏图。失败路径清理 tmp 并上抛，目标保持原内容不被半截写入污染。
-     * 包可见：prefetchImage（webview 源集）与拦截链路共享同一写盘纪律。
+     * 包可见：预取与拦截链路共享同一写盘纪律。
      */
     static void writeFile(File file, byte[] bytes) throws IOException {
         File tmp = new File(file.getAbsolutePath() + ".tmp");

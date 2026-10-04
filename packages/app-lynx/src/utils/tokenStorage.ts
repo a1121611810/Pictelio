@@ -3,7 +3,7 @@
 // - web-core（lynx-bg Worker，无 localStorage）：IndexedDB（utils/idbKV.ts），重启恢复登录
 // - 原生 LynxView（#52）：NativeModules.PictelioSecureStorage —— 对齐主项目
 //   @aparajita/capacitor-secure-storage（AndroidKeyStore + "WSSecureStorageSharedPreferences"，
-//   同 key/同密文格式），登录态与 webview client 共享
+//   同 key/同密文格式），跨版本迁移后登录态仍可解密
 import { idbSet, idbGet, idbRemove } from "./idbKV"
 
 const KEY = "refresh_token"

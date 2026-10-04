@@ -128,7 +128,7 @@ public class PictelioAcceptLanguageTest {
         PixivApiCore.executeRequest("GET", url, null, null, false, null);
 
         RecordedRequest req = server.takeRequest();
-        assertNull("null 头值 = 不加头（webview 旧签名委托路径，ADR-0200 E6）",
+        assertNull("null 头值 = 不加头（旧签名委托路径，ADR-0200 E6）",
                 req.getHeader("Accept-Language"));
     }
 
@@ -146,7 +146,7 @@ public class PictelioAcceptLanguageTest {
 
     @Test
     public void legacyFiveParamSignature_delegatesWithoutHeader() throws Exception {
-        // webview PixivApiPlugin / OAuth 调用点维持旧 5 参签名 → 行为零变化（ADR-0200 D2 / E6）
+        // 插件 / OAuth 调用点维持旧 5 参签名 → 行为零变化（ADR-0200 D2 / E6）
         server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
         String url = server.url("/v1/illust/detail").toString();
 

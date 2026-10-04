@@ -1,5 +1,5 @@
 // ─── app-lynx 翻译缓存层（IndexedDB；ADR-0171） ───
-// 范围限定在 app-lynx 端；不复用 webview 端 translationCache.ts（map #617 Q3）。
+// 范围限定在 app-lynx 端（map #617 Q3 裁定：不做跨端共享包）。
 //
 // 设计要点（ADR-0171）：
 // - 键 = 6 元组：`novelId | chapterId | targetLang | modelId | sourceHash | baseURLHash`
@@ -8,7 +8,7 @@
 //   ADR-0171 §4 已收敛为 FNV-1a）。
 // - 持久化：复用现有 `pictelio_lynx` DB + 新增 `translations` object store + version 3
 //   升级路径（现有 v2 加 v3 不破坏旧 kv store，idbKV.ts line 6-8 注释说明）。
-// - LRU 200 章上限（与 webview 端同基线起步；spec §12 N11）。
+// - LRU 200 章上限。
 // - 半成品策略：`done` 之前永不写（5 个状态：translating / translating_queued /
 //   partial / failed / aborted 不写缓存——避免半成品污染）。
 //
@@ -127,7 +127,7 @@ export function computeBaseURLHash(baseURL: string): string {
 // → onblocked 永不 resolve（真机实测翻译卡 "0% 翻译中"）。复用 openDb 杜绝版本分裂。
 const STORE_TRANSLATIONS = STORE_TRANSLATIONS_FROM_KV
 
-/** LRU 容量上限（ADR-0171 §3；与 webview 端 200 章同基线起步） */
+/** LRU 容量上限 */
 const LRU_CAPACITY = 200
 
 /** 打开数据库（复用 idbKV 共享 openDb：onblocked 显式 reject，禁静默挂起） */

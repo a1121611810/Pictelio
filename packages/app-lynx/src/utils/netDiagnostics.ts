@@ -1,5 +1,5 @@
 // 网络自检 lynx 适配层：NativeModule 优先（Lynx 原生无 fetch 保证），web-core 显式降级。
-// 判定/文案/报告一律委托 @pictelio/net-diagnostics（与 webview 同一份）。
+// 判定/文案/报告一律委托 @pictelio/net-diagnostics。
 import type { DeviceCapability, DiagInput, ProbeOutcome } from "@pictelio/net-diagnostics";
 import { getNativeModules } from "../api/client";
 

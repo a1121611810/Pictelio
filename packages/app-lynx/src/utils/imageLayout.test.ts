@@ -37,7 +37,7 @@ describe('detailImageHeightVw（插画详情比例显示）', () => {
     expect(detailImageHeightVw(undefined, undefined, 120)).toBe('120vw')
   })
 
-  it('极端长图不封顶（用户明确选择与 webview client 一致）', () => {
+  it('极端长图不封顶', () => {
     expect(detailImageHeightVw(1000, 100_000)).toBe('10000vw')
     expect(detailImageHeightVw(1, 1000)).toBe('100000vw')
   })

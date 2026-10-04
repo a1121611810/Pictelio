@@ -87,7 +87,7 @@ public final class LynxRuntimeInitializer {
     /**
      * Lynx 引擎可用性判定（ADR-0153）：CLIENT_KINDS 含 lynx ∧ 初始化不抛异常 ∧ native 库真正加载。
      *
-     * <p>CLIENT_KINDS 能力合取（ADR-0153 决策 1 声明、ADR-0164 §7.1 收口）：webview 单引擎包
+     * <p>CLIENT_KINDS 能力合取（ADR-0153 决策 1 声明、ADR-0164 §7.1 收口）：非 lynx 能力包
      * 即使 native 库加载成功也不可承载 lynx 客户端（能力隐藏，ADR-0062）——提前于
      * {@link #ensureInitialized} 返回 false，避免无谓的 LynxEnv 初始化。full/lynx 包不受影响。
      *

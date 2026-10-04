@@ -30,7 +30,7 @@ import { useApiInfiniteQuery } from "../primitives/useApiInfiniteQuery"
 import { idbGet, idbSet } from "../utils/idbKV"
 import { unquoteNativeString } from "../utils/tokenStorage"
 
-/** 设备级已读时间戳键（ISO 字符串；与 webview 侧逐字一致，ADR-0188 D5） */
+/** 设备级已读时间戳键 */
 export const NOTIFICATIONS_LAST_READ_KEY = "notifications_last_read_time"
 
 // ─── 纯函数：未读推导（spec 边界 6）───

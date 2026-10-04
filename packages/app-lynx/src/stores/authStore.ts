@@ -3,7 +3,7 @@
 // - web-core（lynx-bg Worker，无 localStorage）：IndexedDB 持久化，
 //   重启恢复登录（XSS 风险与 localStorage 同级，MVP 接受；token 为个人资产）
 // - 原生 LynxView（#41）：Lynx Native Module 对齐主项目 @aparajita Keystore
-//   存储（同 key/同加密，登录态与 webview client 共享）
+//   存储
 // Pinia 化（ADR-0139 / spec #337）：setup store——state 移入 defineStore 闭包为
 // 私有 ref（不 return，物理私有替代原 `_` 命名约定）；getters 移入为 computed；
 // actions 逐字搬入（行为零变化，纯重构约束）。消费方由「具名 import + `.value`」

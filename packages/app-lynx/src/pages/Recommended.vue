@@ -279,7 +279,7 @@ function onSlideTap(item: MixFeedItem) {
 }
 
 // 点击标签 → 全局搜索弹层（ADR-0133）：TagChipRow 只发原始 tag.name（纯展示组件不依赖 store），
-// 页面层接线 openSearch——与 webview SearchableTag「点击即搜」语义一致（预填 + 自动搜索）。
+// 页面层接线 openSearch——「点击即搜」（预填 + 自动搜索）。
 function onTagTap(name: string) {
   useSearchSheetStore().openSearch(name)
 }

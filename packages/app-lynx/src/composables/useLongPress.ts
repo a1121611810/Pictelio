@@ -1,7 +1,7 @@
 // ─── 长按手势 composable（T5 / issue #534，spec docs/specs/bookmark-tags.md D3 + ADR-0160 D4）───
 //
 // 详情页心形的「双轨收藏」长按半轨：按住 500ms 唤出收藏面板（单击仍为快速收藏）。
-// 口径与 webview 一致（packages/app/src/routes/IllustDetail.tsx onBookmarkPointerDown/Up）：
+// 口径（按下/抬起成对判定）：
 // 按下起计时，到点即触发（长按态，不等松手）；提前松手 = 快速动作（tap 路径，宿主自理）。
 // 差异仅在事件源——原生 LynxView 无 pointer 事件，用 @touchstart/@touchmove/@touchend
 // （CarouselSwiper 同款后台线程触摸通道，ADR-0115「T5 验证修订」）。
@@ -12,7 +12,7 @@
 //
 // 判定收敛在纯函数 isLongPressHeld（node 单测覆盖时长/位移边界，无需真实 DOM 手势）。
 
-/** 长按判定时长（与 webview 500ms 口径一致） */
+/** 长按判定时长 */
 export const LONG_PRESS_MS = 500
 
 /** 位移容差（px）：超过即判定为滚动手势，放弃长按 */

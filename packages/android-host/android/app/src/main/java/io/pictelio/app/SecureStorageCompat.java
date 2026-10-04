@@ -20,7 +20,7 @@ import javax.crypto.spec.GCMParameterSpec;
 
 /**
  * refresh_token 加密存储核心 —— 逐字段对齐 {@code @aparajita/capacitor-secure-storage}
- * （ADR-0050 契约），保证 lynx client 与 webview client 登录态共享。
+ * （ADR-0050 契约），保证登录态跨版本迁移后仍可解密。
  *
  * 契约（与 SecureStorage.java v8.0.0 一致，勿改）：
  * <ul>

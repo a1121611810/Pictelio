@@ -349,7 +349,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
       if (merge === 'time-merge') {
         // 时间合并翻页：并行拉所有非耗尽源 next 页 → mergeByTime → 去重 → 追加。
         // [oracle 对齐 app 逐源独立] 用 Promise.allSettled：每个源独立 settle，成功源并入、失败源
-        //   跳过该批但不停掉整条流（对照 packages/app/src/stores/shared/createTQFeedStore.ts 的
+        //   跳过该批但不停掉整条流（
         //   items() = mergeAndSort(逐源已加载页.filter(非空)) —— 部分成功仍并入）。若不如此，某源持续
         //   失败会停掉整条「无限滑流」，与 app 行为相悖（ADR-0115 研究/Spec 复核结论）。
         const indexes = sourceStates

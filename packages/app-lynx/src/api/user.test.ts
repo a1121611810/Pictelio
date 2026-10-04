@@ -57,7 +57,7 @@ describe("api/user getMyPixivUsers（GET /v1/user/mypixiv，ADR-0193 D1）", () 
     expect(typeof first.user.account).toBe("string")
     expect(typeof first.user.profile_image_urls?.medium).toBe("string")
     expect(Array.isArray(first.illusts)).toBe(true)
-    // lynx 侧 novels 字段对齐 webview 同形（本批不消费，类型对齐防解析面分叉）
+    // novels 字段（本批不消费，类型对齐防解析面分叉）
     expect(Array.isArray(first.novels)).toBe(true)
     expect(typeof first.is_muted).toBe("boolean")
     // 静音用户保留透传不过滤（ADR-0193 已否决本地过滤）

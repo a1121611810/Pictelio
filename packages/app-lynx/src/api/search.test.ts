@@ -4,7 +4,7 @@
 // 原生模式 stub NativeModules.PictelioApi），断言完整 URL/params 与错误归一，
 // 不 mock apiClient.get —— 避免「实现错 mock 全绿」的虚假信心。
 // 响应 mock 数据结构来自真实契约：字段形状逐字对齐 lynx api/types.ts
-// （与 webview app api/types.ts 同源；PixivIllustListResponse / PixivNovelListResponse）。
+// 。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import {
   setAccessToken,
@@ -22,7 +22,7 @@ import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core"
 import { toIllustId, toNovelId, toSeriesId, toUserId } from "./id"
 import { ApiErrorType, type PixivIllust, type PixivIllustListResponse, type PixivNovel, type PixivNovelListResponse } from "./types"
 
-// ─── 真实契约样例 —— 字段形状来自 api/types.ts（与 webview 同源契约） ───
+// ─── 真实契约样例 —— 字段形状来自 api/types.ts ───
 
 const ILLUST_ITEM: PixivIllust = {
   id: toIllustId(123456789),
@@ -221,7 +221,7 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
   })
 
   it("searchIllustNext 非法 host（evil.com）→ 抛错（带模块前缀，warn 可见），且不发起网络请求", async () => {
-    // 注意：assertPixivUrl 同步抛错（先断言后请求），webview 蓝本同款 — toThrow 而非 .rejects
+    // 注意：assertPixivUrl 同步抛错（先断言后请求）— toThrow 而非 .rejects
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     expect(() => searchIllustNext("https://evil.example.com/steal")).toThrow(
       "[api/search] searchIllustNext: invalid next_url",
@@ -245,7 +245,7 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     warnSpy.mockRestore()
   })
 
-  it("searchIllustNext 非 URL 字符串 / 裸相对路径（非 /pixiv-api 前缀）也拒绝（对齐 webview assertPixivUrl）", () => {
+  it("searchIllustNext 非 URL 字符串 / 裸相对路径（非 /pixiv-api 前缀）也拒绝", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     // 裸相对路径不带 /pixiv-api 前缀 → 无法证明指向 Pixiv（防御性拒绝）
     expect(() => searchIllustNext("/v1/search/illust?word=test&offset=30")).toThrow(

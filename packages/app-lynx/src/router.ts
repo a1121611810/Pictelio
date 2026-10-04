@@ -106,8 +106,7 @@ export const routes: RouteRecordRaw[] = [
   //   此前 /following 零用户入口（仅 benchNav 深链）、追更与通知各只有 Me.vue 单入口 ——
   //   三件回答同一问题的事分散三处，本条把它们收进一个顶层位置。
   { path: '/updates', name: 'updates', component: Updates, meta: { requiresAuth: true, topInset: 'self' } },
-  // 「书架」：三段聚合面（我的收藏 / 稍后看 / 继续读）。继续读尚未实现（ADR-0203 删除了
-  //   旧 WebView 客户端的 historyStore），页内显式说明"即将上线"而非伪装成空列表。
+  // 「书架」：三段聚合面（我的收藏 / 稍后看 / 继续读）。继续读尚未实现，页内显式说明"即将上线"而非伪装成空列表。
   { path: '/shelf', name: 'shelf', component: Shelf, meta: { requiresAuth: true, topInset: 'self' } },
   // 「高级」：承接原「我的」里的调试/自检项（网络自检 / 限流退避调参 / 平台一致性自检），
   //   使业务入口行与调试行不再平级混排（决策 4 = B：只搬调试项，账号区与外观区不动）。
@@ -370,7 +369,7 @@ let lastBackAt = 0
 /** 根路由「再按一次退出应用」提示显隐（App.vue 消费） */
 export const exitHint = ref(false)
 let exitHintTimer: ReturnType<typeof setTimeout> | undefined
-/** 提示条显示时长（ms），与 webview client EXIT_HINT_DURATION_MS 对齐 */
+/** 提示条显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000
 
 function showExitHint(): void {

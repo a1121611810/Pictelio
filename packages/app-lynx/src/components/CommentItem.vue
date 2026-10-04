@@ -27,7 +27,7 @@ const emit = defineEmits<{
   toggleReplies: []
 }>()
 
-// 相对时间：utils/dateFormat（参考 webview CommentList）：刚刚 / N分钟前 / N小时前 / N天前，30 天后落日期
+// 相对时间：utils/dateFormat：刚刚 / N分钟前 / N小时前 / N天前，30 天后落日期
 // 楼层引用：parent_comment 可能是空对象（Record<string, never>），运行时判定后归一
 const parent = computed<PixivCommentParent | null>(() => {
   const p = props.comment.parent_comment

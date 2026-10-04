@@ -1,7 +1,7 @@
 // ─── 下载队列响应式 store（Pinia 薄壳，spec docs/specs/download-manager.md §4）───
 // 深模块在 utils/downloadManager.ts（框架无关、node 可测）；本文件只做三件事：
 // 提供 prefs/idbKV seam、注册原生执行器 seam（T3 接入）、把状态镜像进 Pinia ref。
-// 原生：NativeModules.PictelioPrefs（共享 SharedPreferences，与 webview 同键）；
+// 原生：NativeModules.PictelioPrefs；
 // web-core dev：IndexedDB KV。探测形态对齐 stores/settingsStore.ts。
 import { ref } from 'vue'
 import { defineStore } from 'pinia'

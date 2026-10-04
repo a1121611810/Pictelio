@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
  * 保存到相册 Native Module（spec docs/specs/image-save-download.md §3 D2，lynx 引擎薄壳）。
  *
  * <p>JS 侧访问：{@code NativeModules.PictelioGallery}。
- * 下载/缓存/落盘决策全在 {@link GallerySaver}（main sourceSet 深模块，与 webview 引擎共享）。
+ * 下载/缓存/落盘决策全在 {@link GallerySaver}（main sourceSet 深模块）。
  *
  * <p>回调契约（Callback.invoke；无 null——真机 CallbackImpl 对 null 崩溃）：
  * {@code saveImage(url, fileName, cb)}——成功 cb(uri, "")（content:// 或 file://）；

@@ -55,7 +55,7 @@ describe("RankingEntryCard.vue（#519）", () => {
     expect(illustList).toContain("mode === 'recommend' && settings.rankingEntry")
   })
 
-  it("runners 由 PixivIllust[] 构造 {rank, illust}（防 webview 形状串端，S1 回归）", () => {
+  it("runners 由 PixivIllust[] 构造 {rank, illust}", () => {
     expect(src).toContain("illusts.value.slice(1, 3).map((illust, i) => ({ rank: i + 2, illust }))")
   })
 

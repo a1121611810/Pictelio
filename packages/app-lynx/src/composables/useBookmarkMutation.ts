@@ -61,7 +61,7 @@ export interface UseBookmarkMutationOptions {
   onChange?: (bookmarked: boolean) => void
   /**
    * 收藏目标类型（spec #585 / 票 #587）：'illust'（默认，现状）| 'novel'（小说介绍页）。
-   * 小说端点无 tags 载荷（Pixiv 端点差异，oracle=webview api/novel.ts addBookmark）——
+   * 小说端点无 tags 载荷——
    * novel 形态下 saveWith 的 tags 无法上送，将显式 warn 后按 restrict 保存（禁静默丢载荷）。
    */
   targetKind?: 'illust' | 'novel'

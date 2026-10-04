@@ -6,7 +6,7 @@
 /**
  * 按原图宽高比计算详情页图片容器高度（vw 字符串），返回 `${(height / width) * 100}vw`。
  * width/height 缺失、非正数、非有限值时回退 `fallbackVw`（默认 100，即原 1:1 容器）。
- * 不封顶：与 webview client 一致（webview 端详情大图无 max-height，用户已确认）。
+ * 不封顶。
  */
 export function detailImageHeightVw(
   width: number | undefined | null,
