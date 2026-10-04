@@ -178,29 +178,6 @@ jobs:
             echo "detected=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Gate auto-merge on a complete run
-        # 门禁 1：状态文件说"完成"才允许无人复核合并。
-        # 0.7.0 在 run 开始时就把 status 写成 interrupted（崩溃守卫上膛），跑完才翻成
-        # complete —— 实测确认。langchain-ai/openwiki#921 记录过被中断的 run 仍可能以
-        # exit 0 结束，所以退出码不是可信信号，状态文件才是。
-        run: |
-          set -euo pipefail
-          FILE=openwiki/.last-update.json
-          if [ ! -f "$FILE" ]; then
-            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，禁止自动合并"
-            exit 1
-          fi
-          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
-            echo "::error::$FILE 损坏或无法解析，禁止自动合并"
-            exit 1
-          fi
-          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
-          echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
-          if [ "$STATUS" != "complete" ]; then
-            echo "::error::openwiki 本次 run 未完成（status=${STATUS}），禁止自动合并；PR 已保留已完成页面，请人工判断"
-            exit 1
-          fi
-
       - name: Create OpenWiki update pull request
         id: create-pr
         if: ${{ !cancelled() }}
@@ -225,6 +202,31 @@ jobs:
             `status: complete` **and** require a real content change when the source
             moved. Review it by hand and merge manually if the partial progress is
             worth keeping as the baseline for the next run.
+
+      - name: Gate auto-merge on a complete run
+        # 门禁 1：状态文件说"完成"才允许无人复核合并。
+        # 位置说明：必须排在 create-pull-request **之后**——中断的 run 也要先把已完成的页面
+        # 留成 PR 供人工判断（官方模板的取舍），只是不许自动合并。
+        # 0.7.0 在 run 开始时就把 status 写成 interrupted（崩溃守卫上膛），跑完才翻成
+        # complete —— 实测确认。langchain-ai/openwiki#921 记录过被中断的 run 仍可能以
+        # exit 0 结束，所以退出码不是可信信号，状态文件才是。
+        run: |
+          set -euo pipefail
+          FILE=openwiki/.last-update.json
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，禁止自动合并"
+            exit 1
+          fi
+          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
+            echo "::error::$FILE 损坏或无法解析，禁止自动合并"
+            exit 1
+          fi
+          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
+          echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
+          if [ "$STATUS" != "complete" ]; then
+            echo "::error::openwiki 本次 run 未完成（status=${STATUS}），禁止自动合并。上方 PR 已保留本次跑完的页面，请人工判断"
+            exit 1
+          fi
 
       - name: Enforce no-op detection
         # 门禁 2：空跑假绿。放在建 PR 之后，以保留上游"失败也留下已完成页面"的取舍，
