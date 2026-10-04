@@ -63,6 +63,35 @@ const rowA11yLabel = computed(() => {
   return t('continue.open', { type: typeBadge.value })
 })
 
+/**
+ * ⚠️ **已知失效面（真机取证 2026-10-04 发现，票 #929，未修复）**
+ *
+ * 现象：同一行在**冷启动 + benchNav `shelf`** 下整行渲染为**暗色底**（深色字几乎不可读），
+ * 而 FAB 点进书架 / `/continue` 页均正常。像素取证：黑区 x 35–1044 / y 1507–1753，
+ * 采样色 **(11,15,18) = `#0b0f12`**，等于 `styles/tokens.css:757` 的
+ * `.theme-sky.dark --md-surface-container-lowest`——**全仓唯一产出该色值之处**；
+ * 而设备实测处于**亮色**（`settings_dark_mode=light`）。⇒ 该行的背景令牌被解析成了
+ * 暗色板的值，属节点复用导致的**令牌继承链污染**，非主题切换、非 overlay、非布局漂移。
+ *
+ * 触发条件：**同一路由被连续 `replace` 重建**。benchNav 在 `BuildConfig.DEBUG` 下
+ * 于 1.5/3/4.5/6s 各广播一次 ⇒ 书架实例 ~4.5s 内被 replace 4 次；行根 view 是段 3
+ * 的**第一个可复用节点**（裸 `v-for`，无 `<list-item item-key>` 包裹），故先中招。
+ *
+ * **当前可达性：benchNav 侧不可达**（原四次广播整体在 `BuildConfig.DEBUG` 内，release
+ * 移除）⇒ **不是现行生产缺陷**。但 `createGlobalFab` 的 tab 切换同样走
+ * `navigate(path, { replace: true })`，**快速连点导航环项**理论上可造出同型竞态——
+ * ⚠️ **未验证**（取证时 FAB 路径 4 次试验均未复现）。
+ *
+ * 建议处置（未实施）：优先给 benchNav 监听器加幂等守卫（同一目标只 replace 一次），
+ * 这同时消掉一类真实竞态；**不要**用换背景色绕过（属掩盖，且污染可能波及其它
+ * `var(--md-*)` 消费点）。段 3 改用 `<list-item item-key>` 只降低复现概率、不消除成因。
+ *
+ * 存证：`docs/research/screenshots-2026-10/29-`、`31-`、`33-continue-defect-shelf3-first-row-black-bg.png`。
+ * 未闭合环节：充分性未反向确认（恢复该类后 benchNav 路径未取到黑底样本，被 carousel 竞态干扰）；
+ * 「令牌为何被染成 dark 值」的 LynxView 内部路径未做到引擎级确证。
+ */
+// ↑ 本行的 `bg-surface-container-lowest` 是下述失效面的受害面，勿因「换色绕过」而改动
+
 /** 是否可点：受限或失效行均不导航（ADR-0219 §2.5 不静默隐藏，但也不假装能打开） */
 const openable = computed(() => !restricted.value && !props.entry.unavailable)
 
