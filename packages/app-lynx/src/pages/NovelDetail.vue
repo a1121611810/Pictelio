@@ -3,6 +3,9 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
+import { resolveNovelContentGeometry } from '../primitives/novelContentFitsViewport'
+import { subscribeViewportSize } from '../utils/viewportSizeBridge'
+import type { ViewportContentSize, ViewportSystemInfo } from '../utils/viewportGeometry'
 import { currentParams, goBack, navigate, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist, loadNovelSeriesChapters } from '../api/novel'
 import { toNovelId, toSeriesId } from '../api/id'
@@ -359,23 +362,93 @@ let chapterNoWarned = false
 let chapterPosition: { chapterNo: number; chapterTotal: number } | null = null
 /** 完成判定降级（系列章节坐标不可确定）的 warn 去重：一本只吵一次 */
 let completionWarned = false
+/** 完成判定降级（视口高拿不到真实测量）的 warn 去重：一本只吵一次 */
+let viewportHeightWarned = false
+
+// ─── 视口高（票 #930 前置的唯一输入）────────────────────────────────────
+// ⚠️ **不固化在 setup**：原生内容区契约是**一次性查询、无推送通道**（ADR-0131），
+//   旋转 / 分屏会改 LynxView 尺寸而 JS 侧收不到推送。故每次完成判定前**重拉一次**
+//   （原生 `contentSize` 随布局与 insets 重算，见 LynxActivity 的 addOnLayoutChangeListener），
+//   新值落地后再判一次。写成 setup 期的 const ⇒ 旋转后前置条件停在旧值。
+const viewportSize = ref<ViewportContentSize | null>(null)
+
+/** Lynx 全局全屏物理尺寸（web-core 预览无此对象 ⇒ 引用处必须 `typeof` 探测，同 GlobalFab） */
+declare const SystemInfo: ViewportSystemInfo
 
 /**
- * 完成判定落地（ADR-0219 §2.3 / 票 #928 AC #1/#2/#3）：成立则软删（置 `completedAt`）。
+ * 重拉原生内容区尺寸；`after` 在新值落地后跑（无契约的 web-core 预览直接跳过——
+ * 那条路径下判定用 SystemInfo 口径，调用方已同步判过）。
+ */
+function refreshViewportSize(after: () => void): void {
+  if (typeof NativeModules === 'undefined') return // web-core 无契约可拉
+  subscribeViewportSize(() => NativeModules, (size) => {
+    if (size) viewportSize.value = size
+    after() // 新值落地 ⇒ 再判一次（幂等：markCompleted 对已完成条目是 no-op）
+  })
+}
+
+/**
+ * 完成判定的前置：正文是否**高于**视口（票 #930）。
+ *
+ * [单位] 几何解算在 `primitives/novelContentFitsViewport` 内完成，正文高（中位段高 × 段数）
+ * 与视口高（vw → @375 基准设计 px）统一到**@375 基准设计 px** 后再比；本页不自行折算单位。
+ *
+ * 📌 **禁静默降级**：视口高拿不到真实测量时取**保守侧 false**（不判完成）并 warn 一次。
+ *   为什么这一侧保守：误完成的代价是**软删用户书架里的书**（条目当场离场），
+ *   漏完成的代价只是条目多留一会儿（用户读完再触底即自愈）——代价不对称。
+ */
+function bodyExceedsViewport(): boolean {
+  const geometry = resolveNovelContentGeometry({
+    contentSize: viewportSize.value,
+    systemInfo:
+      typeof SystemInfo === 'undefined'
+        ? undefined
+        : {
+            pixelWidth: SystemInfo.pixelWidth,
+            pixelHeight: SystemInfo.pixelHeight,
+            pixelRatio: SystemInfo.pixelRatio,
+          },
+    paragraphCount: paragraphs.value.length,
+    avgParagraphHeightPx: estimatedHeightPx.value,
+  })
+  if (!geometry.viewportMeasured) {
+    if (!viewportHeightWarned) {
+      viewportHeightWarned = true
+      console.warn(
+        '[novel-detail] 视口高不可得（无内容区尺寸且无 SystemInfo），本话不标记完成（条目保留在继续读列表）',
+      )
+    }
+  }
+  return geometry.contentExceedsViewport
+}
+
+/**
+ * 完成判定落地（ADR-0219 §2.3 / 票 #928 AC #1/#2/#3 + 票 #930 前置）：成立则软删（置 `completedAt`）。
  *
  * 📌 **两个时机都要跑**：章节坐标是**后台**补的，可能晚于触底才落地。
  *   只在触底时判一次 ⇒ 触底早于补齐的用户永远判不出末话；只在补齐时判 ⇒
  *   补齐早于触底的用户同样漏判。故触底时判一次、坐标落地后再判一次（幂等：
  *   `markCompleted` 对已完成的条目是 no-op）。
  *
+ * 📌 **第三次判定（票 #930）**：视口尺寸会随旋转 / 分屏变，故每次判定前重拉内容区尺寸，
+ *   新值落地后再判一次。少这一次 ⇒ 旋转后前置条件停在旧视口。
+ *
  * 📌 降级不静默：坐标不可确定时**不**判完成（宁可留在列表里也不误软删），
  *   并 warn 一次让用户可从日志看出「这本书不会被自动移出列表」。
  */
 function evaluateCompletion(gen: number): void {
   if (gen !== loadGeneration) return // 章节已切换 / 组件已卸载 → 旧判定作废（竞态防护 #3）
+  applyCompletionDecision(gen)
+  refreshViewportSize(() => applyCompletionDecision(gen))
+}
+
+/** 单次判定落地（`evaluateCompletion` 的同步半 + 重拉后的复判共用） */
+function applyCompletionDecision(gen: number): void {
+  if (gen !== loadGeneration) return
   const seriesId = novel.value?.series?.id ?? null
   const decision = decideNovelCompletion({
     reachedBottom: reachedBottom.value,
+    contentExceedsViewport: bodyExceedsViewport(),
     seriesId: seriesId == null ? null : Number(seriesId),
     chapterNo: chapterPosition?.chapterNo,
     chapterTotal: chapterPosition?.chapterTotal,
@@ -500,6 +573,9 @@ async function loadNovel(): Promise<void> {
 
 onMounted(() => {
   void loadNovel()
+  // 首拉视口尺寸（票 #930）：完成判定的前置要用。之后每次判定前仍会重拉
+  //（旋转 / 分屏不在此处覆盖——原生契约无推送通道，见 refreshViewportSize 头注）。
+  refreshViewportSize(() => {})
 })
 
 onUnmounted(() => {

@@ -160,6 +160,13 @@ export function decideContinueLabel(
 export interface NovelCompletionInput {
   /** `@scrolltolower` 是否已触发（**触底是权威信号**：段内滚动在当前构建不可观测） */
   reachedBottom: boolean
+  /**
+   * 📌 **前置条件**（票 #930 / ADR-0219 §2.3 触底前置）：正文内容**高于**视口。
+   * 一屏放得下时引擎的 `scrolltolower` 是几何必然、不是用户行为 ⇒ 不得据此判完成。
+   * 几何解算在 `primitives/novelContentFitsViewport`（单位：@375 基准设计 px），
+   * 调用侧拿不到真实视口高时取**保守侧 `false`** 并显式 warn（禁静默降级）。
+   */
+  contentExceedsViewport: boolean
   /** 系列 id；**单本小说（无系列）为 null** —— 触底即完成 */
   seriesId: number | null
   /** 本话在系列中的序号（1-based）；章节不在服务端首页返回范围内时不可确定 */
@@ -169,22 +176,34 @@ export interface NovelCompletionInput {
 }
 
 /**
- * 完成判定（ADR-0219 §2.3 / 票 #928 AC #1/#2）：**只有两种情形**触发完成。
- *  ① 单本小说（无系列）触底 —— Pixiv 上最常见形态，漏判则该场景永不离场；
- *  ② 系列**末话**触底（`chapterNo === chapterTotal`）。
+ * 完成判定（ADR-0219 §2.3 / 票 #928 AC #1/#2 + 票 #930 前置）：**前置 + 两种情形**。
  *
- * ⚠️ **反例（票 #928 AC #2 钉死）**：系列**中间**话触底 ⇒ false。
- *   判定刻意用严格相等而非「≥」或「已见末话」——放宽即会把读到一半的书误判为读完。
+ * 📌 **前置（票 #930）**：正文内容必须**高于**视口。少了它，单本小说一屏放得下时
+ *   `<list>` 首帧就在下边界 ⇒ `scrolltolower` 立即派发 ⇒ 条目当场软删而用户一字未读
+ *   （真机实证 emulator-5554，存证 `docs/research/screenshots-2026-10/22-continue-single-novel-fits-one-screen.png`）。
+ *   「滚动到末尾」隐含「有可滚动的内容」——一屏放得下时引擎报的「在底部」是几何必然。
+ *
+ * ⚠️ **不引入停留时长 / 滚动百分比门槛**（ADR-0219 §2.3）：可观测信号只有
+ *   「打开了哪本」与「是否触底」两个；`main-thread-bindscroll` 未确认派发，
+ *   段内进度拿不到可靠信号，凭空加门槛 = 造出依赖不存在信号的逻辑。
+ *   📌 **「为何不用停留时长」**（票 #930，防后人重复发明）：追更询问侧的最小停留时长常量
+ *   是同仓现成先例、停留时长也拿得到，但那是**任意阈值**——要拍一个秒数，而秒数长短与
+ *   「读没读完」无因果关系（慢读者被误伤、快读者漏判）。本前置用的是
+ *   **内容高度 / 视口高度**这个**客观事实**：没有东西可滚，就谈不上读到了底。
+ *   两者不是同一类东西——一个是要拍的数，一个是要测的量。
+ *   （同 `primitives/novelContentFitsViewport.ts` 头注，那里的展开版点名了先例常量名；
+ *    本文件不复述该常量名——`continueReadingCompletion.test.ts` 的「术语文档易混辨析 #1」
+ *    守卫禁止 store 出现另一子系统的任何标识符，两条概念在此是刻意不相交的。）
  *
  * ⚠️ **坐标不可确定 ⇒ 不完成**（`chapterNo` / `chapterTotal` 缺失）：宁可条目多留在列表里，
  *   也不凭「大概是末话」把一本书软删。调用侧对这条降级 warn 一次（禁静默降级）。
  *
- * 📌 **不引入停留时长 / 滚动百分比门槛**（ADR-0219 §2.3）：可观测信号只有
- *   「打开了哪本」与「是否触底」两个；`main-thread-bindscroll` 未确认派发，
- *   段内进度拿不到可靠信号，凭空加门槛 = 造出依赖不存在信号的逻辑。
+ * 📌 **入参必填 `contentExceedsViewport`**（票 #930）：不设默认值/可选，
+ *   免得漏接的调用点在类型上「看起来对」而运行时恒取保守侧。
  */
 export function decideNovelCompletion(input: NovelCompletionInput): boolean {
   if (!input.reachedBottom) return false // 未触底：进入正文只记位置（§2.3「进入即记录」）
+  if (!input.contentExceedsViewport) return false // 📌 前置（票 #930）：没有可滚的内容 ⇒ 谈不上读到底
   if (input.seriesId == null) return true // ① 单本小说读到底
   const { chapterNo, chapterTotal } = input
   if (chapterNo == null || chapterTotal == null) return false // 坐标不可确定 ⇒ 宁可不完成

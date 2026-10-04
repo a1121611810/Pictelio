@@ -33,46 +33,100 @@ import { decideIntroReadAction } from "../primitives/novelNavigationTarget"
 describe("完成判定：只有两种情形触发（ADR-0219 §2.3 / 票 #928 AC #1）", () => {
   it("① 正例：单本小说（无系列）读到底 ⇒ 完成", () => {
     // 📌 Pixiv 上单篇小说是最常见形态；只判「系列末话」会让该场景永不离场（ADR-0219 §2.3 单本告警）
-    expect(decideNovelCompletion({ reachedBottom: true, seriesId: null })).toBe(true)
+    expect(
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: null,
+      }),
+    ).toBe(true)
   })
 
   it("② 正例：系列的末话读到底 ⇒ 完成", () => {
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterNo: 12, chapterTotal: 12 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7,
+        chapterNo: 12,
+        chapterTotal: 12,
+      }),
     ).toBe(true)
   })
 
   it("📌 反例（票 #928 AC #2）：系列**中间**话读到底 ⇒ **不**完成（防判定被放宽）", () => {
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterNo: 5, chapterTotal: 12 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7,
+        chapterNo: 5,
+        chapterTotal: 12,
+      }),
     ).toBe(false)
     // 紧邻末话的那话同样不是末话：严格相等，不是「≥ total - 1」
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterNo: 11, chapterTotal: 12 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7,
+        chapterNo: 11,
+        chapterTotal: 12,
+      }),
     ).toBe(false)
   })
 
   it("未触底 ⇒ 不完成（进入正文只记位置；触底才是完成信号）", () => {
-    expect(decideNovelCompletion({ reachedBottom: false, seriesId: null })).toBe(false)
     expect(
-      decideNovelCompletion({ reachedBottom: false, seriesId: 7, chapterNo: 12, chapterTotal: 12 }),
+      decideNovelCompletion({
+        reachedBottom: false,
+        contentExceedsViewport: true,
+        seriesId: null,
+      }),
+    ).toBe(false)
+    expect(
+      decideNovelCompletion({
+        reachedBottom: false,
+        contentExceedsViewport: true,
+        seriesId: 7,
+        chapterNo: 12,
+        chapterTotal: 12,
+      }),
     ).toBe(false)
   })
 
   it("系列坐标不可确定 ⇒ **不**完成（宁可留在列表里也不误软删）", () => {
     // 本话不在服务端首页返回范围内（如第 30 话 / 共 50 话）⇒ 序号不可确定
-    expect(decideNovelCompletion({ reachedBottom: true, seriesId: 7 })).toBe(false)
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterNo: 30 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7,
+      }),
     ).toBe(false)
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterTotal: 50 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7, chapterNo: 30 }),
+    ).toBe(false)
+    expect(
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7, chapterTotal: 50 }),
     ).toBe(false)
   })
 
   it("📌 坐标越界（脏数据 chapterNo > chapterTotal）⇒ 不完成（不把脏数据当末话）", () => {
     expect(
-      decideNovelCompletion({ reachedBottom: true, seriesId: 7, chapterNo: 99, chapterTotal: 12 }),
+      decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: 7,
+        chapterNo: 99,
+        chapterTotal: 12,
+      }),
     ).toBe(false)
   })
 })
@@ -207,7 +261,11 @@ describe("闭环：完成后重开 ⇒ 完成态保留 + 位置照常更新（�
   it("闭环全链：单本读到底 → 软删 → 重开 → 位置更新 → 再进列表仍归「已读完」", () => {
     // 用纯判定函数驱动，验的是「判定 + store 行为」串起来的结果（票 #928 AC #5）
     store.record(item(100, { lastOpenedAt: 1000 }))
-    if (decideNovelCompletion({ reachedBottom: true, seriesId: null })) {
+    if (decideNovelCompletion({
+        reachedBottom: true,
+        contentExceedsViewport: true,
+        seriesId: null,
+      })) {
       store.markCompleted(100, 2000)
     }
     expect(store.active).toEqual([]) // 已离场主列表
