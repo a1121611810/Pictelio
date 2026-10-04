@@ -4,7 +4,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 ## 项目概览
 
-- **技术栈**: vue-lynx + Vue 3.5 + TypeScript 7.0 (strict) + rspeedy/rspeedy-plugin-livereload + Tailwind CSS 3.4；宿主侧 Java 21 / AGP 9.2.1 / Lynx SDK 4.0.1
+- **技术栈**: vue-lynx + Vue 3.5 + TypeScript（共享包 7.0.2；**app-lynx 例外，锁 5.9.3** —— vue-tsc 需 `vueCompilerOptions` 语言插件，TS7 的 Go 编译器不支持，ADR-0080 / ADR-0184 D5）+ rspeedy + Tailwind CSS 3.4；宿主侧 Java 21 / AGP 9.2.1 / Lynx SDK 4.0.1
 - **Monorepo**: pnpm workspace：`pictelio-app-lynx`（唯一客户端）/ `@pictelio/android-host`（构建宿主）/ `@pictelio/{ugoira,update-check,novel-export,search-core,ranking-core,net-diagnostics}`（共享纯逻辑）/ `pictelio-website`
 - **入口**: `packages/app-lynx/src/index.ts` → `App.vue` → `src/router.ts`（vue-router）
 - **设计系统**: `pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）。**Fluent Design 2 章节为历史存档**：它服务的是已删除的 WebView 客户端
