@@ -2,6 +2,11 @@ name: OpenWiki Update
 
 on:
   workflow_dispatch:
+    inputs:
+      debug:
+        description: "加 --debug 跑（失败时输出凭据/错误诊断；本仓库公开，日志同样公开）"
+        type: boolean
+        default: false
   schedule:
     - cron: "0 8 * * *"
 
@@ -12,6 +17,9 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    # 防挂死：0.7.0 的 --print 仍是批量缓冲输出（#924 未修），长跑期间日志全白，
+    # 分不清"在跑"和"卡死"。用超时把挂死转成显式失败，而不是白烧 6 小时 runner。
+    timeout-minutes: 90
     steps:
       - name: Check required secret
         # 提前暴露缺失的 key，避免裸报错（DeepSeek 走 OpenAI 兼容端点，必须有 OPENAI_COMPATIBLE_API_KEY）
@@ -49,11 +57,26 @@ jobs:
 
       - name: Install OpenWiki
         # mermaid + jsdom are optional; they add high-fidelity validation of Mermaid diagrams. Remove if your wiki has none.
-        # 版本与本地开发一致（0.2.5），0.2.3 在部分仓库会卡死
-        run: npm install --global openwiki@0.2.5 mermaid@11.16.0 jsdom@29.1.1
+        # 0.2.5 → 0.7.0（2026-10-02）。升版拿到的、与本仓库直接相关的修复：
+        #   #817 updates 模式兼容 openai-compatible 的流式分片 · #861 规范化嵌套 text
+        #   content 数组让严格 vLLM 端点接受回放 tool output · #888 禁掉 agent 任意 shell
+        #   #901 检测根绝对内链 · #914 替换旧标记块而非追加重复 · #938 --debug 打最内层
+        #   失败原因 · #840 .last-update.json 改原子写 · #933 code 模式不再建 CLAUDE.md
+        #   #903 页面 worker 并行 · #905 MCP search/read/link
+        # 0.5.2 起要求 Node ≥ 22.22.0（#863），本 workflow 用 setup-node "22" 满足。
+        run: npm install --global openwiki@0.7.0 mermaid@11.16.0 jsdom@29.1.1
 
       - name: Run OpenWiki
-        run: openwiki code --update --print
+        # --print 是单次非交互模式（CI 必需：裸 `openwiki` 会起 Ink TUI，非 TTY 下报
+        # "Raw mode is not supported"）。--debug 仅在手动触发且显式勾选时加：仓库公开，
+        # 凭据诊断不该默认进公开日志。
+        run: |
+          if [ "${{ inputs.debug }}" = "true" ]; then
+            echo "::notice::debug 模式开启"
+            openwiki code --update --print --debug
+          else
+            openwiki code --update --print
+          fi
         env:
           # 与本地开发环境一致：DeepSeek 走 OpenAI 兼容端点（见 ~/.openwiki/.env）
           OPENWIKI_PROVIDER: openai-compatible
@@ -65,8 +88,34 @@ jobs:
           LANGCHAIN_PROJECT: openwiki
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
+      - name: Verify the update run actually completed
+        # 门禁（不可省）：被中断的 run 仍可能以 exit 0 结束（langchain-ai/openwiki#921），
+        # 唯一可信信号是 openwiki/.last-update.json 的 status。下面是 auto-merge，
+        # 少了这道断言，半成品 wiki 会被静默并进 main。
+        run: |
+          set -euo pipefail
+          FILE=openwiki/.last-update.json
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，拒绝建 PR"
+            exit 1
+          fi
+          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
+            echo "::error::$FILE 损坏或无法解析，拒绝建 PR"
+            exit 1
+          fi
+          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
+          echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
+          if [ "$STATUS" != "complete" ]; then
+            echo "::error::openwiki 本次 run 未完成（status=$STATUS），拒绝建 PR"
+            exit 1
+          fi
+          if [ -n "$GIT_HEAD" ] && [ "$GIT_HEAD" != "$(git rev-parse HEAD)" ]; then
+            echo "::warning::openwiki 分析的是 $GIT_HEAD，而本次 checkout 是 $(git rev-parse HEAD)"
+          fi
+
       - name: Remove deprecated CLAUDE.md
-        # CLAUDE.md 已废弃删除（AGENTS.md 为唯一 agent 指令载体）；openwiki 可能重建该文件，此处兜底清理
+        # AGENTS.md 为唯一 agent 指令载体，CLAUDE.md 已废弃。0.6.1 起 code 模式不再
+        # 创建该文件（#933），这一步降级为双保险；保留以防回退版本或旧状态残留。
         run: rm -f CLAUDE.md
 
       - name: Create OpenWiki update pull request
