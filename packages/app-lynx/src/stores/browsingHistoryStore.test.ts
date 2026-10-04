@@ -596,4 +596,24 @@ describe("i18n 插值真的生效（行为断言，不是「键存在」）", ()
     expect(out).toContain(t("continue.badge.novel"))
     expect(out).not.toContain("{type}")
   })
+
+  // ⚠️ 上面两条只覆盖**当前 locale**（`t()` 读 `DICTS[locale.value]`）——
+  //   另一侧写坏时它们照样绿（本次就先踩到：只改 zh-CN 时 50 条全过，
+  //   改 en 才转红）。故补一条**逐字两侧都查**的守卫。
+  it("📌 两侧 locale 的占位符都必须是 {{}}，缺一侧即红", () => {
+    for (const loc of ["zh-CN", "en"] as const) {
+      const src = readFileSync(
+        new URL(`../i18n/locales/${loc}/pages.ts`, import.meta.url),
+        "utf-8",
+      )
+      for (const key of ["continue.label.chapter", "continue.open"]) {
+        const line = src.split("\n").find((l) => l.includes(`"${key}":`))
+        expect(line, `${loc} 缺 ${key}`).toBeDefined()
+        // 单花括号 {x} 会被 applyVars 原样返回 ⇒ 行内显示字面量
+        // ⚠️ lookaround 必需：`{{n}}` 内部也含 `{n}` 子串，纯 /\{[^{}]+\}/ 会误判
+        expect(line, `${loc}/${key} 含单花括号占位符`).not.toMatch(/(?<!\{)\{[^{}]+\}(?!\})/)
+        expect(line, `${loc}/${key} 缺 {{}} 占位符`).toMatch(/\{\{[^{}]+\}\}/)
+      }
+    }
+  })
 })
