@@ -184,26 +184,12 @@ const clearHintKey = computed(() =>
       @back="goBack"
     />
 
-    <!-- 首载骨架：hydrate 在飞（Hard constraint #1 先渲染页面框架含骨架屏占位） -->
-    <view v-if="showSkeleton" class="w-full flex-1 px-3 pt-1">
-      <view
-        v-for="i in 4"
-        :key="`sk-${i}`"
-        class="mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low"
-      >
-        <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
-        <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
-      </view>
-    </view>
-
-    <view v-else-if="isEmpty" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <EmptyState :icon="EMPTY_ICON" :title="t('continue.empty.title')" :hint="t('continue.empty.hint')" />
-    </view>
-
     <!-- ══ 跨轴批量清理入口（票 #929 / spec US28）══
          📌 刻意放在 `<list>` **之外**、页面级 flex 容器内：原生 list 对中间插入/移除行
            的处理需设备 spike（ADR-0162，本页文件头那份挂账），把工具条塞进 list
-           等于给它再加一个「插入行」的场景。放在外面它只是普通 view，行为可预测。
+           等于给它再加一个「插入行」的场景。放在外面它只是普通 view——⚠️ 但**若排在「空态」与 `<list>` 之间会抢走 list 的 `v-else`**：
+           Vue 的 `v-else` 只能紧跟 `v-if`/`v-else-if` 兄弟，插在中间会让 list 变成孤儿。
+           真机实证：清理入口可见时列表**整块不渲染**（两条轴互斥）。故本块必须排在**三态链之前**。
          📌 入口**分别**对应两条轴（「清除全部浏览记录」/「清除已读完」），不合并。 -->
     <view
       v-if="!showSkeleton && !isEmpty && showClearBar"
@@ -229,6 +215,23 @@ const clearHintKey = computed(() =>
       >
         <text class="text-label-large text-error">{{ t('continue.clear.completed') }}</text>
       </view>
+    </view>
+
+
+    <!-- 首载骨架：hydrate 在飞（Hard constraint #1 先渲染页面框架含骨架屏占位） -->
+    <view v-if="showSkeleton" class="w-full flex-1 px-3 pt-1">
+      <view
+        v-for="i in 4"
+        :key="`sk-${i}`"
+        class="mb-1.5 px-2.5 py-3 rounded-[var(--md-shape-medium)] bg-surface-container-low"
+      >
+        <view class="shimmer h-[28rpx] w-[45%] rounded-[var(--md-shape-extra-small)]" />
+        <view class="shimmer h-[28rpx] w-[70%] rounded-[var(--md-shape-extra-small)] mt-2" />
+      </view>
+    </view>
+
+    <view v-else-if="isEmpty" class="w-full flex-1 min-h-0 flex items-center justify-center">
+      <EmptyState :icon="EMPTY_ICON" :title="t('continue.empty.title')" :hint="t('continue.empty.hint')" />
     </view>
 
     <list v-else :key="refreshEpoch" class="w-full flex-1" list-type="single" scroll-orientation="vertical">
