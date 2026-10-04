@@ -5,12 +5,12 @@
 // `tests/novelCompletionViewportWiring.test.ts`，不混进本文件。
 //
 // 期望值溯源（测试硬约束 #6：不从实现反推）：
-// - 前置语义「内容高于视口 且 滚到底」  → ADR-0219 §2.3 触底行 + 票 #930 前置
-// - 一屏放得下 ⇒ 不判完成              → 票 #930 缺陷本体（真机 emulator-5554 实证存证
+// - 前置语义「内容高于视口 且 滚到底」  → ADR-0219 §2.3 触底行 + ADR-0219 §2.3 前置
+// - 一屏放得下 ⇒ 不判完成              → ADR-0219 §2.3 缺陷本体（真机 emulator-5554 实证存证
 //   `docs/research/screenshots-2026-10/22-continue-single-novel-fits-one-screen.png`）
 // - 单位换算方向（vw → @375 基准设计 px）→ `glossary-lynx-units.md` 375 设计稿口径 +
 //   `primitives/novelParagraphEstimate.ts` 头注「估算取 375 基准」
-// - 拿不到视口高取保守侧 + warn         → 测试硬约束 #3 禁静默降级 + 票 #930
+// - 拿不到视口高取保守侧 + warn         → 测试硬约束 #3 禁静默降级 + ADR-0219 §2.3
 // - 单本读到底 / 末话读到底仍成立        → ADR-0219 §2.3 触底两行（前置**不得**把判定整体打死）
 import { describe, expect, it } from 'vitest'
 import {
@@ -46,7 +46,7 @@ describe("单位换算：视口 vw → @375 基准设计 px（glossary-lynx-unit
     // ⚠️ 换算若少乘 3.75 倍（视口变成 216.4px），500 > 216 ⇒ 本断言转红 ⇒ 守卫生效
     expect(
       geometry.contentExceedsViewport,
-      "短文被判成「高于视口」⇒ 一屏放得下也会判完成，票 #930 缺陷复发",
+      "短文被判成「高于视口」⇒ 一屏放得下也会判完成，ADR-0219 §2.3 缺陷复发",
     ).toBe(false)
   })
 
@@ -110,8 +110,8 @@ describe("正文高 = 段数 × 中位段高（与 estimatedHeightPx 同口径�
   })
 })
 
-// ─── 前置条件 → 完成判定（ADR-0219 §2.3 / 票 #930）──────────────────────
-describe("前置条件：内容高于视口 才谈得上「读到了底」（票 #930）", () => {
+// ─── 前置条件 → 完成判定（ADR-0219 §2.3 / ADR-0219 §2.3）──────────────────────
+describe("前置条件：内容高于视口 才谈得上「读到了底」（ADR-0219 §2.3）", () => {
   it("📌 正例（缺陷本体）：单本小说一屏放得下 + 引擎报触底 ⇒ **不**完成", () => {
     // 真机实证：<list> 首帧就在下边界 ⇒ scrolltolower 立即派发（此时用户一字未读）
     expect(
@@ -120,7 +120,7 @@ describe("前置条件：内容高于视口 才谈得上「读到了底」（票
         contentExceedsViewport: false,
         seriesId: null,
       }),
-      "一屏放得下的单本小说被当场软删 ⇒ 票 #930 缺陷复发",
+      "一屏放得下的单本小说被当场软删 ⇒ ADR-0219 §2.3 缺陷复发",
     ).toBe(false)
   })
 
