@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "/openwiki/architecture/api-layer.md": {
+      "pageVersion": "sha256:c4716b966491833fd190006115324913c6cb5dd8e402b674b227c5064e70782b",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/architecture/image-pipeline.md": {
+      "pageVersion": "sha256:7e5c14b2d505fff62eb2f37cd6c5da72b1736451f6759230d841e061d8b3eac5",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/architecture/overview.md": {
+      "pageVersion": "sha256:b69d5e923a60fa7f843973e8922abf532d5d15413133e42e377eca0717d04574",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/domain/feed-and-browsing.md": {
+      "pageVersion": "sha256:31e93ce82e5d668ff48257bce960169a86eff147a076feea23f23bc0e36e329b",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/domain/novel-reader.md": {
+      "pageVersion": "sha256:5e31101791914e5828fae81c72b71f4e7968d6efe9450474aea542e32284cf7c",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/integrations/android-native.md": {
+      "pageVersion": "sha256:2946327c829a07f2780ddb4d6e7d66ea022409fa3235e56f20583ba38f8c1173",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/operations/release-and-deploy.md": {
+      "pageVersion": "sha256:59cd4179760c530ecf38ea60e2c5e0ca83fb3e3b7a55faab02e6c481653d9491",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/quickstart.md": {
+      "pageVersion": "sha256:31e3acf4d2e6009e9709f8c68a7ccc2a87d80def340c9166f88811fa1dea0609",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    },
+    "/openwiki/testing/overview.md": {
+      "pageVersion": "sha256:7e5e3820075e90e31c4e430af32ffcd5b4deb2014a25ad5211b7d915fc46ffb7",
+      "completedBy": "openwiki/0.7.0",
+      "completedRunId": "4511920c-b2b0-4993-ace8-609094ebd9cc",
+      "gitHead": "666fe1de57e1ac1dedb19291550c39b8be50a363",
+      "sourceFingerprint": "sha256:06830305f798c656511c352d8d84e9ce3ccbe9fb5cc4f3b38796d86066a917f5"
+    }
+  }
+}

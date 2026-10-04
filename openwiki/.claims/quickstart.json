@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:31e3acf4d2e6009e9709f8c68a7ccc2a87d80def340c9166f88811fa1dea0609",
+  "claims": [
+    {
+      "id": "claim_d0caf478abe743d48fa9f120b44eccd3",
+      "statement": "Pictelio is a single-engine third-party Pixiv client: `pictelio-app-lynx` (vue-lynx) is the only runtime client, and `@pictelio/android-host` is an Android build host (Gradle project, release scripts, native E2E) that packages the Lynx bundle into an APK — it is not a client.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        },
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:96801a8397169c41eb69a4525b144101dcd9ccca1857c5fed5ab3764bb01ea5b"
+        },
+        {
+          "resource": "repo://packages/android-host/package.json",
+          "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
+        }
+      ]
+    },
+    {
+      "id": "claim_a462ef898f1542e4a6996779c60a1ed2",
+      "statement": "The former SolidJS + Capacitor WebView client (`packages/app`) was deleted by ADR-0203 (2026-09-29), after its runtime went offline at v6.3.0; the OTA web-bundle channel was retired in ADR-0202, and OAuth credentials plus the product version were moved into `packages/app-lynx`.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md",
+          "version": "repo-file-v1:sha256:63cf90a27a02e032d1143bd51635698fabf43b2ae7f746a13fd70ded25aebacb"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        }
+      ]
+    },
+    {
+      "id": "claim_561c70e5b54c45aea26c1b0564ce1021",
+      "statement": "Root bare commands (`dev`/`build`/`check`/`test`/`preview`) delegate to `pictelio-app-lynx`, while host-package actions are explicitly named with an `:android-host` suffix (ADR-0204, replacing ADR-0059's bare-name target).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0204-root-command-naming.md",
+          "version": "repo-file-v1:sha256:390c24b0443336d9a8541d36017a31a7e9d4beeeb4a982854bee039dade11b42"
+        },
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        }
+      ]
+    },
+    {
+      "id": "claim_443aa6204f954a83bd302f5c83835198",
+      "statement": "The client is version 6.7.1, built with vue-lynx 0.5.1 on Vue 3.5.40 (ReactLynx runtime), the rspeedy bundler, vue-router 5.3.1, TanStack Vue Query 5.103, and Pinia 4.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/package.json",
+          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+        }
+      ]
+    },
+    {
+      "id": "claim_bac86985a31943a4b6d7058c4ccbad00",
+      "statement": "The pnpm workspace (pnpm 11.9.0, Node ≥ 22.22.2) contains nine packages: the app-lynx client, the android-host build host, six shared pure-logic packages (ugoira, update-check, novel-export, search-core, ranking-core, net-diagnostics), and the Astro website.",
+      "evidence": [
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+        },
+        {
+          "resource": "repo://pnpm-workspace.yaml",
+          "version": "repo-file-v1:sha256:1b990a860b23ced37defc27f294b5798e14bd80e6dcc6a23e95c10fe6911bdb5"
+        }
+      ]
+    },
+    {
+      "id": "claim_e8353f75afc54647a3b070062c5520df",
+      "statement": "Development network access for Pixiv/GitHub goes through a local HTTP proxy read from `https_proxy`/`HTTPS_PROXY`/`http_proxy`/`HTTP_PROXY`, falling back to `http://127.0.0.1:7897`.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md",
+          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+        },
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:96801a8397169c41eb69a4525b144101dcd9ccca1857c5fed5ab3764bb01ea5b"
+        }
+      ]
+    },
+    {
+      "id": "claim_f0a14287aa0647a9a46816e310561656",
+      "statement": "The Android debug build chain (`build:android-host`) runs version and credential sync, builds the app-lynx bundle, syncs it into Android assets, then runs Gradle `assembleDebug`; the release variant runs `assembleRelease` plus `renameReleaseApk`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/package.json",
+          "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}

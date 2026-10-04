@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:2946327c829a07f2780ddb4d6e7d66ea022409fa3235e56f20583ba38f8c1173",
+  "claims": [
+    {
+      "id": "claim_7f62f90ec5854c3e9c954db9d9761a1c",
+      "statement": "The native Android host lives in packages/android-host (@pictelio/android-host) and is explicitly not a client; the only client is @pictelio/app-lynx (packages/app-lynx). The former packages/app WebView client and its Capacitor/three-flavor Android tree were deleted, and the Java host was migrated verbatim to packages/android-host/android (ADR-0203).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        },
+        {
+          "resource": "repo://packages/android-host/package.json",
+          "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
+        }
+      ]
+    },
+    {
+      "id": "claim_3c5125bca7214bac81475ec0e6616d90",
+      "statement": "The Android project is a single-engine Gradle module with no product flavors: the former lynx flavor's src/lynx/java is promoted as an additional main source directory, CLIENT_KINDS is collapsed to {\"lynx\"}, and the manifest resolves the launcher to .LynxActivity and the Application to .PictelioAppLynx via placeholders.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle",
+          "version": "repo-file-v1:sha256:08e1e1ac2aa70605414fcdb16c42b066986d46acd36cd5002538514ca531d132"
+        }
+      ]
+    },
+    {
+      "id": "claim_93ea60dad7ba4d2393c7aa8f6328c8c9",
+      "statement": "The host builds with minSdk 28, compileSdk/targetSdk 36, buildTools 36.1.0, and Java 21; versionName/versionCode in build.gradle are rewritten from packages/app-lynx/package.json by sync-android-version using major*10000 + minor*100 + patch.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle",
+          "version": "repo-file-v1:sha256:08e1e1ac2aa70605414fcdb16c42b066986d46acd36cd5002538514ca531d132"
+        },
+        {
+          "resource": "repo://packages/android-host/android/variables.gradle",
+          "version": "repo-file-v1:sha256:b5bfed2e2716dc2b236db48979bb6c45d69c31f116b3ce35d7e5b180a3c695c6"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/sync-android-version.mjs",
+          "version": "repo-file-v1:sha256:90b45302edd408df11de433f20f648e852b0f1ff7abedf42e6143e6b8d1ddabd"
+        }
+      ]
+    },
+    {
+      "id": "claim_760cd62780f240fe909317483081f1f7",
+      "statement": "Pixiv OAuth credentials and endpoint config are generated into io.pictelio.app.config.OAuthConfig by sync-credentials.mjs reading ../app-lynx/credentials.json5; Gradle compilation depends on this gitignored generated class, so gradlew entry points must run sync:credentials first.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/sync-credentials.mjs",
+          "version": "repo-file-v1:sha256:5ac8ddd29db9c9964bd346c372c3efb8b9bab7a2c43a97d841ce8ec72d7a13da"
+        }
+      ]
+    },
+    {
+      "id": "claim_de4a03038699473686546394390169b6",
+      "statement": "The dual-engine availability fallback of ADR-0153/ADR-0164 is removed: with the WebView client deleted there is no fallback target, and LynxActivity.onFatal converges init failure, bundle load failure, fatal render error, and the 10s timeout into a single exit-only error page with no failure memory and no automatic engine switch.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0153-engine-availability-fallback.md",
+          "version": "repo-file-v1:sha256:2bc479ca6bf8f23294e31b9d90c57496316bfc7e561e2c3426b8fe5f6220522b"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0164-default-engine-lynx-bidirectional-fallback.md",
+          "version": "repo-file-v1:sha256:581978a5805181b771c109f579246717dafe5ec1d64a8028ac18247c9ef47aa3"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+        }
+      ]
+    },
+    {
+      "id": "claim_fba47a9f449b4deab37ad526581120d7",
+      "statement": "LynxRuntimeInitializer is the idempotent runtime init point (InitGate latches only on success) shared by PictelioAppLynx.onCreate and LynxActivity.onCreate; it registers LynxHttpService, LynxLogService, and PictelioImageService, calls LynxEnv.init, globally registers 11 LynxModules, and exposes isAvailable as a CLIENT_KINDS + init-no-throw + native-library-loaded probe.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java",
+          "version": "repo-file-v1:sha256:f2a395f2ba2f5bfad6cec217e87d8f32248f17af3245aea9e62f8827f37c27c3"
+        }
+      ]
+    },
+    {
+      "id": "claim_002e6dae834246e2ad533e9dc582258b",
+      "statement": "LynxActivity is the sole launcher Activity (plain AppCompatActivity, no Capacitor), installs SplashScreen before super.onCreate, holds the splash via bundleLoaded, registers PictelioTranslate and PictelioTranslateCache per-view (the 11 others are global), serves main.lynx.bundle through PictelioTemplateProvider, and forwards lifecycle events to the LynxView.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c8bde94be6a4658b5145320439c649c",
+      "statement": "PictelioApiModule.request forwards Pixiv API calls with the contract cb(status, data, rotatedRefreshToken) and keeps the access token inside Java; it resolves an Accept-Language header from settings_language (en -> en, otherwise zh-CN) and delegates to PixivApiCore.executeRequest for Bearer/Referer/UA injection plus 401-refresh-and-retry-once.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java",
+          "version": "repo-file-v1:sha256:c8c20d666e4a895f2d7efc5e0b725f3a806aaf1d83884fa8526ed6dbe21ab578"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivApiCore.java",
+          "version": "repo-file-v1:sha256:26a936be64cff2514aa2358667ec68af841db7ed49819ebad3c7fae9fc35e387"
+        }
+      ]
+    },
+    {
+      "id": "claim_ebc31fa45346498ba31ac59af4e1d6e4",
+      "statement": "PixivApiCore holds accessToken/refreshToken as static volatile Java-heap fields (never exposed to JS), performs a synchronized 401 refresh with an isRefreshing guard and reference-identity token comparison, retries once, and performs the OAuth refresh-token exchange using MD5 X-Client-Time/Hash signing over a shared tuned OkHttpClient singleton.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivApiCore.java",
+          "version": "repo-file-v1:sha256:26a936be64cff2514aa2358667ec68af841db7ed49819ebad3c7fae9fc35e387"
+        }
+      ]
+    },
+    {
+      "id": "claim_696ccb8da93d4ce3bad2b369e56b638a",
+      "statement": "PictelioAuthModule.loginWithRefreshToken writes the access token only into PixivApiCore.accessToken and returns userInfoJson plus a possibly-rotated refresh token to JS; setAccessToken is the one-way JS->Java push and clearTokens nulls both heap fields on logout.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAuthModule.java",
+          "version": "repo-file-v1:sha256:8365a10250e42d9225d6e201b6ffad161dff9080a6f6a052843d0f69faf1d968"
+        }
+      ]
+    },
+    {
+      "id": "claim_6584a9bbc7c54a3fa63b1a91aff78897",
+      "statement": "SecureStorageCompat is a byte-compatible reimplementation of @aparajita/capacitor-secure-storage 8.x (ADR-0050): AES/GCM/NoPadding in AndroidKeyStore with one key per capacitor-storage_<key> alias, ciphertext stored in WSSecureStorageSharedPreferences as Base64(ciphertext)+U+0010+Base64(iv).",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java",
+          "version": "repo-file-v1:sha256:b59073eb7dfe722571866439a7ea4b9a39dff9650781de9f0a7aa006557eda07"
+        }
+      ]
+    },
+    {
+      "id": "claim_83ee778ecfab418e973913332a327ba7",
+      "statement": "Android backup excludes the Keystore ciphertext file WSSecureStorageSharedPreferences.xml and the historical plaintext residue PictelioPrefs.xml from both cloud backup and device transfer via data_extraction_rules.xml (API 31+) and backup_rules.xml, wired by the manifest's allowBackup/dataExtractionRules/fullBackupContent attributes.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/AndroidManifest.xml",
+          "version": "repo-file-v1:sha256:a290ccf52d4c019ad8d21444528d6f53b9ae94fa6a3d8834dc61a49b4fa5a112"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/res/xml/data_extraction_rules.xml",
+          "version": "repo-file-v1:sha256:a5ff1e212fd79442ed44f2605e5a4483201f1c7240b65a5e87a54ab914b08158"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2670e864af74786a679ae4ac199900a",
+      "statement": "WebDavClient implements the minimal WebDAV subset (MKCOL with 409-as-success, PUT, GET, PROPFIND Depth 0/1, DELETE) over OkHttp Basic auth, classifies failures into a Kind enum, performs write-then-verify uploads (PUT then PROPFIND getcontentlength, GET byte-compare fallback, up to 3 retries), and prunes to the last 10 timestamp-named backups.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/WebDavClient.java",
+          "version": "repo-file-v1:sha256:d4540ca02464932066625b6e1a942d27ec952e2a49a4ca4da630b1845fc198e1"
+        }
+      ]
+    },
+    {
+      "id": "claim_70ebab99d3824d59b1409bc791d81373",
+      "statement": "BackupCrypto implements the v1 backup envelope PICTELIO-ENC1 magic (13B) + salt (16B) + iv (12B) + AES-256-GCM ciphertext, with the key derived by PBKDF2-HMAC-SHA256 at 600k iterations from the user password, so passwords never enter the backup file.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/BackupCrypto.java",
+          "version": "repo-file-v1:sha256:08866b7655df15d084d02bc92a0c4fb73e3612d92efb341206ceb28c93ac2af0"
+        }
+      ]
+    },
+    {
+      "id": "claim_a639bffb7c2a4325b4bb043e1a19ad8c",
+      "statement": "PictelioWebDavModule is the thin Lynx bridge over WebDavClient/BackupCrypto (ensureDir/upload/uploadWithVerify/download/list/stat/delete/prune/encrypt/decrypt/isEncrypted), crossing bytes as base64 and always invoking cb(code, payload) with a JSON error object on failure.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioWebDavModule.java",
+          "version": "repo-file-v1:sha256:fb1884a7edad893cead042ce504b005957bb3ef2fce6f010d6259d5a9ccf3af9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d6e0f0da61d34644aa80085d246a6b2a",
+      "statement": "The download/export bridge routes through PictelioDownloaderModule (start/pollProgress/cancel/deleteFile) into the shared PictelioDownloader executor, which fetches bytes via PixivImageLoader.loadFileWithProgress and lands them via GallerySaver: MediaStore (Pictures/Pictelio, IS_PENDING) on API 29+, app-specific external dir plus MediaScanner on API 28, with Downloads/Pictelio for non-image products.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioDownloaderModule.java",
+          "version": "repo-file-v1:sha256:843defbd47a96d35921599cfb45fb938c08364864a7740464382b18547250931"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/GallerySaver.java",
+          "version": "repo-file-v1:sha256:18d838f1bb3ad657fdb9376ff2a9b9f99862069d54b93bcea3b7ecf186de02d9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PictelioDownloader.java",
+          "version": "repo-file-v1:sha256:ddab2dbafa756cafe99ed1504b332f4d45480a354c8049e9390137aed513d2d7"
+        }
+      ]
+    },
+    {
+      "id": "claim_a3b33e8890494bcf81e6583dbbbf06dc",
+      "statement": "NovelExporter implements 9 output formats (txt/html/md/rtf/json/fb2 plus epub/docx via ZipOutputStream and pdf via PdfDocument+StaticLayout), and UgoiraExporter implements zip/tar/apng while delegating gif/webp/mp4 to dedicated encoders, with all encoding in Java so bytes never enter the JS heap.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/NovelExporter.java",
+          "version": "repo-file-v1:sha256:18719a941b8c5c96fe2aab17234ed47a195594930ade7e84dab5c4bfef364e94"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/UgoiraExporter.java",
+          "version": "repo-file-v1:sha256:c6011c377b26a8ffa8fcea967ea9598d3ebaa8a4b2c27901a15b7bb7fe0fe0d1"
+        }
+      ]
+    },
+    {
+      "id": "claim_8fbb0a7b869c4bb6afcae3eb28e3debc",
+      "statement": "PixivImageLoader is the single image-download source of truth (URL rewrite, Referer/UA injection, disk cache, per-URL lock); ImageHostConfig.resolve picks the download source per request with the cache key fixed to the official URL; and PictelioImageService is the custom ILynxImageService that delegates to PixivImageLoader, registers image behaviors, and serves static Bitmaps with a zero-copy cached delivery.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java",
+          "version": "repo-file-v1:sha256:b0e357330234e3f768b907330bdc518157788bff1819d4cebce98b7f2137752c"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java",
+          "version": "repo-file-v1:sha256:7821ade229d14edbb0f77d40380938a5003969a8687799db51a9085d42fc4157"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java",
+          "version": "repo-file-v1:sha256:b9f9ddaca32288d935df08b43c0a0651f57a4c26985fea7babc5b186e0f6bba6"
+        }
+      ]
+    },
+    {
+      "id": "claim_3f6e5bad61704847b542c86e98f90777",
+      "statement": "LynxActivity owns the native system-UI contract: EdgeToEdge base, content size = LynxView bounds minus visible system-bar insets, a pull-first pictelioInsets event plus getSafeAreaInsets, a fullscreen toggle keyed on settings_fullscreen_mode (only \"true\" is truthy), and a three-state settings_dark_mode (light/dark/system) driving status-bar icon appearance, splash theme (API 31+), and the pictelioDarkMode event.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+        }
+      ]
+    },
+    {
+      "id": "claim_1a7eae4a1bca4c0bb82b3c8c1c76b608",
+      "statement": "Release ProGuard/R8 rules keep Lynx JNI lookups (LynxBaseTrace/LynxLog), PictelioImageService, Lynx-generated $$PropsSetter/$$PropsHolder constructors plus members, and Room-generated WorkDatabase_Impl constructors, and add dontwarn for deliberately-absent Fresco/Gson/Markdown classes.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/proguard-rules.pro",
+          "version": "repo-file-v1:sha256:6bf71f0223ebc39fc3fff6373660a7a5d159b4ad71e89c134a670d61d5d00a6e"
+        }
+      ]
+    },
+    {
+      "id": "claim_18461ea66cd54bd89fda74db60f07c9f",
+      "statement": "PictelioTranslateModule streams OpenAI Responses API translation over SSE with the API key held in Keystore (setApiKey/getEndpoint/clearEndpoint/translateStream/probeEndpoint/abortStream), and PictelioTranslateCacheModule is a filesystem LRU cache (default 10MB/200 entries) under cacheDir/pictelio_translate_cache with a manifest.json index and atomic temp+rename writes.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateCacheModule.java",
+          "version": "repo-file-v1:sha256:9c3bdc2143a352cb74a7377111815f1e183322fcec49182e7514ddd1c0ea6d89"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java",
+          "version": "repo-file-v1:sha256:2eed6bd37c2b6c2ad147ce46fc8aa887c7ba1704035bf8d1c585bd2c2e225876"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-04T18:40:18.128Z"
+  }
+}
