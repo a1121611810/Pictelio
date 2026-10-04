@@ -463,6 +463,12 @@ function registerBenchNavHandler(): void {
     // 稍后看列表页直达（ADR-0191 D5 / #753 T4）：模拟器验收通道（benchNav 打开 /later 验证
     // 快照列表、行点击导航与删除/计数联动）
     pictelioBenchNavLater: '/later',
+    // 书架段 3「继续读」与 /continue 列表页直达（ADR-0219 / 票 #929 真机取证通道）：
+    // 这两页消费 listItemStyle 却无 benchNav 短名 ⇒ 设备取证无法进入（同 #913 D1 的缺口）。
+    // 书架是四个顶层目的地之一，放映 FAB 环项的真机 tap 已实证失效（见 CONTEXT.md），
+    // 故设备取证**必须**有短名通道，否则本功能只能停留在「门禁全绿、无真机证据」。
+    pictelioBenchNavShelf: '/shelf',
+    pictelioBenchNavContinue: '/continue',
     // 好P友列表页直达（ADR-0193 D5 / #754 T7）：benchNav 打开 /mypixiv 验证列表渲染/空态
     pictelioBenchNavMyPixiv: '/mypixiv',
     // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle 却没有 benchNav 短名，

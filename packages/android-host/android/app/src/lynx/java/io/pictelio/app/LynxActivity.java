@@ -532,6 +532,11 @@ public class LynxActivity extends AppCompatActivity {
                             case "me" -> new String[]{"pictelioBenchNavMe"};
                             // 稍后看列表页直达（ADR-0191 D5 / #753）：模拟器验收通道
                             case "later" -> new String[]{"pictelioBenchNavLater"};
+                            // 书架段 3「继续读」/ /continue 列表页（ADR-0219 / 票 #929）：
+                            // 书架是顶层目的地、放映 FAB 环项的真机 tap 已实证失效，
+                            // 无短名则设备取证进不去这两页（同 #913 D1 的缺口形态）。
+                            case "shelf" -> new String[]{"pictelioBenchNavShelf"};
+                            case "continue" -> new String[]{"pictelioBenchNavContinue"};
                             // 好P友列表页直达（ADR-0193 D5 / #754）：模拟器验收通道
                             case "mypixiv" -> new String[]{"pictelioBenchNavMyPixiv"};
                             // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle，

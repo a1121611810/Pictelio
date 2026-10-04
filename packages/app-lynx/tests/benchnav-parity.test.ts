@@ -37,6 +37,9 @@ describe('benchNav 场景注册跨语言奇偶校验（router.ts ↔ LynxActivit
     expect(jsEventNames.length).toBeGreaterThanOrEqual(15)
     expect(jsEventNames).toContain('pictelioBenchNavLater')
     expect(jsEventNames).toContain('pictelioBenchNavMyPixiv')
+    // 票 #929：书架段 3 与 /continue 的设备取证通道（无短名则真机进不去这两页）
+    expect(jsEventNames).toContain('pictelioBenchNavShelf')
+    expect(jsEventNames).toContain('pictelioBenchNavContinue')
   })
 
   it.each(jsEventNames)('%s 在 LynxActivity.java 有对应派发点（case 字面量）', (event) => {
