@@ -71,19 +71,44 @@ describe("源级守卫（票 #926 / ADR-0219 §4）", () => {
     expect(iTrue, "置 true 必须在装载之前，否则窗口为空").toBeLessThan(iLoad)
   })
 
-  it("段 3 骨架分支与空态分支互斥（v-else-if 链，不能同时命中）", () => {
+  it("📌 段 3 骨架与空态是**同一个 v-if 链上的相邻兄弟**（不是只排先后）", () => {
     const s = src("../pages/Shelf.vue")
-    // 📌 条件串在票 #927 起从 `continueStore.items` 换成合并列表 `continueEntries`：
-    //   段 3 现在两轴混排（小说阅读位置 + 插画浏览历史，ADR-0219 §2.1），
-    //   只看小说侧会把「我刷过的插画」渲染成「你什么都没有」。
-    //   本守卫的**意图**（骨架与空态互斥、不同时命中）不变，故只换条件串；
-    //   「不许退回单轴」的反事实守卫由 browsingHistoryWiring.template.test.ts 承担。
+    // ⚠️ 只断言「iEmpty > iSkeleton」是**弱守卫**（反事实实证）：把 v-else-if 块
+    //   挪过一个非 v-if 元素之后，链已断（两者成为独立分支、可同时命中），
+    //   而纯文本顺序断言照样绿。⇒ 必须验**标签结构相邻**。
+    //
+    // ⚠️⚠️ 本守卫**不得有「找不到就 return」的兜底**：v1 正是这么写的，而实际模板是
+    //   单行 `<view v-if=...`、兜底分支命中后直接 return ⇒ 守卫恒绿、形同不存在。
+    //   锚点改为对空白不敏感，且**找不到即红**（抽取器不得静默空转，ArchUnit
+    //   failOnEmptyShould 教训）。
     const iSkeleton = s.indexOf('v-if="continueLoading && continueEntries.length === 0"')
-    const iEmpty = s.indexOf('v-else-if="continueEntries.length === 0"')
-    expect(iSkeleton).toBeGreaterThan(-1)
-    expect(iEmpty, "空态块必须排在骨架块之后").toBeGreaterThan(iSkeleton)
-    // 关键是 else-if 而非独立 v-if：两个独立 v-if 会让骨架与空态同时渲染
-    expect(s.slice(iEmpty, iEmpty + "v-else-if".length)).toBe("v-else-if")
+    expect(iSkeleton, "段 3 骨架分支消失（锚点未命中 ⇒ 本守卫已失效）").toBeGreaterThan(-1)
+
+    // ⚠️ 扫描起点必须是**包含该 v-if 的开标签**，不是 v-if 串本身
+    //   （`<view v-if=...>` 里 v-if 在标签内部；从中途起扫会把内层当根，深度全错）
+    const iOpen = s.lastIndexOf("<view", iSkeleton)
+    expect(iOpen, "未能定位骨架块的开标签").toBeGreaterThan(-1)
+    let depth = 0
+    let closeAt = -1
+    // ⚠️ 必须排除**自闭合**标签（`<view ... />`）：骨架内有两片 shimmer 自闭合块，
+    //   若按 `<view` 一律计深度，深度只增不减，closeAt 永远指错位置。
+    //   （这正是本守卫 v1/v2 连续两版假绿的原因之一。）
+    for (const m of s.slice(iOpen).matchAll(/<view\b[^>]*\/>|<view\b|<\/view>/g)) {
+      if (m[0].startsWith("</")) {
+        depth -= 1
+        if (depth === 0) { closeAt = iOpen + m.index; break }
+      } else if (!m[0].endsWith("/>")) {
+        depth += 1
+      }
+    }
+    expect(closeAt, "未能匹配骨架块的闭合标签").toBeGreaterThan(-1)
+
+    // 闭合之后**紧邻**（仅允许空白）的下一个元素必须就是 v-else-if
+    const next = s.slice(closeAt + "</view>".length).trimStart()
+    expect(
+      next.startsWith('<view v-else-if="continueEntries.length === 0"'),
+      "骨架块与空态块之间插入了元素 ⇒ v-if 链已断，两者可同时命中",
+    ).toBe(true)
   })
 
   it("段 3 接上分段观测读点（ADR-0219 §2.6）", () => {
