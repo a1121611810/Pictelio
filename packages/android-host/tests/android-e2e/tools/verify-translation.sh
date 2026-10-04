@@ -7,7 +7,10 @@ set -eo pipefail
 PKG=io.pictelio.app
 ACT=$PKG/io.pictelio.app.LynxActivity
 MODE="${1:-deepseek}"   # deepseek | mock
-cd /Users/lilianda/develop/pixivizer
+# 仓库根从本脚本位置推导（tools → android-e2e → tests → android-host → packages → root），
+# 不写死任何机器上的绝对路径——否则换机/换用户即失效。
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd)"
+cd "$REPO_ROOT"
 
 TOKEN=$(grep '^PIXIV_REFRESH_TOKEN=' packages/app-lynx/.env | head -1 | sed 's/PIXIV_REFRESH_TOKEN=//' | sed "s/^['\"]//;s/['\"]$//")
 if [ "$MODE" = "mock" ]; then
@@ -21,18 +24,18 @@ fi
 # 构建（带 pipefail）+ 新鲜度校验
 # 构建（带 pipefail）。先删掉 APK：gradle 在「只有 asset（JS bundle）变化」时会把打包任务
 # 判为 up-to-date 而不重写 APK，导致 APK 落后于 bundle —— 删掉即可让打包必然发生。
-APK_PATH=/Users/lilianda/develop/pixivizer/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
+APK_PATH="$REPO_ROOT/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk"
 rm -f "$APK_PATH"
-(cd /Users/lilianda/develop/pixivizer && BENCH_NAV=1 NODE_ENV=production \
+(cd "$REPO_ROOT" && BENCH_NAV=1 NODE_ENV=production \
   pnpm --dir packages/app-lynx run build >/dev/null && \
   node packages/app-lynx/scripts/sync-android-assets.mjs >/dev/null && \
   cd packages/android-host/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleLynxDebug --no-daemon -q)
 # 判据：打包进 APK 的**源集**（main/java + lynx/java，以及 JS 产出的 bundle）不得比 APK 新。
 # 不比「构建开始时刻」—— gradle 判定 up-to-date 时不重写 APK（合法）；而编译失败被吞时
 # 这些源集一定领先于 APK（本检查要抓的正是后者）；test/ 源集不进 APK，故排除。
-APK=/Users/lilianda/develop/pixivizer/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
-STALE=$(find /Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/main/java /Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/lynx/java -type f -newer "$APK" 2>/dev/null | head -1)
-BUNDLE=/Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/main/assets/main.lynx.bundle
+APK="$APK_PATH"
+STALE=$(find "$REPO_ROOT/packages/android-host/android/app/src/main/java" "$REPO_ROOT/packages/android-host/android/app/src/lynx/java" -type f -newer "$APK" 2>/dev/null | head -1)
+BUNDLE="$REPO_ROOT/packages/android-host/android/app/src/main/assets/main.lynx.bundle"
 if [ -f "$BUNDLE" ] && [ "$BUNDLE" -nt "$APK" ]; then STALE="$BUNDLE"; fi
 if [ -n "$STALE" ]; then
   echo "[e2e] APK is older than packaged sources: $STALE"

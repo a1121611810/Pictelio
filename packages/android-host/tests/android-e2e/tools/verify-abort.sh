@@ -17,7 +17,10 @@ set -eo pipefail
 PKG=io.pictelio.app
 ACT=$PKG/io.pictelio.app.LynxActivity
 MODE="${1:-abort}"
-cd /Users/lilianda/develop/pixivizer
+# 仓库根从本脚本位置推导（tools → android-e2e → tests → android-host → packages → root），
+# 不写死任何机器上的绝对路径——否则换机/换用户即失效。
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd)"
+cd "$REPO_ROOT"
 
 # ── 0. 准备 ─────────────────────────────────────────
 mkdir -p /tmp/pictelio-e2e
@@ -49,15 +52,15 @@ adb reverse tcp:8811 tcp:8811 >/dev/null 2>&1 || true
 
 # ── 1. 构建 + 新鲜度校验 + 安装（与 verify-translation.sh 同款，防吞编译失败）──
 echo "[abort] 构建 + 安装"
-APK_PATH=/Users/lilianda/develop/pixivizer/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
+APK_PATH="$REPO_ROOT/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk"
 rm -f "$APK_PATH"
-(cd /Users/lilianda/develop/pixivizer && BENCH_NAV=1 NODE_ENV=production \
+(cd "$REPO_ROOT" && BENCH_NAV=1 NODE_ENV=production \
   pnpm --dir packages/app-lynx run build >/dev/null && \
   node packages/app-lynx/scripts/sync-android-assets.mjs >/dev/null && \
   cd packages/android-host/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleLynxDebug --no-daemon -q)
 APK=$APK_PATH
-STALE=$(find /Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/main/java /Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/lynx/java -type f -newer "$APK" 2>/dev/null | head -1)
-BUNDLE=/Users/lilianda/develop/pixivizer/packages/android-host/android/app/src/main/assets/main.lynx.bundle
+STALE=$(find "$REPO_ROOT/packages/android-host/android/app/src/main/java" "$REPO_ROOT/packages/android-host/android/app/src/lynx/java" -type f -newer "$APK" 2>/dev/null | head -1)
+BUNDLE="$REPO_ROOT/packages/android-host/android/app/src/main/assets/main.lynx.bundle"
 if [ -f "$BUNDLE" ] && [ "$BUNDLE" -nt "$APK" ]; then STALE="$BUNDLE"; fi
 if [ -n "$STALE" ]; then
   echo "[abort] APK is older than packaged sources: $STALE"
