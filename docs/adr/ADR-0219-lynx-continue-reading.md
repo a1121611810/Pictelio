@@ -1,6 +1,9 @@
 # ADR-0219：继续读（本地话级阅读位置 + 书架第三段兑现）
 
-- **状态**：已接受（Accepted，2026-10-04）｜**功能未实现**，本 ADR 是 `to-spec` / `to-tickets` 的输入
+- **状态**：已接受（Accepted，2026-10-04）｜✅ **已实现**（2026-10-05，21 个提交 `8248bd5d`→`3c509799` 已推 `main`）｜收口票 #925 / #929 已关闭
+  - 落地形态：`/continue` 路由 + `pages/ContinueReading.vue` + `stores/continueReadingStore.ts` + `stores/browsingHistoryStore.ts`，书架段 3「继续读」已接上（两轴同段同页）。
+  - ⚠️ 本行的「功能未实现」曾与代码矛盾（2026-10-05 更正）——`/continue` 早已落地，下一个人若照旧标注重做一遍就是白干。
+  - 残余验证缺口（功能已验完，缺的是取证通道）：长篇**单本**分支待验；首载骨架那一态验不了（benchNav 夹具先落 `/shelf` 把两轴 hydrate 掉，`showSkeleton` 恒 false——**取证通道局限，非产品行为**）。已单开跟踪票。
 - **日期**：2026-10-04
 - **决策者**：产品负责人（Round 1–3 共 14 项决策逐条按推荐锁定）
 - **术语表**：[glossary-lynx-continue-reading.md](./glossary-lynx-continue-reading.md)
@@ -8,7 +11,7 @@
   - [ADR-0218-app-lynx-top-nav-user-question-dimension.md](./ADR-0218-app-lynx-top-nav-user-question-dimension.md)——`shelf` 段 3「继续读」是它 §2.1 承诺的三段之一，其 §3.2 已把「继续读是空态占位」登记为**负面项**；本 ADR 是该登记的正面兑现
   - [ADR-0167](./ADR-0167-lynx-novel-intro-three-segment.md)（三段式导航，`/novel/:id` 直达可达性约束）
   - [ADR-0183](./ADR-0183-lynx-novel-intro-toggle.md)（`openNovel()` 单点缝隙 + 介绍页开关）
-  - [ADR-0094-tanstack-db-browsing-history.md](./ADR-0094-tanstack-db-browsing-history.md)（旧 `historyStore`，**浏览历史**——随 ADR-0203 删除，本项目**不重建**）
+  - [ADR-0094-tanstack-db-browsing-history.md](./ADR-0094-tanstack-db-browsing-history.md)（**浏览历史**）——旧 WebView 客户端的 `historyStore` 随 ADR-0203 删除。⚠️ 2026-10-05 更正：本行原写「本项目**不重建**」，与代码矛盾——**浏览历史已在 lynx 单引擎下重建**（`stores/browsingHistoryStore.ts`），且按本 ADR §2.1 与「继续读」**同段同页**呈现。重建的是概念，不是沿用旧实现。
   - [ADR-0203](./ADR-0203-webview-client-source-removal.md)（旧客户端删除）
   - [ADR-0191](./ADR-0191-lynx-watch-later.md)（稍后看，本 ADR 的姊妹功能与存储范式）
   - 证据底座：[`../research/feature-dimension-external-evidence-2026-10.md`](../research/feature-dimension-external-evidence-2026-10.md) §4.4 / §4.6 / §5.4 第 4 条
