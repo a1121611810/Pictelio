@@ -3,9 +3,6 @@ type: Concept
 title: Android Native & Build
 description: Native runtime for Pictelio's single-engine Lynx Android app, now living under packages/android-host. Documents the single-engine Gradle build, the LynxActivity host and its Lynx native module map, Keystore token storage, WebDAV backup, the download/export bridge, and system-bar/dark-mode behavior. The former Capacitor plugin layer, three-flavor build, and dual-engine fallback were removed with the WebView client (ADR-0203).
 tags: [android, native, gradle, build, lynx, android-host, keystore, webdav]
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
 sources:
   - id: openwiki-source-27198a2acf34a5fb56fcccbc
     resource: repo://docs/adr/ADR-0153-engine-availability-fallback.md
@@ -67,7 +64,10 @@ sources:
     resource: repo://packages/android-host/scripts/sync-android-version.mjs
   - id: openwiki-source-0ab469bf9e65f3e09caf90dc
     resource: repo://packages/android-host/scripts/sync-credentials.mjs
-generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-05T06:49:09.686Z
 ---
 
 # Android Native & Build
@@ -102,14 +102,13 @@ Build configuration points:
 - `CLIENT_KINDS = {"lynx"}` is injected via `buildConfigField`; the mechanism and consumers are retained even though the value collapsed to a single engine, so a future WebView rebuild can reuse it (ADR-0062 / ADR-0164).
 - `manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]` resolves the launcher in `AndroidManifest.xml`.
 - SDK/toolchain (from `variables.gradle`): `minSdkVersion = 28`, `compileSdkVersion = 36`, `targetSdkVersion = 36`, `buildToolsVersion = "36.1.0"`, Java 21. The old "minimum Android 11 (API 30)" figure is wrong; the host's real minSdk is **28**.
-- `versionCode 60701` / `versionName "6.7.1"` are the checked-in values, but `pnpm sync:android-version` rewrites them from `app-lynx/package.json` using `major×10000 + minor×100 + patch`.
+- `versionCode 60800` / `versionName "6.8.0"` are the checked-in values, but `pnpm sync:android-version` rewrites them from `app-lynx/package.json` using `major×10000 + minor×100 + patch`.
 - Release signing uses `pictelio-release.keystore` with `PICTELIO_KEYSTORE_PASSWORD` / `PICTELIO_KEY_PASSWORD` env vars (key alias `pictelio`), validated only when a release task is in the Gradle task graph.
 - An APK rename task produces `pictelio-{versionName}-{buildType}.apk`.
 - The OTA Ed25519 public key is compiled in as a `buildConfigField` with a build-time length check (32 raw bytes).
 - `minifyEnabled true` for release, with `proguard-rules.pro` (see [ProGuard / R8](#proguard--r8-keep-rules)).
 
-<!-- openwiki: broken internal link [#pictelioimageservice] heading anchor "pictelioimageservice" does not exist in /openwiki/integrations/android-native.md. Fix the href or restore the target, then delete this comment. -->
-Dependencies: AndroidX `appcompat` + `core-splashscreen:1.2.0`, OkHttp `4.12.0`, and the Lynx SDK `4.0.1` (`lynx`, `lynx-service-http`, `lynx-service-log`, `xelement`, `xelement-input`). Fresco's `lynx-service-image` is deliberately **not** included because it cannot forward the `Referer` header required by `i.pximg.net` (403s); the custom [`PictelioImageService`](#pictelioimageservice) replaces it.
+Dependencies: AndroidX `appcompat` + `core-splashscreen:1.2.0`, OkHttp `4.12.0`, and the Lynx SDK `4.0.1` (`lynx`, `lynx-service-http`, `lynx-service-log`, `xelement`, `xelement-input`). Fresco's `lynx-service-image` is deliberately **not** included because it cannot forward the `Referer` header required by `i.pximg.net` (403s); the custom [`PictelioImageService`](#image-pipeline-native-side) replaces it.
 
 ## Engine availability & fallback (ADR-0153 / ADR-0164)
 

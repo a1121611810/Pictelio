@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:b69d5e923a60fa7f843973e8922abf532d5d15413133e42e377eca0717d04574",
+  "pageVersion": "sha256:bacaf7b01265137c69238d6813cc52bc403dc4d774930ec37c79bc3ef23746bf",
   "claims": [
     {
       "id": "claim_0c597c5fda3d4962ba46b74ba904b8ad",
@@ -8,7 +8,7 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         },
         {
           "resource": "repo://docs/adr/ADR-0204-root-command-naming.md",
@@ -16,7 +16,7 @@
         },
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         },
         {
           "resource": "repo://packages/android-host/package.json",
@@ -30,7 +30,7 @@
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/package.json",
-          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+          "version": "repo-file-v1:sha256:32907b5a93d066f4ede178896cf036e011a9eda9c7a246cb9271c9b14e29c0fe"
         },
         {
           "resource": "repo://pnpm-workspace.yaml",
@@ -48,7 +48,7 @@
         },
         {
           "resource": "repo://packages/app-lynx/package.json",
-          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+          "version": "repo-file-v1:sha256:32907b5a93d066f4ede178896cf036e011a9eda9c7a246cb9271c9b14e29c0fe"
         }
       ]
     },
@@ -181,6 +181,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-05T06:49:09.686Z"
   }
 }

@@ -5,7 +5,7 @@ description: Pixiv API gateway for the app-lynx client — the JS api layer (cli
 tags: [pixiv-api, oauth, http-client, authentication, tanstack-query, rate-limit, native-module, lynx]
 verified:
   - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
+    at: 2026-10-05T06:49:09.686Z
 sources:
   - id: openwiki-source-ef23994e4e6eff1937056370
     resource: repo://docs/adr/0004-401-concurrent-retry-promise-queue.md
@@ -35,7 +35,7 @@ sources:
     resource: repo://packages/app-lynx/src/stores/authStore.ts
   - id: openwiki-source-1bc8ca2265cceb3b5cafdd23
     resource: repo://packages/app-lynx/src/utils/tokenStorage.ts
-generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
 ---
 
 # API Layer & Authentication
@@ -69,9 +69,8 @@ The design principle inherited from [ADR-0037](../../docs/adr/ADR-0037-pixiv-api
 1. `client.ts` rewrites absolute `next_url` values back to relative paths (see [URL Rewrite & Token Guard](#url-rewrite--token-guard)), appends the query string, and calls `PictelioApi.request`.
 2. `PictelioApiModule.request` concatenates `PixivApiCore.apiBase()` + path, resolves the `Accept-Language` header from the `settings_language` pref on the worker thread (ADR-0200), and submits the blocking I/O to a cached thread pool (`API_EXECUTOR`), so the Lynx call thread is not occupied.
 3. `PixivApiCore.executeRequest` builds an OkHttp request, injecting `Authorization: Bearer <accessToken>`, `Referer`, `User-Agent`, and (optionally) `Accept-Language`, then executes it against the shared `OkHttpClient`.
-<!-- openwiki: broken internal link [#java-side-401-refresh] heading anchor "java-side-401-refresh" does not exist in /openwiki/architecture/api-layer.md. Fix the href or restore the target, then delete this comment. -->
-4. If the response is 401, Java silently refreshes once and retries (see [Java-Side 401 Refresh](#java-side-401-refresh)).
-5. The callback returns `(status, data, rotatedRefreshToken)` to JS — `data` is the raw response body (JSON for `request`, raw text for `requestRaw`), and `rotatedRefreshToken` is non-empty only when the refresh rotated the refresh token.
+4. If the response is 401, Java silently refreshes once and retries (see [Java-Side 401 Refresh](#java-side-401-refresh-native-primary-path)).
+5. The callback returns `(status, data, rotatedRefreshToken)` to JS — `data` is always the raw response-body string (Java never parses it; `execute` JSON-parses before resolving, while `executeRaw` resolves the raw text), and `rotatedRefreshToken` is non-empty only when the refresh rotated the refresh token.
 
 The callback never includes the `access_token`; `PixivApiCore`'s `accessToken` is a `static volatile` field written only on the Java side.
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:31e3acf4d2e6009e9709f8c68a7ccc2a87d80def340c9166f88811fa1dea0609",
+  "pageVersion": "sha256:064302fec6c7a1003c0698e9779e5fc3352f09d38217d11b215f54a09c0c8f0f",
   "claims": [
     {
       "id": "claim_d0caf478abe743d48fa9f120b44eccd3",
@@ -8,11 +8,11 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         },
         {
           "resource": "repo://README.md",
-          "version": "repo-file-v1:sha256:96801a8397169c41eb69a4525b144101dcd9ccca1857c5fed5ab3764bb01ea5b"
+          "version": "repo-file-v1:sha256:1cf452d5ac8e66e0fd698d0c4f29e8cb3af4fd6f90f77f3094f6564929101131"
         },
         {
           "resource": "repo://packages/android-host/package.json",
@@ -30,7 +30,7 @@
         },
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         }
       ]
     },
@@ -44,17 +44,21 @@
         },
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         }
       ]
     },
     {
       "id": "claim_443aa6204f954a83bd302f5c83835198",
-      "statement": "The client is version 6.7.1, built with vue-lynx 0.5.1 on Vue 3.5.40 (ReactLynx runtime), the rspeedy bundler, vue-router 5.3.1, TanStack Vue Query 5.103, and Pinia 4.",
+      "statement": "The client is version 6.8.0, built with vue-lynx 0.5.1 on Vue 3.5.40 (ReactLynx runtime), the rspeedy bundler, vue-router 5.3.1, TanStack Vue Query 5.103, and Pinia 4.",
       "evidence": [
         {
+          "resource": "repo://packages/app-lynx/README.md",
+          "version": "repo-file-v1:sha256:a4eac67c9121231ec33046c37bd6a2dcc31411a94e25a61b0594b100c8f0dc83"
+        },
+        {
           "resource": "repo://packages/app-lynx/package.json",
-          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+          "version": "repo-file-v1:sha256:32907b5a93d066f4ede178896cf036e011a9eda9c7a246cb9271c9b14e29c0fe"
         }
       ]
     },
@@ -64,7 +68,7 @@
       "evidence": [
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         },
         {
           "resource": "repo://pnpm-workspace.yaml",
@@ -78,11 +82,11 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         },
         {
           "resource": "repo://README.md",
-          "version": "repo-file-v1:sha256:96801a8397169c41eb69a4525b144101dcd9ccca1857c5fed5ab3764bb01ea5b"
+          "version": "repo-file-v1:sha256:1cf452d5ac8e66e0fd698d0c4f29e8cb3af4fd6f90f77f3094f6564929101131"
         }
       ]
     },
@@ -95,10 +99,28 @@
           "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
         }
       ]
+    },
+    {
+      "id": "claim_5e375b88367c4678a788d544edd1b0cd",
+      "statement": "The Android build host's Gradle `defaultConfig` declares `versionCode 60800` and `versionName \"6.8.0\"`, matching the app-lynx client version 6.8.0; the versionCode is derived as major×10000 + minor×100 + patch and written back by `sync:android-version` from `packages/app-lynx/package.json`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle",
+          "version": "repo-file-v1:sha256:2b59f391489119eb4febca3eeba7e7c7aec16fa3554629c06cbd22097dcb12e5"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/sync-android-version.mjs",
+          "version": "repo-file-v1:sha256:90b45302edd408df11de433f20f648e852b0f1ff7abedf42e6143e6b8d1ddabd"
+        },
+        {
+          "resource": "repo://packages/app-lynx/package.json",
+          "version": "repo-file-v1:sha256:32907b5a93d066f4ede178896cf036e011a9eda9c7a246cb9271c9b14e29c0fe"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-05T06:49:09.686Z"
   }
 }

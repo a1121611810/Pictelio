@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:2946327c829a07f2780ddb4d6e7d66ea022409fa3235e56f20583ba38f8c1173",
+  "pageVersion": "sha256:bd63a17a8847eddc3b65d8dcb194a698ab4772236a901514862ccb67fed92180",
   "claims": [
     {
       "id": "claim_7f62f90ec5854c3e9c954db9d9761a1c",
@@ -8,7 +8,7 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         },
         {
           "resource": "repo://packages/android-host/package.json",
@@ -22,17 +22,17 @@
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/build.gradle",
-          "version": "repo-file-v1:sha256:08e1e1ac2aa70605414fcdb16c42b066986d46acd36cd5002538514ca531d132"
+          "version": "repo-file-v1:sha256:2b59f391489119eb4febca3eeba7e7c7aec16fa3554629c06cbd22097dcb12e5"
         }
       ]
     },
     {
       "id": "claim_93ea60dad7ba4d2393c7aa8f6328c8c9",
-      "statement": "The host builds with minSdk 28, compileSdk/targetSdk 36, buildTools 36.1.0, and Java 21; versionName/versionCode in build.gradle are rewritten from packages/app-lynx/package.json by sync-android-version using major*10000 + minor*100 + patch.",
+      "statement": "The host builds with minSdk 28, compileSdk/targetSdk 36, buildTools 36.1.0, and Java 21; build.gradle's checked-in values are versionCode 60800 / versionName 6.8.0, and sync-android-version.mjs rewrites both from packages/app-lynx/package.json using major×10000 + minor×100 + patch.",
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/build.gradle",
-          "version": "repo-file-v1:sha256:08e1e1ac2aa70605414fcdb16c42b066986d46acd36cd5002538514ca531d132"
+          "version": "repo-file-v1:sha256:2b59f391489119eb4febca3eeba7e7c7aec16fa3554629c06cbd22097dcb12e5"
         },
         {
           "resource": "repo://packages/android-host/android/variables.gradle",
@@ -50,7 +50,7 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         },
         {
           "resource": "repo://packages/android-host/scripts/sync-credentials.mjs",
@@ -271,6 +271,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-05T06:49:09.686Z"
   }
 }

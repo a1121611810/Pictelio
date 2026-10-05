@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:7e5c14b2d505fff62eb2f37cd6c5da72b1736451f6759230d841e061d8b3eac5",
+  "pageVersion": "sha256:5a2b45f92db31f9539ca0098a5d09a7821213e6d7d8fe0ecfd7b5ef08955e20f",
   "claims": [
     {
       "id": "claim_12d61e0ae8994cc897c4e4e5126234ef",
@@ -8,15 +8,15 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         },
         {
           "resource": "repo://docs/adr/glossary-webview-client-removal.md",
-          "version": "repo-file-v1:sha256:71bbbbb00c1bfcf7bbf76b99506904dab5d71da00d29e71872cacf4dabd9bf3d"
+          "version": "repo-file-v1:sha256:032de42acf7bf3a5425e5358406832454bc05e0aee539f39a104a0d577993aed"
         },
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         }
       ]
     },
@@ -86,7 +86,7 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         },
         {
           "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java",
@@ -173,6 +173,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-05T06:49:09.686Z"
   }
 }
