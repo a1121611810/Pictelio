@@ -3,9 +3,6 @@ type: Concept
 title: Testing Strategy
 description: The post-consolidation test pyramid — app-lynx Vitest unit/template suites, android-host Vitest contract gates (repo invariants, AGENTS.md contract, webview-removal invariants) and JVM/Robolectric units, manual Appium/WebdriverIO emulator E2E, and local Stryker mutation testing. The agent-browser and Playwright/component suites were removed with the WebView client (ADR-0203).
 tags: [testing, vitest, e2e, unit-tests, android-host, app-lynx, mutation-testing]
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
 sources:
   - id: openwiki-source-164e2da859b5277df81c7d94
     resource: repo://.github/workflows/ci.yml
@@ -29,6 +26,12 @@ sources:
     resource: repo://packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts
   - id: openwiki-source-acfefc8ed5ad27ba68fa2d6d
     resource: repo://packages/android-host/tests/android-e2e/support/releaseGate.ts
+  - id: openwiki-source-1b8f434c09124b9fdff408f8
+    resource: repo://packages/android-host/tests/android-e2e/tools/README.md
+  - id: openwiki-source-2bc492fe24e15ad8f67e15ec
+    resource: repo://packages/android-host/tests/android-e2e/tools/verify-abort.sh
+  - id: openwiki-source-e3133699c87294d093b84ad6
+    resource: repo://packages/android-host/tests/android-e2e/tools/verify-translation.sh
   - id: openwiki-source-183ea1f729c0b56a15bcd688
     resource: repo://packages/android-host/tests/android-e2e/vitest.config.ts
   - id: openwiki-source-0c986189d1217c3e6214fe46
@@ -55,7 +58,10 @@ sources:
     resource: repo://packages/ugoira/stryker.config.ts
   - id: openwiki-source-67b94b94647a43abc53a5f2b
     resource: repo://packages/update-check/stryker.config.ts
-generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-05T06:49:09.686Z
 ---
 
 # Testing Strategy
@@ -96,7 +102,7 @@ The authoritative gate boundary is `.github/workflows/ci.yml` plus the [AGENTS.m
 ### 1. app-lynx Vitest — unit, template, and contract gates
 
 - **Config:** [packages/app-lynx/vitest.config.ts](../../packages/app-lynx/vitest.config.ts) — `environment: "node"`, includes `tests/**/*.test.ts` and `src/**/*.test.ts`, excludes `**/*.fallback.test.ts`, and injects the same compile-time constants as `lynx.config.ts` (`__APP_VERSION__` from the package `version`, `__HOME_BLEED_HEADER__: 'true'`, `__PUBLIC_CONFIG__`, `__CREDENTIALS__`). A `setupFiles` script pins the i18n locale so Node ≥22's `navigator.language` does not skew tests.
-- **Fallback config:** [packages/app-lynx/vitest.fallback.config.ts](../../packages/app-lynx/vitest.fallback.config.ts) flips `__HOME_BLEED_HEADER__` to `'false'` and collects only `src/**/*.fallback.test.ts`. The home-top-bar build flag is a compile-time macro, so the default (new header) and fallback (bleed → self, ticket #920/#906) paths each need their own run; `pnpm test` runs **both** configs.
+- **Fallback config:** [packages/app-lynx/vitest.fallback.config.ts](../../packages/app-lynx/vitest.fallback.config.ts) flips `__HOME_BLEED_HEADER__` to `'false'` and collects only `src/**/*.fallback.test.ts`. The macro is evaluated at `router.ts` module top level, so each polarity needs its own run and `pnpm test` runs **both** configs (`vitest run && vitest run --config vitest.fallback.config.ts`). Per ADR-0216 the `false` branch no longer renders the old 64dp top bar — it only regresses the bleed aperture (`meta 'bleed' → 'self'`, ticket #920/#906) — so the config still asserts `meta.topInset === 'self'`; it deliberately neither merges the main config (merging would drop the `.vue` source-text template-guard parsing) nor includes the source-text template guard `recommendedBleedHeader.template.test.ts` (zero branch-coverage delta, and keeping it would keep `passWithNoTests: false` from catching a deleted real fallback test).
 - **Layout:** classic logic tests under `tests/unit/` (`api/`, `composables/`, `i18n/`, `primitives/`, `stores/`, `utils/`), single-engine behavior-baseline fixtures under `tests/contract/` (shared truth tables for R18/R18G restriction, URL rewrite, OAuth error classification, illust-type badges, tag mute, AI filter), and a large set of source-text/template gates at `tests/*.test.ts` (MD3 token/hardcode gates, icon consumption, motion contract, top-inset metrics, route transition wiring, etc.). Co-located `src/**/*.test.ts` files cover components and utils such as `BookmarkButton.host-matrix.test.ts`, `settingsStore.test.ts`, and `safeAreaJavaContract.test.ts`.
 - **`check`** runs `vue-tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.node.json`, so `.vue` template expressions and `defineProps`/slot inference are actually type-checked (closing the blind spot pure `tsc` silently skipped).
 
@@ -120,6 +126,7 @@ The authoritative gate boundary is `.github/workflows/ci.yml` plus the [AGENTS.m
 - **11 specs**, all under `specs/`: `smoke`, `background-resume`, `transition-matrix`, `webdav-backup-lynx`, `fab-hit-testing-regression`, `lynx-bookmark-tags`, `lynx-boot-renders`, `lynx-detail-image-probe`, `lynx-network-check`, `settings-sync-contract`, and `md3-visual-tokens` (the only spec that skips login and Appium session — screenshot sampling only, not release-gated).
 - **Assertion reality:** Lynx 4.0.1's `LynxView` accessibility tree does **not** expose view/text nodes, and `uiautomator dump` is SIGKILLed on the reference AVD, so interaction is driven by adb taps/swipes and content is asserted via **screenshot + pixel analysis** (region-scoped frame diffs), not text reads.
 - **Removed specs:** the `client-kind-contract.spec.ts` and `switch-client-*` family were deleted with the client-switch capability (ADR-0203 decision 7); `MainActivity`/`MainActivityWebview` are gone, so there is no WebView↔native context switching and `LynxActivity` is the only entry.
+- **Device-side verification tools** — `tools/` holds self-verifying shell scripts that drive a real APK on the emulator outside the Appium spec harness: [verify-translation.sh](../../packages/android-host/tests/android-e2e/tools/verify-translation.sh) (navigate → PIL pixel-detect the blue translate button → tap → assert `translateStream 入口` actually fired, retrying the tap otherwise) and [verify-abort.sh](../../packages/android-host/tests/android-e2e/tools/verify-abort.sh) (issue #653: start translation against a slow mock SSE server `MOCK_SLOW_MS=5000`, then stop, asserting `abortStream 取消:` appears while `response.completed` does not — proof the JS abort really cancels the OkHttp Call). Both use `BENCH_NAV=1` deep links, a local mock SSE server ([mock-responses-sse-server.mjs](../../packages/android-host/tests/android-e2e/tools/mock-responses-sse-server.mjs), an OpenAI `/v1/responses`-compatible SSE stub on `127.0.0.1:8811`), and a build-freshness guard that refuses to test a stale APK (a swallowed compile failure would otherwise silently replay the old build). These are local-only, non-CI tools; see [tools/README.md](../../packages/android-host/tests/android-e2e/tools/README.md).
 
 ### 5. Mutation testing (local)
 
@@ -163,6 +170,7 @@ The **six hard constraints** (AGENTS.md summary numbers):
 - **Agent-browser E2E** (`packages/app/tests/agent-browser/`, 16 spec files, `pnpm test:agent-browser`) — removed with the WebView client. It drove flows through an agent-browser CLI (`evaluate`, `mockFetch`, `spyOnWindowOpen`, `aiAssert`) and required a local Vite dev server on port 5173 plus `PIXIV_REFRESH_TOKEN`; no replacement exists (ADR-0203 consequence 4).
 - **Playwright E2E** (11 spec files) had already migrated to agent-browser (ADR-0034), and **Vitest browser component tests** (29 files, `@vitest/browser-playwright`) were migrated or removed (ADR-0035); both `playwright` and `@vitest/browser-playwright` dependencies are gone.
 - **WebView static anchor validation** (`packages/app/scripts/check-e2e-anchors.mjs`) was removed with the client; the remaining pre-push domains are the app-lynx anchor check ([`check-app-lynx-anchors.mjs`](../../packages/app-lynx/scripts/check-app-lynx-anchors.mjs)) and the `.agents/` skill check, orchestrated by [`scripts/check-push-refs.mjs`](../../scripts/check-push-refs.mjs).
+- **Dual-engine switch failure record** — [docs/android-e2e-engine-switch-known-failures.md](../../docs/android-e2e-engine-switch-known-failures.md) is an archive (marked 2026-09-28): all 10 recorded failures lived on the removed WebView↔Lynx client-switch line (`switch-client-*` specs, `MainActivity` entry routing, engine availability fallback), so the file is decision history only and its commands/paths must not be run.
 
 ## Running tests
 
@@ -195,6 +203,15 @@ The **six hard constraints** (AGENTS.md summary numbers):
 | AGENTS.md contract gate | `packages/android-host/tests/unit/agentsMd.contract.test.ts` |
 | E2E contract-suite collection gate | `packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts` |
 | Release-gate transition matrix | `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts` |
+| Release-gate three-state classifier | `packages/android-host/tests/android-e2e/support/releaseGate.ts` |
+| Host-matrix contract test | `packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts` |
+| Platform consistency self-check | `packages/app-lynx/src/pages/PlatformCheck.vue` |
+| URL-domain-parse consolidation | `packages/app-lynx/src/utils/safeParseUrl.ts` |
+| Behavior-baseline fixtures | `packages/app-lynx/tests/contract/` |
+| Repo-localized code-review skill | `.agents/skills/code-review/SKILL.md` |
+| Agent-skills format gate | `scripts/verify-agent-skills.mjs` |
+| Mutation configs | `packages/ugoira/stryker.config.ts`, `packages/update-check/stryker.config.ts` |
+ate transition matrix | `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts` |
 | Release-gate three-state classifier | `packages/android-host/tests/android-e2e/support/releaseGate.ts` |
 | Host-matrix contract test | `packages/app-lynx/src/components/BookmarkButton.host-matrix.test.ts` |
 | Platform consistency self-check | `packages/app-lynx/src/pages/PlatformCheck.vue` |

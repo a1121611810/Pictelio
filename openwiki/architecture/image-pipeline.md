@@ -3,9 +3,6 @@ type: Concept
 title: Image Loading Pipeline
 description: End-to-end image loading for the Lynx single-engine client — native bitmap memory cache, shared PixivImageLoader disk cache, Java image-host download-source selection, the PictelioImageService backend, and ugoira unpacked/streaming playback.
 tags: [images, caching, lynx, android, ugoira]
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
 sources:
   - id: openwiki-source-b5e289f92fb0592c3dbc523f
     resource: repo://docs/adr/ADR-0054-image-pipeline-unified-core.md
@@ -50,6 +47,9 @@ sources:
   - id: openwiki-source-31d28355e5730767584572ca
     resource: repo://packages/ugoira/src/stream.ts
 generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-05T06:49:09.686Z
 ---
 
 # Image Loading Pipeline

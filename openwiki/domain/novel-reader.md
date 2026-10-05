@@ -3,9 +3,6 @@ type: Concept
 title: Novel Reader
 description: The app-lynx novel reading experience — virtualized novel list and body pages, optional three-segment intro navigation, long-press text selection with in-text search, BYOK AI translation over the OpenAI Responses API (chunked streaming, chapter cache, R18 grading), and 9-format export through @pictelio/novel-export plus Java encoders.
 tags: [novel, reader, app-lynx, virtual-scroll, text-selection, translation, export, lynx]
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
 sources:
   - id: openwiki-source-b3b0a5199ff4bf7733623584
     resource: repo://docs/adr/ADR-0134-app-lynx-novel-list-virtualization.md

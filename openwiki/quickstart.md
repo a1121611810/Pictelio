@@ -1,11 +1,8 @@
 ---
 type: Quickstart
 title: Pictelio — OpenWiki Quickstart
-description: Entrypoint and task-routing map for the Pictelio (pixivizer) repository — a single-engine Lynx (vue-lynx) Pixiv client packaged into an APK by the @pictelio/android-host build host.
+description: Entry point and task-routing map for the Pictelio (pixivizer) repository — a single-engine Lynx (vue-lynx) Pixiv client packaged into an APK by the @pictelio/android-host build host, orienting engineers to the monorepo, commands, ADRs, and the wiki hierarchy including the continue-reading-and-history domain page.
 tags: [pictelio, pixiv, lynx, vue-lynx, android, monorepo]
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
 sources:
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
     resource: repo://AGENTS.md
@@ -17,15 +14,24 @@ sources:
     resource: repo://docs/adr/ADR-0204-root-command-naming.md
   - id: openwiki-source-5b54a58d1b51cd490b0e7162
     resource: repo://package.json
+  - id: openwiki-source-0f2dc325834b2f7fe7051ab9
+    resource: repo://packages/android-host/android/app/build.gradle
   - id: openwiki-source-7f3058d7ffb09ba613ce5aca
     resource: repo://packages/android-host/package.json
+  - id: openwiki-source-c77a2d8f001277042a57526c
+    resource: repo://packages/android-host/scripts/sync-android-version.mjs
   - id: openwiki-source-27ad4aacc4aecfa67f873e90
     resource: repo://packages/app-lynx/package.json
+  - id: openwiki-source-dd8e77e92dee3762f1cf1359
+    resource: repo://packages/app-lynx/README.md
   - id: openwiki-source-40275cb92c3610938f16ade3
     resource: repo://pnpm-workspace.yaml
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
-generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
+verified:
+  - by: openwiki/0.7.0
+    at: 2026-10-05T06:49:09.686Z
 ---
 
 # Pictelio — OpenWiki Quickstart
@@ -35,7 +41,7 @@ generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
 - **[`pictelio-app-lynx`](../packages/app-lynx/)** — the vue-lynx client (Vue 3 custom renderer on the ReactLynx runtime). This is the **only application client**.
 - **[`@pictelio/android-host`](../packages/android-host/)** — the Android **build host**: Gradle project, release scripts, and native E2E that package the Lynx bundle into an APK. It is **not** a client.
 
-The former SolidJS + Capacitor WebView client (`pictelio-app` / `packages/app`) was **deleted** in [ADR-0203](../docs/adr/ADR-0203-webview-client-source-removal.md) (2026-09-29). Its runtime had already gone offline at v6.3.0, and the OTA web-bundle channel was retired in [ADR-0202](../docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md). Root commands were re-pointed at the Lynx client in [ADR-0204](../docs/adr/ADR-0204-root-command-naming.md).
+The former SolidJS + Capacitor WebView client (`packages/app`) was **removed** in [ADR-0203](../docs/adr/ADR-0203-webview-client-source-removal.md) (2026-09-29): *host migration* moved the surviving Android Gradle project into `packages/android-host`, then *client removal* deleted the WebView source, leaving *source removed* and the Capacitor *dependencies zeroed*. Its runtime had already been *decommissioned* at v6.3.0, and the OTA web-bundle channel was retired in [ADR-0202](../docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md). OAuth credentials and the product version became source-of-truth files in `packages/app-lynx`. Root commands were re-pointed at the Lynx client in [ADR-0204](../docs/adr/ADR-0204-root-command-naming.md). Terminology follows [`glossary-webview-client-removal.md`](../docs/adr/glossary-webview-client-removal.md).
 
 This page is the entry point for humans and agents. Orient here, then follow the documentation map below.
 
@@ -43,7 +49,8 @@ This page is the entry point for humans and agents. Orient here, then follow the
 
 | Attribute | Value |
 |-----------|-------|
-| Client version | 6.7.1 (`pictelio-app-lynx`) |
+| Client version | 6.8.0 (`pictelio-app-lynx`) |
+| Android version | versionName 6.8.0 / versionCode 60800 (`packages/android-host/android/app/build.gradle`) |
 | Engine / framework | Lynx single engine — vue-lynx 0.5.1 (Vue 3.5.40) on the ReactLynx runtime |
 | Bundler | rspeedy (`@lynx-js/rspeedy`) for `dev` / `build` / `preview` |
 | Routing | vue-router 5.3.1 (`createMemoryHistory`) |
@@ -70,6 +77,7 @@ This page is the entry point for humans and agents. Orient here, then follow the
 |------|----------------|
 | [Feed & Browsing](domain/feed-and-browsing.md) | Recommended feeds, unified `createMixFeed` pagination, search, ranking, bookmarks, content control (R18/AI/tag mute) |
 | [Novel Reader](domain/novel-reader.md) | Novel detail layout, reading progress, text-selection search, AI translation, multi-format export |
+| [Continue Reading & Browsing History](domain/continue-reading-and-history.md) | The `/continue` page — illust browsing history (30-day expiry) + novel continue-reading positions (no expiry, `completedAt` soft-delete) via `browsingHistoryStore` / `continueReadingStore` |
 
 ### Integrations & Operations
 

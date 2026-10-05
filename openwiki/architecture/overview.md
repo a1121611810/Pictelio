@@ -5,7 +5,7 @@ description: High-level architecture of Pictelio — a single Lynx (vue-lynx) cl
 tags: [architecture, pictelio, lynx, vue-lynx, monorepo]
 verified:
   - by: openwiki/0.7.0
-    at: 2026-10-04T18:40:18.128Z
+    at: 2026-10-05T06:49:09.686Z
 sources:
   - id: openwiki-source-8026bb482f86818c760c09c2
     resource: repo://docs/adr/ADR-0138-app-lynx-vue-router.md
@@ -53,7 +53,7 @@ sources:
     resource: repo://pnpm-workspace.yaml
   - id: openwiki-source-5e1b077422a94ae165e88e4e
     resource: repo://vite.config.ts
-generated: { by: "openwiki/0.7.0", at: "2026-10-04T18:40:18.128Z" }
+generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
 ---
 
 # Architecture Overview
@@ -68,7 +68,7 @@ The repository is a **pnpm workspace** (`pnpm-workspace.yaml`: root + `packages/
 
 | Package | Location | Role |
 |---------|----------|------|
-| `pictelio-app-lynx` | `packages/app-lynx/` | The **only** application client — `vue-lynx` (Vue 3.5 on ReactLynx). Version `6.x` is the product version source. |
+| `pictelio-app-lynx` | `packages/app-lynx/` | The **only** application client — `vue-lynx` (Vue 3.5 on ReactLynx). Version `6.8.0` is the product version source. |
 | `@pictelio/android-host` | `packages/android-host/` | Android **build host** — Gradle project, Lynx native modules, release/sync scripts, android-e2e and JVM/Robolectric tests. Not a client. |
 | `pictelio-website` | `packages/website/` | Astro landing page (GitHub Pages). |
 | `@pictelio/update-check` | `packages/update-check/` | APK update-check pure logic (`checkForUpdate` / `isNewer` / `isBelowMin`). OTA web-bundle API was removed with the WebView client (ADR-0202/0203). |
@@ -78,7 +78,7 @@ The repository is a **pnpm workspace** (`pnpm-workspace.yaml`: root + `packages/
 | `@pictelio/net-diagnostics` | `packages/net-diagnostics/` | Network self-check pure logic (consumed by `/network-check`). |
 | `@pictelio/novel-export` | `packages/novel-export/` | Novel export pure logic — format whitelist/MIME/ext, Pixiv HTML extraction, payload building. |
 
-`pictelio-app-lynx` depends on the six `@pictelio/*` workspace packages above (`packages/app-lynx/package.json`). Cross-engine shared state (the encrypted `refresh_token`) still follows the shared-storage contract described in [Android Native & Build](../integrations/android-native.md).
+`pictelio-app-lynx` depends on the six `@pictelio/*` workspace packages above (`packages/app-lynx/package.json`). Persisted user state (the encrypted `refresh_token`) still follows the persisted-format contract described in [Android Native & Build](../integrations/android-native.md).
 
 ## Build & Command Tooling
 
@@ -140,7 +140,7 @@ sequenceDiagram
     I->>A: app.mount()
 ```
 
-*The four framework plugins are installed before mount; the router's module-level `router.replace('/discover')` sets the memory-history starting point.*
+*The three framework plugins are installed before mount; the router's module-level `router.replace('/discover')` sets the memory-history starting point.*
 
 ## Application Shell
 
@@ -188,7 +188,7 @@ Client state migrated from hand-written module-level `ref` singletons to **Pinia
 
 Stores expose one `useXStore()` accessor each: `authStore`, `settingsStore`, `searchSheetStore`, `searchHistoryStore`, `modalStack`, `updateStore`, `globalFab`, `downloadStore`, `engineFallbackStore`, `notificationStore`, `novelTranslateStore`, `tagNeighbor`, `usageMetrics`, `watchLaterStore`, `watchlistStore`, `continueReadingStore`, `browsingHistoryStore`, `relatedInjection`, `navMigrationNotice`.
 
-- **`watchlistStore` stays outside Pinia** (non-reactive `Set`/`Map` cache), and **instance-level primitives** (`useSearch`, `createMixFeed`, `useComments`, `createGlobalFab`) are deliberately not stores — their lifecycle is page/component-scoped.
+- **`watchlistStore` stays outside Pinia** (a module-level `reactive` watch-state record plus a dismissed `Set`, not a Pinia store), and **instance-level primitives** (`useSearch`, `createMixFeed`, `useComments`, `createGlobalFab`) are deliberately not stores — their lifecycle is page/component-scoped.
 - Tests isolate each case with `setActivePinia(createPinia())`; the old `resetXxxForTest` hooks were deleted.
 
 ## Data Fetching (TanStack Vue Query)

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:7e5e3820075e90e31c4e430af32ffcd5b4deb2014a25ad5211b7d915fc46ffb7",
+  "pageVersion": "sha256:47ad0e92cb2e7a8f9dcf07fb316184dde7f5f178b1c0b36886fbf932b46baca6",
   "claims": [
     {
       "id": "claim_28697105e1194dc0a5ea30128f90c883",
@@ -12,7 +12,7 @@
         },
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         }
       ]
     },
@@ -22,11 +22,11 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         },
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         }
       ]
     },
@@ -36,7 +36,7 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         },
         {
           "resource": "repo://docs/testing/conventions.md",
@@ -90,11 +90,11 @@
     },
     {
       "id": "claim_188a655d6ec7404f977aeecbf601d462",
-      "statement": "app-lynx has two Vitest configs: the main config injects compile-time constants with `__HOME_BLEED_HEADER__: 'true'` and excludes `**/*.fallback.test.ts`, while vitest.fallback.config.ts sets `__HOME_BLEED_HEADER__: 'false'` and collects only `src/**/*.fallback.test.ts`; `pnpm test` runs both configs so the default and fallback home-top-bar paths are each CI-covered.",
+      "statement": "app-lynx has two Vitest configs: the main config injects compile-time constants with `__HOME_BLEED_HEADER__: 'true'` and excludes `**/*.fallback.test.ts`, while vitest.fallback.config.ts sets `__HOME_BLEED_HEADER__: 'false'` and collects only `src/**/*.fallback.test.ts`; `pnpm test` runs both configs (`vitest run && vitest run --config vitest.fallback.config.ts`) so the default and the bleed-aperture fallback (`meta.topInset === 'self'`; ADR-0216 — no longer the old 64dp top bar) paths are each CI-covered.",
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/package.json",
-          "version": "repo-file-v1:sha256:977dc1401353bc75e96ef28ef249e09f98336c11d6d3e28b0bda3b2cd65ece5e"
+          "version": "repo-file-v1:sha256:32907b5a93d066f4ede178896cf036e011a9eda9c7a246cb9271c9b14e29c0fe"
         },
         {
           "resource": "repo://packages/app-lynx/vitest.config.ts",
@@ -150,7 +150,7 @@
         },
         {
           "resource": "repo://package.json",
-          "version": "repo-file-v1:sha256:7b41ee0db4c68babc3869e53ee5affba9e5104b53efbb1189bdb04ea593da16f"
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
         },
         {
           "resource": "repo://packages/ugoira/stryker.config.ts",
@@ -168,7 +168,7 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:d3064817c0ef5604bfac66d1e227abc4c3de071bed6663b604bdb6066a2228df"
+          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
         },
         {
           "resource": "repo://docs/testing/conventions.md",
@@ -231,10 +231,28 @@
           "version": "repo-file-v1:sha256:c486abdfed630d69a19cd07ed6823404cf13afa940ded9595d55bb00a1efdca8"
         }
       ]
+    },
+    {
+      "id": "claim_5d858449504c47f4abb6fc2682d718a8",
+      "statement": "Beyond the Appium spec harness, `packages/android-host/tests/android-e2e/tools/` holds local-only, non-CI device-side verification scripts: `verify-translation.sh` (navigate → PIL pixel-detect the blue translate button → tap → assert `translateStream 入口` fired) and `verify-abort.sh` (issue #653: translate against a slow mock SSE server then stop, asserting `abortStream 取消:` appears while `response.completed` does not). Both use `BENCH_NAV=1` deep links, the OpenAI `/v1/responses`-compatible mock SSE stub `mock-responses-sse-server.mjs` on `127.0.0.1:8811`, and an APK build-freshness guard that refuses to test a stale APK so a swallowed compile failure cannot silently replay the old build.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/README.md",
+          "version": "repo-file-v1:sha256:7ca4ac3bba3a3291435c99dcfcc40519c89488a1c43821105e5c2b86cbd75c91"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-abort.sh",
+          "version": "repo-file-v1:sha256:ba4657b6918bbac1fddcbd314eb604010ec9d72dddd474c11a12d3d3dcad0cd1"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-translation.sh",
+          "version": "repo-file-v1:sha256:8b680dee5b767191bf6b94493e6439502fa85b5ce1f0ea00262bc0d673c0864a"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-05T06:49:09.686Z"
   }
 }

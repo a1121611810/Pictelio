@@ -1,4 +1,5 @@
 # Files
 
+- [Continue Reading & Browsing History](continue-reading-and-history.md) - The app-lynx Shelf "Continue Reading" segment and single /continue page — two disjoint axes (illust browsing history with 30-day expiry, novel continue-reading positions without expiry and completedAt soft-delete) backed by browsingHistoryStore and continueReadingStore.
 - [Feed & Browsing](feed-and-browsing.md) - The app-lynx browsing system — the recommended single-card carousel and waterfall/list feeds unified behind createMixFeed pagination, plus global search (advanced filters via search-core), ranking (ranking-core), bookmarks/watchlist, related-works injection, tag neighbors, and content control (R18/R18G/AI overlays, tag mute, account-scoped settings).
 - [Novel Reader](novel-reader.md) - The app-lynx novel reading experience — virtualized novel list and body pages, optional three-segment intro navigation, long-press text selection with in-text search, BYOK AI translation over the OpenAI Responses API (chunked streaming, chapter cache, R18 grading), and 9-format export through @pictelio/novel-export plus Java encoders.

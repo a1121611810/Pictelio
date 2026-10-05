@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:c85fe1355c36cb393f6a078a83f6f4c56baeb1d85f91e8d3f49c1f77a469d2da",
+  "claims": [
+    {
+      "id": "claim_ab747b7ccc4142ec966fcde74fc30a01",
+      "statement": "Shelf segment 3 and the single /continue route merge two physically disjoint local axes — illust browsing history (browsingHistoryStore, keyed by illustId) and novel continue-reading positions (continueReadingStore, keyed by novelId) — into one recent-activity list with no dedup, because the axes are disjoint by work type and only the per-row chapter label needs to differ in the UI.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L50-L61",
+          "version": "repo-lines-v1:sha256:4e31de8fd0a59e4d78eb0cdee9cdde9f48bbb204eb1606896e6a1bd55207ada0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1YjRhNTkxYjI3MDk1MjI1YmY0OTc0NzRmZmJmOGQ5NzI3M2YxNzEzMTUzNjBhOWNjMTVkMWMzMGI0ZWU3ZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUwZTk5N2Y4ZGYyMzZlMmUwZTE0YjI1NDExYmQwYWY4MjJiN2E5YmM0ZDFhNzYyYmZjZGVjZjdmODljNjY1NWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4NGVlZjA1YTg2MjA1NzUwYjFkNDI4NDZmMTZkODBjN2Y0NTY5MDU0YTc3OWU4MTAxMDJmNWNiMWUwZDkyMzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzNmU3ZjUzYjdhYTFhNWRlNWU2YzZhMzhkMTc4M2QxNTEyY2M1YzM3ZTVlMWJlOTYwY2IwZThlOGEyYWQ4N2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/continueEntries.ts#L1-L9",
+          "version": "repo-lines-v1:sha256:4e2c6189ec28e764a39efe145ef4298b07768039afb66ca2a99627adb8befb80:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzJkY2IxN2UyMzJjNDQ3NDkxMzYyMjVjNzQ2ODliZjg0ODUyYTllNjU4ZjM2MmY4MWFiY2ZmMmYwYWM1MGYzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UzMDljZTUxMzA5YTgzYThmYTA3NGM4YmI1MjEzOWVhNmJiZmNhNmNlMWNiN2RjMDk3NjdlZTNiMGI4OWQ5OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTJkYWRmOTE2ZjRlYzQ0MmU4NGM0YjU4MWQxYWQ3MmVmN2I2MWYyYzAyOTA3MjNhNjBjZGQ3Y2VkYmVhMDAwMSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L137-L139",
+          "version": "repo-lines-v1:sha256:90075762f31bd75b1a15e25b719ee870b55edddb0ed48006c94d3aa11f470ef0:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY3ZWRiYjYwMTk3NDg5NTI1NzNkOWJmZmJjYmJiNTJlY2JkNWNlOTZhZjRlYjNkYzg1YjQxNmZiODA4ZTRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiZWNlNjFlZDU5OTBmYWViNjJhZmNjNzc4MTJlOTUyZTk0NDViM2NiNTAyMDYzYWRjMDM1ZGJhODhkZThjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWQxYmRkYzhjNDZiZTJlNDllYTMwNmY5OTdkMTg2YWI0Njk3NmYxMjYzMmYxZDU1ZWM4ODQ4MWE4MWZmOWE2MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmNhYzdkNjk3YWUwZmZhYjNmMjIxMjc4Zjg2MDIwMWI4M2FiODY5MjZiODVhZDc0ZjNhMDYxMzMwYjZlOWEwOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L1-L17",
+          "version": "repo-lines-v1:sha256:fc49b846e5a83b33f5d15f97493f82894205094039372e678b33133e1023b45a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlOTI3ZDIwNmI0YmYxOWQwYjdkZjg5ZGI1NGUwY2Q0YWUwY2E5MzE5MTVkMmQ0MmU1NWIyMjBmOTVmNjQ0MWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MzFjYjk5MmIwMjMyZjkyOWExNjhhODBiYjIxNmU2ZTY5ZDBiMTZkNmRkODE1ZTdmOGIyOGZlNGRlNWJiNTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJjMGI3MmUyYzE3MDI5MDEwZjVjYmNmYjRhZGY3ZThiM2M4ZmFiOWU1ODRjNjlmOWZlMzk1MTM0NDc4MDk5MGMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L1-L12",
+          "version": "repo-lines-v1:sha256:fb3819f94ac46ec589f333ade41bc039fe10c543f102dfbac999736f00189dfd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxZWZkOWNiY2M2MzM1YmY5ZTU3NDNkZTMxZDEzNjFiZjVlMGViYzg1Njc2ZjQ1NjVjOTU2ODQ1ODg3NzhiMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyYjlmODI4OTkwM2FjZjdjMmM2MTQ3NDE3M2M2MTJhNjY1OWE1NjJhYTE5ZjFkOTkxYzYyODQ2NjQ2YTY5YzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIxMjA3MTEyODg3OTAyYTliMTc5OWE3YmExYTFmM2ViMmE0M2VmNGIwYzAxNjMwYzcxYTY3OGQ0NzA0MDQyOTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0f2358c383794264aa7a494584c8b635",
+      "statement": "The illust browsing-history axis is an illust-only behavior log: it expires entries after a strict >30 days (boundary inclusive), caps at 300 entries (drop oldest + warn), accumulates visitCount on reopen without adding an entry, and has no completion state.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L196-L221",
+          "version": "repo-lines-v1:sha256:6fd366f4489a20791ba6773c4fcf0ddf9994082f5ad3c865d47e3b4c148753e9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmYzQxNGIzOGUxMjgzNzcyMThhYTA2NzdlYmYyN2ExZjU1YTI5OWIxOTU1M2M3MTg4ZjE1NTgxMTc1ZWZlNTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhkYzQ4NWY5NTdhMzRlNTI0ZGNiZDA1NTczNjQ0MTkyZjQ4NzVkMjczZDlhOTMyYTZjOWZmYjEyNzNkODBiODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ5ZmIyZTFiZDc3NTU4M2FmNjgxYjhjOWU3ZjIyMmVjNTE3NGQyYzhjZjAwOTM2ZjBlM2I3OWY3Njg3ODFhNWIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L29-L48",
+          "version": "repo-lines-v1:sha256:dc56c340b3c0b665729f47ad30a403e389ba24f1e472d5cd0dfc0f1fccd27fdc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2ODdiNzIwN2VmYTJhNGU3N2Y3NzRlYzE3MjJiOGMwNjBhZmJhMWMzMjZiMzM1NjU1MWQ2ZTQxYWRhNjE0MTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzZDVkM2JkMTNhMzk4Y2M0OTE5YmU4YmVhOTU5NmJkOTBlOTc0NDA5ODhhMTQ0ZWViMWM3NjU3NWNiYmE3YWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2ZWNhNmY4ZGFhMDQxMWNkYjFlNDJmYTAyY2FlNGUyNmU3MTBjYTZmMDNlZDgwZmIwYzEwNTI5ZWRiMzQ1MDQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L50-L70",
+          "version": "repo-lines-v1:sha256:111316d303ec30a52429265ed544f1a4fcb2399aefd946d46fa30d5c6e8a3849:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczNjgyMzE1ZWNhMDJjM2RjMTM3YmM1MTdhNWE1Y2FlNmRhYTJhMmRjNzllNjBkNGE3M2ExOTE1MzZkYTk1YTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlNmNlMDgyNTVkYjkzN2NmMjIyODgyYWJjY2FhMDFjNjFmMGYxNDIxMzJlOTJhNDVhODM3ZmVmZTYzYTRlZmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNjODljMGM4N2IzNTZiNjhhYzJiM2VmZTFjMzVjZWM4NjlhNTNlMWNkYjk0NDhjZDYwODUwMjZmMmNmYmU4YTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7db285accd6046b48c1c89e513b03905",
+      "statement": "The novel continue-reading axis is a novel-only unfinished-item list with no expiry, a 200-entry cap (drop oldest + warn), and a completedAt soft-delete state; the store exposes complementary computed views active (no completedAt) and completed (has completedAt).",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L273-L279",
+          "version": "repo-lines-v1:sha256:e37efdd32b6aada88af6f822a246067ec239113b3d1eca5ae6bc16f5b0820871:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWY3NGM2ZGI4YzZjMWI0OWFjMTUwNjE3YjdmNGU2YWQxNjk2ODg4ZjNkYzIzOWMwM2UwZTFjYzk2YjM4MTgxOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGVjNTE1NWRmMTRhZDYxYzlhMTAwYjJlZmU1MjIzOTllNTdjMDYwNjhiOGRlZTllOGQ5YjFiODk2OWM1ZmUwZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTRlMmJmNTFiNDYzYzJmY2YxNDU1YmYxYmEwNDk2YTVmMjgxNDM0NzYzZTc4MDM5MDNjMDUwZTQzOGFhZTkwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzVjODBjNjRjOTE5NDFkNmIwZjU4ZTI3Zjc1NWY0ZTEzODBjMjFjMWQ4MGVkNWZiZDFhZTEwOTQxZDg3MjJhYyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L56-L60",
+          "version": "repo-lines-v1:sha256:36297a43febac0724b28edea7c463af07820c9683b60ff47213bab1c170cc8ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmNmN2VlZGYwNmMyMjllNTBjMjA5MjIwZGM1NDg2MTliYzRkZDAyODJiN2VkNTZjNTI0MjdiZGRiMzdhMGJmZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE4ZGQ5YjllNWNmOWE0MjhlZmI3N2RkOGQwOTJlMTdjYzExNzMwNjZhYmQwMzVkNDliYTE2ZjFlMzEzN2ExYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWU2Y2UwODI1NWRiOTM3Y2YyMjI4ODJhYmNjYWEwMWM2MWYwZjE0MjEzMmU5MmE0NWE4MzdmZWZlNjNhNGVmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWFhZTBhOTA3MWU2Y2ZmYmJjMTM1NjZmNGIxOGExY2RjZTZkNTllNzUwYWI4NzhiZWMyMjUyYzgzYzhjN2NmNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d5ef754d96134029ac2bffba3ebe33ac",
+      "statement": "Novel positions use session-end semantics: re-recording the same novelId updates the position and moves the entry to the front (does not append), and the position may be rewound for re-reading, deliberately rejecting monotonic furthest-page/oldest-unread semantics because there is no cross-device conflict to arbitrate.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md#L79-L93",
+          "version": "repo-lines-v1:sha256:a550464e6e35ac55a4bf7886f792c67abde612547fc315b458b4423340cdb45b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3YWMwMzZiNmJjNjhkOTBjNTQyNmI3NWMyN2Y1OGE0YmVmZTFkY2Y4OGYxNmIwNDk0M2NmNDM3MjYwYzVmNGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyMzEwMzgyMjA0MDAwODRiZjI5N2M0YmM0N2Y0NTI0ODNjYTU5YmY4NzI4NzliNGYzYzEwZjUyYjhhOWQ0NGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5NjlkNmZhY2ZhMmYwN2JjMWQ5MDgyMGEyYmM0ZjQ1YjNlODU0N2ZhMGQyMTdkNzk1NjNkYjJiYTQ4YjNiZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYwNWYzN2Q5ZDVmZTAyMjBiMmNiZTQ1MGFlNWVjZTQ0MWFmMGVlMzNkZGIwNzU5Y2FiMTgxZjNkOGUwNTM0OTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.test.ts#L118-L138",
+          "version": "repo-lines-v1:sha256:ed5e6c2745aa45b4809115dd0f8a8e1ac670ea8b8f3361d11228485723b6da94:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkZTE0NjA3MDExOTgyNjVhYjEzMDZmNzVjYmUxYzY0ODMwMTRlMjRhOTJjZmUxMzUzM2E3OTRhMzYyOTEwZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc3YjBhNzJjZjI5NmE2ZmZkNDg0MmVlZWNmNWI1ZjYyNDM1NmNiNzMwMDgwYzhmNTU0ZmNjY2FlNWY3ODUwZDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NGUwMTNkYzM3MjRkMjc0MWJjN2ExNzU2MjExNWVkMTFlOTI1NjcwMDcxMjVlM2JjNTc5YWQ1ZjEyYmEyZGEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L301-L327",
+          "version": "repo-lines-v1:sha256:fccb783913e13a5fcb29713265d8b697770eb244bbf98235c4a1bdb96e857ad3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFhMzc2ZDE2YzNkZGEzZTQ0MjQ5OTM4YmRkNDkxY2Q1YzRiMmZkMDQzNzI5NDIyNzFhYjc2ZjM4ZDY0MzcwM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4MTc3YWFiODU0MjYwNzBkZGU1ZjE2NDI4OWE5ZTJjYzAzMzI4ODgwNmU5Zjk2MTJmOGRiNWU5NmVhYmMwMGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_40e200778891433c837a2250a13e407d",
+      "statement": "Entry recording is zero-threshold and uses already-fetched page data: entering the novel body records a snapshot and back-fills chapter coordinates in the background without blocking render, and a successful illust detail load records/updates a history snapshot — both with zero additional network requests.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/IllustDetail.vue#L416-L424",
+          "version": "repo-lines-v1:sha256:2d4f62f3d9f8023daec20bdaea43f5728b38dc0862b7b3842135ef46e65b4653:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWEyN2QzMzYwNjVhNjZmMzhkODliOTQxNjdiMTFkMjRlZDRkOTU0MjkyYjliY2U4MDNjN2I0OTliYTBlZmYxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGU0NGRkYmI3NWU0OTg4YzI3YWI1NTRjMjdkM2Y1ZmQ1NmZhZTBlN2QxZTk0MWI3M2JjZTI4NjczODg5NWJiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTU1MTFjMTI3YzMxYjMwYjE2YjU3MzY2NDkwYWM4ZGNjMTIxZWQzODNlY2NmM2RjNDljYzUwNjgzODAxZTBiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWVlMzcxOGQwYWI1MTcxY2RiZDkxYWU0Y2I0MDZlOTQ0ZjdhYjA3OWU1MTc2MTM0ODk3NmI3YWIxOGM1MjExNCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L477-L524",
+          "version": "repo-lines-v1:sha256:ecbe90956ae6a0cc7f898be842d5cb317ee77788c346609a56ce0da1c7b36334:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiMDNhNDkwZmE1N2IzZDQ0NmU1NmE2MmFjMDNjZGQ2OTBmZDZmMDEyYWUxMGFhMmZjZmU3MzZjZjI5ZmJlYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2OTk0MTk2M2EzYzA2ODhiYTNmODI3ZDlkMzcxYjIxYmRjNmUzNDdiNjI2YWUxZmE2MzcyOTVhNmE2NGUyYjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFhN2M0NGJlNDQ4ZDIzNzBlZDVkNmNlYjY1MjEyYTJlNjU2MDQzMzMxYWRiYTNhN2NlZDk4MWM4Nzk2MzY3MzgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L133-L151",
+          "version": "repo-lines-v1:sha256:2b55c1a2f4426fff36fa85f8e4c923fd70a8e5a735bbe7a09a9bd216a35c1e92:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMmZmNmQ3NWE3NmNkMDM4MzI2YTVkYTcyMmRjY2M4OGI5MzBmYTBiMWYwZDBkMjVhMjU3MzkzMGRkMzY0NmMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L119-L143",
+          "version": "repo-lines-v1:sha256:2b37d2b27d4ea38a0c79d311d854912bbc12dc039e21a139c0d3067d1ca2cc9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNjMGI4NGY2ZmQ4Mjg3MTg0N2NkMjMyYTk3ZjBjZGZkY2E2YzA4MzVlM2VlNzNhMzIyZDJjNjY2YWFjYmI3MTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1e874e1257084f629876cfc5fa725f42",
+      "statement": "Completion is a soft-delete for the novel axis: decideNovelCompletion returns true only when reachedBottom, contentExceedsViewport, and either the novel has no series (single novel) or chapterNo equals chapterTotal (last chapter); markCompleted then sets completedAt without deleting the entry, and a later reopen preserves completedAt while updating the position.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingCompletion.test.ts#L33-L131",
+          "version": "repo-lines-v1:sha256:ff3d28310c58b042f97333af1abc3749ac69767a43815621ba65d003bd480ca9:eyJzZWxlY3RlZExpbmVDb3VudCI6OTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2NjJjMmU1YjEzYmRkZmJiYjBiOTllZmY2YTBlNWEzOWZlYzZkODk1MDJhNmYyMGYxYmQ5ZTIyMGVmYmViYTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM4M2JjZDZiOTY2NGYzM2ViYzNlMDE1ZTRlOTc5MDllNjY3OWNkZWZiYTg0Yjc5YjgzYWI4Y2E1ZWNjYWFmZTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxNTkwYTMxZWJhYWMwZDYyMTBhMjdjNzJiN2UwNTI1NTdlZmFmMzRlMDZjOTY3NjE4MjExZmM3OGIyMDcwMjEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L204-L211",
+          "version": "repo-lines-v1:sha256:9003cb61dd509f59555c77f89c810581590be7763ab91c0f897a4652a4eb18b3:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjAzOWYzZDY5OWNhZWViMGNmNDA3MDRlY2ZlY2ZlMDVhY2RlYzBhMTk0NzIyODg5YWQzNGYxM2ZhM2ExYWRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmE5NjA2ZjQzNzI0YTA4MGM3ZTUxNzEzODg0N2MzNTVmNzEwMzY1MzkxYTIxZDI5ZWYwMGUxN2VhYzgxNWNiMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTBlZDA3MWI2N2Y1M2UzZWVkYjgxZGY2NThlZTM1NTk0OTc0MGMxNDlkYTI2ZGZkMmFkMzQ3ZjgyZDAwYjZmYyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L341-L367",
+          "version": "repo-lines-v1:sha256:a534b694c229e576c809c084203cc50c6803291e87f23f8e2f8996ab20460e52:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzUxZjgyOGNjOTM1NDAzOGVmOWQ5NjE5OTg3YjZmYWJlOTdhMzc4OGQ5MzgyZTU1NjAyMmE5MjAyNDAzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2MTRmY2Y2NGU5YTRkODA1NWM3YmJjNmU2OTc2NGIyYTQxYTY4MTFiNWRlN2JlM2IzYTkzZGRmMDZmY2QxYjYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_142025e9f620442ab2200cab2b496575",
+      "statement": "The completion decision requires the body content height to be strictly greater than the viewport height, computed by resolveNovelContentGeometry in @375 design-px base; when the viewport cannot be truly measured it returns the conservative false and the caller warns, preventing a single-screen novel from being soft-deleted by the geometric first-frame scrolltolower.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md#L107-L131",
+          "version": "repo-lines-v1:sha256:010f6de33c39b3277dd645787949cec6285d6a01d51ca334a9e6dd3fa7ca988b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhNGVkOTg5MTNlZTBiNTRkNGExZTkyYmY1YzYyNjFmYzNiZjY4MDE2Y2U1MTJjMDA0NmFjODY2MzdmNjdkNzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwNTFkYWMzMWFhMjhkMjYzMzlmNjhlMjM0NzQxZWUyNGFmYzM3OTYzYjg2YjcwMzg0ZTE3NjFiMWRmNTFmYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg4NTdjZmE0NjBiMzViNGM3NTMyNWQ4YWY0ZWI0ZDI5MDQ1MjBhZjNhODllN2VhM2RjYmIwY2Q4YjcyOTYzNWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkNWM0MzEyOGYyNzZmYjZhZDYzNmFmNTE0NWZhNDY2Mzc5ZGFkN2MxMThmZWRmNmEzYzg5Zjc3Yjc5NjkxZGMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L400-L423",
+          "version": "repo-lines-v1:sha256:6e151c79ba9615173cae5e7e6e7386df8adf1dcfb78cdf02bb22d2f09cd4ddd9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4ZmQ3YmY4ZDI1MWZhMzdhYmNmNThiNmQ5OGEzODE4N2YzNTIzNmQ0NGJkZjA0ODM3NzBmNTYxMDRiMGJiNjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNmYzU4NjYwZGJkNzY0M2U2NDA4NjgzZDhkOTU5OWQ4NDMzNzQxZDI4MjJiYmIyYmMxYTg4NTFiOTRkNzkwMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3YzYyMjM4MmQ0NTZjZGRiODQzMzIzOGJmYWUzNjEzN2M4ZTFjMDAxNmY1NzgzZDE4OTNmMDk5NzY1YjUwNTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/novelContentFitsViewport.ts#L119-L148",
+          "version": "repo-lines-v1:sha256:8e2bf67cf53c20b0a089f4677bf4f8d7361cbcc55454c35ed021687fc8ee17f7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgwZDg3MmI3OGZjY2YxMzkzMTYwNzQzNzJkNDFjZjIxNjJjNGIwMzJlMDQ4YTY0ZjA5M2I1MWRhYmMwNjBmN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiNTdkYWI4MzNlNGE4NzA0YmE3MzRlN2E0NzI2YWQxMTZjN2JjMDhjOGM3NDUyZjBhYWU5OWMwZjA0Zjk5NmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_986c1558a41441ce9fc2c625cf45511a",
+      "statement": "Completing a series' last chapter cascades completion to already-recorded same-series entries with a strictly smaller chapterNo and no completedAt (decideSeriesSweepIds), because Pixiv models each chapter as its own novel and completing only the final entry would strand earlier chapters as in-progress.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L235-L254",
+          "version": "repo-lines-v1:sha256:7e3cd433a5aadadc19654091278aa5ca72c52a7cb5c7abe5c66ee0d8687e837f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMTI0MjkyMWM1MjQzZmNhYTRmNGViMzE4NTU0MjkwY2UwNjgxN2FmNGY3YmRlYThhZTY4OGIyMTExMmRhNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyN2Q3OTBlNDhiNDE2OGQ4YjQwYWQ4YTFmNzAzY2JmYzY1MDc5OTg1YTNlOTc1MTA3YjU2NGEwZTVkNzIzZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmNWVmOGQxYmZlOWFmODRlNmVlYmZiYWUxYWQzOTk4ZDI1YTE4ZTAxYWI2OTYxZWY3N2UzNzFmY2MwMmIwZjMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L356-L367",
+          "version": "repo-lines-v1:sha256:c71f0066d0a1330c355bfa72f4cdf40376dd2e924b9d84d94d49d2f85cae67a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNWY5ZGRjZGEyMmI5YzZmZDFmMjU2M2IxZDE3NGNjY2IyM2UyNzk3NzI4NDE2MjA2YjU0NDc3MzRiOGZlMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyNThkYzY2ZTI0YzVjYThjMzc3NWM0OTJmMmJhZDRmNzZhNTUwODkwNTMwZDFhYTA1MWE4Y2RkN2MyMTk4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2MTRmY2Y2NGU5YTRkODA1NWM3YmJjNmU2OTc2NGIyYTQxYTY4MTFiNWRlN2JlM2IzYTkzZGRmMDZmY2QxYjYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_08ec0fda69f94276bd88d0fa35f8f37d",
+      "statement": "Both stores persist to account-scoped keys (browsing_history_${uid} and continue_reading_${uid}) through the settingsStore prefs() PrefsStorage seam, and neither key is in the WebDAV backup domain (ACCOUNT_KEY_PREFIXES only covers the R18/AI settings keys).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md#L188-L190",
+          "version": "repo-lines-v1:sha256:a84807866e62a2f176deb53f084a99ec9dd73acbeea68fe621d3529fe0f0c483:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjIyYWIzYTIyNWQzNmNmNjRjMTIyYjFkODc1OTNlMjMxM2E4YjNlODAzMDczYTE2ZTFiYmRkODYzZDEyNDI2NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTJkMDM3NjcxMDU1ZWRmMDc4YzA2OTE2NzA3ZWU4ZTM4ODQ5YTBkYWVkMDZiYThhZmI3ZmNiMWE1YTE0Y2QzNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2FiMWU3OThkZWNmN2JiNWY3NDdkMzkwMThkNTNmOTU2NGQ0MTE3OTQyY2Q5YjIwN2VhMGMyZDc4M2IzY2M4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODM0YmNkYmRkOWMzYTQ0ZWM4ZWMzNTQ4ZTlmYTFjYWRhOGMxM2Y3YTBkNGQwZTgwZWY0MzU1ZWQ1YWJiYWRkYiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L179-L185",
+          "version": "repo-lines-v1:sha256:5a66ebe4ce7b7615b38ccaa907b4259b5219c5275d70406d694d14a27f87494c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg4YmI4Y2UyMGE4NmMxZjgyYTcwYzEyOTg5NDc5ZmU3NzU3YmMzY2U1OTI3MjJiNDc4MWIzNjZmZThlNjg3ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGJmNzFmYzNiMDJkYjRhYjZjZjQyNDhjMDljYjI4ZDJmNTdhNmU3YTM4OTY0Yjk4NDk2MzQxNGE2NWRmMjg3NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDVjNjZlNmYyY2JmMWEyNTIwZjhlYWE2NmU1ZDNlMzU1ZDRmYzgxNTlkM2I5MWEzMDNkNWJjOGM1YjcxMTE4MiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L56-L57",
+          "version": "repo-lines-v1:sha256:23b3c9e0a0e72447107f1944ca3dabaff3594ad9cbc83cffbd77770eb58fc774:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDEzYTk2MTdjMzA3NmU0ZThlZjE5NTVlODNmYjJiMTE5M2JkMTM4Mjg5OWViYTkxOTk5MGNmZjdmYTA5Njk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTk5YmU5MzFjNjY2ZGYxMjJhNmNmNWEyODk4YmJlZDQ4Yzk2OWM0NmQyY2MyNzFlNDBmOWFmNThjNzRjMmIyMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODJmMWIyZmJhODMyZDQ4MjkzYjkyMjYwN2MyNmMwMzE0OWE4OGVmZGU5MjU4MTdhYzg5MTM5NWNmNzQ0MjM0OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGRhOWY4YmNjN2RiNTI4Njg4NzE3ZWExOTM3MjcxNDc5Y2ExMDljMGIzMDMxYTZkMGEyNWM3MDI1ODcyZTg2NyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L293-L299",
+          "version": "repo-lines-v1:sha256:70f68d504f3b88ee4cb973232caa22128a1ff6913943b20610df8c648f9fbb66:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg4YmI4Y2UyMGE4NmMxZjgyYTcwYzEyOTg5NDc5ZmU3NzU3YmMzY2U1OTI3MjJiNDc4MWIzNjZmZThlNjg3ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGJmNzFmYzNiMDJkYjRhYjZjZjQyNDhjMDljYjI4ZDJmNTdhNmU3YTM4OTY0Yjk4NDk2MzQxNGE2NWRmMjg3NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmYwMWE5ZjUyY2M5ZTYwYjRlNGFhNjcyNjdjYzk0Njc4MjE4Y2M0MjgxYTE2YmI0YjJmNmIyMDllZjdhODJjMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L59-L60",
+          "version": "repo-lines-v1:sha256:e462ad3437f0584330629c612b131ddbee75a759769700c40be3612fe3642925:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDEzYTk2MTdjMzA3NmU0ZThlZjE5NTVlODNmYjJiMTE5M2JkMTM4Mjg5OWViYTkxOTk5MGNmZjdmYTA5Njk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE4ZGQ5YjllNWNmOWE0MjhlZmI3N2RkOGQwOTJlMTdjYzExNzMwNjZhYmQwMzVkNDliYTE2ZjFlMzEzN2ExYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTgyZTgyNzI4NGU3NzRjNDJiMzY3ZTlkYTM5NGJhYTFjYTk1NGViNDJjMTBjZDM3NDhjMzZiY2M1Yzk3MjM3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWFhZTBhOTA3MWU2Y2ZmYmJjMTM1NjZmNGIxOGExY2RjZTZkNTllNzUwYWI4NzhiZWMyMjUyYzgzYzhjN2NmNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_27810635ea254125af4a2a1049be3033",
+      "statement": "Each store keeps a ready flag and a hydrateGeneration gate: uid changes reset ready and re-hydrate, stale in-flight reads are discarded, and corrupt or invalid stored data is warned about and falls back to an empty list rather than being silently dropped.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L266-L297",
+          "version": "repo-lines-v1:sha256:33575ff354608a58ffaefad7073e89425a6967ce4d7cce5d73cf742bf3823fe7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmNmZmOGIzYmEyMDMxZWIwNDFkNDlmNDYwYzJmMDJlNGVlZjM5MGRkMTM4MzhiMWYwNTgyMTUzOWMwZGZlOTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2MjY3OTM1ZmM2MzM0NjVkODQ4YjQwYTRlZDY5NjdlN2I3YTMyM2Y4MWNkNTNjMTEwYWUyMTAyOTY4N2FhMTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE1MWQ0NmM2MThhMjdhZmEwY2FhYTFlZjcxMWMyYmEwYTY2YjhiZDFjZmQxOWViYWQ4N2NhZWY2M2ZiMmQyOWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0M2RlNjBlMzI5YjU4MWQ3ZmRmZjg5YTE3NWU5ZGQ1ZGM5YzZmOTQ0M2FkODYxOTZjYjEyZjQ4MTVjZTFiZTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L98-L131",
+          "version": "repo-lines-v1:sha256:d118546131f8983aa3a93bcc2b28caf9225985e18011707b6a42087567df5ad4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiOGNhMTgzOGUxMDQ0MjE3NDkyM2VhNTQ5NDA2ZDZjMzZhNTljYzRmNTU5NDAyZmI4MmZjNDlmODU2NDlhZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMDQ2MTZiNjBmYTljNjEyNzk3NzFhZGYzOGQzMTA2NTFhNzk1OTIwZTFjZTdkMWU3YWM2ODVjZTMyNjczNjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5NjFjNmQyMjIyZTEwZDYzZGExNDUxMTlmZjdlNzc5MGI4N2FlMDY4Nzk2MDE3NzllNjdmOWYyYThjZDg1ZTgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L396-L432",
+          "version": "repo-lines-v1:sha256:5d774e4d23969eafc5f8e8f17b802e8877abf6c0673b6ae0663119ecf2313e3f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2MjY3OTM1ZmM2MzM0NjVkODQ4YjQwYTRlZDY5NjdlN2I3YTMyM2Y4MWNkNTNjMTEwYWUyMTAyOTY4N2FhMTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzUxZjgyOGNjOTM1NDAzOGVmOWQ5NjE5OTg3YjZmYWJlOTdhMzc4OGQ5MzgyZTU1NjAyMmE5MjAyNDAzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczZWJmZjAxODE3NTMyNzg5NzVlNjlkMjZlNjk3MDcwM2M5Y2ZjOWVjMjNmNWI0OTE5M2E5YjFlZmIxY2Q1MTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c7c6c070e3c74d46a1a6efc03c705684",
+      "statement": "mergeContinueEntries is a pure, store-free aggregation that produces the shared row view model for both Shelf and /continue: recent-activity descending sort, type-prefixed list keys (n- for novel, h- for illust), a fixed novel-first tiebreak for equal timestamps, and a chapterNo label only for novels with computable coordinates.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/continueEntries.test.ts#L44-L92",
+          "version": "repo-lines-v1:sha256:3007804ab2e5bdd82321bb0ab8b02f366a1fa2a8b841e772c03cce1287a65fc0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyM2RjYWEzNmZkMzEyNzUxMWJhNTc1MjExY2Y2OGIzOTI5ZmY1NzlkMWZkODQ2MjA2N2RjZGQzNzY0NTE2NDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1NWIyY2ZjODdiOWUwNTdlYTNkNzRkYTM4MDg0OGJlMzllYTZiZDI5YjEyMDA0ZDNlNjE5OWMwODY2ZmI2MzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/continueEntries.ts#L80-L87",
+          "version": "repo-lines-v1:sha256:80de1e0014ba952ef15e14c6100163fcf91892372719686930eb805b4b1f5614:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTBmNmI1MmM4YzU3NzFmMzg2OGMyMzQwNzhjNWIxODYyNDllNDA1YzFjYTk3ZDkyYjc3MGE0NWZhNzBmNTBmOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTAyOGI5OWM3NzY0ODYwYmU2NGNkNWQzMTU2NGMwZGQ4ZDcyYzgwOGMwMDc1MGE5OTZmMWQ2MTE5MDlmMDQ3NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2EyYmM5YTdiNzg2OTk5ZTk3Zjg0OTQ0N2ZhZTIyMGE4NzgyZDhkM2JjNmViYTY1NGM4OTA3ZDU1Njc1YzYxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c44641ac47c7474ea38ee94ef001d8e0",
+      "statement": "Shelf.vue segment 3 renders a 3-row preview of the merged entries, and ContinueReading.vue renders the full merged list plus a novels-only finished group from continueStore.completed; both pages hydrate both axes and gate their empty state on both stores' ready flags.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L145-L156",
+          "version": "repo-lines-v1:sha256:d6332b169261d7aa64f551d7b4067147243098b990c2baa71f2be864b01e3b4d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyMzg3MTYzN2Y0NDZkMzE1N2M3M2RiYmQxMmE5ZTBmOGQ4ZjkxMjZkMDk4YThmNzNhYzkyNzMyZDEzMGM1YWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0ZTg3NWQ4NmQ2ZWVjY2QxYjFhZjUyNzdmZTYxNGYwZmQ0NjYxMjI3ZDYzODUxZGE3MjQ2ZDU2NGVkZmEzZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIyYzA3YjNlMThkZGQ1NWYwNGY5YzkyMGEzNGQ0N2QyYWI3NWMwNzhiYzdiNGUyMTkwNzAzZGFlMDEyOTcwYTcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L50-L61",
+          "version": "repo-lines-v1:sha256:4e31de8fd0a59e4d78eb0cdee9cdde9f48bbb204eb1606896e6a1bd55207ada0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1YjRhNTkxYjI3MDk1MjI1YmY0OTc0NzRmZmJmOGQ5NzI3M2YxNzEzMTUzNjBhOWNjMTVkMWMzMGI0ZWU3ZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUwZTk5N2Y4ZGYyMzZlMmUwZTE0YjI1NDExYmQwYWY4MjJiN2E5YmM0ZDFhNzYyYmZjZGVjZjdmODljNjY1NWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4NGVlZjA1YTg2MjA1NzUwYjFkNDI4NDZmMTZkODBjN2Y0NTY5MDU0YTc3OWU4MTAxMDJmNWNiMWUwZDkyMzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzNmU3ZjUzYjdhYTFhNWRlNWU2YzZhMzhkMTc4M2QxNTEyY2M1YzM3ZTVlMWJlOTYwY2IwZThlOGEyYWQ4N2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue#L114-L129",
+          "version": "repo-lines-v1:sha256:3f27df6865f5ce96378c71e4f6348ee1b7d4e5e5e1eea6b7fff45d9ff25d9dbe:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4YWI1MDI2ZWM2NjgwMDAyNDkzYTFlZDliOWQ0MzA4YzQ4ODU0ZGJhNDI0NWU0NmY5ZjQ3NTEzNmU4NDBiZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmMjhiMWQ1OTViNzlhN2U3NGI3YmEyZDY1MGVjNDQwY2Q3ZWQ4N2ZjYjJhYmI3N2RkZTJhYTFkMGQ1ZDJlNDUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4NmI4OWJiNDRmNjY0ZWMwNjAxYjcyYjJlZDFkNDNkM2ZkYTNhYjVlNWU2MTIxNzI4MDc2MjI3MzdkMTA4Y2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue#L148-L195",
+          "version": "repo-lines-v1:sha256:4c85f3d3e3b5f6fcb61102cc39aa8ea76e9d30ad414f231537d1a785817163cd:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNWM5MWNiODk0NGZhNTI0MzRlYmVmYzAwNjU2ODEyYjdlNWRhN2NmM2E0YjY5NzU0NzhlOTFjYTNkYTljOTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyNjljODZkNzk0ZmNhYjU1NzQ5OTg1OTAxNGJiZjNjODFkNmM0MmExMGY3YmNjYWQ0MjZlMmM0N2ViZTE5ZTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzMzMzMjU5NGQ1ODlmMTIwZGY3ZTNhOWIxMWU4MDI2ZDNmODllMDAyYmI2YTJhZmY3MDNhNzFkMTM4N2QyY2IifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue#L331-L373",
+          "version": "repo-lines-v1:sha256:1271419764a1aaeb59c8307bed1402259e09cce4be9e7d82f80e2be9d1be3eb6:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzMzYwOGM4NjM5NzFkMDdjY2VmMmZlZTkwMzExNjM2ZTI5NTFkMmFjNDRmZTg0YjZlYWE1YTNmMzhlNjZkZDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjUyZDAzYThmMDkzNTAyMmI5YmU0MGVhYjU4ZWI1NjdjYWM0MzE5ZWZlMTQ4MDBiNDUwZjQ3OWIwYmMwMDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhMDhmNzkzMWJkMjI2NGUzNGRlYzAxMmYzNTFkOGRiMDBmMTI3OTIwODIxZjZiYmI1ZDQzYzczOGIzMzExNTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwZGJhZjQ3NGI1YWI2MDQ2ZjdjOWM4MzExN2JkZDMyODE5YzE2YmJkODg3MGFiMzc5YzcyMmY5OWI5Y2RmYWQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fb3df2b98fe84024b10c5b65287ed02d",
+      "statement": "ContinueRow.vue distinguishes the two axes by the presence or absence of the '上次读到 第N话' status line plus a type badge, and decides restricted and unavailable presentation locally from the snapshot's xRestrict without any network request, rendering those entries with an explicit label and a remove entry instead of hiding them.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L113-L177",
+          "version": "repo-lines-v1:sha256:e140f6535f451b17cf937a0c5ab27fa15c7140d77b7f8d45c1106dbc4268f3ce:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkMTdjYTJhZTNmYWQ1ZDg1NGNjZTBlNThhM2VkMDNmZjc4ZGJiMjlkZWQzMjU2MTBkMGRlN2RmMzg5YzkzYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3YzM2YjMyYjU3ZWZiYjc0NDk0NWM5MDY1NzUzMDRiMGFkNDZiMzY3ZjVlNGNjMDU1NTVhYTQ3Zjk5NTJkNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjOGNlMGJjYzFkZWUzYTJjN2VmYjRhZjFmZTM0YTFkYjEyNzg5OTVmOGJkZjM3NDRmNzlhNWYzNWU2ZTE4ZWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA1MjI4NDBlZDVlYzU4YTM2MmYyMGI3MWI4YWViNjc1ZDdlZmI5NzQzOWM5MGMzZjYxNTVhZmVjNjUyODU5NDMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L43-L64",
+          "version": "repo-lines-v1:sha256:d34d3c02186024330e202591cc1555d3eeb2b137e622cee84d639ae2e951c5a3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2ZTQ0NGUwN2Q1NDc0YzEzNDM2NjNmZTVmODZjYjBmOTA5MDBjYzNkNjNiNGM3NjdmZjdmZDRhYmY2MjhhN2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5ZTU5OWIyNmUwYjgzYWY0Y2EwNjg4OGZlNDhhN2ZkNjg3ZTI3MzlkMzg2MDA4ZjVmZThhMGJkNjJmZDc3MmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjN2Q0NjU3NDk0ZDk3ZjkyZWY5ZjZkZmJmNGJiOTg5NDE4YWQ3NjE2Y2NkMmRmOGZiMWNjYTY1MzQ2NGExNDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1505748c7a994cf7b76dcca200e45ecd",
+      "statement": "Novel recall routes through openNovel(id, { resume: true }), which bypasses the intro-page toggle and goes straight to the body via the existing openNovel single point, while the intro page's main CTA flips between start-reading and continue-reading based on continueStore.has(novelId).",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L85-L89",
+          "version": "repo-lines-v1:sha256:2659b819f78fd33389c012fa68767899dd4c367da2a9a93b017356ac5f22d88f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGRkZGRiYzI1YmFlNjdiZmRmNmQ2NTI4NGMyM2UzMWQ5NDYyMDAzMzIyODY0ZTk5ZWRmNDMxYjM4ZTIzMWI3NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODU4NGQxNmZmNDAxNmFmZmEwZmY1YmUzNGYxMjlkYWE0MDBmNzg0NzNkZGRkZTJhMzYzMjRlY2Q1Y2YzMWM4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjlhZjI4Yjc1ZWRlNjU1ZDY1MDg0MmFkYjZmNmJmNTNkYzk4YmNlOTBkYmJjMzBmYTVjNmYxYTViYzJmMGZmOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelIntro.vue#L197-L214",
+          "version": "repo-lines-v1:sha256:80f71e9036f51f224f7d449f4a54bfc60ac28786e16671fcaace09e51e34018b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc5YzVkMmI5N2Y3ZWQ1MjQ1ZGM2MzJiNDM2NTBkZjJkZGNjNzFlNzZkYjJhZWM2ZjljYmY3YTI5ZDI0NGM1YzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg2ZDM3ODg0ODgwMjljMzE3ODFhNDgwODliMGFmYWZjYzYwN2IzMWE5MzdhY2UxMzkyYmYyNDFmYWRkYTIxMjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNjMWMxZjgxY2NkNjM0Zjg2ZjM4YzMwNjE5OWIzYWNiYTRlNDYyM2YwN2Q5NDU4ZWI5ZmMxYzg2ODk4M2Q3NjIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/novelNavigation.ts#L22-L37",
+          "version": "repo-lines-v1:sha256:c91d301d12760172dccbce9a0b7555bce67d89f0bd4adfe5379ce515fd30ed7a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMDM1YWIwMzRkNjE2OWFlOTFmZmY3YTJlNmE3YjVlMWQ3NTUwYzAwYWRiZjA4YWVmMWJmYjhmNjczMWFkZTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBkZjM4ZDFmYTE2NTMzZTk4NWJjOGE1NzcwZDBlNTYwNzY2NWJiYmMzMmU5NjYyOThhNGViMjViZWVhZjJmZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7870338fe5bd4aa0a7478c18265b64f3",
+      "statement": "When a detail load fails, the existing entry is marked unavailable (never creating an entry for an unread work); the list keeps rendering it with an explicit unavailable label and a remove entry, and a later successful open clears the flag so the mark self-heals.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/IllustDetail.vue#L437-L441",
+          "version": "repo-lines-v1:sha256:e2c07c63e97385f21641ce9ccbc588f2642c93c89dd4155d97a110b925eafedf:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTBjOTM0ZjVjZjU4YzBmYjc2ODA0OGU1OTUwZGY1YjZkZTI1Zjk5M2U3OTNhM2QxYWE5YzczNmYzNDVmZGM1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzU2ZDkyZGY1MjA4YTQwMzZjYTdmNzdlNGQwNmNlZTkwMTBhYmQ1YTliZTZhNzMzMzEwYjI3MzE3N2VkMDQ1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTA4ZjVmOGQ4YjRmZDRhMjIwNWVlMTkxNmM5NjE2OWZjNmEyOWZkMzBlODFmMjNlNTFjMGZmOTllYWZmNjA4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmM3ZmQ3NzUxMjY4NjZmYjY2YmNhNzFlZjRhZWJlYTgwN2M2ZWIxM2Q2MzM1ZjkzMGJjMGI5YjFhODFiMGZiZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L562-L568",
+          "version": "repo-lines-v1:sha256:c7e6a9b4247faa963cb2b995a214be24041adc7922ca1b9f7437b7d09abbf120:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTBjOTM0ZjVjZjU4YzBmYjc2ODA0OGU1OTUwZGY1YjZkZTI1Zjk5M2U3OTNhM2QxYWE5YzczNmYzNDVmZGM1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmZlMDQ3ZWU3MDQ1OGJlM2U3ZjA3NjkzYWMxYmUzMDkwN2IyYzc2NDljYmFiYjZiOWY3NDA4OWI4YzVjYTQ4ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODkzZmE1MDEzNjBhMWUyMzI0ZDI5YmEyYzJlYzU3YmMzNWMxYjVkNzcyZTc2NDYwNDkyYTM4NjNlMjJiYjc1YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDYyMjU4ZmZhYjZiY2NmYTZmNDU3NDMyMGU2MTEwNjdiZTkwYjZjOTk2MGRhOTE3MGVlNTQyMzZlNzhjMmEwYyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L227-L233",
+          "version": "repo-lines-v1:sha256:4ced88bb1b746ae882cf5bf6fd1b4adc568a2af31ca0784c58c877d3b3191e7d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzY3YWVhZmU5YTM1ZmYyNGM0ZDgwZjI4ZDk1MTFjOGU1N2I3MmRmNDk5ZjliNjdjN2JiZjQ4ODQwNzMzYThhZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjU2NGZjZmJhM2VlN2FjNWQ0YWE3NGFkMjdlOThjMzU4ZGMwYTNjMmU0Y2IxOGZlMjYwMTU1NmFjZGIzNzFmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTg1NGY2MmI3NTIxNzk1ODhiMzc3ZTg1Mzc2YWY1NTUwYTNmOGQyNGI1YWJlZDUxNWFkMTkzYmE2MTRiZDg5OCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L333-L339",
+          "version": "repo-lines-v1:sha256:03ddffe66ccadf60b3ea9ed7b9d9d7079314cd1c4c43323761ea776f43cce295:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWU5NzAzY2E0YTY0MjNkOTljNTRlN2RmMTExNTc3YTVhODVkNzZmYTc2NGI1ZWY5OThlOWExODdhYzQ0NDVjYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjBhY2E1YmUwNTlkOWUxZjMwOGVlNGFmMWRjYTczODY3NmU5Zjg0NGI5Y2ZjZDg4YjkwOGM0ODQxMjVmMzEzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTE1MTg5YmRiN2U1ZThiNzc4NjRhNzJiMzYyMWE0NmZiOWZlZmNkNWRmZWQwODI1ZDk1MmQ0NWRlNTA4NDQ4YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_311018d2d97f46fda0d17bf9f5ba81c7",
+      "statement": "The /continue page exposes two separate, irreversible bulk-clear actions behind a confirm dialog — clear all browsing history (browsingHistoryStore.clearAll) and clear finished novels (continueReadingStore.clearCompleted, which preserves in-progress entries) — and they never cascade across axes.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L97-L135",
+          "version": "repo-lines-v1:sha256:3f6c29e45efa6856bb0e3e47b7ae10e82ffeab1070bda7d5abad834e96c9f15b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwMjg2YWUyMDkzOTAyNDM2ZmMzM2EyMzBjZjNhMGYxZDM3ZDllY2I0ZmIyODQzMWYxOGNiY2EyN2RiNzgzNmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2M2UwZTJkNDg3MTkyMzA4NDRjNzA3MGY2MzdjY2JjYmUwYzY1ZGVkNWE1NzY2ODkyMmM1MWNiNzJmNTZhMzYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhM2JiZTE5NGUxNjg5NmIyZTNmYjMwYjFhYWU0NTQ3NWUzYjk5ZDIxMTUzYjNmYWI4ZGZlMjEwMTA3NzQ5YzYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.ts#L242-L258",
+          "version": "repo-lines-v1:sha256:241f6d0ad6d8fc9d8da5835f29bf42b7def7b975ca3730e0771c3a0896fd54e3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzUxZjgyOGNjOTM1NDAzOGVmOWQ5NjE5OTg3YjZmYWJlOTdhMzc4OGQ5MzgyZTU1NjAyMmE5MjAyNDAzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzZDIyNDJkZDA4ZTFkODZlODdiNjgzZmM4NWU3NTBhMjA1NmFkMTIzZWQ1YTI1YTViMzNjNGIwMmJhN2UzYWIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts#L376-L394",
+          "version": "repo-lines-v1:sha256:289bad4caa9bc1aa297da66918c37ccf5651b614cb70bcd5465069cd60a6b395:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzUxZjgyOGNjOTM1NDAzOGVmOWQ5NjE5OTg3YjZmYWJlOTdhMzc4OGQ5MzgyZTU1NjAyMmE5MjAyNDAzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzZDIyNDJkZDA4ZTFkODZlODdiNjgzZmM4NWU3NTBhMjA1NmFkMTIzZWQ1YTI1YTViMzNjNGIwMmJhN2UzYWIifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-05T06:49:09.686Z"
+  }
+}
