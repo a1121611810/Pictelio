@@ -32,7 +32,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
 import { assertDebugApkInstalled, forceStopApp, writePrefKey } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
-import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
+import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 import { SLEEP } from "../helpers";
 
 /** 证据落盘目录（相对 android-e2e/）。失败时人能直接翻出卡在哪一步。 */
@@ -69,9 +69,21 @@ function logHas(serial: string, needle: string): boolean {
   return adb(serial, ["logcat", "-d"], 60_000).includes(needle);
 }
 
+/**
+ * 当前前台 Activity 的组件名。
+ *
+ * ⚠️ dumpsys 给的是**短形式** `io.pictelio.app/.LynxActivity`，而 env 里的常量是
+ * 全限定名 `io.pictelio.app.LynxActivity` —— 直接 endsWith 比对**恒不成立**
+ * （本轮 e2e 就卡在这一步，而前面所有链路其实都已通过）。故两种形式都认。
+ */
 function resumed(serial: string): string {
   const d = adb(serial, ["shell", "dumpsys", "activity", "activities"]);
   return /ResumedActivity:\s*ActivityRecord\{[^}]*u0\s+([^\s]+)/u.exec(d)?.[1] ?? "";
+}
+
+function resumedIsLynx(serial: string): boolean {
+  const c = resumed(serial);
+  return c.endsWith("LynxActivity");
 }
 
 /** 系统里是否真的有本 App 的通知（不是「代码调用没抛异常」）。 */
@@ -198,7 +210,7 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
     );
 
     // 步骤 6：页面确实在前台（落点页非空）
-    await waitFor(() => resumed(serial).endsWith(LYNX_ACTIVITY), 30_000, "落点页处于前台");
+    await waitFor(() => resumedIsLynx(serial), 30_000, "落点页处于前台");
     shoot(serial, "07-landed.png");
   }, 600_000);
 });
