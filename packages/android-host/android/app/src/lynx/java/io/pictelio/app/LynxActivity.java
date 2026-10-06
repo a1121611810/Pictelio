@@ -101,6 +101,27 @@ public class LynxActivity extends AppCompatActivity {
      *  JS 端 settingsStore.loadSettings 读取该键，若 === "true" 则强制 _showR18 / _showR18G = true。
      *  比事件总线更可靠：bundle 渲染时序无关，loadSettings 总会读到。 */
     private static final String DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
+
+    // ─── 通知落点契约（#940 / ADR-0220 决策 8、9）────────────────────────────
+    // ⚠️ 这些常量**不是** dev extra：通知落点必须在 release 可用
+    //   （benchNav 整条链被 BuildConfig.DEBUG + __BENCH_NAV__ 门死，release 不可用）。
+
+    /** 点击意图携带的落点目标页 key */
+    static final String EXTRA_NOTIFICATION_TARGET = "pictelio_notification_target";
+    /** 点击意图携带的本次投递 id（冷启动多窗重发共享同一个 id，JS 据此去重） */
+    static final String EXTRA_NOTIFICATION_CLICK_ID = "pictelio_notification_click_id";
+    /** 唯一落点：通知列表页（#940 AC-1：不是通知中心子页，也不是别的聚合页） */
+    static final String TARGET_NOTIFICATIONS = "notifications";
+    /** 冷启动落点事件（随 onLoadSuccess 多窗重发，4 次） */
+    static final String EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget";
+    /** 热启动落点事件（JS 早已挂载，单次即可） */
+    static final String EVENT_NOTIFICATION_TARGET_WARM = "pictelioNotificationTargetWarm";
+    /** 点击来源编码：冷启动（App 已被系统关闭） */
+    static final int CLICK_KIND_COLD = 1;
+    /** 点击来源编码：热启动（进程存活，用户本就在 App 里） */
+    static final int CLICK_KIND_WARM = 2;
+    /** 多窗重发的四档延时（ms）——与 benchNav 深链同一组数值（1.5/3/4.5/6s） */
+    private static final long[] TARGET_BROADCAST_DELAYS = {1500L, 3000L, 4500L, 6000L};
     /**
      * 翻译 endpoint dev 播种 extras（BuildConfig.DEBUG 门禁）：
      * {@code pictelio_dev_llm_base_url} / {@code pictelio_dev_llm_api_key} / {@code pictelio_dev_llm_model}。
@@ -120,6 +141,9 @@ public class LynxActivity extends AppCompatActivity {
 
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
+
+    /** 本进程是否已渲染过 JS（= 用户可能已经在里面）。点击瞬间读取即「点击前是否活着」。 */
+    private static volatile boolean sProcessRendered = false;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -494,6 +518,7 @@ public class LynxActivity extends AppCompatActivity {
             @Override
             public void onLoadSuccess() {
                 bundleLoaded.set(true);
+                sProcessRendered = true;
                 cancelLoadTimeout();
                 // bench 导航钩子（wayfinder #306，ADR-0136）：adb `am start --es benchNav <scenario>`
                 // 直达目标页。真机 input tap 对放射 FAB 环项 hit-test 失效（事件送达但不导航，
@@ -609,6 +634,12 @@ public class LynxActivity extends AppCompatActivity {
                         }
                     }
                 }
+                // ⚠️ **通知落点分发在 DEBUG 门之外**（#940）：benchNav 那整块被 BuildConfig.DEBUG
+                //   门死、release 被 R8 移除，而通知落点必须在**正式包**里可用
+                //   ——否则这个探测在日常构建上永远点不开。
+                //   手法沿用 benchNav 深链（事件名编码路由 + 多窗重发对抗渲染竞态），
+                //   门禁与载荷约定另立，故不复用 benchNav 的 extra 名与 switch 表。
+                dispatchNotificationTarget(getIntent());
             }
 
             @Override
@@ -961,6 +992,100 @@ public class LynxActivity extends AppCompatActivity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    // ─── 通知落点分派（#940）────────────────────────────────────────────────
+
+    /**
+     * 把 intent 里的通知落点转成 JS 全局事件。
+     *
+     * <p>⚠️ <strong>冷启动必须多窗重发</strong>：bundle 渲染竞态下，页面级监听可能晚于
+     *   onLoadSuccess 那一刻（这是本仓 benchNav 深链踩过的坑，同款延时组）。
+     *   热启动则 JS 早已挂载，单次即可——多发只会白白多记几次到达。
+     *
+     * <p>载荷只带 clickId（单个 Long，见 benchNav illust-detail 先例：lynx 4.0.1 的
+     *   {@code JavaOnlyArray.of} 只实证过单参数）；冷/热由<strong>事件名</strong>区分。
+     *
+     * <p>无落点 extra ⇒ 直接返回（绝大多数启动都走这条，不能误报）。
+     *
+     * <p>⚠️ {@code clickKind} 必须由调用方按 <strong>bundle 是否已加载</strong>判定，
+     *   不能按「onLoadSuccess 传 cold / onNewIntent 传 warm」硬编码——理由见 onNewIntent 的注释。
+     */
+    /** 供 {@link NotificationTapActivity} 在<strong>点击瞬间</strong>调用。 */
+    static boolean wasProcessRenderedBefore() {
+        return sProcessRendered;
+    }
+
+    private void dispatchNotificationTarget(android.content.Intent intent) {
+        if (lynxView == null) return;
+        if (intent == null) return;
+        String target = intent.getStringExtra(EXTRA_NOTIFICATION_TARGET);
+        if (target == null || target.isEmpty()) return;
+        if (!TARGET_NOTIFICATIONS.equals(target)) {
+            // 未知目标：显式告警后不导航（禁静默降级）
+            Log.w(TAG, "通知落点目标未知：" + target + "，不导航");
+            return;
+        }
+        long clickId = intent.getLongExtra(EXTRA_NOTIFICATION_CLICK_ID, 0L);
+        // ⚠️ 判据来自 **NotificationTapReceiver 在点击瞬间**写下的 extra，
+        //   不是 Activity 侧任何可观测状态（bundleLoaded / 哪个回调都被真机打脸过）。
+        boolean wasRunning = NotificationTapActivity.wasRunningAtTap;
+        int clickKind = wasRunning ? CLICK_KIND_WARM : CLICK_KIND_COLD;
+        String event =
+                clickKind == CLICK_KIND_WARM ? EVENT_NOTIFICATION_TARGET_WARM : EVENT_NOTIFICATION_TARGET;
+        // 把判据本身打进日志：kind 是推出来的结论，bundleLoaded 才是依据。
+        // 只打结论时，「进程刚起却被判热」这类矛盾无从追（曾真机打脸过一次）。
+        Log.i(
+                TAG,
+                "通知落点 kind="
+                        + (clickKind == CLICK_KIND_WARM ? "WARM" : "COLD")
+                        + " 点击瞬间进程已运行="
+                        + wasRunning
+                        + " pid="
+                        + android.os.Process.myPid()
+                        + " → "
+                        + event
+                        + " clickId="
+                        + clickId);
+
+        if (clickKind == CLICK_KIND_WARM) {
+            lynxView.sendGlobalEvent(event, JavaOnlyArray.of(clickId));
+            Log.i(TAG, "通知落点（热启动）→ " + event + " clickId=" + clickId);
+            return;
+        }
+        for (long delay : TARGET_BROADCAST_DELAYS) {
+            final long id = clickId;
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(
+                            () -> {
+                                if (!isFinishing() && lynxView != null) {
+                                    lynxView.sendGlobalEvent(event, JavaOnlyArray.of(id));
+                                }
+                            },
+                            delay);
+        }
+        Log.i(TAG, "通知落点（冷启动）→ " + event + " clickId=" + clickId + "，四次广播");
+    }
+
+    /**
+     * 热启动落点（#940 AC-6）。
+     *
+     * <p>⚠️ {@code setIntent} 不可省：不调用的话 {@code getIntent()} 仍返回<strong>首次</strong>启动的
+     *   intent，后续点击带来的 extra 会被静默丢弃——正是 ADR-0220 §6-3 点名的
+     *   「onNewIntent 未 override ⇒ extra 静默丢弃 ⇒ 点了像没点」。
+     *
+     * <p>⚠️⚠️ <strong>不能用「哪个回调触发」判冷热</strong>（真机打脸过一次）：
+     *   点击意图带 {@code FLAG_ACTIVITY_SINGLE_TOP}，任务记录仍在（用户只是 HOME 了、
+     *   进程被系统回收）时，Android 会把新 intent 以 {@code onNewIntent} 投给
+     *   <strong>已重建</strong>的 Activity——回调是热的，进程却是新起的，用户**并不在** App 里。
+     *   真机实证：`am kill` 后进程确已死亡，落点仍被判成「热启动」。
+     *   判据必须是 <strong>bundle 是否已加载</strong>（= JS 是否已在跑 = 用户是否可能在里面）。
+     */
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        dispatchNotificationTarget(intent);
     }
 
     @Override

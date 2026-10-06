@@ -55,6 +55,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+        <!-- 送达通道 · 触达探测的落点中转（#940）。NoDisplay：用户看不到它；
+             exported=false：只由自家通知的 PendingIntent 触发，否则外部可伪造点击刷计数。 -->
+        <activity
+            android:name="io.pictelio.app.NotificationTapActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
     </application>
 
     <!-- Permissions -->

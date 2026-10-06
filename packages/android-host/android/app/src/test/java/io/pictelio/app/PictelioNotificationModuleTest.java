@@ -2,6 +2,7 @@ package io.pictelio.app;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -136,8 +137,7 @@ public class PictelioNotificationModuleTest {
     }
 
     @Test
-    public void postTo_连续多轮互相覆盖而非堆叠() {
-        // 探测关心的是「有没有送达」，堆一屏同 id 通知只会干扰用户且无额外信息量。
+    public void postTo_连续多轮互相覆盖而非堆叠() {        // 探测关心的是「有没有送达」，堆一屏同 id 通知只会干扰用户且无额外信息量。
         PictelioNotificationModule.postTo(ctx(), nm(), 1, ZH);
         PictelioNotificationModule.postTo(ctx(), nm(), 2, ZH);
         assertEquals("同 id 覆盖，不堆叠", 1, shadow().size());
@@ -161,5 +161,43 @@ public class PictelioNotificationModuleTest {
         // 若这里抛出去，JS 侧拿不到 (false, msg) 形态的回调，降级到角标的链路就断了。
         shadow().setNotificationsEnabled(false);
         assertEquals(false, PictelioNotificationModule.notificationsEnabledNow(nm()));
+    }
+
+    // ─── 点击意图（#940：contentIntent 为 null 就是 ADR-0220 §6-3 的「点了没点」）──
+
+    @Test
+    public void postTo_通知带点击意图() {
+        PictelioNotificationModule.postTo(ctx(), nm(), 1, ZH);
+        android.app.PendingIntent pi = shadow().getAllNotifications().get(0).contentIntent;
+        assertNotNull(
+                "点击意图为 null ⇒ 点了通知直接消失而无反应（ADR-0220 §6-3），#940 的核心交付", pi);
+    }
+
+    @Test
+    public void postTo_点击意图带落点与clickId() {
+        // 载荷只承载 clickId（lynx 4.0.1 的 JavaOnlyArray.of 只实证过单个 Long），
+        // 冷/热由**事件名**区分；clickId 缺失则 JS 无法去重，一次点击会被记 4 次。
+        PictelioNotificationModule.postTo(ctx(), nm(), 1, ZH);
+        android.app.PendingIntent pi = shadow().getAllNotifications().get(0).contentIntent;
+        assertNotNull(pi);
+        android.content.Intent saved = Shadows.shadowOf(pi).getSavedIntent();
+        assertNotNull("拿不到 PendingIntent 内的 Intent，载荷断言无从谈起", saved);
+        // 落点目标由接收器在点击瞬间补上，PendingIntent 里只带 clickId
+        assertEquals("PendingIntent 必须指向中转 Activity（才能在点击瞬间判定进程是否已运行，且豁免 BAL）",
+                NotificationTapActivity.class.getName(), saved.getComponent().getClassName());
+        assertTrue("clickId 缺失 ⇒ 一次点击记 4 次",
+                saved.getLongExtra(LynxActivity.EXTRA_NOTIFICATION_CLICK_ID, 0L) > 0L);
+    }
+
+    @Test
+    public void 点击意图的clickId就是本轮传入的那个() {
+        // 去重键必须逐轮不同，否则第二轮的点击会被第一轮的记录吃掉。
+        // ⚠️ 不断言 PendingIntent 的 hashCode：Robolectric 的影子按 requestCode 算，
+        //   同一个 requestCode + 不同 extras 也会相等 —— 拿它当判别式是假断言。
+        android.content.Intent saved = Shadows.shadowOf(
+                PictelioNotificationModule.clickIntent(ctx(), 4242L)).getSavedIntent();
+        assertNotNull(saved);
+        assertEquals("载荷里的 clickId 必须就是本轮传入的那个",
+                4242L, saved.getLongExtra(LynxActivity.EXTRA_NOTIFICATION_CLICK_ID, -1L));
     }
 }

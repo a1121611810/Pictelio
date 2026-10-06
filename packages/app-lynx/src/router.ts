@@ -86,6 +86,11 @@ import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
 import PlatformCheck from './pages/PlatformCheck.vue'
+import {
+  EVENT_NOTIFICATION_TARGET,
+  EVENT_NOTIFICATION_TARGET_WARM,
+  handleNotificationTarget,
+} from './utils/deliveryProbeLanding'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -546,6 +551,45 @@ function registerBenchNavHandler(): void {
 // 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
 // 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。
 if (isNativeMode()) registerBenchNavHandler()
+
+/**
+ * 通知落点（#940 / ADR-0220 决策 8、9）：点系统通知 → 落到 /notifications。
+ *
+ * ⚠️ **刻意不受 `__BENCH_NAV__` 门禁**：benchNav 是设备取证通道，release 被 R8 移除；
+ *   而通知落点是产品行为，必须在正式包可用。
+ *
+ * ⚠️ 两个事件名分冷/热：冷启动那一跳原生广播 4 次（对抗渲染竞态），热启动单次。
+ *   去重在 {@link handleNotificationTarget} 内按 clickId 做 —— navigate 幂等但**计数不幂等**。
+ */
+let notificationTargetRegistered = false
+function registerNotificationTargetHandler(): void {
+  if (notificationTargetRegistered) return
+  notificationTargetRegistered = true
+  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx
+  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+  if (!emitter || typeof emitter.addListener !== 'function') {
+    console.warn('[router] GlobalEventEmitter 不可用，通知落点未注册（web-core 预览属预期）')
+    return
+  }
+  const dedupe = { seen: new Set<number>() }
+  for (const [event, provenance] of [
+    [EVENT_NOTIFICATION_TARGET, 'cold'],
+    [EVENT_NOTIFICATION_TARGET_WARM, 'warm'],
+  ] as const) {
+    emitter.addListener(event, (...args: unknown[]) => {
+      const clickId = args[0]
+      if (typeof clickId !== 'number' || !Number.isFinite(clickId)) {
+        // 载荷缺 clickId 就无法去重 ⇒ 宁可这次不计，也不能把一次点击记 4 次
+        console.warn('[router] 通知落点载荷缺 clickId，跳过（不导航不计数）')
+        return
+      }
+      void handleNotificationTarget(dedupe, clickId, provenance)
+      void navigate('/notifications', { replace: true })
+    })
+  }
+}
+// 同 benchNav：模块加载即注册，早于 initRouter 的 token 恢复
+if (isNativeMode()) registerNotificationTargetHandler()
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {

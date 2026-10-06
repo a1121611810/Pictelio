@@ -66,7 +66,7 @@ describe("deliveryProbe · 计数语义", () => {
       await s.load()
       await s.recordSent()
       await s.recordSent()
-      await s.recordClicked()
+      await s.recordClicked("cold")
       const startedAt = s.counts.startedAt
       expect(startedAt).not.toBeNull()
 
@@ -90,7 +90,7 @@ describe("deliveryProbe · 计数语义", () => {
       const s = useDeliveryProbeStore()
       await s.load()
       await s.recordSent()
-      await s.recordClicked()
+      await s.recordClicked("cold")
       const raw = store.map.get(DELIVERY_PROBE_KEY)
       expect(raw).toBeTruthy()
       const v = JSON.parse(raw!)
@@ -103,7 +103,7 @@ describe("deliveryProbe · 计数语义", () => {
       const first = useDeliveryProbeStore()
       await first.load()
       await first.recordSent()
-      await first.recordClicked()
+      await first.recordClicked("warm")
 
       setActivePinia(createPinia())
       const second = useDeliveryProbeStore()
@@ -118,6 +118,49 @@ describe("deliveryProbe · 计数语义", () => {
       await s.recordSent()
       await s.load()
       expect(s.counts.sent, "重复 load 覆盖了内存计数").toBe(1)
+    })
+  })
+
+  describe("点击样本的冷/热拆分（#940：App 存活时的点击不构成「被通知叫回来」）", () => {
+    it("clicked 恒等于冷+热（保持 D12 的分子语义，不改既有字段含义）", async () => {
+      const s = useDeliveryProbeStore()
+      await s.recordClicked("cold")
+      await s.recordClicked("warm")
+      await s.recordClicked("warm")
+      expect(s.counts.clicked).toBe(3)
+      expect(s.counts.clickedCold).toBe(1)
+      expect(s.counts.clickedWarm).toBe(2)
+    })
+
+    it("重置轮次清掉冷/热拆分、**保留** startedAt（ADR-0220 D12 字段级重置）", async () => {
+      const s = useDeliveryProbeStore()
+      await s.recordSent()
+      await s.recordClicked("cold")
+      await s.resetRound()
+      expect(s.counts.clicked).toBe(0)
+      expect(s.counts.clickedCold).toBe(0)
+      expect(s.counts.clickedWarm).toBe(0)
+      expect(s.counts.sent).toBe(0)
+      expect(s.counts.startedAt, "startedAt 跨轮保留（否则多轮时间线断裂）").not.toBeNull()
+    })
+
+    it("存量 JSON 缺冷/热字段 ⇒ 按 0 处理，不得解析失败", () => {
+      // 真机上已有旧格式 { sent, clicked, startedAt }；解析炸掉会把旧数据全丢，
+      // 探测报告的分母凭空归零。
+      const old = parseCounts(JSON.stringify({ sent: 3, clicked: 1, startedAt: 1000 }))
+      expect(old.clickedCold).toBe(0)
+      expect(old.clickedWarm).toBe(0)
+      expect(old.sent, "旧数据本身不能丢").toBe(3)
+      expect(old.clicked).toBe(1)
+    })
+
+    it("畸形冷/热字段（字符串/null/NaN）⇒ 按 0 处理而非 NaN 污染", () => {
+      const bad = parseCounts(
+        JSON.stringify({ sent: 1, clicked: 2, clickedCold: "x", clickedWarm: null, startedAt: null }),
+      )
+      expect(bad.clickedCold).toBe(0)
+      expect(bad.clickedWarm).toBe(0)
+      expect(bad.clicked).toBe(2)
     })
   })
 

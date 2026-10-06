@@ -3,7 +3,9 @@ package io.pictelio.app;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
 
@@ -30,21 +32,18 @@ import com.lynx.tasm.behavior.LynxContext;
  *       自动弹权限框等于替用户做决定，且第二次弹会被当作骚扰；降级路径是已交付的
  *       外环未读角标（零新增成本）。</li>
  *   <li><b>不逐条发</b>——决策 6：一次轮询 = 一条汇总，条数只进文案。</li>
- *   <li><b>不设点击落点</b>——决策 9：冷启动落点属 #940，本模块<strong>完全不发</strong>
- *       {@code setContentIntent}（真机 dumpsys 实证 {@code contentIntent=null}）。</li>
  * </ul>
  *
- * <p>⚠️ <strong>已知失效面，勿当成已解决</strong>（ADR-0220 §6-3 要求「实施期必须处理」，
- *   本票两条路都选了「不发」）：
- *   <ul>
- *     <li>无点击意图的通知被点后<strong>直接消失而无反应</strong>（{@code setAutoCancel}）；</li>
- *     <li>而本模块发通知的时机是「用户在前台静默 90s 后」（ADR-0220 §3.1 的近似），
- *         即被点的用户本就开着 App —— 这一记点击因此不构成「被通知叫回来」的信号，
- *         <strong>会污染点击率分子</strong>。</li>
- *   </ul>
- *   两条都由 #940（点击落点 + onNewIntent）收口。此处登记而非掩盖：双轴 review 均判它阻塞，
- *   已连同票面一并升级给票据负责人。字面执行 §6-3 的「该情形不发通知」会导致**永不发**
- *   （探测只在进入前台时排时），故「不发」与「永不排」不能同时取。
+ * <p><b>点击落点（#940）</b>：通知带 {@code setContentIntent}，点开启动 LynxActivity
+ *   并带上目标页与 {@code clickId}。本模块<strong>不</strong>关心冷/热——那是 Activity 层
+ *   的进程状态，由 LynxActivity 分派到两个不同的事件名（冷 / 热），
+ *   JS 侧据此把点击拆成 {@code clickedCold} / {@code clickedWarm}。
+ *
+ * <p>⚠️ {@code clickId} 在**每次投递**时重新生成：冷启动那一跳要广播 4 次对抗渲染竞态，
+ *   而计数不是幂等的（同 id 的 4 次到达只应记 1 次）——id 相同是去重的前提。
+ *
+ * <p>⚠️ <b>本桥<strong>不</strong>申请权限、不写计数</b>（决策 3 / 13）：计数由 JS 侧 store
+ *   单写（ADR-0220 §5：复用 PictelioPrefs，无需新建存储模块）。
  *
  * <p><b>文案为什么在宿主侧组装</b>：语言是 JS 侧 i18n 核心的模块级 ref，切语言即时生效；
  *   而本模块的通知<b>只能在</b>宿主发。若让 JS 把成品文案传进来，「条数 → 文案」这条
@@ -187,7 +186,34 @@ public class PictelioNotificationModule extends LynxModule {
                 .setContentTitle("Pictelio")
                 .setContentText(summaryText(unreadCount, locale))
                 .setAutoCancel(true)
+                .setContentIntent(clickIntent(ctx))
                 .build();
         nm.notify(NOTIFICATION_ID, n);
+    }
+
+    /**
+     * 点击意图：指向 {@link NotificationTapActivity} 中转，由它在<strong>点击瞬间</strong>判定进程状态
+     *     再转交 LynxActivity（#940）。
+     *
+     * <p>⚠️ <strong>必须走 Broadcast 而不是直接 getActivity</strong>：只有接收器能在**点击瞬间**
+     *   于 App 进程内执行，从而回答「点击之前 App 是否已经活着」。
+     *   任何 Activity 侧信号（bundleLoaded、onCreate/onNewIntent 哪个回调）都在点击之后才可观测，
+     *   真机已实证两次判反。
+     *
+     * <p>⚠️ {@code clickId} 用<strong>投递时刻</strong>而不是点击时刻：PendingIntent 在
+     *   投递时就定型了，而「同一次投递的多窗重发携带同一个 id」正是 JS 去重要的性质。
+     */
+    static PendingIntent clickIntent(Context ctx, long clickId) {
+        Intent tap = new Intent(ctx, NotificationTapActivity.class);
+        tap.putExtra(LynxActivity.EXTRA_NOTIFICATION_CLICK_ID, clickId);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        // ⚠️ 必须是 getActivity：getBroadcast + 接收器里 startActivity 会被 Android 10+ 的
+        //   后台 Activity 启动限制拦掉（实测接收器日志打了、App 没起来）。
+        //   中转 Activity 由系统发起 ⇒ 豁免 BAL，且它此刻在前台，转发也合法。
+        return PendingIntent.getActivity(ctx, NOTIFICATION_ID, tap, flags);
+    }
+
+    static PendingIntent clickIntent(Context ctx) {
+        return clickIntent(ctx, System.currentTimeMillis());
     }
 }

@@ -59,6 +59,10 @@ const LIFECYCLE_CODE = stripComments(
 const TRIGGER_CODE = stripComments(
   safeRead(new URL('../utils/deliveryProbeTrigger.ts', import.meta.url)),
 )
+const LANDING_CODE = stripComments(
+  safeRead(new URL('../utils/deliveryProbeLanding.ts', import.meta.url)),
+)
+const ROUTER_CODE = stripComments(safeRead(new URL('../router.ts', import.meta.url)))
 const NOTIFY_MODULE_CODE = stripComments(
   safeRead(
     new URL(
@@ -267,21 +271,148 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       expect(new Set(called)).not.toEqual(new Set(['areNotificationsEnabled', 'postSummary'])) // 本组：拦得住
     })
 
-    it('⚠️ 通知当前**完全没有点击意图**（#940 范围；本条显式记录现状）', () => {
-      // ADR-0220 §6-3 要求的二选一：不发通知，或补 onNewIntent。二者都不在本票范围内 ——
-      // 点击落点整体归 #940。本票的处置是「钉住现状 + 记录归属」，不是假装它已解决。
-      //
-      // ⚠️ 现状的准确形态是**无 contentIntent**（真机 dumpsys 实证 contentIntent=null），
-      // 不是「有跳转载荷但跳不过去」。两者不可混为一谈：后者是半接线，最难排查；
-      // 前者是「没有可点的东西」，#940 落地后本条转红即提示改成真正的跨端比对。
+    it('⚠️ 通知点击的冷/热落点两侧逐字一致（#940：#939 的「无点击意图」绊线到此转红）', () => {
+      // #939 交付时本条是「显式记录现状」的绊线：断言通知**没有** setContentIntent。
+      // #940 落地后它如期转红 —— 这正是当初写它的目的（提示改成真正的跨端比对）。
+      // 现在比的是**两侧事件名 + 落点路由**，事件名取自 JS 侧源码（不在本文件硬写）。
+      const cold = LANDING_CODE.match(
+        /export const EVENT_NOTIFICATION_TARGET\s*=\s*["']([^"']+)["']/,
+      )?.[1]
+      const warm = LANDING_CODE.match(
+        /export const EVENT_NOTIFICATION_TARGET_WARM\s*=\s*["']([^"']+)["']/,
+      )?.[1]
+      expect(cold, '未能从落点模块抽出冷启动事件名').not.toBeUndefined()
+      expect(warm, '未能从落点模块抽出热启动事件名').not.toBeUndefined()
+
+      expect(ACTIVITY_CODE, `宿主未广播冷启动落点事件 ${cold}`).toContain(cold as string)
+      expect(ACTIVITY_CODE, `宿主未广播热启动落点事件 ${warm}`).toContain(warm as string)
+      // JS 侧必须真的订阅这两个名字（导出不等于被消费）
+      expect(ROUTER_CODE, 'router 未订阅落点事件').toContain('EVENT_NOTIFICATION_TARGET')
+      expect(ROUTER_CODE, 'router 未订阅热启动落点事件').toContain(
+        'EVENT_NOTIFICATION_TARGET_WARM',
+      )
+      expect(ROUTER_CODE, '落点未导航到通知列表页').toContain("navigate('/notifications'")
+    })
+
+    it('落点目标与事件名在宿主侧都是**真实代码**而非注释（#940 变异自证）', () => {
+      // 正向：宿主当前确实声明了落点目标为通知列表页（剥注释后仍在）
+      expect(ACTIVITY_CODE, '宿主未声明通知落点目标').toMatch(
+        /TARGET_NOTIFICATIONS\s*=\s*"notifications"/,
+      )
+
+      // 变异 A：只在注释里留落点路由字符串（代码里换成别的）
+      const commentOnly = '// case "notifications" -> emit pictelioNotificationTarget;'
+      expect(commentOnly).toContain('notifications') // 朴素 toContain 会命中
+      expect(stripComments(commentOnly)).not.toContain('notifications')
+
+      // 变异 B：把落点改成另一个页面 —— 逐字比对必须转红
+      const drift = 'static final String TARGET_NOTIFICATIONS = "shelf";'
+      expect(drift).not.toMatch(/TARGET_NOTIFICATIONS\s*=\s*"notifications"/)
+    })
+
+    it('⚠️ 点击意图必须带 clickId 载荷（没有它就无法去重 ⇒ 一次点击记 4 次）', () => {
       expect(
         NOTIFY_MODULE_CODE,
-        '原生侧意外已设置点击意图 ⇒ 半接线落点，#940 落地后须改为真正的跨端比对',
-      ).not.toMatch(/setContentIntent|PendingIntent|benchNavNavigate/)
+        '点击意图未携带 clickId ⇒ 冷启动 4 次广播会被记成 4 次点击',
+      ).toMatch(/EXTRA_NOTIFICATION_CLICK_ID/)
+      expect(NOTIFY_MODULE_CODE, '点击意图未设置 contentIntent').toMatch(/setContentIntent/)
+      // 载荷必须真的进 intent（只读常量名 = 没接上）
+      expect(NOTIFY_MODULE_CODE, 'clickId 只声明未 putExtra').toMatch(
+        /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_CLICK_ID/,
+      )
+    })
+
+    it('⚠️ 热启动必须 override onNewIntent 且 setIntent（否则 extra 静默丢弃）', () => {
+      // ADR-0220 §6-3 点名的失效机制：onNewIntent 未 override ⇒ getIntent() 仍返回首次的
+      // intent ⇒ 点击带来的 extra 被丢弃 ⇒「点了像没点」。
+      expect(ACTIVITY_CODE, '未 override onNewIntent ⇒ 热启动落点永不触发').toMatch(
+        /protected void onNewIntent\(/,
+      )
+      expect(
+        ACTIVITY_CODE,
+        'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
+      ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
+      // 热启动须单次广播（JS 已挂载），冷启动才多窗重发
+      expect(ACTIVITY_CODE, '热启动未走单次广播分支').toMatch(
+        /CLICK_KIND_WARM[\s\S]*?sendGlobalEvent[\s\S]*?return/,
+      )
+    })
+
+    it('⚠️ 冷热判据必须来自**点击瞬间**（#940 变异自证：Activity 侧信号两次判反）', () => {
+      // 真机连续打脸两次：
+      //  ① 按「哪个回调」判 —— SINGLE_TOP + 任务记录仍在时，进程被系统回收也会走 onNewIntent；
+      //  ② 改按「bundle 是否已加载」判 —— onNewIntent 在 bundle 加载**之后**才送达，
+      //     实测 bundleLoaded=true 而进程是这次点击才起来的。
+      // ⇒ 任何 Activity 侧信号都在点击之后才可观测，天然答不了「点击前是否活着」。
+      // 唯一正解：PendingIntent.getBroadcast → 接收器在点击瞬间于进程内执行。
       expect(
         NOTIFY_MODULE_CODE,
-        '出现落点键名但未接线 ⇒ 属更危险的半接线形态（载荷在、路径不在）',
-      ).not.toMatch(/pictelioNotificationTarget/)
+        '点击意图未走 BroadcastReceiver ⇒ 冷热判据取不到点击瞬间的事实',
+      ).toMatch(/PendingIntent\.getActivity\(\s*ctx,\s*NOTIFICATION_ID,\s*tap,\s*flags\s*\)/)
+      // ⚠️ 不能是 getBroadcast：接收器里 startActivity 会被 Android 10+ 的 BAL 限制拦掉，
+      //   实测「接收器日志打了、App 没起来」⇒ 通知退回成「点了没反应」。
+      expect(
+        NOTIFY_MODULE_CODE,
+        '点击走 BroadcastReceiver ⇒ 被后台 Activity 启动限制拦掉，点了没反应',
+      ).not.toMatch(/PendingIntent\.getBroadcast\(/)
+      expect(
+        NOTIFY_MODULE_CODE,
+        'PendingIntent 必须指向中转 Activity（点击瞬间才可判定进程是否已运行）',
+      ).toMatch(/NotificationTapActivity\.class/)
+      expect(
+        MANIFEST_CODE,
+        '中转 Activity 未在清单注册 ⇒ 点击时被系统忽略，通知变成「点了没反应」',
+      ).toContain('NotificationTapActivity')
+      expect(
+        MANIFEST_CODE,
+        '中转 Activity 未配 NoDisplay ⇒ 用户会看到一闪而过的空页面',
+      ).toMatch(/NotificationTapActivity[\s\S]{0,200}Theme\.NoDisplay/)
+      // 接收器必须把「点击瞬间进程是否已运行」写进启动 intent
+      expect(ACTIVITY_CODE, '缺少「点击瞬间进程是否已运行」的判据读取').toMatch(
+        /NotificationTapActivity\.wasRunningAtTap/
+      )
+      // 且必须是 not-exported：否则第三方可伪造点击刷计数
+      expect(MANIFEST_CODE, '中转 Activity exported ⇒ 外部可伪造点击污染计数').toMatch(
+        /NotificationTapActivity[\s\S]{0,160}exported="false"/
+      )
+    })
+
+    it('⚠️ 点击意图必须带 clickId 载荷（没有它就无法去重 ⇒ 一次点击记 4 次）', () => {
+      expect(
+        NOTIFY_MODULE_CODE,
+        '点击意图未携带 clickId ⇒ 冷启动 4 次广播会被记成 4 次点击',
+      ).toMatch(/EXTRA_NOTIFICATION_CLICK_ID/)
+      expect(NOTIFY_MODULE_CODE, '点击意图未设置 contentIntent').toMatch(/setContentIntent/)
+      // 载荷必须真的进 intent（只读常量名 = 没接上）
+      expect(NOTIFY_MODULE_CODE, 'clickId 只声明未 putExtra').toMatch(
+        /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_CLICK_ID/,
+      )
+    })
+
+    it('⚠️ 热启动必须 override onNewIntent 且 setIntent（否则 extra 静默丢弃）', () => {
+      // ADR-0220 §6-3 点名的失效机制：onNewIntent 未 override ⇒ getIntent() 仍返回首次的
+      // intent ⇒ 点击带来的 extra 被丢弃 ⇒「点了像没点」。
+      expect(ACTIVITY_CODE, '未 override onNewIntent ⇒ 热启动落点永不触发').toMatch(
+        /protected void onNewIntent\(/,
+      )
+      expect(
+        ACTIVITY_CODE,
+        'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
+      ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
+      // 热启动须单次广播（JS 已挂载），冷启动才多窗重发
+      expect(ACTIVITY_CODE, '热启动未走单次广播分支').toMatch(
+        /CLICK_KIND_WARM[\s\S]*?sendGlobalEvent[\s\S]*?return/,
+      )
+    })
+
+    it('⚠️ onNewIntent 必须 setIntent（否则点击 extra 被静默丢弃）', () => {
+      expect(
+        ACTIVITY_CODE,
+        'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
+      ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
+      expect(ACTIVITY_CODE, 'onNewIntent 未转发落点').toMatch(
+        /onNewIntent[\s\S]*?dispatchNotificationTarget\(intent\)/,
+      )
     })
   })
 
