@@ -130,4 +130,43 @@ describe("探测报告 · 口径诚实（#941）", () => {
       expect(r.rateText).toContain("无法计算")
     })
   })
+  describe("真机样本（测试硬约束 2：mock 必须来自真实数据源）", () => {
+    // ⚠️ 原样取自设备 SharedPreferences 的 delivery_probe_v1（API 34 模拟器，
+    //   #942 e2e 那几轮真机跑出来的）。
+    //   ⚠️️ 注意：**不要**把 dumpsys/grep 看到的 &quot; 写进夹具——那是 **XML 存储层**的转义，
+    //   而 PictelioPrefsModule 交给 JS 的值已经是真引号。我第一版就把这两层混了，
+    //   结果 parseCounts 拿到一坨带转义的串、sent 被判成 0——
+    //   **这恰好是测试硬约束 2 要防的那类错**：自己造了个自洽样本，把真坑测没了。
+    const REAL_DEVICE_JSON = '{"sent":16,"clicked":9,"startedAt":1791299940085}';
+
+    it("能解析设备原样回传的串并得出诚实结论", async () => {
+      const { parseCounts } = await import("../stores/deliveryProbeStore");
+      const { unquoteNativeString } = await import("../utils/tokenStorage");
+
+      const counts = parseCounts(unquoteNativeString(REAL_DEVICE_JSON));
+      expect(counts.sent, "设备上的真实发出样本数").toBe(16);
+      expect(counts.clicked, "设备上的真实点击样本数").toBe(9);
+      expect(counts.startedAt).not.toBeNull();
+
+      const r = buildProbeReport({ counts, permissionGranted: true });
+      // 16 发 9 点 ⇒ 真有点击，且数字本身自洽（分子未超分母）
+      expect(r.verdict).toBe("clicked");
+      expect(r.anomalies, "真实数据不应被判为自相矛盾").toEqual([]);
+      expect(r.rateText).toBe("56%");
+      // ⚠️ 但**不得**据此声称「被叫回来 9 次」——四条限制里明写着不可区分
+      expect(r.caveats.join()).toContain("无法区分");
+    });
+
+    it("同一份真实数据在权限未授予时，结论翻转成 no-data（而非「没人点」）", async () => {
+      const { parseCounts } = await import("../stores/deliveryProbeStore");
+      const { unquoteNativeString } = await import("../utils/tokenStorage");
+      const counts = parseCounts(unquoteNativeString(REAL_DEVICE_JSON));
+
+      // 有 16 发 9 点却「权限未授予」⇒ 数据自相矛盾，报告必须并列展示而非照单全收
+      const r = buildProbeReport({ counts, permissionGranted: false });
+      expect(r.verdict).toBe("no-data");
+      expect(r.anomalies).toContain("permission=denied-but-sent>0");
+    });
+  });
+
 })
