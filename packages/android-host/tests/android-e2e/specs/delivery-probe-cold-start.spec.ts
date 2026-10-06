@@ -76,7 +76,9 @@ function resumed(serial: string): string {
 
 /** 系统里是否真的有本 App 的通知（不是「代码调用没抛异常」）。 */
 function notificationPresent(serial: string): boolean {
-  return adb(serial, ["shell", "dumpsys", "notification"], 60_000).includes("pictelio_delivery_probe");
+  return adb(serial, ["shell", "dumpsys", "notification"], 60_000).includes(
+    "pictelio_delivery_probe",
+  );
 }
 
 function shoot(serial: string, name: string): string {
@@ -103,13 +105,23 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
   });
 
   afterAll(() => {
-    if (serial) runOrThrow(adbPath(), ["-s", serial, "shell", "cmd", "statusbar", "collapse"], 30_000);
+    if (serial)
+      runOrThrow(adbPath(), ["-s", serial, "shell", "cmd", "statusbar", "collapse"], 30_000);
   });
 
   it("强杀进程后点通知 ⇒ 冷启动落到通知中心页并记 1 次点击", async () => {
     // 步骤 1：启动 App（登录态由 devLoginIntent 在外层 spec 播种；此处只验链路）
-    runOrThrow(adbPath(), ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/.LynxActivity`], 60_000);
-    await waitFor(() => logHas(serial, "deliveryProbe"), 60_000, "App 启动并挂上探测链", shoot(serial, "01-boot.png"));
+    runOrThrow(
+      adbPath(),
+      ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/.LynxActivity`],
+      60_000,
+    );
+    await waitFor(
+      () => logHas(serial, "deliveryProbe"),
+      60_000,
+      "App 启动并挂上探测链",
+      shoot(serial, "01-boot.png"),
+    );
 
     // 步骤 2：等静默期走完，探测器发出汇总通知
     await waitFor(
@@ -118,7 +130,12 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
       "探测器发出汇总通知（未读为 0 或权限未授予时本步会超时——属预期，见已知失效面 2）",
       shoot(serial, "02-no-notification.png"),
     );
-    await waitFor(() => notificationPresent(serial), 30_000, "通知落到系统通知栏", shoot(serial, "03-no-system-notification.png"));
+    await waitFor(
+      () => notificationPresent(serial),
+      30_000,
+      "通知落到系统通知栏",
+      shoot(serial, "03-no-system-notification.png"),
+    );
 
     // 步骤 3：退到后台让进程变成可被回收态，再用 am kill 强杀
     //（force-stop 会连通知一起清掉，冷启动场景就构造不出来了 —— 已知失效面 3）
@@ -132,21 +149,47 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
     expect(notificationPresent(serial), "am kill 后通知应仍在（强杀进程不清通知）").toBe(true);
 
     // 步骤 4：点通知
-    runOrThrow(adbPath(), ["-s", serial, "shell", "cmd", "statusbar", "expand-notifications"], 30_000);
+    runOrThrow(
+      adbPath(),
+      ["-s", serial, "shell", "cmd", "statusbar", "expand-notifications"],
+      30_000,
+    );
     await SLEEP(3_000);
     shoot(serial, "04-shade.png");
     runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
-    runOrThrow(adbPath(), ["-s", serial, "shell", "input", "tap", String(NOTIFICATION_TAP_X), String(NOTIFICATION_TAP_Y)], 30_000);
+    runOrThrow(
+      adbPath(),
+      [
+        "-s",
+        serial,
+        "shell",
+        "input",
+        "tap",
+        String(NOTIFICATION_TAP_X),
+        String(NOTIFICATION_TAP_Y),
+      ],
+      30_000,
+    );
 
     // 步骤 5：断言落点被分派并落地（oracle = 原生日志，见文件头）
     //  ⚠️ **不**断言 kind=COLD/WARM：广播次数判据已在 #940 被证伪并移除（恒为四窗重发），
     //  冷启动性由步骤 3 的前置条件证明（点通知前 pidof 为空）。
-    await waitFor(() => logHas(serial, "通知落点"), 60_000, "落点被分派", shoot(serial, "05-no-landing.png"));
+    await waitFor(
+      () => logHas(serial, "通知落点"),
+      60_000,
+      "落点被分派",
+      shoot(serial, "05-no-landing.png"),
+    );
     expect(
       logHas(serial, "四次广播"),
       "落点未走四窗重发 ⇒ 渲染竞态下页面级监听未挂，点击会丢。证据: evidence/05-no-landing.png",
     ).toBe(true);
-    await waitFor(() => logHas(serial, "记 1 个点击样本"), 30_000, "点击被记 1 次", shoot(serial, "06-no-click.png"));
+    await waitFor(
+      () => logHas(serial, "记 1 个点击样本"),
+      30_000,
+      "点击被记 1 次",
+      shoot(serial, "06-no-click.png"),
+    );
 
     // 步骤 6：页面确实在前台（落点页非空）
     await waitFor(() => resumed(serial).endsWith(LYNX_ACTIVITY), 30_000, "落点页处于前台");
