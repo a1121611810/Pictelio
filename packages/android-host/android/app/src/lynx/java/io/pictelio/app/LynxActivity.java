@@ -1035,6 +1035,8 @@ public class LynxActivity extends AppCompatActivity {
         long clickId = intent.getLongExtra(EXTRA_NOTIFICATION_CLICK_ID, 0L);
         // ⚠️ 判据来自 **NotificationTapReceiver 在点击瞬间**写下的 extra，
         //   不是 Activity 侧任何可观测状态（bundleLoaded / 哪个回调都被真机打脸过）。
+        // ⚠️ 判据来自**进程外持久标记**（中转在点击瞬间写入），不是任何进程内状态：
+        //   真机实证 Android 会在投递中转前重建栈顶的 LynxActivity，把进程级静态写好。
         boolean wasRunning = NotificationTapActivity.wasRunningAtTap;
         int clickKind = wasRunning ? CLICK_KIND_WARM : CLICK_KIND_COLD;
         String event =
@@ -1097,6 +1099,8 @@ public class LynxActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // 「点击时用户是否在 App 里」的持久标记置前台（见 markAppBackgrounded 的说明）
+        markAppBackgrounded(getApplication(), false);
         if (lynxView != null) {
             lynxView.onEnterForeground();
             // 送达通道 · 触达探测（ADR-0220 决策 2）：进入前台事件。
@@ -1129,12 +1133,48 @@ public class LynxActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        markAppBackgrounded(getApplication(), true);
         if (lynxView != null) {
             lynxView.onEnterBackground();
             // 离开前台事件（ADR-0220 决策 2）：与 onResume 的前台事件成对。
             // JS 侧据此停止静默期计时——用户已经离开，本轮不再打扰。
             lynxView.sendGlobalEvent("pictelioAppBackground", new JavaOnlyArray());
         }
+    }
+
+    // ─── 「点击时用户是否在 App 里」的持久判据（#940 / ADR-0220 决策 9）──────────
+    //
+    // ⚠️ 为什么必须落盘、不能用进程内静态：真机实证——任务记录里 LynxActivity 仍在栈顶时，
+    //   Android 在投递落点中转 Activity **之前**就重建了 LynxActivity（进程随之起来、
+    //   bundle 从缓存秒加载），`sInstance` / `sProcessRendered` 在中转跑到前已被写好。
+    //   ⇒ 进程级标记在「点击瞬间」读到的永远是「已运行」，判据恒为 warm。
+    //   进程寿命类信号（Process.getStartUptimeMillis）同样不可用：进程正是这次点击拉起来的。
+    //
+    // ⚠️ 为什么用 commit() 而非 apply()：进程可能紧接着就被系统回收，apply 的异步落盘会丢。
+    //   代价是 onPause 主线程一次极小的同步写；正确性优先。
+
+    /** 前台状态标记的键（存于既有偏好存储，与 JS 侧共用同一文件） */
+    static final String KEY_APP_IN_BACKGROUND = "delivery_probe_app_in_background";
+
+    /**
+     * 写「用户此刻是否已离开 App」到偏好存储。
+     *
+     * <p>正确性依据：进程被系统回收前**一定**先收到 {@code onPause} ⇒ 该标记不会错留在
+     * 「仍在前台」。唯一例外是进程在前台被强杀（罕见），此时会误判为 warm —— 已登记。
+     */
+    static void markAppBackgrounded(Context appCtx, boolean backgrounded) {
+        android.content.SharedPreferences.Editor ed =
+                appCtx.getSharedPreferences(PictelioPrefsModule.PREFS_FILE, Context.MODE_PRIVATE)
+                        .edit();
+        ed.putString(KEY_APP_IN_BACKGROUND, backgrounded ? "true" : "false");
+        ed.commit(); // 同步落盘：进程可能随时被回收
+    }
+
+    /** 点击瞬间读取：true = 用户点击时**已离开** App（通知把他叫了回来 ⇒ 冷启动） */
+    static boolean wasAppBackgroundedAtTap(Context appCtx) {
+        return "true".equals(
+                appCtx.getSharedPreferences(PictelioPrefsModule.PREFS_FILE, Context.MODE_PRIVATE)
+                        .getString(KEY_APP_IN_BACKGROUND, "false"));
     }
 
     /**

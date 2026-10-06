@@ -39,10 +39,14 @@ public class NotificationTapActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // 此刻进程若为本次点击新起，LynxActivity.sProcessRendered 仍是初值 ⇒ 判据成立
-        wasRunningAtTap = LynxActivity.wasProcessRenderedBefore();
+        // ⚠️ 读**持久**的前台标记，不是进程内静态：Android 在把本中转投递进来之前，
+        //   会先重建任务栈顶的 LynxActivity（进程随之起来、bundle 秒加载），
+        //   此刻任何进程级静态都已经被这次点击自己写好，读出来恒为「已运行」。
+        boolean wasBackgrounded = LynxActivity.wasAppBackgroundedAtTap(getApplicationContext());
+        wasRunningAtTap = !wasBackgrounded;
         Log.i(
                 TAG,
-                "通知点击中转：点击瞬间进程已渲染过="
+                "通知点击中转：点击瞬间用户已离开App="
                         + wasRunningAtTap
                         + " pid="
                         + android.os.Process.myPid()

@@ -63,6 +63,14 @@ const LANDING_CODE = stripComments(
   safeRead(new URL('../utils/deliveryProbeLanding.ts', import.meta.url)),
 )
 const ROUTER_CODE = stripComments(safeRead(new URL('../router.ts', import.meta.url)))
+const TAP_ACTIVITY_CODE = stripComments(
+  safeRead(
+    new URL(
+      '../../../android-host/android/app/src/lynx/java/io/pictelio/app/NotificationTapActivity.java',
+      import.meta.url,
+    ),
+  ),
+)
 const NOTIFY_MODULE_CODE = stripComments(
   safeRead(
     new URL(
@@ -368,9 +376,40 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         '中转 Activity 未配 NoDisplay ⇒ 用户会看到一闪而过的空页面',
       ).toMatch(/NotificationTapActivity[\s\S]{0,200}Theme\.NoDisplay/)
       // 接收器必须把「点击瞬间进程是否已运行」写进启动 intent
-      expect(ACTIVITY_CODE, '缺少「点击瞬间进程是否已运行」的判据读取').toMatch(
+      expect(ACTIVITY_CODE, '缺少「点击瞬间用户是否已离开 App」的判据读取').toMatch(
         /NotificationTapActivity\.wasRunningAtTap/
       )
+      // ⚠️ 判据必须来自**进程外持久标记**：真机实证 Android 在投递中转前会重建栈顶的
+      //   LynxActivity（进程随之起来、bundle 秒加载），此刻任何进程内静态都已被这次
+      //   点击自己写好，读出来恒为「已运行」⇒ 判据恒为 warm。
+      expect(
+        ACTIVITY_CODE,
+        '判据改回进程内静态 ⇒ 进程被回收后点击仍被判成「用户本就在 App 里」',
+      ).not.toMatch(/wasRunningAtTap\s*=\s*LynxActivity\.wasProcessRenderedBefore\(\)/)
+      expect(
+        ACTIVITY_CODE,
+        '缺少「点击瞬间 App 是否已回后台」的持久标记读取',
+      ).toMatch(/wasAppBackgroundedAtTap\(/)
+      expect(
+        TAP_ACTIVITY_CODE,
+        '中转未读持久标记 ⇒ 判据取不到点击瞬间的事实',
+      ).toMatch(/wasAppBackgroundedAtTap\(getApplicationContext\(\)\)/)
+      expect(
+        TAP_ACTIVITY_CODE,
+        '中转仍在读进程内静态 ⇒ 上述真机矛盾会复现',
+      ).not.toMatch(/wasProcessRenderedBefore\(\)/)
+      expect(
+        ACTIVITY_CODE,
+        '前台标记必须落盘（进程可能随时被回收，apply 的异步写会丢）',
+      ).toMatch(/putString\(KEY_APP_IN_BACKGROUND,[\s\S]{0,120}commit\(\)/)
+      expect(
+        ACTIVITY_CODE,
+        'onPause 未置「已回后台」⇒ 用户离开后点通知仍被判 warm',
+      ).toMatch(/protected void onPause\([\s\S]*?markAppBackgrounded\([\s\S]{0,60}?true/)
+      expect(
+        ACTIVITY_CODE,
+        'onResume 未置「在前台」⇒ App 开着时点通知会被误判 cold',
+      ).toMatch(/protected void onResume\([\s\S]*?markAppBackgrounded\([\s\S]{0,60}?false/)
       // 且必须是 not-exported：否则第三方可伪造点击刷计数
       expect(MANIFEST_CODE, '中转 Activity exported ⇒ 外部可伪造点击污染计数').toMatch(
         /NotificationTapActivity[\s\S]{0,160}exported="false"/
