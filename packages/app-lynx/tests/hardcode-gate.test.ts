@@ -22,7 +22,20 @@ function* walk(dir: string): Generator<string> {
 }
 
 function isConsoleArg(node: ts.Node): boolean {
-  const p = node.parent;
+  // ⚠️ 模板各片段的**直接父节点不是 console 调用**：TemplateHead 的父是 TemplateExpression，
+  //   而 TemplateTail 的父是 TemplateSpan（再上一级才是 TemplateExpression）。
+  //   不穿透这一层，`console.log(\`中文 ${x}\`)` 会被判成用户可见文案，而同文件的
+  //   `console.log('中文')` 不会 —— 同一批日志两种待遇，纯属检测器形态差异。
+  //   实证来源：deliveryProbe 的两条插值日志被判红、单引号日志没被判（同文件同批次）。
+  //   与 review P1-2 的属性值盲区同款：检测器把「碰巧没扫到」当成了「不存在」。
+  let target: ts.Node = node;
+  while (
+    target.parent &&
+    (ts.isTemplateSpan(target.parent) || ts.isTemplateExpression(target.parent))
+  ) {
+    target = target.parent;
+  }
+  const p = target.parent;
   if (p && ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression)) {
     const obj = p.expression.expression;
     return ts.isIdentifier(obj) && obj.text === "console";
@@ -91,6 +104,26 @@ describe("i18n 回潮门禁（副端）：src 内禁硬编码中文文案", () =
     const hits = collectVueTemplate(sample);
     expect(hits).toContain("搜索作品");
     expect(hits).toContain("暂无内容");
+  });
+
+  it("扫描器自检：console 参数豁免对**模板字面量**同样成立（非只对单引号串）", () => {
+    // 防「为了让 deliveryProbe 的日志过门禁而放宽检测器」——两条必须同时成立：
+    // console 的插值日志豁免，且**非** console 的插值中文照样被抓。
+    const src = (code: string): string[] => collectTsLiterals(code, ts.ScriptKind.TS);
+
+    const consoleTpl = src('console.log(`[probe] 已排判定（${n}ms 后）`);');
+    expect(consoleTpl).toEqual([]);
+
+    const uiTpl = src('const label = `你有 ${n} 条新通知`;');
+    // 插值把一段拆成 head/tail 两段，故断言段数与内容（逐字数组会随 trim 规则变脆）
+    expect(uiTpl).toHaveLength(2);
+    expect(uiTpl.join("")).toContain("条新通知");
+
+    const uiPlain = src('const label = "你有新通知";');
+    expect(uiPlain).toEqual(["你有新通知"]);
+
+    // 与单引号形态对齐：修复前后 console 串的待遇必须一致
+    expect(src("console.log('进入前台');")).toEqual(src("console.log(`进入前台`);"))
   });
 
   it("白名单外零命中", () => {
