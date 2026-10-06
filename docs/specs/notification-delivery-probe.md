@@ -213,3 +213,25 @@ ADR-0188 原文要求「系统推送需自建后台基础设施，独立立项�
 
 它**不能**回答：「用户想不想要更新提醒」（覆盖场景太窄，见决策 14），
 也**不能**回答：「通知功能对用户有多大价值」（样本量不足，见决策 12）。
+
+### 如何读这份结论（探测器会写，但没人能读 ⇒ 实验无法收口）
+
+计数器落在设备本地 `SharedPreferences("CapacitorStorage")` 的 `delivery_probe_v1` 键，
+**没有 UI 读入口**（探测器是诊断装置，不进产品界面）。读法：
+
+```bash
+ADB=~/Library/Android/sdk/platform-tools/adb
+# ① 计数（注意 &quot; 是 XML 存储层的转义，JS 拿到的是真引号）
+$ADB shell run-as io.pictelio.app cat shared_prefs/CapacitorStorage.xml \
+  | grep -o '<string name="delivery_probe_v1">[^<]*'
+# ② 权限是否真的授予（决定了「没数据」是用户拒绝还是探测器坏了）
+$ADB shell dumpsys package io.pictelio.app | grep POST_NOTIFICATIONS
+```
+
+把 ① 的 JSON 与 ② 的 granted/denied 喂给 `utils/deliveryProbeReport.buildProbeReport`，
+即得出一份带四条限制的结论。**报告里必须保留那四条限制**——它们不是免责声明，
+是结论的适用边界（尤其第 4 条：点击数不可被说成「被叫回来的比例」）。
+
+⚠️ 计数会**跨轮污染**：`resetRound()` 只清计数、不清已读记忆；而落点进入通知列表页后
+该页按 ADR-0188 D11 推进已读记忆 ⇒ 未读归零 ⇒ 探测器下一轮判 `no-unread` 根本不发通知。
+做新一轮探测前需把 `notifications_last_read_time` 退回过去（e2e #942 的步骤 0 同款）。
