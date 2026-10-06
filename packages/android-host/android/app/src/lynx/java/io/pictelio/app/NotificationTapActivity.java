@@ -40,7 +40,14 @@ public class NotificationTapActivity extends Activity {
         super.onCreate(savedInstanceState);
         // 此刻进程若为本次点击新起，LynxActivity.sProcessRendered 仍是初值 ⇒ 判据成立
         wasRunningAtTap = LynxActivity.wasProcessRenderedBefore();
-        Log.i(TAG, "通知点击中转：点击瞬间进程已渲染过=" + wasRunningAtTap);
+        Log.i(
+                TAG,
+                "通知点击中转：点击瞬间进程已渲染过="
+                        + wasRunningAtTap
+                        + " pid="
+                        + android.os.Process.myPid()
+                        + " 本进程已有LynxActivity实例="
+                        + LynxActivity.hasLiveInstance());
 
         Intent src = getIntent();
         Intent next = new Intent(this, LynxActivity.class);

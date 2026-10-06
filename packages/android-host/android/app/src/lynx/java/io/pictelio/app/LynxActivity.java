@@ -1016,6 +1016,12 @@ public class LynxActivity extends AppCompatActivity {
         return sProcessRendered;
     }
 
+    /** 本进程里是否已存在活着的 LynxActivity 实例（判「点击前用户是否已在 App 里」的旁证）。 */
+    static boolean hasLiveInstance() {
+        WeakReference<LynxActivity> ref = sInstance;
+        return ref != null && ref.get() != null;
+    }
+
     private void dispatchNotificationTarget(android.content.Intent intent) {
         if (lynxView == null) return;
         if (intent == null) return;
