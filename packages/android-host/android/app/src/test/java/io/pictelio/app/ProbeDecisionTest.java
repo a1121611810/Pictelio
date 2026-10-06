@@ -27,7 +27,7 @@ import io.pictelio.app.delivery.ProbeDecision;
  * 与 PictelioClipboardModuleTest / PictelioWebDavModuleTest 同款先例）。
  */
 /**
- * ⚠️ 必须显式钉 sdk：本仓 targetSdk=36 超�� Robolectric 本版支持上限，
+ * ⚠️ 必须显式钉 sdk：本仓 targetSdk=36 超出 Robolectric 本版支持上限，
  *   不钉会在**初始化期**就抛 initializationError（不是断言红，且看不出是哪个类）。
  *   口径同 PictelioClipboardModuleTest / PictelioDownloaderTest。
  *   本类不碰任何系统 API，sdk 取值不影响判定结果。

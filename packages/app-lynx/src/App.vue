@@ -6,6 +6,7 @@ import GlobalFab from './components/GlobalFab.vue'
 import SearchSheet from './components/SearchSheet.vue'
 import { topLevelTabForPath } from './components/navTabs'
 import { useUsageMetricsStore } from './stores/usageMetrics'
+import { initDeliveryProbeLifecycle } from './utils/deliveryProbeLifecycle'
 import { useNotificationStore } from './stores/notificationStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
@@ -86,6 +87,15 @@ watch(
   },
 )
 onMounted(() => {
+  // 送达通道 · 触达探测的静默期计时起点（ADR-0220 决策 2 / #938）。
+  // 必须在此初始化：宿主在 onResume 发「进入前台」事件，而 App 的 onMounted 与它同处
+  // 首次进入前台，早于任何 onPause ⇒ 不会漏掉启动那一次。
+  // 失败不得影响启动（订阅失败时探测链整条不可用，由该函数自身显式告警）。
+  try {
+    initDeliveryProbeLifecycle()
+  } catch (e) {
+    console.warn('[app] 送达探测生命周期接线失败（不影响启动）', e)
+  }
   // 本地度量读点（spec §4 P0.5「复访间隔」）：冷启动记一次，相邻差值即间隔。
   // 只存本地、不上传（决策 5 = A）；失败不得影响启动。
   try {
