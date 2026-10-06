@@ -16,7 +16,7 @@
 
 | # | 辅助机制 | 失败形态 | 表象 | 现状 |
 |---|---------|---------|------|------|
-| A | 入场动画 | 绑在**冷挂载静态兄弟**上时整段设置区永久不可见 | 无日志、无报错、单测全绿 | 仅 benchNav 深链可达（真实导航正常），机理未定案 |
+| A | 入场动画 | 绑在**冷挂载静态兄弟**上时整段设置区永久不可见（`from { opacity: 0 }` 叠加 `fill-mode: both` 使 `from` 态驻留） | 无日志、无报错、单测全绿 | **已缓解（#913 / `b04fc449`）** —— 帧体 `from` 改为 `opacity: 1`（只动几何），门禁 `composables/entranceVisibility.test.ts` 钉住该不变量。事故形态仅 benchNav 深链可达（真实导航正常），触发机理仍未定案 |
 | B | 构建配置类型检查 | `tsconfig.node.json` 声明了 project reference 但**无任何命令执行过它** | 类型错误长期存在（基线 7 个 → 后续 commit 9 个） | 已建单 #910 |
 | C | 对比度取样 | 文档里的 `12.03:1` **无法在提交内复现** | 数字看起来精确可信 | **已闭环（#914）** —— 工具落地后发现 **`12.03:1` 本身不可复现**，它是某一张封面的值，已留样的实测区间 **5.83 ~ 16.67:1**；所有引用已改为区间 + 取样条件。附带关闭 #906 风险⑤（暗色首次实测 **13.05:1**）。|
 | D | 验收判据 | 「整屏浅纯色底」这一族输入下给不出答案 | 报 PASS 或 FAIL，**都不是「不知道」** | 已登记为失效面，判据本身无解 |
@@ -61,14 +61,16 @@
 ### D1 · 入场动画的 fail-safe 契约（#908）
 
 - 动效是**装饰性**的：可改变内容**如何**出现，不可改变内容**是否**出现。
-- 帧体的 `from` 态**不得**包含会让元素「占位但不可见」的属性组合。当前 `item-rise` 的 `from { opacity: 0; … }` 是嫌疑点。
+- 帧体的 `from` 态**不得**包含会让元素「占位但不可见」的属性组合。**该契约已兑现**：`item-rise` 现为 `from { opacity: 1; transform: … }`（只动几何、起始即可见），由 `b04fc449` 落地（#913）；门禁 `composables/entranceVisibility.test.ts` 钉住该不变量（把 `from` 变异回 `opacity: 0` 可自证转红），ADR-0211 的失效方向同日翻转。修复前的嫌疑形态即 `from { opacity: 0; … }`。
 - 验收条件（形态无关）：**把动效整条摘掉，每个页面的内容必须完全可见**。这条比任何具体实现都重要。
 - 该修复**优先于**保持错峰视觉一致性；两者冲突时牺牲视觉。错峰观感是否退化须在真机记录。
-- 适用范围：`listItemStyle` 的**全部**消费方，而非只修 Me 页那 10 处绑定。
-  口径（`grep -rln ':style="listItemStyle(' src/` = 8 个文件）：**7 个消费页**
-  `DownloadManager` / `IllustDetail` / `Me` / `MuteTags` / `NetworkCheck` /
-  `PlatformCheck` / `UpdatePage` + 定义方 `RefreshableList.vue`；
-  第 8 个是 `composables/motion.ts` 自身，属误命中。
+- 适用范围：`listItemStyle` 的**全部**消费方，而非只修 Me 页那 9 处绑定。
+  实测口径（`grep -rn ':style="listItemStyle(' src/ --include='*.vue'` = **11 个文件 / 27 个绑定点**）：
+  **10 个消费页** `AdvancedSettings` / `DownloadManager` / `IllustDetail` / `Me` / `MuteTags` /
+  `NetworkCheck` / `PlatformCheck` / `Shelf` / `UpdatePage` / `Updates` + 定义方 `RefreshableList.vue`。
+  差额来自 2026-10-03 导航维度重构新增的 `AdvancedSettings` / `Shelf` / `Updates` 三页（各 3 处绑定）。
+  不带 `--include` 的同一 grep 还会多返回 `composables/motion.ts`——它是 `listItemStyle` 的函数自身（JSDoc 示例里出现该串），属**误命中**，故文件数为 12。
+  门禁侧的同等口径见 `tests/listItemStaggerContract.test.ts` 的目标页清单。
 - 冷挂载 vs patch 插入的区别要保留在文档里：`v-for` 动态行（patch 插入）正常，冷挂载的静态兄弟不正常——这是定位依据，不是豁免理由。
 
 ### D2 · 构建配置层的类型检查接入（#910）

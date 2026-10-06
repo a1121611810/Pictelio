@@ -57,7 +57,9 @@ const { pressColor, pressOpacity } = useMotion()
 
 /** FAB 菜单三项的入场（ADR-0211 决策 5 / issue 879）：**错峰延迟来自预设**，不再由本组件
  *  自定 0/60/120ms 三档字面量。`listItemStyle(i)` 已内建 R2 归零 + R3 延迟归零 +
- *  STAGGER_MAX_ITEMS 上限，与 7 个手写列表页共用同一出口 ⇒ 全仓列表错峰只有一处事实源。
+ *  STAGGER_MAX_ITEMS 上限，与 10 个手写列表页共用同一出口 ⇒ 全仓列表错峰只有一处事实源。
+ *  （该计数随新增 scroll-view 消费页变化，实测口径见 spec「入场动画的 fail-safe 契约」D1 与
+ *  tests/listItemStaggerContract.test.ts 的目标页清单，不在本文件内自维护。）
  *  ⚠️ 帧体 `@keyframes item-rise` 仍定义在本文件下方的非 scoped `<style>`（几何量归调用方），
  *  本栈非 scoped keyframes 跨文件全局生效。 */
 const { listItemStyle } = useMotion()
@@ -314,7 +316,7 @@ onUnmounted(() => {
 /* menu item 从 FAB top-trailing edge 浮出（ADR-0111）。
    ⚠️ 帧体是**几何量**（travel 12px / scale 0.92）⇒ 归调用方组件（motion.ts 抬头约束
    「唯一入口只管时长与曲线」），故定义在此而非 motion.ts。
-   ⚠️ 非 scoped ⇒ 本栈跨文件全局生效，7 个手写列表页无需 import 即可引用（与 SheetShell
+   ⚠️ 非 scoped ⇒ 本栈跨文件全局生效，10 个手写列表页无需 import 即可引用（与 SheetShell
    的 sheet-enter 同机制，真机已取证）。tests/listItemStaggerContract.test.ts 的 L3
    钉住「本文件是帧体唯一定义方」，防止第二个组件另起一条同义帧体。 */
 /* ⚠️ `from` 态**不得**含 `opacity: 0`（#913 / spec D1，ADR-0211 失效方向已翻转）。
@@ -342,6 +344,6 @@ onUnmounted(() => {
 }
 /* 延迟槽**不再**在 CSS 里：原 `.item-rise-1/2/extra` 三档把 0/60/120ms 写死，
    那正是「错峰延迟由组件自定」的形态（ADR-0211 决策 5 要收口的那一处）。
-   现统一走 motion.ts 的 listItemStyle(i) —— 与 7 个列表页同一出口、同一 STAGGER 步长，
+   现统一走 motion.ts 的 listItemStyle(i) —— 与 10 个列表页同一出口、同一 STAGGER 步长，
    且 R3 下延迟随整条 animation 一起归零（原先 R3 只能靠 motionStyle 置 none 覆盖）。 */
 </style>

@@ -537,6 +537,13 @@ public class LynxActivity extends AppCompatActivity {
                             // 无短名则设备取证进不去这两页（同 #913 D1 的缺口形态）。
                             case "shelf" -> new String[]{"pictelioBenchNavShelf"};
                             case "continue" -> new String[]{"pictelioBenchNavContinue"};
+                            // 「更新」顶层页与「高级」次级页（维度重构 / #913 D1 补证）：
+                            // 两页都消费 listItemStyle（各 3 处绑定），但重构时漏了短名，
+                            // 导致 D1 的「消费方全覆盖」取证进不去这两页 —— 与 #913 当初
+                            // 补 downloads/illust-detail/mute-tags 短名是同一类通道缺口
+                            // （「未取证」≠「不可验证」，先查是不是自己造成的）。
+                            case "updates" -> new String[]{"pictelioBenchNavUpdates"};
+                            case "advanced" -> new String[]{"pictelioBenchNavAdvanced"};
                             // 好P友列表页直达（ADR-0193 D5 / #754）：模拟器验收通道
                             case "mypixiv" -> new String[]{"pictelioBenchNavMyPixiv"};
                             // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle，

@@ -469,6 +469,10 @@ function registerBenchNavHandler(): void {
     // 故设备取证**必须**有短名通道，否则本功能只能停留在「门禁全绿、无真机证据」。
     pictelioBenchNavShelf: '/shelf',
     pictelioBenchNavContinue: '/continue',
+    // 「更新」顶层页与「高级」次级页（维度重构 / #913 D1 补证）：两页各 3 处
+    // listItemStyle 绑定，重构时漏了短名 ⇒ D1「消费方全覆盖」取证进不去。
+    pictelioBenchNavUpdates: '/updates',
+    pictelioBenchNavAdvanced: '/advanced',
     // 好P友列表页直达（ADR-0193 D5 / #754 T7）：benchNav 打开 /mypixiv 验证列表渲染/空态
     pictelioBenchNavMyPixiv: '/mypixiv',
     // #913 D1 取证补齐：下载管理 / 静音标签两页消费 listItemStyle 却没有 benchNav 短名，
