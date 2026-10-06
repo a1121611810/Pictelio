@@ -27,21 +27,10 @@ public class NotificationTapActivity extends Activity {
 
     private static final String TAG = "NotificationTapActivity";
 
-    /** 点击瞬间 Activity 是否已存在（决定广播次数，不用于计数分类）。 */
-    static volatile boolean wasActivityAlreadyUp = false;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // ⚠️ 只判定「Activity 是否已存在」——它**只决定广播次数**（单次 vs 多窗重发），
-        //   **不进入计数分类**：冷热在设备上不可判定（见 LynxActivity.dispatch 的注释）。
-        wasActivityAlreadyUp = LynxActivity.wasProcessRenderedBefore();
-        Log.i(
-                TAG,
-                "通知点击中转：Activity已存在="
-                        + wasActivityAlreadyUp
-                        + " pid="
-                        + android.os.Process.myPid());
+        Log.i(TAG, "通知点击中转：转发落点 pid=" + android.os.Process.myPid());
 
         Intent src = getIntent();
         Intent next = new Intent(this, LynxActivity.class);

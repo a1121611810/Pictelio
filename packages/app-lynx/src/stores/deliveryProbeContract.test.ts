@@ -315,8 +315,16 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       expect(stripComments(commentOnly)).not.toContain('notifications')
 
       // 变异 B：把落点改成另一个页面 —— 逐字比对必须转红
-      const drift = 'static final String TARGET_NOTIFICATIONS = "shelf";'
-      expect(drift).not.toMatch(/TARGET_NOTIFICATIONS\s*=\s*"notifications"/)
+      // ⚠️ 这里必须断言**真盘源码**，不能拿测试内的字面量自证：
+      //   拿 `const drift = '...'` 再断言它不匹配，等于只测了 stripComments 与正则本身，
+      //   对生产代码零覆盖（双轴 review 判为假绿）。真盘形态已由上面两条正向断言覆盖。
+      expect(ACTIVITY_CODE, '落点目标未在真盘源码里声明').toMatch(
+        /TARGET_NOTIFICATIONS\s*=\s*"notifications"/,
+      )
+      expect(
+        ACTIVITY_CODE,
+        '真盘源码里落点目标不是 notifications ⇒ 两侧不一致',
+      ).not.toMatch(/TARGET_NOTIFICATIONS\s*=\s*"(?!notifications)/)
     })
 
     it('⚠️ 点击意图必须带 clickId 载荷（没有它就无法去重 ⇒ 一次点击记 4 次）', () => {
@@ -327,6 +335,16 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       expect(NOTIFY_MODULE_CODE, '点击意图未设置 contentIntent').toMatch(/setContentIntent/)
       // 载荷必须真的进 intent（只读常量名 = 没接上）
       expect(NOTIFY_MODULE_CODE, 'clickId 只声明未 putExtra').toMatch(
+        /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_CLICK_ID/,
+      )
+      // ⚠️ 中转那一跳此前**零断言**（TAP_ACTIVITY_CODE 读进来却没用），而它最隐蔽：
+      //   LynxActivity 用 getLongExtra(..., 0L) 兜底 ⇒ 中转漏传 ⇒ clickId 恒 0
+      //   ⇒ 所有点击共享一个去重键 ⇒ 第一次计数、之后全被当重复吞掉，
+      //   clicked 冻结在 1 而 sent 持续上涨，产出一个「看起来很像真的」0 点击率。
+      expect(TAP_ACTIVITY_CODE, '中转未把落点目标转到启动 intent').toMatch(
+        /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_TARGET/,
+      )
+      expect(TAP_ACTIVITY_CODE, '中转未把 clickId 转到启动 intent').toMatch(
         /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_CLICK_ID/,
       )
     })
@@ -341,21 +359,22 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         ACTIVITY_CODE,
         'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
       ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
-      // Activity 已存在 ⇒ JS 已挂载 ⇒ 单次广播足够；不存在 ⇒ 渲染竞态 ⇒ 多窗重发
-      expect(ACTIVITY_CODE, 'Activity 已存在时未走单次广播分支').toMatch(
+      // 判据必须是「活实例 ∧ bundle 已加载」：**不可**用 onLoadSuccess 置位后永不重置的
+      // 进程静态——exitApp 只 finish() 不杀进程 ⇒「进程活着但没有 Activity」是可达状态，
+      // 用它会把单次广播发给不存在的监听者 ⇒ 点击静默丢失（双轴 review 判为阻塞）。
+      expect(ACTIVITY_CODE, '单次广播分支缺失').toMatch(
         /CLICK_KIND_REUSE[\s\S]*?sendGlobalEvent[\s\S]*?return/,
       )
-    })
-
-    it('⚠️ 点击意图必须带 clickId 载荷（没有它就无法去重 ⇒ 一次点击记 4 次）', () => {
       expect(
-        NOTIFY_MODULE_CODE,
-        '点击意图未携带 clickId ⇒ 冷启动 4 次广播会被记成 4 次点击',
-      ).toMatch(/EXTRA_NOTIFICATION_CLICK_ID/)
-      expect(NOTIFY_MODULE_CODE, '点击意图未设置 contentIntent').toMatch(/setContentIntent/)
-      // 载荷必须真的进 intent（只读常量名 = 没接上）
-      expect(NOTIFY_MODULE_CODE, 'clickId 只声明未 putExtra').toMatch(
-        /putExtra\(\s*LynxActivity\.EXTRA_NOTIFICATION_CLICK_ID/,
+        ACTIVITY_CODE,
+        '广播次数判据未用「活实例 ∧ bundle 已加载」',
+      ).toMatch(/hasLiveActivityInstance\(\)\s*&&\s*bundleLoaded\.get\(\)/)
+      expect(
+        ACTIVITY_CODE,
+        '仍在用永不重置的进程静态判广播次数 ⇒ 进程活着但无 Activity 时点击静默丢失',
+      ).not.toMatch(/sProcessRendered/)
+      expect(ACTIVITY_CODE, '未读取 ADR-0066 维护的 sInstance 存活标志').toMatch(
+        /hasLiveActivityInstance\(\)[\s\S]{0,200}?sInstance/,
       )
     })
 

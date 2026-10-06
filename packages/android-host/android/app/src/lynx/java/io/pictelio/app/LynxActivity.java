@@ -140,9 +140,6 @@ public class LynxActivity extends AppCompatActivity {
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
 
-    /** 本进程是否已渲染过 JS。只用于判定「点击时 Activity 是否已存在」（决定广播次数）。 */
-    private static volatile boolean sProcessRendered = false;
-
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
 
@@ -516,7 +513,6 @@ public class LynxActivity extends AppCompatActivity {
             @Override
             public void onLoadSuccess() {
                 bundleLoaded.set(true);
-                sProcessRendered = true;
                 cancelLoadTimeout();
                 // bench 导航钩子（wayfinder #306，ADR-0136）：adb `am start --es benchNav <scenario>`
                 // 直达目标页。真机 input tap 对放射 FAB 环项 hit-test 失效（事件送达但不导航，
@@ -1009,9 +1005,17 @@ public class LynxActivity extends AppCompatActivity {
      * <p>⚠️ {@code clickKind} 必须由调用方按 <strong>bundle 是否已加载</strong>判定，
      *   不能按「onLoadSuccess 传 cold / onNewIntent 传 warm」硬编码——理由见 onNewIntent 的注释。
      */
-    /** 供 {@link NotificationTapActivity} 判定「点击时 Activity 是否已存在」（只决定广播次数，不决定计数分类）。 */
-    static boolean wasProcessRenderedBefore() {
-        return sProcessRendered;
+    /**
+     * 本进程是否还有**活着的** LynxActivity 实例。
+     *
+     * <p>⚠️ 刻意**不用** {@code sProcessRendered}：那个静态在 onLoadSuccess 置位后**永不重置**，
+     *   而 {@code PictelioAppModule.exitApp()} 只 {@code finish()} 不杀进程
+     *   ⇒「进程活着但没有 Activity」是可达状态，用它会把单次广播发给一个不存在的监听者
+     *   ⇒ 点击静默丢失。{@code sInstance} 由 ADR-0066 的 onCreate/onDestroy 成对维护，是真实存活标志。
+     */
+    static boolean hasLiveActivityInstance() {
+        WeakReference<LynxActivity> ref = sInstance;
+        return ref != null && ref.get() != null;
     }
 
     private void dispatchNotificationTarget(android.content.Intent intent) {
@@ -1025,21 +1029,27 @@ public class LynxActivity extends AppCompatActivity {
             return;
         }
         long clickId = intent.getLongExtra(EXTRA_NOTIFICATION_CLICK_ID, 0L);
-        // ⚠️ 判据来自 **NotificationTapReceiver 在点击瞬间**写下的 extra，
-        //   不是 Activity 侧任何可观测状态（bundleLoaded / 哪个回调都被真机打脸过）。
-        // ⚠️ 这里**不再判冷热**：#940 实施期结论——「点击时用户是否在 App 里」在进程内不可判定
-        //   （处理点击本身即状态跃迁，四种候选信号全被污染）。本字段只决定广播次数
-        //   （Activity 已存在 ⇒ JS 已挂载 ⇒ 单次足够），不进入计数。
+        // ⚠️ 这里**不判冷热**：#940 实施期结论——「点击时用户是否在 App 里」在进程内不可判定
+        //   （处理点击本身即状态跃迁，四种候选信号全被污染，见 ADR-0220 §6-3）。
+        //   clickKind **只决定广播次数**，不进入计数。
+        // ⚠️ 判据必须问「这次广播之前，JS 侧监听是否**已经**挂好」：
+        //   · onLoadSuccess 的调用点**就在**加载完成回调内部 ⇒ 页面级监听此刻仍可能没挂
+        //     ⇒ 必须多窗重发（这正是 benchNav 四窗手法要对抗的渲染竞态）；
+        //     此前误按「进程渲染过」判定会走单次，审查据此判出「点击静默丢失」缺陷。
+        //   · onNewIntent 时 bundle 若已加载 ⇒ JS 早已挂载 ⇒ 单次足够。
         int clickKind =
-                NotificationTapActivity.wasActivityAlreadyUp ? CLICK_KIND_REUSE : CLICK_KIND_COLD;
-        String event =
-                EVENT_NOTIFICATION_TARGET;
-        // 把判据本身打进日志：kind 是推出来的结论，bundleLoaded 才是依据。
+                hasLiveActivityInstance() && bundleLoaded.get() ? CLICK_KIND_REUSE : CLICK_KIND_COLD;
+        String event = EVENT_NOTIFICATION_TARGET;
+        // 把判据本身打进日志：kind 是结论，两个依据（实例存活 / bundle 已加载）一并打出。
         // 只打结论时，「进程刚起却被判热」这类矛盾无从追（曾真机打脸过一次）。
         Log.i(
                 TAG,
                 "通知落点 kind="
                         + (clickKind == CLICK_KIND_REUSE ? "REUSE" : "COLD")
+                        + " 有活实例="
+                        + hasLiveActivityInstance()
+                        + " bundleLoaded="
+                        + bundleLoaded.get()
                         + " pid="
                         + android.os.Process.myPid()
                         + " → "

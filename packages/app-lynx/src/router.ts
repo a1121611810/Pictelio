@@ -554,8 +554,9 @@ if (isNativeMode()) registerBenchNavHandler()
  * ⚠️ **刻意不受 `__BENCH_NAV__` 门禁**：benchNav 是设备取证通道，release 被 R8 移除；
  *   而通知落点是产品行为，必须在正式包可用。
  *
- * ⚠️ 两个事件名分冷/热：冷启动那一跳原生广播 4 次（对抗渲染竞态），热启动单次。
- *   去重在 {@link handleNotificationTarget} 内按 clickId 做 —— navigate 幂等但**计数不幂等**。
+ * ⚠️ 原生可能在 4 个时间点各广播一次（对抗 bundle 渲染竞态），也可能只广播一次
+ *   （JS 早已挂载）。去重在 {@link handleNotificationTarget} 内按 clickId 做 ——
+//   navigate 幂等但**计数不幂等**，且重复 push 会压出 4 层。
  */
 let notificationTargetRegistered = false
 function registerNotificationTargetHandler(): void {
@@ -582,9 +583,14 @@ function registerNotificationTargetHandler(): void {
     //
     // ⚠️ 导航也要经 clickId 去重：冷启动要广播 4 次防渲染竞态，
     //   每次都 push 会压出 4 层，返回要按 4 次才回得去。
-    void handleNotificationTarget(dedupe, clickId).then((counted) => {
-      if (counted) void navigate('/notifications')
-    })
+    void handleNotificationTarget(dedupe, clickId)
+      .then((counted) => {
+        if (counted) void navigate('/notifications')
+      })
+      .catch((e: unknown) => {
+        // 导航被跳过必须可见：否则表现为「点了通知却没反应」，且无任何日志
+        console.warn('[router] 通知落点处理失败（未导航）', e)
+      })
   })
 }
 // 同 benchNav：模块加载即注册，早于 initRouter 的 token 恢复

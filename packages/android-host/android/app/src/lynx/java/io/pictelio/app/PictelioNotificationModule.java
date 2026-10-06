@@ -34,10 +34,10 @@ import com.lynx.tasm.behavior.LynxContext;
  *   <li><b>不逐条发</b>——决策 6：一次轮询 = 一条汇总，条数只进文案。</li>
  * </ul>
  *
- * <p><b>点击落点（#940）</b>：通知带 {@code setContentIntent}，点开启动 LynxActivity
- *   并带上目标页与 {@code clickId}。本模块<strong>不</strong>关心冷/热——那是 Activity 层
- *   的进程状态，由 LynxActivity 分派到两个不同的事件名（冷 / 热），
- *   JS 侧据此把点击拆成 {@code clickedCold} / {@code clickedWarm}。
+ * <p><b>点击落点（#940）</b>：通知带 {@code setContentIntent}，点开先经
+ *   {@link NotificationTapActivity} 中转（点击瞬间执行，绕开 Android 10+ 的后台 Activity
+ *   启动限制），再落到 LynxActivity 并带上目标页与 {@code clickId}。
+ *   JS 侧据此记 1 次点击；<strong>不拆冷/热</strong>——那在设备上不可判定，见 ADR-0220 §6-3。
  *
  * <p>⚠️ {@code clickId} 在**每次投递**时重新生成：冷启动那一跳要广播 4 次对抗渲染竞态，
  *   而计数不是幂等的（同 id 的 4 次到达只应记 1 次）——id 相同是去重的前提。
