@@ -391,6 +391,21 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       ).not.toMatch(/clickedCold|clickedWarm|ClickProvenance/)
     })
 
+    it('⚠️ 落点导航必须 push 且经 clickId 去重（AC-5：replace 会让返回卡死）', () => {
+      // 真机实证：replace 只改真实历史栈，而返回处理器按**镜像栈** hasBackEntry() 判断
+      // ⇒ 两者失配，连按返回永远判定「可返回」却无处可退。
+      expect(
+        ROUTER_CODE,
+        '落点用了 replace ⇒ 返回键会卡死（AC-5）',
+      ).not.toMatch(/navigate\('\/notifications',\s*\{\s*replace\s*:\s*true/)
+      expect(ROUTER_CODE, '落点未导航到通知列表页').toMatch(/navigate\('\/notifications'\)/)
+      // 导航也必须经 clickId 去重：冷启动广播 4 次，每次 push 会压出 4 层
+      expect(
+        ROUTER_CODE,
+        '导航未经去重 ⇒ 冷启动 4 次广播压 4 层，返回要按 4 次',
+      ).toMatch(/handleNotificationTarget\([\s\S]{0,80}?\)\s*\.then\(\s*\(?\s*\w*\s*\)?\s*=>\s*\{[\s\S]{0,120}?if \(/)
+    })
+
     it('⚠️ onNewIntent 必须 setIntent（否则点击 extra 被静默丢弃）', () => {
       expect(
         ACTIVITY_CODE,

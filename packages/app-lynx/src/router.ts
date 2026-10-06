@@ -575,8 +575,16 @@ function registerNotificationTargetHandler(): void {
       console.warn('[router] 通知落点载荷缺 clickId，跳过（不导航不计数）')
       return
     }
-    void handleNotificationTarget(dedupe, clickId)
-    void navigate('/notifications', { replace: true })
+    // ⚠️ **必须 push，不能 replace**（#940 AC-5 实证）：返回处理器按**镜像栈**
+    //   hasBackEntry() 判断能否返回，而 replace 只改真实历史栈 ⇒ 两者失配 ⇒
+    //   连按返回永远判定「可返回」却无处可退（真机连按 3 次仍停在通知页）。
+    // 代价是冷启动那一跳会多压一层，但正因如此才有得可退。
+    //
+    // ⚠️ 导航也要经 clickId 去重：冷启动要广播 4 次防渲染竞态，
+    //   每次都 push 会压出 4 层，返回要按 4 次才回得去。
+    void handleNotificationTarget(dedupe, clickId).then((counted) => {
+      if (counted) void navigate('/notifications')
+    })
   })
 }
 // 同 benchNav：模块加载即注册，早于 initRouter 的 token 恢复
