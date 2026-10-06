@@ -62,4 +62,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 网络自检：读 NetworkCapabilities（类型/validated/captive/metered）。normal 权限，无需运行时申请，且不碰 SSID/位置。 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 送达通道 · 触达探测（ADR-0220 / spec notification-delivery-probe）：
+         Android 13+ 发系统通知必须运行时申请本权限；未授予时降级到既有外环未读角标。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

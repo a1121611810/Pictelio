@@ -968,6 +968,13 @@ public class LynxActivity extends AppCompatActivity {
         super.onResume();
         if (lynxView != null) {
             lynxView.onEnterForeground();
+            // 送达通道 · 触达探测（ADR-0220 决策 2）：进入前台事件。
+            // LynxView.onEnterForeground() **不会**转成 JS 事件（insets/darkMode/back 之外
+            // 没有第四条 JS 生命周期通道），而 Lynx 侧也没有窗口 focus 事件
+            // （api/queryClient 已因此关闭 refetchOnWindowFocus）⇒ 静默期判定只能靠本事件。
+            // ⚠️ 不设防抖：onResume 与 onPause 成对，重复进入前台的语义就是「又在前台了」，
+            //   JS 侧静默期计时会自行重置。
+            lynxView.sendGlobalEvent("pictelioAppForeground", new JavaOnlyArray());
         }
         // ADR-0180（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
         // configChanges（个别厂商 / 后台省电冻结），resume 时强制补发事件，避免 JS 漏感知。
@@ -993,6 +1000,9 @@ public class LynxActivity extends AppCompatActivity {
         super.onPause();
         if (lynxView != null) {
             lynxView.onEnterBackground();
+            // 离开前台事件（ADR-0220 决策 2）：与 onResume 的前台事件成对。
+            // JS 侧据此停止静默期计时——用户已经离开，本轮不再打扰。
+            lynxView.sendGlobalEvent("pictelioAppBackground", new JavaOnlyArray());
         }
     }
 
