@@ -56,6 +56,9 @@ const PROBE_STORE_CODE = stripComments(
 const LIFECYCLE_CODE = stripComments(
   safeRead(new URL('../utils/deliveryProbeLifecycle.ts', import.meta.url)),
 )
+const STORE_CODE = stripComments(
+  safeRead(new URL('../stores/deliveryProbeStore.ts', import.meta.url)),
+)
 const TRIGGER_CODE = stripComments(
   safeRead(new URL('../utils/deliveryProbeTrigger.ts', import.meta.url)),
 )
@@ -286,19 +289,17 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       const cold = LANDING_CODE.match(
         /export const EVENT_NOTIFICATION_TARGET\s*=\s*["']([^"']+)["']/,
       )?.[1]
-      const warm = LANDING_CODE.match(
-        /export const EVENT_NOTIFICATION_TARGET_WARM\s*=\s*["']([^"']+)["']/,
-      )?.[1]
       expect(cold, '未能从落点模块抽出冷启动事件名').not.toBeUndefined()
-      expect(warm, '未能从落点模块抽出热启动事件名').not.toBeUndefined()
 
-      expect(ACTIVITY_CODE, `宿主未广播冷启动落点事件 ${cold}`).toContain(cold as string)
-      expect(ACTIVITY_CODE, `宿主未广播热启动落点事件 ${warm}`).toContain(warm as string)
+      expect(ACTIVITY_CODE, `宿主未广播落点事件 ${cold}`).toContain(cold as string)
+      // ⚠️ 冷热**合并成一个事件名**（#940 实施期）：冷热在进程内不可判定，
+      //   两个事件名会让 JS 侧看起来像能区分，其实只是换了广播次数。
+      expect(
+        LANDING_CODE,
+        '落点链路仍导出热启动专用事件名 ⇒ 暗示冷热可判定，实际不可',
+      ).not.toContain('EVENT_NOTIFICATION_TARGET_WARM')
       // JS 侧必须真的订阅这两个名字（导出不等于被消费）
       expect(ROUTER_CODE, 'router 未订阅落点事件').toContain('EVENT_NOTIFICATION_TARGET')
-      expect(ROUTER_CODE, 'router 未订阅热启动落点事件').toContain(
-        'EVENT_NOTIFICATION_TARGET_WARM',
-      )
       expect(ROUTER_CODE, '落点未导航到通知列表页').toContain("navigate('/notifications'")
     })
 
@@ -340,79 +341,9 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         ACTIVITY_CODE,
         'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
       ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
-      // 热启动须单次广播（JS 已挂载），冷启动才多窗重发
-      expect(ACTIVITY_CODE, '热启动未走单次广播分支').toMatch(
-        /CLICK_KIND_WARM[\s\S]*?sendGlobalEvent[\s\S]*?return/,
-      )
-    })
-
-    it('⚠️ 冷热判据必须来自**点击瞬间**（#940 变异自证：Activity 侧信号两次判反）', () => {
-      // 真机连续打脸两次：
-      //  ① 按「哪个回调」判 —— SINGLE_TOP + 任务记录仍在时，进程被系统回收也会走 onNewIntent；
-      //  ② 改按「bundle 是否已加载」判 —— onNewIntent 在 bundle 加载**之后**才送达，
-      //     实测 bundleLoaded=true 而进程是这次点击才起来的。
-      // ⇒ 任何 Activity 侧信号都在点击之后才可观测，天然答不了「点击前是否活着」。
-      // 唯一正解：PendingIntent.getBroadcast → 接收器在点击瞬间于进程内执行。
-      expect(
-        NOTIFY_MODULE_CODE,
-        '点击意图未走 BroadcastReceiver ⇒ 冷热判据取不到点击瞬间的事实',
-      ).toMatch(/PendingIntent\.getActivity\(\s*ctx,\s*NOTIFICATION_ID,\s*tap,\s*flags\s*\)/)
-      // ⚠️ 不能是 getBroadcast：接收器里 startActivity 会被 Android 10+ 的 BAL 限制拦掉，
-      //   实测「接收器日志打了、App 没起来」⇒ 通知退回成「点了没反应」。
-      expect(
-        NOTIFY_MODULE_CODE,
-        '点击走 BroadcastReceiver ⇒ 被后台 Activity 启动限制拦掉，点了没反应',
-      ).not.toMatch(/PendingIntent\.getBroadcast\(/)
-      expect(
-        NOTIFY_MODULE_CODE,
-        'PendingIntent 必须指向中转 Activity（点击瞬间才可判定进程是否已运行）',
-      ).toMatch(/NotificationTapActivity\.class/)
-      expect(
-        MANIFEST_CODE,
-        '中转 Activity 未在清单注册 ⇒ 点击时被系统忽略，通知变成「点了没反应」',
-      ).toContain('NotificationTapActivity')
-      expect(
-        MANIFEST_CODE,
-        '中转 Activity 未配 NoDisplay ⇒ 用户会看到一闪而过的空页面',
-      ).toMatch(/NotificationTapActivity[\s\S]{0,200}Theme\.NoDisplay/)
-      // 接收器必须把「点击瞬间进程是否已运行」写进启动 intent
-      expect(ACTIVITY_CODE, '缺少「点击瞬间用户是否已离开 App」的判据读取').toMatch(
-        /NotificationTapActivity\.wasRunningAtTap/
-      )
-      // ⚠️ 判据必须来自**进程外持久标记**：真机实证 Android 在投递中转前会重建栈顶的
-      //   LynxActivity（进程随之起来、bundle 秒加载），此刻任何进程内静态都已被这次
-      //   点击自己写好，读出来恒为「已运行」⇒ 判据恒为 warm。
-      expect(
-        ACTIVITY_CODE,
-        '判据改回进程内静态 ⇒ 进程被回收后点击仍被判成「用户本就在 App 里」',
-      ).not.toMatch(/wasRunningAtTap\s*=\s*LynxActivity\.wasProcessRenderedBefore\(\)/)
-      expect(
-        ACTIVITY_CODE,
-        '缺少「点击瞬间 App 是否已回后台」的持久标记读取',
-      ).toMatch(/wasAppBackgroundedAtTap\(/)
-      expect(
-        TAP_ACTIVITY_CODE,
-        '中转未读持久标记 ⇒ 判据取不到点击瞬间的事实',
-      ).toMatch(/wasAppBackgroundedAtTap\(getApplicationContext\(\)\)/)
-      expect(
-        TAP_ACTIVITY_CODE,
-        '中转仍在读进程内静态 ⇒ 上述真机矛盾会复现',
-      ).not.toMatch(/wasProcessRenderedBefore\(\)/)
-      expect(
-        ACTIVITY_CODE,
-        '前台标记必须落盘（进程可能随时被回收，apply 的异步写会丢）',
-      ).toMatch(/putString\(KEY_APP_IN_BACKGROUND,[\s\S]{0,120}commit\(\)/)
-      expect(
-        ACTIVITY_CODE,
-        'onPause 未置「已回后台」⇒ 用户离开后点通知仍被判 warm',
-      ).toMatch(/protected void onPause\([\s\S]*?markAppBackgrounded\([\s\S]{0,60}?true/)
-      expect(
-        ACTIVITY_CODE,
-        'onResume 未置「在前台」⇒ App 开着时点通知会被误判 cold',
-      ).toMatch(/protected void onResume\([\s\S]*?markAppBackgrounded\([\s\S]{0,60}?false/)
-      // 且必须是 not-exported：否则第三方可伪造点击刷计数
-      expect(MANIFEST_CODE, '中转 Activity exported ⇒ 外部可伪造点击污染计数').toMatch(
-        /NotificationTapActivity[\s\S]{0,160}exported="false"/
+      // Activity 已存在 ⇒ JS 已挂载 ⇒ 单次广播足够；不存在 ⇒ 渲染竞态 ⇒ 多窗重发
+      expect(ACTIVITY_CODE, 'Activity 已存在时未走单次广播分支').toMatch(
+        /CLICK_KIND_REUSE[\s\S]*?sendGlobalEvent[\s\S]*?return/,
       )
     })
 
@@ -438,10 +369,26 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         ACTIVITY_CODE,
         'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
       ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
-      // 热启动须单次广播（JS 已挂载），冷启动才多窗重发
-      expect(ACTIVITY_CODE, '热启动未走单次广播分支').toMatch(
-        /CLICK_KIND_WARM[\s\S]*?sendGlobalEvent[\s\S]*?return/,
+      // Activity 已存在 ⇒ JS 已挂载 ⇒ 单次广播足够；不存在 ⇒ 渲染竞态 ⇒ 多窗重发
+      expect(ACTIVITY_CODE, 'Activity 已存在时未走单次广播分支').toMatch(
+        /CLICK_KIND_REUSE[\s\S]*?sendGlobalEvent[\s\S]*?return/,
       )
+    })
+
+    it('⚠️ 计数里不得再出现冷/热分类字段（#940 实施期结论：不可判定）', () => {
+      // 四种候选判据全被点击本身污染（回调类型 / 进程内静态 / 持久前台标记 / 进程寿命），
+      // 留一个看似精确实则不可信的分类，比只留总量更危险——报告期会被误用。
+      expect(
+        LANDING_CODE,
+        '落点链路仍传冷/热来源 ⇒ 会把不可判定的分类写进计数',
+      ).not.toMatch(/provenance|\bcold\b|\bwarm\b/)
+      expect(TRIGGER_CODE + LANDING_CODE, 'store 调用仍带来源参数').not.toMatch(
+        /recordClicked\([^)]/
+      )
+      expect(
+        STORE_CODE,
+        '计数形状里仍有冷/热字段',
+      ).not.toMatch(/clickedCold|clickedWarm|ClickProvenance/)
     })
 
     it('⚠️ onNewIntent 必须 setIntent（否则点击 extra 被静默丢弃）', () => {

@@ -12,20 +12,10 @@
 // 【为什么冷/热要分开记】探测只在「用户已进入前台 + 静默期」后投递（ADR-0220 §3.1），
 //   所以热启动时用户本就在 App 里 —— 这一记点击**不构成**「被通知叫回来」。
 //   现在分开记，等报告期有数据了再决定要不要把它算进分子（ADR-0220 D10）。
-import { useDeliveryProbeStore, type ClickProvenance } from "../stores/deliveryProbeStore"
+import { useDeliveryProbeStore } from "../stores/deliveryProbeStore"
 
 /** 宿主广播的落点事件名（冷启动：随 onLoadSuccess 多窗重发，与 benchNav 深链同款竞态对抗） */
 export const EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget"
-/**
- * 热启动落点事件名。**单次**广播即可（JS 早已挂载），无渲染竞态。
- *
- * ⚠️ 为什么用两个事件名而不是「一个事件名 + 载荷带来源」：lynx 4.0.1 的
- *   `JavaOnlyArray.of` 载荷只实证过**单个** Long（见 benchNav illust-detail 先例），
- *   双参签名未经取证。与其赌签名，不如沿用**事件名编码**这一既有手法
- *   ——benchNav 的整张路由表都是这么做的。
- */
-export const EVENT_NOTIFICATION_TARGET_WARM = "pictelioNotificationTargetWarm"
-
 /** 已见 clickId 的滑动窗口大小：够覆盖 4 次广播，又不会让 Set 无限长 */
 const SEEN_LIMIT = 32
 
@@ -52,17 +42,17 @@ export function acceptClick(state: ClickDedupeState, clickId: number): boolean {
 /**
  * 处理一次落点到达：去重 → 记点击。
  *
- * @param provenance 由**哪个事件**送达决定（冷 / 热），不是载荷里的数字 ——
- *   载荷只承载 clickId，来源靠事件名区分（理由见上方事件名注释）。
+ * ⚠️ 不做冷/热拆分（#940 实施期结论）：「点击时用户是否在 App 里」在进程内**不可判定**——
+ *   处理点击这个动作本身就是状态跃迁，四种候选信号全被它污染。详见 store 的 recordClicked。
+ *
  * @returns 是否真的记了一笔（重复广播返回 false）
  */
 export async function handleNotificationTarget(
   state: ClickDedupeState,
   clickId: number,
-  provenance: ClickProvenance,
 ): Promise<boolean> {
   if (!acceptClick(state, clickId)) return false
-  await useDeliveryProbeStore().recordClicked(provenance)
-  console.log(`[deliveryProbe] 记 1 个点击样本（${provenance}，clickId=${clickId}）`)
+  await useDeliveryProbeStore().recordClicked()
+  console.log(`[deliveryProbe] 记 1 个点击样本（clickId=${clickId}）`)
   return true
 }

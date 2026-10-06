@@ -86,11 +86,7 @@ import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
 import PlatformCheck from './pages/PlatformCheck.vue'
-import {
-  EVENT_NOTIFICATION_TARGET,
-  EVENT_NOTIFICATION_TARGET_WARM,
-  handleNotificationTarget,
-} from './utils/deliveryProbeLanding'
+import { EVENT_NOTIFICATION_TARGET, handleNotificationTarget } from './utils/deliveryProbeLanding'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -572,21 +568,16 @@ function registerNotificationTargetHandler(): void {
     return
   }
   const dedupe = { seen: new Set<number>() }
-  for (const [event, provenance] of [
-    [EVENT_NOTIFICATION_TARGET, 'cold'],
-    [EVENT_NOTIFICATION_TARGET_WARM, 'warm'],
-  ] as const) {
-    emitter.addListener(event, (...args: unknown[]) => {
-      const clickId = args[0]
-      if (typeof clickId !== 'number' || !Number.isFinite(clickId)) {
-        // 载荷缺 clickId 就无法去重 ⇒ 宁可这次不计，也不能把一次点击记 4 次
-        console.warn('[router] 通知落点载荷缺 clickId，跳过（不导航不计数）')
-        return
-      }
-      void handleNotificationTarget(dedupe, clickId, provenance)
-      void navigate('/notifications', { replace: true })
-    })
-  }
+  emitter.addListener(EVENT_NOTIFICATION_TARGET, (...args: unknown[]) => {
+    const clickId = args[0]
+    if (typeof clickId !== 'number' || !Number.isFinite(clickId)) {
+      // 载荷缺 clickId 就无法去重 ⇒ 宁可这次不计，也不能把一次点击记 4 次
+      console.warn('[router] 通知落点载荷缺 clickId，跳过（不导航不计数）')
+      return
+    }
+    void handleNotificationTarget(dedupe, clickId)
+    void navigate('/notifications', { replace: true })
+  })
 }
 // 同 benchNav：模块加载即注册，早于 initRouter 的 token 恢复
 if (isNativeMode()) registerNotificationTargetHandler()

@@ -36,30 +36,14 @@ export const DELIVERY_PROBE_KEY = "delivery_probe_v1"
 export interface DeliveryProbeCounts {
   /** 发出样本数：一次轮询 = 1（汇总形态，不论该批有几条更新） */
   sent: number
-  /**
-   * 点击样本数 = {@link clickedCold} + {@link clickedWarm}。
-   * 保持 ADR-0220 D12 的「分子」语义不变，拆分只是**附带**信息，不改既有字段含义。
-   */
+  /** 点击样本数（ADR-0220 D12 的分子）。 */
   clicked: number
-  /**
-   * 冷启动点击：App 已被系统关闭时点的通知。
-   * 这才是「被通知叫回来」的真实信号（ADR-0220 D9）。
-   */
-  clickedCold: number
-  /**
-   * 热启动点击：App 存活时点的通知——用户本就在 App 里，
-   * 这一记**不构成**「被通知叫回来」，单独记以便报告期决定是否计入分子。
-   */
-  clickedWarm: number
   /** 本轮探测开始时间（ms）。**跨轮保留**，故重置不清它 */
   startedAt: number | null
 }
 
-/** 点击来源。原生按点击瞬间的进程状态判定（#940）。 */
-export type ClickProvenance = "cold" | "warm"
-
 export function emptyCounts(): DeliveryProbeCounts {
-  return { sent: 0, clicked: 0, clickedCold: 0, clickedWarm: 0, startedAt: null }
+  return { sent: 0, clicked: 0, startedAt: null }
 }
 
 function num(v: unknown): number {
@@ -80,11 +64,6 @@ export function parseCounts(raw: string | null): DeliveryProbeCounts {
     return {
       sent: num(v.sent),
       clicked: num(v.clicked),
-      // ⚠️ 存量 JSON 没有这两个字段（#940 之前只有 sent/clicked/startedAt）。
-      //   真机上已有旧格式数据，按 0 处理而非解析失败 —— 炸掉会把旧数据全丢，
-      //   探测报告的分母凭空归零。
-      clickedCold: num(v.clickedCold),
-      clickedWarm: num(v.clickedWarm),
       startedAt:
         typeof v.startedAt === "number" && Number.isFinite(v.startedAt) ? v.startedAt : null,
     }
@@ -213,15 +192,18 @@ export const useDeliveryProbeStore = defineStore("deliveryProbe", () => {
   }
 
   /**
-   * 记一个点击样本（#940）。`provenance` 由原生按点击瞬间的进程状态给出：
-   * 冷启动才是「被通知叫回来」，热启动时用户本就在 App 里。
-   * ⚠️ **调用方必须先按 clickId 去重**——冷启动要广播 4 次对抗渲染竞态，
+   * 记一个点击样本（#940）。
+   *
+   * ⚠️ **调用方必须先按 clickId 去重**——冷启动那一跳要广播 4 次对抗渲染竞态，
    *   而计数不是幂等的（幂等的是 `navigate(..., { replace: true })`）。
+   *
+   * ⚠️ 刻意**不做冷/热拆分**（#940 实施期结论，见 docs/adr/ADR-0220 §6-3）：
+   *   「点击时用户是否在 App 里」在进程内**不可判定**——处理点击这个动作本身
+   *   就是状态跃迁，四种候选信号全被它污染（回调类型 / 进程内静态 / 持久前台
+   *   标记 / 进程寿命）。宁可只留不可靠的总点击数，也不留会被误用的分类字段。
    */
-  async function recordClicked(provenance: ClickProvenance): Promise<void> {
+  async function recordClicked(): Promise<void> {
     counts.value.clicked += 1
-    if (provenance === "cold") counts.value.clickedCold += 1
-    else counts.value.clickedWarm += 1
     await persist()
   }
 

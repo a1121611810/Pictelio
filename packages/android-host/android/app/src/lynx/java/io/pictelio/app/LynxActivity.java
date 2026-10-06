@@ -112,14 +112,12 @@ public class LynxActivity extends AppCompatActivity {
     static final String EXTRA_NOTIFICATION_CLICK_ID = "pictelio_notification_click_id";
     /** 唯一落点：通知列表页（#940 AC-1：不是通知中心子页，也不是别的聚合页） */
     static final String TARGET_NOTIFICATIONS = "notifications";
-    /** 冷启动落点事件（随 onLoadSuccess 多窗重发，4 次） */
+    /** 落点事件名（与 JS 侧逐字一致，由契约门禁两侧比对） */
     static final String EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget";
-    /** 热启动落点事件（JS 早已挂载，单次即可） */
-    static final String EVENT_NOTIFICATION_TARGET_WARM = "pictelioNotificationTargetWarm";
-    /** 点击来源编码：冷启动（App 已被系统关闭） */
+    /** 冷启动（App 此前不存在）：渲染竞态存在，须多窗重发 */
     static final int CLICK_KIND_COLD = 1;
-    /** 点击来源编码：热启动（进程存活，用户本就在 App 里） */
-    static final int CLICK_KIND_WARM = 2;
+    /** 前台已有 Activity：JS 已挂载，单次广播即可 */
+    static final int CLICK_KIND_REUSE = 2;
     /** 多窗重发的四档延时（ms）——与 benchNav 深链同一组数值（1.5/3/4.5/6s） */
     private static final long[] TARGET_BROADCAST_DELAYS = {1500L, 3000L, 4500L, 6000L};
     /**
@@ -142,7 +140,7 @@ public class LynxActivity extends AppCompatActivity {
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
 
-    /** 本进程是否已渲染过 JS（= 用户可能已经在里面）。点击瞬间读取即「点击前是否活着」。 */
+    /** 本进程是否已渲染过 JS。只用于判定「点击时 Activity 是否已存在」（决定广播次数）。 */
     private static volatile boolean sProcessRendered = false;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
@@ -1011,15 +1009,9 @@ public class LynxActivity extends AppCompatActivity {
      * <p>⚠️ {@code clickKind} 必须由调用方按 <strong>bundle 是否已加载</strong>判定，
      *   不能按「onLoadSuccess 传 cold / onNewIntent 传 warm」硬编码——理由见 onNewIntent 的注释。
      */
-    /** 供 {@link NotificationTapActivity} 在<strong>点击瞬间</strong>调用。 */
+    /** 供 {@link NotificationTapActivity} 判定「点击时 Activity 是否已存在」（只决定广播次数，不决定计数分类）。 */
     static boolean wasProcessRenderedBefore() {
         return sProcessRendered;
-    }
-
-    /** 本进程里是否已存在活着的 LynxActivity 实例（判「点击前用户是否已在 App 里」的旁证）。 */
-    static boolean hasLiveInstance() {
-        WeakReference<LynxActivity> ref = sInstance;
-        return ref != null && ref.get() != null;
     }
 
     private void dispatchNotificationTarget(android.content.Intent intent) {
@@ -1035,20 +1027,19 @@ public class LynxActivity extends AppCompatActivity {
         long clickId = intent.getLongExtra(EXTRA_NOTIFICATION_CLICK_ID, 0L);
         // ⚠️ 判据来自 **NotificationTapReceiver 在点击瞬间**写下的 extra，
         //   不是 Activity 侧任何可观测状态（bundleLoaded / 哪个回调都被真机打脸过）。
-        // ⚠️ 判据来自**进程外持久标记**（中转在点击瞬间写入），不是任何进程内状态：
-        //   真机实证 Android 会在投递中转前重建栈顶的 LynxActivity，把进程级静态写好。
-        boolean wasRunning = NotificationTapActivity.wasRunningAtTap;
-        int clickKind = wasRunning ? CLICK_KIND_WARM : CLICK_KIND_COLD;
+        // ⚠️ 这里**不再判冷热**：#940 实施期结论——「点击时用户是否在 App 里」在进程内不可判定
+        //   （处理点击本身即状态跃迁，四种候选信号全被污染）。本字段只决定广播次数
+        //   （Activity 已存在 ⇒ JS 已挂载 ⇒ 单次足够），不进入计数。
+        int clickKind =
+                NotificationTapActivity.wasActivityAlreadyUp ? CLICK_KIND_REUSE : CLICK_KIND_COLD;
         String event =
-                clickKind == CLICK_KIND_WARM ? EVENT_NOTIFICATION_TARGET_WARM : EVENT_NOTIFICATION_TARGET;
+                EVENT_NOTIFICATION_TARGET;
         // 把判据本身打进日志：kind 是推出来的结论，bundleLoaded 才是依据。
         // 只打结论时，「进程刚起却被判热」这类矛盾无从追（曾真机打脸过一次）。
         Log.i(
                 TAG,
                 "通知落点 kind="
-                        + (clickKind == CLICK_KIND_WARM ? "WARM" : "COLD")
-                        + " 点击瞬间进程已运行="
-                        + wasRunning
+                        + (clickKind == CLICK_KIND_REUSE ? "REUSE" : "COLD")
                         + " pid="
                         + android.os.Process.myPid()
                         + " → "
@@ -1056,9 +1047,9 @@ public class LynxActivity extends AppCompatActivity {
                         + " clickId="
                         + clickId);
 
-        if (clickKind == CLICK_KIND_WARM) {
+        if (clickKind == CLICK_KIND_REUSE) {
             lynxView.sendGlobalEvent(event, JavaOnlyArray.of(clickId));
-            Log.i(TAG, "通知落点（热启动）→ " + event + " clickId=" + clickId);
+            Log.i(TAG, "通知落点（复用已有 Activity，单次广播）→ " + event + " clickId=" + clickId);
             return;
         }
         for (long delay : TARGET_BROADCAST_DELAYS) {
@@ -1099,8 +1090,6 @@ public class LynxActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 「点击时用户是否在 App 里」的持久标记置前台（见 markAppBackgrounded 的说明）
-        markAppBackgrounded(getApplication(), false);
         if (lynxView != null) {
             lynxView.onEnterForeground();
             // 送达通道 · 触达探测（ADR-0220 决策 2）：进入前台事件。
@@ -1133,7 +1122,6 @@ public class LynxActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        markAppBackgrounded(getApplication(), true);
         if (lynxView != null) {
             lynxView.onEnterBackground();
             // 离开前台事件（ADR-0220 决策 2）：与 onResume 的前台事件成对。
@@ -1142,40 +1130,7 @@ public class LynxActivity extends AppCompatActivity {
         }
     }
 
-    // ─── 「点击时用户是否在 App 里」的持久判据（#940 / ADR-0220 决策 9）──────────
-    //
-    // ⚠️ 为什么必须落盘、不能用进程内静态：真机实证——任务记录里 LynxActivity 仍在栈顶时，
-    //   Android 在投递落点中转 Activity **之前**就重建了 LynxActivity（进程随之起来、
-    //   bundle 从缓存秒加载），`sInstance` / `sProcessRendered` 在中转跑到前已被写好。
-    //   ⇒ 进程级标记在「点击瞬间」读到的永远是「已运行」，判据恒为 warm。
-    //   进程寿命类信号（Process.getStartUptimeMillis）同样不可用：进程正是这次点击拉起来的。
-    //
-    // ⚠️ 为什么用 commit() 而非 apply()：进程可能紧接着就被系统回收，apply 的异步落盘会丢。
-    //   代价是 onPause 主线程一次极小的同步写；正确性优先。
-
-    /** 前台状态标记的键（存于既有偏好存储，与 JS 侧共用同一文件） */
-    static final String KEY_APP_IN_BACKGROUND = "delivery_probe_app_in_background";
-
-    /**
-     * 写「用户此刻是否已离开 App」到偏好存储。
-     *
-     * <p>正确性依据：进程被系统回收前**一定**先收到 {@code onPause} ⇒ 该标记不会错留在
-     * 「仍在前台」。唯一例外是进程在前台被强杀（罕见），此时会误判为 warm —— 已登记。
-     */
-    static void markAppBackgrounded(Context appCtx, boolean backgrounded) {
-        android.content.SharedPreferences.Editor ed =
-                appCtx.getSharedPreferences(PictelioPrefsModule.PREFS_FILE, Context.MODE_PRIVATE)
-                        .edit();
-        ed.putString(KEY_APP_IN_BACKGROUND, backgrounded ? "true" : "false");
-        ed.commit(); // 同步落盘：进程可能随时被回收
-    }
-
-    /** 点击瞬间读取：true = 用户点击时**已离开** App（通知把他叫了回来 ⇒ 冷启动） */
-    static boolean wasAppBackgroundedAtTap(Context appCtx) {
-        return "true".equals(
-                appCtx.getSharedPreferences(PictelioPrefsModule.PREFS_FILE, Context.MODE_PRIVATE)
-                        .getString(KEY_APP_IN_BACKGROUND, "false"));
-    }
+    
 
     /**
      * 系统配置变化回调（spec lynx-night-mode T1 §3）：manifest 已声明 uiMode configChanges，

@@ -14,12 +14,9 @@ vi.mock("../stores/deliveryProbeStore", async (importOriginal) => {
   }
 })
 
-const {
-  acceptClick,
-  handleNotificationTarget,
-  EVENT_NOTIFICATION_TARGET,
-  EVENT_NOTIFICATION_TARGET_WARM,
-} = await import("./deliveryProbeLanding")
+const { acceptClick, handleNotificationTarget, EVENT_NOTIFICATION_TARGET } = await import(
+  "./deliveryProbeLanding"
+)
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -51,45 +48,34 @@ describe("触达探测 · 通知落点（#940）", () => {
   })
 
   describe("点击计数入账", () => {
-    it("冷启动点击计入 cold", async () => {
-      const state = { seen: new Set<number>() }
-      expect(await handleNotificationTarget(state, 7, "cold")).toBe(true)
-      expect(recordClicked).toHaveBeenCalledWith("cold")
-    })
-
-    it("热启动点击计入 warm（用户本就在 App 里，不等于被叫回来）", async () => {
-      const state = { seen: new Set<number>() }
-      await handleNotificationTarget(state, 8, "warm")
-      expect(recordClicked).toHaveBeenCalledWith("warm")
-    })
-
     it("重复广播不重复入账（去重发生在入账**之前**）", async () => {
       const state = { seen: new Set<number>() }
-      const first = await handleNotificationTarget(state, 9, "cold")
-      const second = await handleNotificationTarget(state, 9, "cold")
+      const first = await handleNotificationTarget(state, 9)
+      const second = await handleNotificationTarget(state, 9)
       expect([first, second]).toEqual([true, false])
       expect(recordClicked, "一次点击记了两笔").toHaveBeenCalledTimes(1)
     })
 
-    it("冷热由**事件名**决定，故不存在「猜来源」的分支", async () => {
-      // 载荷只带 clickId（lynx 4.0.1 的 JavaOnlyArray.of 只实证过单个 Long），
-      // 来源靠两个事件名区分 ⇒ 没有「未知来源码」这种需要兜底的状态。
+    it("点击只记总数：冷热在进程内不可判定，不留会误导的分类字段", async () => {
       const state = { seen: new Set<number>() }
-      await handleNotificationTarget(state, 11, "cold")
-      await handleNotificationTarget(state, 12, "warm")
-      expect(recordClicked.mock.calls.map((c) => c[0])).toEqual(["cold", "warm"])
+      await handleNotificationTarget(state, 11)
+      await handleNotificationTarget(state, 12)
+      expect(recordClicked).toHaveBeenCalledTimes(2)
+      // 不得向 store 传冷/热 —— 四种候选信号都被点击本身污染（详见 store.recordClicked）
+      expect(recordClicked.mock.calls.every((c) => c.length === 0)).toBe(true)
     })
   })
 
   describe("跨端事件名", () => {
-    it("落点事件名已导出（供 router 订阅 + 契约门禁两侧比对）", () => {
+    it("落点事件名已导出（供 router 订阅 + 契约门禁两侧比对）", async () => {
       expect(EVENT_NOTIFICATION_TARGET).not.toBe("")
-      expect(EVENT_NOTIFICATION_TARGET_WARM).not.toBe("")
-      expect(EVENT_NOTIFICATION_TARGET_WARM).not.toBe(EVENT_NOTIFICATION_TARGET)
       // 非 bench 前缀：benchNav 整条链被 BuildConfig.DEBUG / __BENCH_NAV__ 门死，
       // 正式包不可用；落点必须在 release 可用。
       expect(EVENT_NOTIFICATION_TARGET.startsWith("pictelioBenchNav")).toBe(false)
-      expect(EVENT_NOTIFICATION_TARGET_WARM.startsWith("pictelioBenchNav")).toBe(false)
+      // ⚠️ 不得再有「热启动专用事件名」：冷热在进程内不可判定，两个事件名会让 JS 侧
+      //   看起来像能区分，其实只换了广播次数（#940 实施期结论）。
+      const ns = (await import("./deliveryProbeLanding")) as Record<string, unknown>
+      expect(Object.keys(ns)).not.toContain("EVENT_NOTIFICATION_TARGET_WARM")
     })
   })
 })

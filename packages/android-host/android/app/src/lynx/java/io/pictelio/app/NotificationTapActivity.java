@@ -27,31 +27,21 @@ public class NotificationTapActivity extends Activity {
 
     private static final String TAG = "NotificationTapActivity";
 
-    /**
-     * 点击瞬间「本进程此前是否已渲染过 JS」。由本中转在 onCreate 里写入，
-     * 随后 LynxActivity（在**同一进程**内）读取。
-     *
-     * <p>⚠️ 这是一次传递而非常驻状态：判断必须在点击瞬间做出，之后再推断就晚了。
-     */
-    static volatile boolean wasRunningAtTap = false;
+    /** 点击瞬间 Activity 是否已存在（决定广播次数，不用于计数分类）。 */
+    static volatile boolean wasActivityAlreadyUp = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 此刻进程若为本次点击新起，LynxActivity.sProcessRendered 仍是初值 ⇒ 判据成立
-        // ⚠️ 读**持久**的前台标记，不是进程内静态：Android 在把本中转投递进来之前，
-        //   会先重建任务栈顶的 LynxActivity（进程随之起来、bundle 秒加载），
-        //   此刻任何进程级静态都已经被这次点击自己写好，读出来恒为「已运行」。
-        boolean wasBackgrounded = LynxActivity.wasAppBackgroundedAtTap(getApplicationContext());
-        wasRunningAtTap = !wasBackgrounded;
+        // ⚠️ 只判定「Activity 是否已存在」——它**只决定广播次数**（单次 vs 多窗重发），
+        //   **不进入计数分类**：冷热在设备上不可判定（见 LynxActivity.dispatch 的注释）。
+        wasActivityAlreadyUp = LynxActivity.wasProcessRenderedBefore();
         Log.i(
                 TAG,
-                "通知点击中转：点击瞬间用户已离开App="
-                        + wasRunningAtTap
+                "通知点击中转：Activity已存在="
+                        + wasActivityAlreadyUp
                         + " pid="
-                        + android.os.Process.myPid()
-                        + " 本进程已有LynxActivity实例="
-                        + LynxActivity.hasLiveInstance());
+                        + android.os.Process.myPid());
 
         Intent src = getIntent();
         Intent next = new Intent(this, LynxActivity.class);
