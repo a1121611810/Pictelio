@@ -30,7 +30,7 @@ import { resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import { assertDebugApkInstalled, forceStopApp } from "../prefs";
+import { assertDebugApkInstalled, forceStopApp, writePrefKey } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
 import { SLEEP } from "../helpers";
@@ -110,6 +110,12 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
   });
 
   it("强杀进程后点通知 ⇒ 冷启动落到通知中心页并记 1 次点击", async () => {
+    // 步骤 0：把「本地已读记忆」退回过去 ⇒ 未读恢复 ⇒ 探测器才会发通知。
+    //  ⚠️ 不可省：落点会进入通知列表页，而该页加载成功后按 ADR-0188 D11 推进已读记忆
+    //  ⇒ 上一轮跑完后未读归零，本轮 decideProbe 会判 no-unread 而**根本不发通知**。
+    //  这是探测器与被测链路共享同一份状态导致的跨轮污染，手测时同样会踩。
+    writePrefKey(serial, "notifications_last_read_time", "2020-01-01T00:00:00.000Z");
+
     // 步骤 1：启动 App（登录态由 devLoginIntent 在外层 spec 播种；此处只验链路）
     runOrThrow(
       adbPath(),

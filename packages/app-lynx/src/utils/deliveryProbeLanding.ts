@@ -13,6 +13,7 @@
 //   所以热启动时用户本就在 App 里 —— 这一记点击**不构成**「被通知叫回来」。
 //   现在分开记，等报告期有数据了再决定要不要把它算进分子（ADR-0220 D10）。
 import { useDeliveryProbeStore } from "../stores/deliveryProbeStore"
+import { idbGet } from "./idbKV"
 
 /** 宿主广播的落点事件名（冷启动：随 onLoadSuccess 多窗重发，与 benchNav 深链同款竞态对抗） */
 export const EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget"
@@ -55,4 +56,32 @@ export async function handleNotificationTarget(
   await useDeliveryProbeStore().recordClicked()
   console.log(`[deliveryProbe] 记 1 个点击样本（clickId=${clickId}）`)
   return true
+}
+
+/**
+ * 待认领的点击：宿主在落点分派时把 clickId 落盘，JS 挂载时主动拉取。
+ *
+ * ⚠️ 为什么需要这条**拉取**通道（e2e #942 实测）：四窗广播**可能全部落在 JS 订阅之前**
+ * ——落点分派成功、点击却一次都没被记。多加广播窗口只是把概率压低，不是根治；
+ * 本仓 safeArea / darkMode 早已为此立过同款先例（「首帧事件早于 JS 订阅而丢失 ⇒
+ * 订阅后拉取初值」）。⇒ 事件负责「已经在跑的时候」，拉取负责「错过了也不丢」。
+ */
+export const PENDING_CLICK_KEY = "delivery_probe_pending_click"
+
+/** 拉取并处理宿主落盘的那一次点击；无待认领点击时静默返回。 */
+export async function pullPendingClick(state: ClickDedupeState): Promise<boolean> {
+  let raw: string | null = null
+  try {
+    raw = await idbGet(PENDING_CLICK_KEY)
+  } catch (e) {
+    console.warn("[deliveryProbe] 待认领点击读取失败（跳过）", e)
+    return false
+  }
+  if (!raw) return false
+  const clickId = Number(raw)
+  if (!Number.isFinite(clickId) || clickId <= 0) {
+    console.warn(`[deliveryProbe] 待认领点击 id 畸形：${raw}（跳过）`)
+    return false
+  }
+  return handleNotificationTarget(state, clickId)
 }

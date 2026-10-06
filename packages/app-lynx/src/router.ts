@@ -86,7 +86,7 @@ import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
 import PlatformCheck from './pages/PlatformCheck.vue'
-import { EVENT_NOTIFICATION_TARGET, handleNotificationTarget } from './utils/deliveryProbeLanding'
+import { EVENT_NOTIFICATION_TARGET, handleNotificationTarget, pullPendingClick } from './utils/deliveryProbeLanding'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -569,6 +569,16 @@ function registerNotificationTargetHandler(): void {
     return
   }
   const dedupe = { seen: new Set<number>() }
+  // ⚠️ 订阅后**主动拉取**一次：四窗广播可能全落在本次订阅之前（e2e #942 实测），
+  //   拉取是「错过了也不丢」的那一半（safeArea / darkMode 同款先例）。
+  void pullPendingClick(dedupe)
+    .then((counted) => {
+      if (counted) void navigate('/notifications')
+    })
+    .catch((e: unknown) => {
+      console.warn('[router] 待认领点击拉取失败', e)
+    })
+
   emitter.addListener(EVENT_NOTIFICATION_TARGET, (...args: unknown[]) => {
     const clickId = args[0]
     if (typeof clickId !== 'number' || !Number.isFinite(clickId)) {

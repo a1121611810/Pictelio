@@ -399,6 +399,22 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
     })
 
+    it('⚠️ 落点必须留「待认领」通道（e2e #942：四窗广播可能全落在订阅之前）', () => {
+      // 只靠广播不可靠：bundle 挂载晚于四次窗口时，一次点击都不会被记
+      //（e2e 实测：落点分派成功、点击一次没被记）。本仓 safeArea / darkMode
+      // 早已立过同款先例：事件负责「已在跑时」，**订阅后拉取**负责「错过了也不丢」。
+      expect(
+        ACTIVITY_CODE,
+        '落点未把 clickId 落盘 ⇒ JS 挂载后无从补认领（点击会静默丢失）',
+      ).toMatch(/putString\(KEY_PENDING_NOTIFICATION_CLICK/)
+      expect(
+        ACTIVITY_CODE,
+        '待认领 clickId 未同步落盘（apply 的异步写会随进程回收而丢）',
+      ).toMatch(/putString\(KEY_PENDING_NOTIFICATION_CLICK,[\s\S]{0,160}commit\(\)/)
+      expect(ROUTER_CODE, 'router 订阅后未主动拉取待认领点击').toMatch(/pullPendingClick\(dedupe\)/)
+      expect(LANDING_CODE, '落点模块未导出拉取通道').toMatch(/export async function pullPendingClick/)
+    })
+
     it('⚠️ 重置只清计数两字段、保留 startedAt（#941 AC-1）', () => {
       // ADR-0220 D12：连它一起清就丢掉了「这轮从什么时候开始」，多轮时间线断裂。
       const reset = STORE_CODE.slice(

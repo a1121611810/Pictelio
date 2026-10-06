@@ -114,6 +114,8 @@ public class LynxActivity extends AppCompatActivity {
     static final String TARGET_NOTIFICATIONS = "notifications";
     /** 落点事件名（与 JS 侧逐字一致，由契约门禁两侧比对） */
     static final String EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget";
+    /** 待认领的点击 clickId：广播可能全落在 JS 订阅之前，故同时落盘供 JS 拉取 */
+    static final String KEY_PENDING_NOTIFICATION_CLICK = "delivery_probe_pending_click";
     /** 多窗重发的四档延时（ms）——与 benchNav 深链同一组数值（1.5/3/4.5/6s） */
     private static final long[] TARGET_BROADCAST_DELAYS = {1500L, 3000L, 4500L, 6000L};
     /**
@@ -1034,6 +1036,16 @@ public class LynxActivity extends AppCompatActivity {
         Log.i(
                 TAG,
                 "通知落点 → " + event + " clickId=" + clickId + "，四次广播 pid=" + android.os.Process.myPid());
+
+        // ⚠️ 四次广播**可能全部落在 JS 订阅之前**（e2e #942 实测：落点分派成功、
+        //   点击却一次没被记）。故同时把 clickId 落盘，让 JS 挂载时**主动拉取**
+        //   ——与本仓 safeArea / darkMode 的「首帧事件早于订阅 ⇒ 订阅后拉取初值」同款。
+        android.content.SharedPreferences.Editor ed =
+                getApplication()
+                        .getSharedPreferences(PictelioPrefsModule.PREFS_FILE, MODE_PRIVATE)
+                        .edit();
+        ed.putString(KEY_PENDING_NOTIFICATION_CLICK, String.valueOf(clickId));
+        ed.commit(); // 同步落盘：进程可能随时被回收
 
         for (long delay : TARGET_BROADCAST_DELAYS) {
             final long id = clickId;

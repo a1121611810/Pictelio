@@ -14,7 +14,7 @@ vi.mock("../stores/deliveryProbeStore", async (importOriginal) => {
   }
 })
 
-const { acceptClick, handleNotificationTarget, EVENT_NOTIFICATION_TARGET } = await import(
+const { acceptClick, handleNotificationTarget, pullPendingClick, PENDING_CLICK_KEY, EVENT_NOTIFICATION_TARGET } = await import(
   "./deliveryProbeLanding"
 )
 
@@ -78,4 +78,49 @@ describe("触达探测 · 通知落点（#940）", () => {
       expect(Object.keys(ns)).not.toContain("EVENT_NOTIFICATION_TARGET_WARM")
     })
   })
+  describe("待认领点击的拉取通道（e2e #942：四窗广播可能全落在订阅之前）", () => {
+    it("无待认领点击时静默返回 false", async () => {
+      const { idbGet } = await import("./idbKV")
+      vi.spyOn(await import("./idbKV"), "idbGet").mockResolvedValue(null as never)
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const state = { seen: new Set<number>() }
+      expect(await pullPendingClick(state)).toBe(false)
+      expect(recordClicked).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it("拉到 id 时记一次点击", async () => {
+      const mod = await import("./idbKV")
+      vi.spyOn(mod, "idbGet").mockResolvedValue("12345" as never)
+      const state = { seen: new Set<number>() }
+      expect(await pullPendingClick(state)).toBe(true)
+      expect(recordClicked).toHaveBeenCalledTimes(1)
+    })
+
+    it("⚠️ 拉到的 id 已见过 ⇒ 不重复计数（广播与拉取会同时到达同一 id）", async () => {
+      const mod = await import("./idbKV")
+      vi.spyOn(mod, "idbGet").mockResolvedValue("777" as never)
+      const state = { seen: new Set<number>() }
+      expect(await pullPendingClick(state)).toBe(true)
+      expect(await pullPendingClick(state), "拉取与广播共享同一 clickId，不得记两次").toBe(false)
+      expect(recordClicked).toHaveBeenCalledTimes(1)
+    })
+
+    it("id 畸形（NaN / 0 / 非数字）⇒ 显式告警且不计数（禁静默降级）", async () => {
+      const mod = await import("./idbKV")
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      for (const bad of ["0", "-1", "abc", ""]) {
+        vi.spyOn(mod, "idbGet").mockResolvedValue(bad as never)
+        const state = { seen: new Set<number>() }
+        expect(await pullPendingClick(state), `id=${bad} 不该计数`).toBe(false)
+      }
+      expect(recordClicked).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it("⚠️ 宿主侧必须把待认领 clickId 落盘（否则拉取通道永远是空）", () => {
+      expect(PENDING_CLICK_KEY, "拉取键名未导出").not.toBe("")
+    })
+  })
+
 })
