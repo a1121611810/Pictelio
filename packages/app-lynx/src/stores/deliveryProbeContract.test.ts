@@ -365,18 +365,24 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
       // 判据必须是「活实例 ∧ bundle 已加载」：**不可**用 onLoadSuccess 置位后永不重置的
       // 进程静态——exitApp 只 finish() 不杀进程 ⇒「进程活着但没有 Activity」是可达状态，
       // 用它会把单次广播发给不存在的监听者 ⇒ 点击静默丢失（双轴 review 判为阻塞）。
-      expect(ACTIVITY_CODE, '单次广播分支缺失').toMatch(
-        /CLICK_KIND_REUSE[\s\S]*?sendGlobalEvent[\s\S]*?return/,
+      // ⚠️ 广播**恒为四次**，不得再引入「单次 / 多窗」判据（e2e #942 实测两种都错）：
+      //   ① 按 onLoadSuccess/onNewIntent 硬编码 ⇒ 冷启动时 onNewIntent 在 bundle 加载**之后**
+      //      才送达，判成单次 ⇒ 点击丢失；
+      //   ② 按「bundle 是否已加载」实测 ⇒ onLoadSuccess 调用点在加载回调**内部**，该判据恒真。
+      //   多余三次由 clickId 去重挡掉（首次到达才导航 + 计数），成本可忽略。
+      const dispatchBody = ACTIVITY_CODE.slice(
+        ACTIVITY_CODE.indexOf('private void dispatchNotificationTarget'),
+        ACTIVITY_CODE.indexOf('private void dispatchNotificationTarget') + 2600,
       )
       expect(
-        ACTIVITY_CODE,
-        '广播次数判据未用「活实例 ∧ bundle 已加载」',
-      ).toMatch(/hasLiveActivityInstance\(\)\s*&&\s*bundleLoaded\.get\(\)/)
+        dispatchBody,
+        '落点未走多窗重发 ⇒ 渲染竞态下页面级监听未挂时点击丢失',
+      ).toMatch(/for \(long delay : TARGET_BROADCAST_DELAYS\)/)
       expect(
-        ACTIVITY_CODE,
-        '仍在用永不重置的进程静态判广播次数 ⇒ 进程活着但无 Activity 时点击静默丢失',
-      ).not.toMatch(/sProcessRendered/)
-      expect(ACTIVITY_CODE, '未读取 ADR-0066 维护的 sInstance 存活标志').toMatch(
+        dispatchBody,
+        '落点重新引入了「单次 / 多窗」判据 ⇒ e2e #942 实测两种判据都会错',
+      ).not.toMatch(/CLICK_KIND|clickKind|singleBroadcast/)
+      expect(ACTIVITY_CODE, '未保留 ADR-0066 维护的 sInstance 存活标志读取').toMatch(
         /hasLiveActivityInstance\(\)[\s\S]{0,200}?sInstance/,
       )
     })
@@ -391,10 +397,6 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         ACTIVITY_CODE,
         'onNewIntent 未 setIntent ⇒ getIntent() 仍返回首次 intent，extra 静默丢弃',
       ).toMatch(/onNewIntent[\s\S]*?setIntent\(intent\)/)
-      // Activity 已存在 ⇒ JS 已挂载 ⇒ 单次广播足够；不存在 ⇒ 渲染竞态 ⇒ 多窗重发
-      expect(ACTIVITY_CODE, 'Activity 已存在时未走单次广播分支').toMatch(
-        /CLICK_KIND_REUSE[\s\S]*?sendGlobalEvent[\s\S]*?return/,
-      )
     })
 
     it('⚠️ 重置只清计数两字段、保留 startedAt（#941 AC-1）', () => {

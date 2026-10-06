@@ -24,8 +24,15 @@
 > Vite dev server（端口 5173），随客户端删除**整轮不可用**，无替代实现
 > （见 ADR-0203 §后果第 4 条）。本表中标注 WebView-only 的章节同理。
 >
-> 替代入口：模拟器 E2E 走 `pnpm test:android-host:e2e`（手动），
+> 替代入口：模拟器 E2E 走 `pnpm test:android-host:e2e`（**手动，不进 CI**，ADR-0084），
 > JVM / Robolectric 原生单测走 `pnpm test:android-host:unit`（随 CI 跑）。
+>
+> **模拟器 E2E 是手动发布门，不是唯一防线**：本仓 e2e 不进 CI，且历史上多次出现
+> 「单测全绿而真机错」。门禁职责由各片单测与跨端契约门禁承担；E2E 只钉**只有真机能证伪**
+> 的链路。当前用例：
+> - `delivery-probe-cold-start.spec.ts`（#942）：触达探测「强杀 App → 点通知 → 落通知中心」。
+>   已知失效面写在 spec 文件头（点通知依赖固定坐标、依赖权限已授予、强杀必须用 `am kill`
+>   而非 `am force-stop`），失败时截图落 `tests/android-e2e/evidence/`。
 
 ### app-lynx 侧的单测与 E2E
 

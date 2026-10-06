@@ -114,10 +114,6 @@ public class LynxActivity extends AppCompatActivity {
     static final String TARGET_NOTIFICATIONS = "notifications";
     /** 落点事件名（与 JS 侧逐字一致，由契约门禁两侧比对） */
     static final String EVENT_NOTIFICATION_TARGET = "pictelioNotificationTarget";
-    /** 冷启动（App 此前不存在）：渲染竞态存在，须多窗重发 */
-    static final int CLICK_KIND_COLD = 1;
-    /** 前台已有 Activity：JS 已挂载，单次广播即可 */
-    static final int CLICK_KIND_REUSE = 2;
     /** 多窗重发的四档延时（ms）——与 benchNav 深链同一组数值（1.5/3/4.5/6s） */
     private static final long[] TARGET_BROADCAST_DELAYS = {1500L, 3000L, 4500L, 6000L};
     /**
@@ -1002,8 +998,6 @@ public class LynxActivity extends AppCompatActivity {
      *
      * <p>无落点 extra ⇒ 直接返回（绝大多数启动都走这条，不能误报）。
      *
-     * <p>⚠️ {@code clickKind} 必须由调用方按 <strong>bundle 是否已加载</strong>判定，
-     *   不能按「onLoadSuccess 传 cold / onNewIntent 传 warm」硬编码——理由见 onNewIntent 的注释。
      */
     /**
      * 本进程是否还有**活着的** LynxActivity 实例。
@@ -1031,37 +1025,16 @@ public class LynxActivity extends AppCompatActivity {
         long clickId = intent.getLongExtra(EXTRA_NOTIFICATION_CLICK_ID, 0L);
         // ⚠️ 这里**不判冷热**：#940 实施期结论——「点击时用户是否在 App 里」在进程内不可判定
         //   （处理点击本身即状态跃迁，四种候选信号全被污染，见 ADR-0220 §6-3）。
-        //   clickKind **只决定广播次数**，不进入计数。
-        // ⚠️ 判据必须问「这次广播之前，JS 侧监听是否**已经**挂好」：
-        //   · onLoadSuccess 的调用点**就在**加载完成回调内部 ⇒ 页面级监听此刻仍可能没挂
-        //     ⇒ 必须多窗重发（这正是 benchNav 四窗手法要对抗的渲染竞态）；
-        //     此前误按「进程渲染过」判定会走单次，审查据此判出「点击静默丢失」缺陷。
-        //   · onNewIntent 时 bundle 若已加载 ⇒ JS 早已挂载 ⇒ 单次足够。
-        int clickKind =
-                hasLiveActivityInstance() && bundleLoaded.get() ? CLICK_KIND_REUSE : CLICK_KIND_COLD;
         String event = EVENT_NOTIFICATION_TARGET;
-        // 把判据本身打进日志：kind 是结论，两个依据（实例存活 / bundle 已加载）一并打出。
-        // 只打结论时，「进程刚起却被判热」这类矛盾无从追（曾真机打脸过一次）。
+        // ⚠️ 广播**恒为四次**，不再按「单次 / 多窗」判：两种判据都会错 ——
+        //   ① 按 onLoadSuccess/onNewIntent 硬编码：冷启动时 onNewIntent 在 bundle 加载**之后**才送达
+        //      （e2e #942 实测），判成单次 ⇒ 点击丢失；
+        //   ② 按「bundle 是否已加载」实测：onLoadSuccess 调用点在加载回调**内部**，此刻该判据恒真。
+        //   ⇒ 干脆不判：多余的三次由 clickId 去重挡掉（首次到达才导航+计数），成本可忽略。
         Log.i(
                 TAG,
-                "通知落点 kind="
-                        + (clickKind == CLICK_KIND_REUSE ? "REUSE" : "COLD")
-                        + " 有活实例="
-                        + hasLiveActivityInstance()
-                        + " bundleLoaded="
-                        + bundleLoaded.get()
-                        + " pid="
-                        + android.os.Process.myPid()
-                        + " → "
-                        + event
-                        + " clickId="
-                        + clickId);
+                "通知落点 → " + event + " clickId=" + clickId + "，四次广播 pid=" + android.os.Process.myPid());
 
-        if (clickKind == CLICK_KIND_REUSE) {
-            lynxView.sendGlobalEvent(event, JavaOnlyArray.of(clickId));
-            Log.i(TAG, "通知落点（复用已有 Activity，单次广播）→ " + event + " clickId=" + clickId);
-            return;
-        }
         for (long delay : TARGET_BROADCAST_DELAYS) {
             final long id = clickId;
             new android.os.Handler(android.os.Looper.getMainLooper())
@@ -1073,7 +1046,7 @@ public class LynxActivity extends AppCompatActivity {
                             },
                             delay);
         }
-        Log.i(TAG, "通知落点（冷启动）→ " + event + " clickId=" + clickId + "，四次广播");
+        Log.i(TAG, "通知落点 → " + event + " clickId=" + clickId + "，四次广播");
     }
 
     /**
