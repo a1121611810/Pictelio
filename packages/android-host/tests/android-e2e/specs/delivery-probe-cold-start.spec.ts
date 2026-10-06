@@ -14,8 +14,14 @@
  *
  * ⚠️ **已知失效面**（AC-5 要求诚实登记）：
  *  1. **点通知靠固定坐标**：通知栏里本 App 通知的位置随系统通知增减而漂移
- *     （本轮实测漂移过一次，误点到系统「设置屏锁」）。因此这里用 `NOTIFICATION_TAP_Y`
- *     常量并在失败时**落截图**，而不是假装坐标稳定。若系统通知挤占，改该常量即可。
+ *     （本轮实测漂移过一次，误点到系统「设置屏锁」）。
+ *
+ * ⚠️ 早期版本硬编码绝对像素 (540, 832)——那是 1080×2160 的值。拿到 **720×1280** 的
+ *   `pictelio_low` 上一试就打到别处（实测：落点一次没分派、通知仍在、坐标恰好落在屏内）。
+ *   ⇒ 改为**按屏幕尺寸现算**：x=50%、y=38.5%（1080×2160 上 832 的对应比例）。
+ *   换 AVD / 换分辨率都不必再改常量。
+ *   剩余漂移面：系统通知的条数与折叠状态仍会挪动本 App 通知的位置；
+ *   真撞上了 `04-shade.png` 会显示当时通知栏长什么样（失败必留证据）。
  *  2. **依赖通知权限已授予**：探测器刻意不申请权限（ADR-0220 D3），未授权时
  *     根本不会发出通知，本 spec 会卡在「等通知」这一步并报错——这是**预期行为**，
  *     不是 flaky。
@@ -30,7 +36,7 @@ import { resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import { assertDebugApkInstalled, forceStopApp, writePrefKey } from "../prefs";
+import { assertDebugApkInstalled, forceStopApp, loginViaDevIntent, writePrefKey } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 import { SLEEP } from "../helpers";
@@ -38,8 +44,8 @@ import { SLEEP } from "../helpers";
 /** 证据落盘目录（相对 android-e2e/）。失败时人能直接翻出卡在哪一步。 */
 const EVIDENCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "evidence");
 /** 通知栏里本 App 通知正文的 y 坐标（1080×2160 模拟器）。漂移时改这里。 */
-const NOTIFICATION_TAP_Y = 832;
-const NOTIFICATION_TAP_X = 540;
+const NOTIFICATION_TAP_RATIO_X = 0.5;
+const NOTIFICATION_TAP_RATIO_Y = 0.385;
 /** 探测静默期 90s（ADR-0220 决策 2），加余量。 */
 const PROBE_TIMEOUT_MS = 180_000;
 
@@ -93,6 +99,12 @@ function notificationPresent(serial: string): boolean {
   );
 }
 
+/** 屏幕像素尺寸；取不到时退回参考机型 1080×2160。 */
+function screenSize(serial: string): { w: number; h: number } {
+  const m = /Physical size:\s*(\d+)x(\d+)/u.exec(adb(serial, ["shell", "wm", "size"]));
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : { w: 1080, h: 2160 };
+}
+
 function shoot(serial: string, name: string): string {
   const remote = `/data/local/tmp/evidence/${name}`;
   const local = resolve(EVIDENCE_DIR, name);
@@ -114,6 +126,10 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
     mkdirSync(EVIDENCE_DIR, { recursive: true });
     forceStopApp(serial);
     runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
+    // ⚠️ **必须先登录**：探测器靠 refreshUnreadBadge 取未读；未登录时它 warn 后按 0 处理
+    //   ⇒ decideProbe 判 no-unread ⇒ **一条通知都不会发**，spec 会卡在「等通知」那一步，
+    //   并把「没登录」误报成「探测器坏了」。
+    await loginViaDevIntent(serial);
   });
 
   afterAll(() => {
@@ -183,8 +199,8 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
         "shell",
         "input",
         "tap",
-        String(NOTIFICATION_TAP_X),
-        String(NOTIFICATION_TAP_Y),
+        String(Math.round(screenSize(serial).w * NOTIFICATION_TAP_RATIO_X)),
+        String(Math.round(screenSize(serial).h * NOTIFICATION_TAP_RATIO_Y)),
       ],
       30_000,
     );
