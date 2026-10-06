@@ -167,6 +167,33 @@ describe("探测报告 · 口径诚实（#941）", () => {
       expect(r.verdict).toBe("no-data");
       expect(r.anomalies).toContain("permission=denied-but-sent>0");
     });
+    it("第二个设备档案（API 28 / 720×1280）的计数同样得出诚实结论", async () => {
+      // pictelio_low：Android 9、2GB、720×1280 ⇒ POST_NOTIFICATIONS 尚不存在
+      // （运行时权限是 API 33 才引入的），故这条走的是「无运行时权限、默认允许」那条路径 ——
+      // 在 API 33+ 上永远不会发生。干净安装 + 全新登录跑出来的独立计数。
+      const { parseCounts } = await import("../stores/deliveryProbeStore");
+      const counts = parseCounts('{"sent":3,"clicked":1,"startedAt":1791327845522}');
+      expect(counts.sent).toBe(3);
+      expect(counts.clicked).toBe(1);
+
+      const r = buildProbeReport({ counts, permissionGranted: true });
+      expect(r.verdict).toBe("clicked");
+      expect(r.anomalies).toEqual([]);
+      expect(r.rateText).toBe("33%");
+    });
+
+    it("样本量极小时比率仍照实算，但不因此抬高结论强度", async () => {
+      // 3 发 1 点：33% 在统计上毫无意义（ADR-0220 §3.2：单用户样本无统计效力）。
+      // 报告必须照实给数字，**同时**把「不可推广 / 定性观察」钉在旁边 ——
+      // 否则一个小样本的高比率会被读成强信号。
+      const r = buildProbeReport({
+        counts: { sent: 3, clicked: 1, startedAt: 1 },
+        permissionGranted: true,
+      });
+      expect(r.rateText).toBe("33%");
+      expect(r.caveats.join()).toContain("不可推广");
+      expect(r.caveats.join()).toContain("定性");
+    });
   });
 
 })
