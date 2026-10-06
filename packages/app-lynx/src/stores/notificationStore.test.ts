@@ -204,13 +204,17 @@ describe("notificationStore（Pinia：已读推进 / 角标）", () => {
       expect.objectContaining({ pages: 1 }),
     )
     expect(store.unreadCount).toBe(1)
+    // 触达探测把本返回值当「计数是否新鲜」的判据（#939），故契约本身要钉住
+    expect(await store.refreshUnreadBadge()).toBe(true)
   })
 
   it("refreshUnreadBadge 失败：warn 保留上次计数、零写盘（失败不影响页面）", async () => {
     fetchInfiniteQueryMock.mockRejectedValue({ type: "NETWORK", message: "网络不可用" })
     const store = useNotificationStore()
     store.unreadCount = 2
-    await store.refreshUnreadBadge()
+    // ⚠️ 失败时 unreadCount 仍是**上次的值**（角标语义，调用方不可忽略）⇒ 返回 false，
+    //   否则触达探测会拿旧计数当新的发通知，且没有任何告警。
+    await expect(store.refreshUnreadBadge()).resolves.toBe(false)
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[notificationStore]"), expect.anything())
     expect(store.unreadCount).toBe(2)
     expect(idbSetMock).not.toHaveBeenCalled()

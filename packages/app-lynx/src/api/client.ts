@@ -254,6 +254,8 @@ export function getNativeModules(): {
   PictelioDownloader?: unknown
   PictelioGallery?: unknown
   PictelioShare?: unknown
+  /** 送达通道 · 触达探测薄桥（spec notification-delivery-probe / #939） */
+  PictelioNotification?: unknown
 } | undefined {
   return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: unknown }).NativeModules as never

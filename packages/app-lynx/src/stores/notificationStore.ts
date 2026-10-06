@@ -227,8 +227,12 @@ export const useNotificationStore = defineStore("notifications", () => {
    * Me 页挂载静默刷新（ADR-0188 D7 lynx 侧；无前台恢复通道，挂账）：复用列表 query
    * 的键与 queryFn 取首页 1 页（fetchInfiniteQuery pages:1，命中/填充同一缓存条目），
    * 仅更新计数，失败 warn 且不改动页面（保持上次计数，非静默）。
+   *
+   * @returns 本轮是否真的刷新到了新值。**失败时 unreadCount 保留上次的值**，
+   *   故调用方若把它当输入（如触达探测的未读轨）必须看这个返回值——
+   *   拿到旧值还当新的用，就是一次「无告警的静默降级」。
    */
-  async function refreshUnreadBadge(): Promise<void> {
+  async function refreshUnreadBadge(): Promise<boolean> {
     try {
       const data = await queryClient.fetchInfiniteQuery({
         queryKey: queryKeys.notifications.list(),
@@ -239,8 +243,10 @@ export const useNotificationStore = defineStore("notifications", () => {
       })
       const lastReadMs = await loadLastReadMs()
       unreadCount.value = countUnreadNotifications(data.pages[0]?.notifications ?? [], lastReadMs)
+      return true
     } catch (e) {
       console.warn("[notificationStore] 未读角标静默刷新失败（保留上次计数）", e)
+      return false
     }
   }
 

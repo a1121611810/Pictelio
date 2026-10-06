@@ -81,6 +81,8 @@ public final class LynxRuntimeInitializer {
         LynxEnv.inst().registerModule("NetDiag", NetDiagModule.class);
         LynxEnv.inst().registerModule("PictelioWebDav", PictelioWebDavModule.class); // WebDAV 备份薄桥（spec webdav-backup T3）
         LynxEnv.inst().registerModule("PictelioClipboard", PictelioClipboardModule.class); // 剪贴板薄桥（spec app-lynx-novel-text-selection §ID 6）
+        // 送达通道 · 触达探测薄桥（spec notification-delivery-probe / ADR-0220 决策 4）
+        LynxEnv.inst().registerModule("PictelioNotification", PictelioNotificationModule.class);
         LynxEnv.inst().enableLynxDebug(BuildConfig.DEBUG);
     }
 
