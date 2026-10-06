@@ -47,8 +47,24 @@ describe("deliveryProbe · 计数语义", () => {
     })
 
     it("畸形 JSON ⇒ 首轮未探测**且显式告警**（不静默当成「0 次发出」）", () => {
+
       expect(parseCounts("{不是json")).toEqual(emptyCounts())
       expect(console.warn).toHaveBeenCalled()
+    })
+    it("⚠️ 字段畸形（类型错 / NaN / null）⇒ 按 0 处理**且不抛**（#941 AC-2）", () => {
+      // 逐字段畸形比整段 JSON 畸形更常见：写入方改了结构，解析仍成功。
+      // 此时若让 NaN 混进计数，报告里的比率会变成 NaN% —— 正是「看起来很像真的」的坏结论。
+      const bad = parseCounts(
+        JSON.stringify({
+          sent: "3",
+          clicked: Number.NaN,
+          startedAt: "yesterday",
+        }),
+      )
+      expect(bad.sent).toBe(0)
+      expect(bad.clicked).toBe(0)
+      expect(bad.startedAt).toBeNull()
+      expect(Number.isNaN(bad.sent + bad.clicked)).toBe(false)
     })
 
     it("字段类型不对 ⇒ 逐字段回退，不整体丢弃", () => {
