@@ -87,12 +87,18 @@ Pictelio 无任何通知能力（关注/收藏/评论等事件用户不可感知
 ## Out of Scope
 
 - 系统推送 / WorkManager 后台检查 / POST_NOTIFICATIONS（Phase 2 独立 Grill）
+  → 📌 **该 Grill 已完成（2026-10-06），形态决策见
+  [ADR-0220](../../adr/ADR-0220-notification-delivery-channel-probe.md)**。结论要点：
+  定为「补生命周期事件 + 进入前台 + 静默期后轮询」的**触达探测**（非通知功能），
+  **不是**本条原措辞的「WorkManager 后台检查」；只拿定性信号、**不设统计阈值**（单用户样本量不足）。
+  同一件工作在 `app-lynx-navigation-dimension-restructure.md` §4 称「P2 · 送达通道」，三处已互相引用。
 - 富文本渲染、通知文本翻译
 - 公告面（`/v1/info/latest`）
 - 服务端 is_read 消费、已读跨设备同步
 - R18 缩略图遮罩、组头收起
 - 设置开关
 - lynx 前台恢复原生事件通道（挂账 ADR-0188 后果节）
+  → 📌 ADR-0220 D2 决定**补**该通道（作为「静默期」判定的基础），此项随 ADR-0220 一并落地
 
 ## Further Notes
 
