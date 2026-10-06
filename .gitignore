@@ -78,4 +78,5 @@ packages/app/bench-results/
 packages/app/tests/agent-browser/.token-state.json
 
 # android-e2e 失败证据截图（测试产物，不入库）
-packages/android-host/evidence/
+packages/android-host/tests/android-e2e/evidence/
+packages/android-host/tests/evidence/

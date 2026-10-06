@@ -36,7 +36,7 @@ import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 import { SLEEP } from "../helpers";
 
 /** 证据落盘目录（相对 android-e2e/）。失败时人能直接翻出卡在哪一步。 */
-const EVIDENCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "evidence");
+const EVIDENCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "evidence");
 /** 通知栏里本 App 通知正文的 y 坐标（1080×2160 模拟器）。漂移时改这里。 */
 const NOTIFICATION_TAP_Y = 832;
 const NOTIFICATION_TAP_X = 540;
