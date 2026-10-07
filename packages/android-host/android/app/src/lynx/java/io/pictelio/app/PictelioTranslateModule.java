@@ -894,14 +894,30 @@ public class PictelioTranslateModule extends LynxModule {
     }
 
     /**
-     * 构造 Responses API 的 {@code input}：JS 侧传段落**字符串数组**，本方法把段落按
-     * web 路径（{@code buildResponsesRequestBody}，api/translate.ts）同款形态拼装成单条
-     * user 消息 —— 段落以 {@code [N]} 前缀锚定、空行分隔，供 SSE 侧按 N 对齐回填。
+     * 构造 Responses API 的 {@code input}：JS 侧传段落**字符串数组**，本方法拼成一条
+     * {@code [N]} 锚定、空行分隔的文本，供 SSE 侧按 N 对齐回填。
      *
-     * <p>两端同形是硬约束：native 与 web 路径的指令 / input 形态必须一致，否则同一 endpoint
-     * 换路径后译文结构不同（native 无 [N] 锚定 → 无法按段回填）。
+     * <p><b>真正的不变量有两条（#943 据实测重写，原注释三句里两句为伪约束）</b>：
+     * <ol>
+     *   <li><b>指令同源</b>：native 与 web 都调用 {@code buildSystemInstructions(config)}，
+     *       同一函数产出，不可能漂移。这条约束成立且自带防线（单一事实源）。</li>
+     *   <li><b>锚定文本与 web 路径逐字节相同</b>：两端都用 {@code [i] } 前缀 + {@code \n\n}
+     *       分隔同一段落序列。下游 {@code alignParagraphs} 只读<b>译文文本</b>
+     *       （{@code stripAnchorPrefix} + 按空行切分），从不看请求形态 —— 故锚定与分隔符
+     *       就是跨端契约的全部。</li>
+     * </ol>
+     *
+     * <p><b>原「两端 input 形态必须一致」是伪约束（已删除）</b>：原文称「native 无 [N]
+     * 锚定 → 无法按段回填」，与实现相反 —— 本方法逐段拼 {@code [N]}，且实测两端产出的锚定
+     * 文本逐字节相同。而外层报文形态本就不同（native 用标量字符串、web 用
+     * {@code [{role:'user', content}]}），两者<b>都被 Responses API 接受</b>
+     * （2026-10-07 以真实密钥实测：两种形态对 {@code /v1/responses} 均返回 200 —— 该取证
+     * 在本仓外，不在 {@code PictelioTranslateBuildInputTest} 中，后者只钉锚定文本契约）。
+     * 把报文形态写成硬约束，会诱导后人去「修」一个并不存在的缺陷。
+     *
+     * <p>真机唯一走本方法；web 路径仅 dev-core 预览使用。
      */
-    private static String buildInput(JSONArray paragraphs) throws Exception {
+    static String buildInput(JSONArray paragraphs) throws Exception {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < paragraphs.length(); i++) {
             if (i > 0) sb.append("\n\n");
