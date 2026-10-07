@@ -153,7 +153,7 @@ function scheduleCompatibilityProbe(): void {
   }, 600)
 }
 
-/** 兼容性 chip 文案（八态；store 是唯一事实源）。显式映射而非模板拼键——i18n 键是字面量联合类型 */
+/** 兼容性 chip 文案（七态；store 是唯一事实源）。显式映射而非模板拼键——i18n 键是字面量联合类型 */
 const COMPAT_KEYS = {
   idle: "novelTranslate.endpoint.compat.idle",
   ok: "novelTranslate.endpoint.compat.ok",

@@ -40,7 +40,7 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.deleteConfirm",
   // 清除流程行内二次确认（lynx 无浏览器 confirm()，见 SettingsEndpoint.vue）；
   // ADR-0173 同批新增（探测六态 + 凭据三态 + 动作键）
-  // ADR-0173：动作按钮键（测试连接）+ 兼容性八态 + 凭据三态 + 动作二键
+  // ADR-0173：动作按钮键（测试连接）+ 兼容性七态 + 凭据三态 + 动作二键
   "novelTranslate.endpoint.test.button",
   "novelTranslate.endpoint.test.running",
   "novelTranslate.endpoint.compat.idle",

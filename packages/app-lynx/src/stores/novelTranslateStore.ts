@@ -75,7 +75,7 @@ export const CHUNK_OFFSET = Symbol("chunkOffset")
 
 /**
  * 端点兼容性（**地址层**事实，spec §6.1 / ADR-0173 D1）：由 dummy-key 探测产生，
- * 与「凭据是否有效」正交。八态（含 idle 与实现新增的 incompatible）。
+ * 与「凭据是否有效」正交。七态（含 idle 与实现新增的 incompatible；vllm 已于 #945 移除）。
  */
 export type EndpointCompatibilityStatus =
   | "idle"
