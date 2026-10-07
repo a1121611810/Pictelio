@@ -587,7 +587,6 @@ sequenceDiagram
 | `endpoint.baseURL.probe.ok` | ✓ Responses API 兼容 | ✓ Responses API compatible |
 | `endpoint.baseURL.probe.azure` | ✓ Azure OpenAI Responses | ✓ Azure OpenAI Responses |
 | `endpoint.baseURL.probe.deepseek` | ✓ DeepSeek (Codex 兼容) | ✓ DeepSeek (Codex compatible) |
-| `endpoint.baseURL.probe.vllm` | ✓ vLLM 自托管 | ✓ vLLM self-hosted |
 | `endpoint.baseURL.probe.partial` | ⚠ 仅 chat/completions 兼容 | ⚠ Only chat/completions compatible |
 | `endpoint.baseURL.probe.unknown` | ⚠ 无法探测 endpoint | ⚠ Could not probe endpoint |
 | `endpoint.apiKey.label` | API Key | API Key |

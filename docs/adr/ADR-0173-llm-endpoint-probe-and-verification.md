@@ -25,7 +25,7 @@ spec/ADR 里**没有**任何关于「已验证状态」「免密钥重测」「�
 
 | 层 | 状态 | 触发 | 用什么 key |
 |---|---|---|---|
-| **端点兼容性** | `idle`（未探测）/ `ok` / `azure` / `deepseek` / `vllm` / `partial`（仅 chat-completions）/ `incompatible` / `unknown`（无法探测） | 输入 baseURL 后 **debounce 600ms 自动** | **dummy key** |
+| **端点兼容性** | `idle`（未探测）/ `ok` / `azure` / `deepseek` / `partial`（仅 chat-completions）/ `incompatible` / `unknown`（无法探测） | 输入 baseURL 后 **debounce 600ms 自动** | **dummy key** |
 | **凭据验证** | `unverified` / `verified` / `failed` | 用户点「测试连接」 | **真实 key**（用户当场输入） |
 
 禁止：用兼容性冒充凭据有效；缺少 key 时沿用上一次的 `verified` 徽章；把结果文案当作动作按钮的标题。

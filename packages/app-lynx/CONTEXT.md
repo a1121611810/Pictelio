@@ -306,7 +306,7 @@ _Avoid_: 复制 inline 分段 markup（5 份拷贝曾致「修 2 漏 1」drift�
 ### 翻译端点（Translation endpoint）【2026-09-19 新增，ADR-0173】
 
 **端点兼容性（endpoint compatibility）**：
-「这个地址是不是 OpenAI Responses 兼容端点」这一**地址层**事实。八态：`idle`（未探测）/ `ok` / `azure` / `deepseek` / `vllm` / `partial`（仅 chat-completions 兼容，如 OpenRouter/智谱/Qwen）/ `incompatible`（404/405）/ `unknown`（5xx 或网络错）。由输入 baseURL 后 **debounce 600ms 自动**探测产生，**携带 dummy key**——因此未配置密钥也能回答，且与「凭据是否有效」无关。
+「这个地址是不是 OpenAI Responses 兼容端点」这一**地址层**事实。七态：`idle`（未探测）/ `ok` / `azure` / `deepseek` / `partial`（仅 chat-completions 兼容，如 OpenRouter/智谱/Qwen）/ `incompatible`（404/405）/ `unknown`（5xx 或网络错）。由输入 baseURL 后 **debounce 600ms 自动**探测产生，**携带 dummy key**——因此未配置密钥也能回答，且与「凭据是否有效」无关。
 _Avoid_: 用兼容性冒充凭据有效、把探测结果当作动作按钮的标题（「连接成功」按钮即此错）
 
 **凭据验证（credential verification）**：
