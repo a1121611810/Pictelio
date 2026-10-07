@@ -897,23 +897,38 @@ public class PictelioTranslateModule extends LynxModule {
      * 构造 Responses API 的 {@code input}：JS 侧传段落**字符串数组**，本方法拼成一条
      * {@code [N]} 锚定、空行分隔的文本，供 SSE 侧按 N 对齐回填。
      *
-     * <p><b>真正的不变量有两条（#943 据实测重写，原注释三句里两句为伪约束）</b>：
+     * <p><b>真正的不变量有两条（#943 重写；原注释三句里两句为伪约束）</b>：
      * <ol>
-     *   <li><b>指令同源</b>：native 与 web 都调用 {@code buildSystemInstructions(config)}，
-     *       同一函数产出，不可能漂移。这条约束成立且自带防线（单一事实源）。</li>
+     *   <li><b>指令同源</b>：两条路的 {@code instructions} 都由 JS 侧同一个
+     *       {@code buildSystemInstructions(config)}（api/translate.ts）产出 —— native 经
+     *       {@code nativeTranslate.ts} 随载荷下发、web 直接调用。Java 侧只接收成品字符串，
+     *       不自己生成。单一事实源，不可能漂移。</li>
      *   <li><b>锚定文本与 web 路径逐字节相同</b>：两端都用 {@code [i] } 前缀 + {@code \n\n}
-     *       分隔同一段落序列。下游 {@code alignParagraphs} 只读<b>译文文本</b>
-     *       （{@code stripAnchorPrefix} + 按空行切分），从不看请求形态 —— 故锚定与分隔符
-     *       就是跨端契约的全部。</li>
+     *       分隔同一段落序列。</li>
      * </ol>
      *
+     * <p><b>下游各是谁（别再归错）</b>：
+     * <ul>
+     *   <li><b>native（本方法，真机唯一路径）</b>：切段在 <b>Java</b> 完成 ——
+     *       {@code TranslationSseParser} 用 {@code PARAGRAPH_ANCHOR}（{@code \[(\d+)\]}）
+     *       正则识别锚点、逐段 {@code trim()} 后以 {@code delta_all} 下发，JS 展开成逐段 delta。
+     *       故此路径下<b>空行分隔符在 Java 侧即被消费</b>。</li>
+     *   <li><b>web（dev-core 预览）</b>：切段在 JS 的 {@code alignParagraphs}
+     *       （{@code split(/\n\n+/u)} + {@code stripAnchorPrefix}）—— 该路径下<b>空行分隔符
+     *       才是承重项</b>。</li>
+     * </ul>
+     * 两者共同依赖的是 <b>{@code [N] } 锚点前缀本身</b>；请求形态（而非译文形态）不参与下游对齐。
+     *
      * <p><b>原「两端 input 形态必须一致」是伪约束（已删除）</b>：原文称「native 无 [N]
-     * 锚定 → 无法按段回填」，与实现相反 —— 本方法逐段拼 {@code [N]}，且实测两端产出的锚定
-     * 文本逐字节相同。而外层报文形态本就不同（native 用标量字符串、web 用
-     * {@code [{role:'user', content}]}），两者<b>都被 Responses API 接受</b>
-     * （2026-10-07 以真实密钥实测：两种形态对 {@code /v1/responses} 均返回 200 —— 该取证
-     * 在本仓外，不在 {@code PictelioTranslateBuildInputTest} 中，后者只钉锚定文本契约）。
-     * 把报文形态写成硬约束，会诱导后人去「修」一个并不存在的缺陷。
+     * 锚定 → 无法按段回填」，与实现相反 —— 本方法逐段拼 {@code [N]}。而外层报文形态本就不同
+     * （native 用标量字符串、web 用 {@code [{role:'user', content}]}），两者<b>都被 Responses
+     * API 接受</b>（2026-10-07 以真实密钥实测，两种形态打 {@code /v1/responses} 均返回 200）。
+     * 该取证在本仓外；仓内可溯源的同类证据是 ADR-0173「探测报文的形态要求」一节与其
+     * fixture {@code deepseek-200-completed.json}（由 {@code PictelioTranslateProbeTest}
+     * 消费），但那是<b>探测报文</b>的取证，<b>不是</b>本方法运行时报文的取证 ——
+     * 两者形态不同，不可互相引用。
+     *
+     * <p>把报文形态写成硬约束，会诱导后人去「修」一个并不存在的缺陷。
      *
      * <p>真机唯一走本方法；web 路径仅 dev-core 预览使用。
      */

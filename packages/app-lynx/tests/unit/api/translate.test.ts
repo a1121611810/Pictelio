@@ -426,6 +426,19 @@ describe('buildResponsesRequestBody 请求体构造', () => {
     expect(body.reasoning?.effort).toBe('minimal')
   })
 
+  // #943：锚点前缀此前只被 toContain 钉住，**分隔符零覆盖** —— 把 join('\n\n') 改成
+  // join('\n') 两侧 Java 与 JS 全绿，而 web 路径的 alignParagraphs 会把整章切成 1 段、
+  // 其余全部回退原文（静默）。此处补齐分隔符侧，与 native 的
+  // PictelioTranslateBuildInputTest.separatorIsBlankLineNotSingleNewline 构成跨端对钉。
+  it('锚定段落以空行分隔（web 路径 alignParagraphs 的切段前提）', () => {
+    const { body } = buildResponsesRequestBody(SAMPLE_REQUEST, SAMPLE_CONFIG)
+    const content = body.input[0].content as string
+
+    expect(content).toContain('[0] 第一段落原文\n\n[1] 第二段落原文')
+    // 按空行切分应恰好得到与段落数相同的段数（少一段即意味着合并了两段）
+    expect(content.split(/\n\n+/u)).toHaveLength(SAMPLE_REQUEST.paragraphs.length)
+  })
+
   it('instructions prefix 稳定（顺序/措辞固定 → 命中 prompt cache）', () => {
     const a = buildSystemInstructions(SAMPLE_CONFIG)
     const b = buildSystemInstructions(SAMPLE_CONFIG)
