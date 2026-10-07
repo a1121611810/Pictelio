@@ -205,7 +205,7 @@ describe("ContinueRow 行内动作在行首（ADR-0221 决策 2）", () => {
 
   it("40dp 圆形图标按钮 + `close` 字形走 AppIcon（禁内联字形，ADR-0208 决策 3）", () => {
     expect(code).toContain(
-      'class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"',
+      'class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full active:bg-layer-pressed-on-surface"',
     );
     // `rounded-full` 写全：裸方向类 `rounded-t` 取 DEFAULT(=medium 12dp) 而非 extra-small/full
     expect(code).not.toMatch(/class="[^"]*\brounded-t(?![a-z-])/);
@@ -221,13 +221,17 @@ describe("ContinueRow 行内动作在行首（ADR-0221 决策 2）", () => {
 
   it("按压状态层：顶层 `bg-layer-pressed-*` + `pressColor.className` 载体（ADR-0211 决策 2）", () => {
     expect(code).toContain(
-      ":class=\"[pressColor.className, 'active:bg-layer-pressed-on-surface']\"",
+      ":class=\"pressColor.className\"",
     );
     // ⚠️ 顶层 vs `state` 嵌套：嵌在 `state` 下产出的是 `bg-state-layer-*`（不同名的死类名、
     //   静默无样式）。本仓既有门禁 tests/pressStateLayerTransition.test.ts 判的是载体覆盖，
     //   「类名是否写错层级」这条由本守卫负向钉住。
     expect(code).not.toContain("active:bg-state-layer-");
     expect(code).not.toContain("active:bg-state-pressed-");
+    // ⚠️ 四处形态收敛（ADR-0221 §7）：状态层走**静态 class**、`:class` 只带 pressColor 载体，
+    //   与 Watchlist / WatchLater / MuteTags 同形。反事实：改回数组形态即红。
+    expect(code).not.toMatch(/:class="\[pressColor\.className,\s*'active:bg-layer/);
+    expect(code).toContain('rounded-full active:bg-layer-pressed-on-surface"');
   });
 
   it("a11y 与 `@tap.stop` 原样保留（`.stop` 与位置无关，是承重的）", () => {

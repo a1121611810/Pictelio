@@ -150,8 +150,8 @@ const chapterLabel = computed(() =>
     <!-- 单条移除（@tap.stop 防卡片导航误触）——**行首**圆形图标按钮（ADR-0221 决策 2 / 票 #932） -->
     <view
       v-if="detailed"
-      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"
-      :class="[pressColor.className, 'active:bg-layer-pressed-on-surface']"
+      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full active:bg-layer-pressed-on-surface"
+      :class="pressColor.className"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="t('continue.remove')"
       @tap.stop="emit('remove', entry)"

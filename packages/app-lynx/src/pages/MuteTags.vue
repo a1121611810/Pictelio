@@ -82,7 +82,7 @@ function removeTag(name: string): void {
                :class="pressColor.className"（本页原本就有，另三处是本次补齐）。
                utility 必须是顶层 `bg-layer-pressed-*`，嵌在 `state` 下会产出不同名的死类名 `bg-state-layer-*`。
              · **@tap 不加 .stop**：本页行根**不带** @tap（不可点导航），`.stop` 在此无对象可停。
-               `.stop` 的必要性只取决于行根是否带 @tap，与按钮在行内的位置无关（spec 决策 6）。
+               `.stop` 的必要性只取决于行根是否带 @tap，与按钮在行内的位置无关（spec §Implementation Decisions「`.stop` 语义与位置无关」条）。
              · 行根的 justify-between 随之移除：它的意图就是「把动作推到行尾」，正是本票废除的那件事；
                标签 text 自带 flex-1，剩余空间本就由它吃掉，移除后视觉结果不变。 -->
         <view

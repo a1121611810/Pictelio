@@ -3,7 +3,7 @@
 - **承接**：[ADR-0221](../../adr/ADR-0221-row-action-leaves-trailing-band.md) · [术语表（命中测试与覆盖层）](../../adr/glossary-app-lynx-hit-testing.md) · [术语表（底部让位族）](../../adr/glossary-bottom-occlusion-allowance.md)
 - **兑现**：票 #932（`/continue` 行尾「移除」被悬浮 FAB 遮挡）
 - **决策来源**：Grill 两轮 + 真机三方案原型（方案 A 水平让位 / 方案 B 行首动作 / 方案 C FAB 滚动收起）逐一点按验证，2026-10-07 按推荐锁定方案 B
-- **状态**：待实施
+- **状态**：已实施（票 #952–#956 落地；真机取证仅覆盖 `/continue` 与 `/watchlist`，见 ADR-0221 §7）
 
 ---
 

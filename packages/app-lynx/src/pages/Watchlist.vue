@@ -281,8 +281,8 @@ onUnmounted(() => {
                  · **@tap.stop 保留**：行根有 @tap（openLatest），`.stop` 是防止误触变成导航的唯一手段，与位置无关。
                  · 二次确认由 askUnwatch → unwatchTarget 打开 M3 Dialog，不在此处直删。 -->
             <view
-              class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"
-              :class="[pressColor.className, 'active:bg-layer-pressed-on-surface']"
+              class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full active:bg-layer-pressed-on-surface"
+              :class="pressColor.className"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="WATCHLIST_A11Y_LABELS.unwatch"
               @tap.stop="askUnwatch(item)"

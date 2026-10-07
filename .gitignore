@@ -71,6 +71,11 @@ packages/app/ios/
 #（实测一次 `git status --untracked-files=all` 有上千条缓存噪声），
 # 既拖慢每次状态查询，也诱导人用 `git add -A` —— 那会把 Gradle 缓存吸进提交。
 packages/android-host/.gradle/
+# ⚠️ 2026-10-07 补：真实构建会在**包根**（packages/）下留下 GRADLE_USER_HOME
+#（`build:android` 以 `GRADLE_USER_HOME=$(pwd)/.gradle` 起 gradle，cwd 落在包根）。
+# 该目录此前既未被 gitignore、也不在 vite.config.ts 的 lint/fmt 忽略表里
+# ⇒ `git status` 长期脏 + `pnpm lint:all` 扫进 Gradle 发行版文档恒红（诊断 0 条来自本仓源码）。
+packages/.gradle/
 packages/app-lynx/.gradle/
 packages/app-lynx/node_modules/.gradle/
 packages/app-lynx/node_modules/.cache/
