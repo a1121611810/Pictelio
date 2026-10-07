@@ -24,12 +24,12 @@ fi
 # 构建（带 pipefail）+ 新鲜度校验
 # 构建（带 pipefail）。先删掉 APK：gradle 在「只有 asset（JS bundle）变化」时会把打包任务
 # 判为 up-to-date 而不重写 APK，导致 APK 落后于 bundle —— 删掉即可让打包必然发生。
-APK_PATH="$REPO_ROOT/packages/android-host/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk"
+APK_PATH="$REPO_ROOT/packages/android-host/android/app/build/outputs/apk/debug/app-debug.apk"
 rm -f "$APK_PATH"
 (cd "$REPO_ROOT" && BENCH_NAV=1 NODE_ENV=production \
   pnpm --dir packages/app-lynx run build >/dev/null && \
   node packages/app-lynx/scripts/sync-android-assets.mjs >/dev/null && \
-  cd packages/android-host/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleLynxDebug --no-daemon -q)
+  cd packages/android-host/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug --no-daemon -q)
 # 判据：打包进 APK 的**源集**（main/java + lynx/java，以及 JS 产出的 bundle）不得比 APK 新。
 # 不比「构建开始时刻」—— gradle 判定 up-to-date 时不重写 APK（合法）；而编译失败被吞时
 # 这些源集一定领先于 APK（本检查要抓的正是后者）；test/ 源集不进 APK，故排除。
@@ -43,6 +43,10 @@ if [ -n "$STALE" ]; then
   exit 1
 fi
 adb install -r "$APK" >/dev/null 2>&1
+
+# 截图输出目录：脚本此前假定 /tmp/pictelio-e2e 已存在，换机或清过 /tmp 就会在首次
+# screencap 处失败（No such file or directory），且报错点远离真正原因。
+mkdir -p /tmp/pictelio-e2e
 
 adb shell am force-stop "$PKG"; sleep 2
 adb logcat -c
@@ -75,7 +79,9 @@ im = Image.open(f'/tmp/pictelio-e2e/btn-{a}.png').convert('RGB'); px = im.load()
 def blue(c):
     r,g,b = c
     return b > 110 and b - r > 40 and g > r and g < b
-ys = [y for y in range(0,1300) if blue(px[540,y])]
+W,H = im.size
+x = int(W * 0.75)   # 原写死 540 = 720×0.75；换机型（1080 宽）会越界报 IndexError
+ys = [y for y in range(0,H) if blue(px[x,y])]
 if not ys:
     print("NONE"); raise SystemExit
 s = p = ys[0]; bands = []
