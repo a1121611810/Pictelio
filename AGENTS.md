@@ -288,6 +288,9 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 - **工具路由**：本次工具选择是否按「工具触发协议」执行？（代码结构/调用链/影响面 → CodeGraph；架构/领域/集成/测试 → OpenWiki；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
 - **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）
 - **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
+- **闭环规格**：凡产生了代码改动，强制闭环一律以
+  [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) 为准 —— **含**「工作流强制规范」的
+  三条例外路径（纯 Bug 修复 / 纯重构 / ≤20 行局部改动）；`/review-fix-loop` 可显式调用
 - **生成物归属**：`openwiki/` 由 CI 定时重生成（见「OpenWiki 维护规则」），提交前不手改
 - **提交信息**：`type(scope): description`，type 取值见「Notes」
 
