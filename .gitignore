@@ -73,8 +73,11 @@ packages/app/ios/
 packages/android-host/.gradle/
 # ⚠️ 2026-10-07 补：真实构建会在**包根**（packages/）下留下 GRADLE_USER_HOME
 #（`build:android` 以 `GRADLE_USER_HOME=$(pwd)/.gradle` 起 gradle，cwd 落在包根）。
-# 该目录此前既未被 gitignore、也不在 vite.config.ts 的 lint/fmt 忽略表里
-# ⇒ `git status` 长期脏 + `pnpm lint:all` 扫进 Gradle 发行版文档恒红（诊断 0 条来自本仓源码）。
+# 该目录此前未被 gitignore ⇒ `git status` 长期脏，且诱导人用 `git add -A`
+# 把 1.3GB Gradle 缓存吸进提交。
+# ⚠️ 只解决 `git status` 这一半：`pnpm lint:all` 的对应症状由 `vite.config.ts`
+# 的 lint/fmt 忽略块单独解决（oxlint/oxfmt **不读** .gitignore，两者各管一头），
+# 那两条忽略项已存在于 d7e69ccf，本条不是它的前提、也不能替代它。
 packages/.gradle/
 packages/app-lynx/.gradle/
 packages/app-lynx/node_modules/.gradle/
