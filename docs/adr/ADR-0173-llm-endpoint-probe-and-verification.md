@@ -58,7 +58,7 @@ spec/ADR 里**没有**任何关于「已验证状态」「免密钥重测」「�
 由此产生的两个已知局限，均**接受、不整改**：
 
 1. **绿灯的结论可能是对的，理由却是错的**。若某服务后来下线 Responses 支持，本表仍会给绿灯。因此绿灯**不得被当作协议兼容的证明**，UI 文案只陈述已验证事实（见 #945：`✓ DeepSeek（Responses API）`）。
-2. **不要反向过度修正**。曾有 bug 票据「DeepSeek 不支持 Responses」推断应把 401 判为不兼容——该前提为假（DeepSeek 自 2026-07-31 起原生支持 Responses API，2026-08-13 扩展至 V4-Pro），照此整改会把真兼容判红、**制造假阴性**。
+2. **不要反向过度修正**。曾有 bug 票据「DeepSeek 不支持 Responses」推断应把 401 判为不兼容——该前提为假（DeepSeek 自 2026-07-31 起原生支持 Responses API，2026-08-13 扩展至 V4-Pro），照此整改会把真兼容判红、**制造假阴性**。证据来源：官方更新日志 <https://api-docs.deepseek.com/zh-cn/updates/> 与 Responses API 指南 <https://api-docs.deepseek.com/guides/responses_api/>；完整取证记录见 `docs/specs/llm-endpoint-probe-payload-and-verdict-honesty.md`（§上游取证，含真实密钥实测 200 与 SSE 事件名）。
 
 #### 探测报文的形态要求（2026-10-07 新增，#831）
 

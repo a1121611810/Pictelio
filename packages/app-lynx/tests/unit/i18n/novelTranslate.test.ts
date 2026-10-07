@@ -125,9 +125,10 @@ function extractPlaceholders(s: string): string[] {
 describe('i18n: novelTranslate 字典结构（spec §8）', () => {
   it('zh-CN 与 en 键数与 EXPECTED_KEYS 一致（spec §8 键名实现态）', () => {
     // spec §8 用「示意键名」（endpoint.section.title / baseURL.probe.ok…）描述设计意图；
-    // 实现按 4 子命名空间落为 90 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
+    // 实现按 4 子命名空间落为 89 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
     // 历史：47 → 51 → 67（ADR-0173：探测/凭据状态 + 动作键）→ 75（翻译授权 + 同意面板）
-    //       → 79（错误码分类补全：insufficient_balance / model_not_found / invalid_request / content_filter）。
+    //       → 79（错误码分类补全：insufficient_balance / model_not_found / invalid_request / content_filter）
+    //       → 89（#945：vllm 死状态清除，删 compat.vllm）。
     expect(Object.keys(zh).length).toBe(EXPECTED_KEYS.length)
     expect(Object.keys(en).length).toBe(EXPECTED_KEYS.length)
   })

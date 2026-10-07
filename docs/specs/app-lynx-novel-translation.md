@@ -429,7 +429,7 @@ sequenceDiagram
 
 **关键细节**：
 - 「Base URL」下方有一行轻量级 inline probe 状态（M3 tonal chip）：
-  - `✓ Responses API 兼容` / `✓ Azure OpenAI Responses` / `✓ DeepSeek (Codex 兼容)` / `✓ vLLM 自托管`
+  - `✓ Responses API 兼容` / `✓ Azure OpenAI Responses` / `✓ DeepSeek（Responses API）`
   - `⚠ 仅 chat/completions 兼容`（OpenRouter / 智谱 / Qwen / 文心 / LocalAI / LM Studio）
   - `⚠ 无法探测`（网络错误）
 - 「API Key」字段是 password type；提供「显示」toggle（临时明文显示 5s 后自动隐藏）+ 「清空」按钮。
@@ -586,7 +586,7 @@ sequenceDiagram
 | `endpoint.baseURL.hint` | 形如 `https://api.openai.com/v1`，不含 `/responses` | e.g. `https://api.openai.com/v1`, no `/responses` suffix |
 | `endpoint.baseURL.probe.ok` | ✓ Responses API 兼容 | ✓ Responses API compatible |
 | `endpoint.baseURL.probe.azure` | ✓ Azure OpenAI Responses | ✓ Azure OpenAI Responses |
-| `endpoint.baseURL.probe.deepseek` | ✓ DeepSeek (Codex 兼容) | ✓ DeepSeek (Codex compatible) |
+| `endpoint.baseURL.probe.deepseek` | ✓ DeepSeek（Responses API） | ✓ DeepSeek (Responses API) |
 | `endpoint.baseURL.probe.partial` | ⚠ 仅 chat/completions 兼容 | ⚠ Only chat/completions compatible |
 | `endpoint.baseURL.probe.unknown` | ⚠ 无法探测 endpoint | ⚠ Could not probe endpoint |
 | `endpoint.apiKey.label` | API Key | API Key |

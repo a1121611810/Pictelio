@@ -164,9 +164,11 @@ ADR-0173 通篇为中文。修订段落保持中文，与既有文档一致。
 实测抓到的真实 DeepSeek 响应体将存为测试 fixture：
 
 - 401 · `authentication_error`（含 `invalid_request_error` code 与 request_id）
+- 400 · 未知模型名（**不含** invalid-key 关键词 → 落 `unknown`，非 `ok`）
 - 422 · `input: invalid input item`
-- 200 · `object: response` / `status: completed`
-- 404 · 空体
+- 422 · missing field `model`
+
+**200 / 404 / 5xx 不需要 fixture**：`classifyProbe` 这几行只读状态码，不消费 body 任何字段，故用内联惰性字面量即可。真正需要真实样例的是**关键词敏感的行**（401 / 400 / 422）——它们读 body 内容，手写样例会与实现共享同一错误假设。
 
 **禁止手写自洽字段**——mock 必须来自真实数据源。
 
