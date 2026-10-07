@@ -159,7 +159,6 @@ const COMPAT_KEYS = {
   ok: "novelTranslate.endpoint.compat.ok",
   azure: "novelTranslate.endpoint.compat.azure",
   deepseek: "novelTranslate.endpoint.compat.deepseek",
-  vllm: "novelTranslate.endpoint.compat.vllm",
   partial: "novelTranslate.endpoint.compat.partial",
   incompatible: "novelTranslate.endpoint.compat.incompatible",
   unknown: "novelTranslate.endpoint.compat.unknown",
@@ -173,7 +172,6 @@ const compatClass = computed<string>(() => {
     case "ok":
     case "azure":
     case "deepseek":
-    case "vllm":
       return "text-primary"
     case "partial":
     case "unknown":

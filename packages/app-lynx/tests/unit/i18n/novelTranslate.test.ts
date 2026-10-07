@@ -47,7 +47,6 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.compat.ok",
   "novelTranslate.endpoint.compat.azure",
   "novelTranslate.endpoint.compat.deepseek",
-  "novelTranslate.endpoint.compat.vllm",
   "novelTranslate.endpoint.compat.partial",
   "novelTranslate.endpoint.compat.incompatible",
   "novelTranslate.endpoint.compat.unknown",
@@ -185,14 +184,14 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     }
   })
 
-  it('endpoint 50 键 + action 9 键 + status 12 键 + error 19 键 = 90', () => {
+  it('endpoint 49 键 + action 9 键 + status 12 键 + error 19 键 = 89', () => {
     const groups = {
       endpoint: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.endpoint.')),
       action: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.action.')),
       status: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.status.')),
       error: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.error.')),
     }
-    expect(groups.endpoint.length).toBe(50)
+    expect(groups.endpoint.length).toBe(49)
     expect(groups.action.length).toBe(9)
     expect(groups.status.length).toBe(12)
     expect(groups.error.length).toBe(19)

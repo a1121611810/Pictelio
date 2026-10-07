@@ -31,11 +31,18 @@ describe('端点兼容性（地址层，自动探测）', () => {
     expect(code).toContain('store.probeCompatibility(baseURL.value)')
   })
 
-  it('兼容性 chip 有全部八态文案键（显式映射，禁拼键）', () => {
+  it('兼容性 chip 有全部七态文案键（显式映射，禁拼键）', () => {
     expect(code).toContain('const COMPAT_KEYS = {')
-    for (const state of ['idle', 'ok', 'azure', 'deepseek', 'vllm', 'partial', 'incompatible', 'unknown']) {
+    // 七态：vllm 已移除 —— classifyProvider 从不产出该值，属不可达状态（#945）
+    for (const state of ['idle', 'ok', 'azure', 'deepseek', 'partial', 'incompatible', 'unknown']) {
       expect(code).toContain(`novelTranslate.endpoint.compat.${state}`)
     }
+  })
+
+  it('vllm 死状态已清除（类型/映射/配色/i18n 均不得残留）', () => {
+    // 不可达状态留在类型里会让后来者以为存在这条分流 —— 「门禁全绿但语义是死的」
+    expect(code).not.toContain('compat.vllm')
+    expect(code).not.toContain('"vllm"')
   })
 })
 

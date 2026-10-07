@@ -82,7 +82,6 @@ export type EndpointCompatibilityStatus =
   | "ok"
   | "azure"
   | "deepseek"
-  | "vllm"
   | "partial"
   | "incompatible"
   | "unknown"
