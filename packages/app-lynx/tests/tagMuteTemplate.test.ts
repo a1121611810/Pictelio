@@ -34,12 +34,60 @@ describe("MuteTags.vue 管理页（ADR-0187 D5 / #732）", () => {
     expect(muteTagsVue).toContain("MUTE_TAGS_A11Y_LABELS.back")
     expect(muteTagsVue).toContain("MUTE_TAGS_A11Y_LABELS.pageTitle")
     expect(muteTagsVue).toContain("t('muteTags.title')")
-    expect(muteTagsVue).toContain("t('muteTags.remove')")
+    // 移除动作的行内文案 <text> 已随行尾药丸一并改为行首图标（ADR-0221 决策 2），
+    // 语义改由 a11y 注册表承载（ADR-0061 element + label 成对）
+    expect(muteTagsVue).toContain(':accessibility-label="MUTE_TAGS_A11Y_LABELS.remove"')
+    expect(muteTagsVue).not.toContain("t('muteTags.remove')")
     expect(muteTagsVue).toContain("t('muteTags.empty.title')")
     expect(muteTagsVue).toContain("t('muteTags.empty.hint')")
     // 数据源 = settingsStore 集合快照（响应式 computed）
     expect(muteTagsVue).toContain("settings.mutedTags()")
     expect(muteTagsVue).toContain("settings.unmuteTag(name)")
+  })
+
+  it("行首动作：移除按钮在标签名之前，40dp 圆形 + close 字形（ADR-0221 决策 2）", () => {
+    const btn =
+      code(muteTagsVue).match(/<view\b[^>]*@tap="removeTag\(name\)"[^>]*>[\s\S]*?<\/view>/)?.[0] ?? ""
+    expect(btn).not.toBe("")
+    // 40dp（10.667vw）触控目标 + 圆形。必须写全 rounded-full —— 裸方向类取 medium 档而非 full
+    expect(btn).toContain("w-[10.667vw] h-[10.667vw]")
+    expect(btn).toContain("rounded-full")
+    expect(btn).toContain("border-outline")
+    // 字形走统一图标组件，不内联；`close` 承载「取消静音」是 ADR-0221 §2.3 登记的语义借用
+    expect(btn).toMatch(/<AppIcon name="close"/)
+    expect(muteTagsVue).toContain("import AppIcon from '../components/AppIcon.vue'")
+    // 位置：按钮在标签名之前 —— 行首恒在 GlobalFab 遮挡带 [80.80, 95.73]vw 之外
+    const rowCode = code(muteTagsVue)
+    expect(rowCode.indexOf('@tap="removeTag(name)"')).toBeLessThan(rowCode.indexOf("{{ name }}"))
+    // 行尾药丸整体移除（不做「两头都留」）；justify-between 的意图就是推动作到行尾，一并去掉
+    expect(rowCode).not.toContain("justify-between")
+  })
+
+  it("本页按压状态层载体沿用原样 + 顶层 utility（ADR-0221 §3 代价 3）", () => {
+    const btn =
+      code(muteTagsVue).match(/<view\b[^>]*@tap="removeTag\(name\)"[^>]*>[\s\S]*?<\/view>/)?.[0] ?? ""
+    // 本页原本就有状态层：静态 class 上的 active:bg-layer-pressed-on-surface + pressColor 载体
+    expect(btn).toContain("active:bg-layer-pressed-on-surface")
+    expect(btn).toContain("pressColor.className")
+    // 嵌在 state 下会产出不同名的死类名 bg-state-layer-*（静默无样式）
+    expect(code(muteTagsVue)).not.toContain("bg-state-layer-")
+  })
+
+  it("破坏性语义：图标染 text-error，不得为「四处长得一样」抹平成主色（ADR-0221 §3 代价 2）", () => {
+    const btn =
+      code(muteTagsVue).match(/<view\b[^>]*@tap="removeTag\(name\)"[^>]*>[\s\S]*?<\/view>/)?.[0] ?? ""
+    // 移除文案刻意用错误色（ADR-0187 D5）；失去四字后严重性线索只剩图标颜色
+    expect(btn).toMatch(/<AppIcon name="close" class="text-error"/)
+  })
+
+  it("按压语义：行根不带 @tap ⇒ 按钮用裸 @tap，不加 .stop（spec 决策 6）", () => {
+    const rowCode = code(muteTagsVue)
+    const row = rowCode.match(/<view\b[^>]*:accessibility-label="name"[^>]*>/)?.[0] ?? ""
+    expect(row).not.toBe("")
+    expect(row).not.toContain("@tap")
+    // `.stop` 在此无对象可停；反之若误加 .stop 就是把无意义的修饰当契约
+    expect(rowCode).not.toContain('@tap.stop="removeTag(name)"')
+    expect(rowCode).toContain('@tap="removeTag(name)"')
   })
 
   it("MUTE_TAGS_A11Y_LABELS 注册表全键被模板消费且配套 element（注册表完整性口径）", () => {

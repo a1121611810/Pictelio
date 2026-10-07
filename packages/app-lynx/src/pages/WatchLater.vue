@@ -12,6 +12,7 @@ import { WATCH_LATER_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessib
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import AppIcon from '../components/AppIcon.vue'
 // 底部遮挡让位（ADR-0217 / 票 #922 / 术语文档 glossary-bottom-occlusion-allowance.md）：
 // 模板末尾的让位占位。本页是**非 tab 内容页** ⇒ 档位为 search（让位 58.668vw）。
 //   **档位/高度/遮挡源/接线约定全部写在 `FabAllowanceSpacer.vue` 头注，本页只负责接线。**
@@ -103,6 +104,23 @@ function openItem(item: WatchLaterItem): void {
             :accessibility-label="WATCH_LATER_A11Y_LABELS.openItem"
             @tap="openItem(item)"
           >
+            <!-- 行首动作（ADR-0221 / 术语文档 glossary-app-lynx-hit-testing.md · 票 #932）：
+                 单条删除由行尾药丸改为行首 40dp 圆形图标按钮，行尾恒落在 GlobalFab 遮挡带
+                 [80.80, 95.73]vw 内，点它原本 97% 概率开出搜索弹层而非删除。
+                 · **图标染 text-error**：删除动作失去「移除」四字后，严重性线索只剩颜色（ADR-0221 §3 代价 2）。
+                 · **按压状态层**：失去文字后按压反馈只能靠状态层（ADR-0221 §3 代价 3）；utility 必须是顶层
+                   `bg-layer-pressed-*`，嵌在 `state` 下会产出不同名的死类名 `bg-state-layer-*`（静默无样式）。
+                 · **@tap.stop 保留**：行根有 @tap（openItem），`.stop` 是防止误触变成导航的唯一手段，与位置无关。
+                 · `close` 字形是语义借用（ADR-0221 §2.3）：`delete` 未登记，重生成图标子集需联网 + fonttools。 -->
+            <view
+              class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full active:bg-layer-pressed-on-surface"
+              :class="pressColor.className"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="WATCH_LATER_A11Y_LABELS.remove"
+              @tap.stop="removeItem(item)"
+            >
+              <AppIcon name="close" class="text-error" />
+            </view>
             <!-- 封面：快照存 API 原值，渲染时过代理（SkeletonImage 列表卡惯例 + 懒加载） -->
             <SkeletonImage
               :id="item.kind === 'illust' ? heroTransition.sourceId(item.id) : undefined"
@@ -118,15 +136,6 @@ function openItem(item: WatchLaterItem): void {
               </view>
               <text class="text-title-medium font-medium text-surface-on [max-line:2] mt-1.5">{{ artworkTitle(item.title) }}</text>
               <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.userName }}</text>
-            </view>
-            <!-- 单条删除（spec US10）：触控高度 10.667vw = 40dp 等效；@tap.stop 防卡片导航误触 -->
-            <view
-              class="self-center ml-2 h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="WATCH_LATER_A11Y_LABELS.remove"
-              @tap.stop="removeItem(item)"
-            >
-              <text class="text-label-large text-primary">{{ t('later.remove') }}</text>
             </view>
           </view>
         </view>

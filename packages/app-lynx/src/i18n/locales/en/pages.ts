@@ -64,7 +64,6 @@ const enPages = {
   "later.title": "Watch Later",
   "later.empty.title": "Nothing saved for later yet",
   "later.empty.hint": "Tap Watch Later on artwork details or novel intro to save it here",
-  "later.remove": "Remove",
   "later.badge.illust": "Illustration",
   "later.badge.novel": "Novel",
   "later.me.entry": "Watch Later",
@@ -297,7 +296,6 @@ const enPages = {
   "muteTags.title": "Muted tags",
   "muteTags.empty.title": "No muted tags",
   "muteTags.empty.hint": "Long-press a tag on artwork to mute it",
-  "muteTags.remove": "Remove",
 
   // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
   // Code set = EngineRoute.Reason (10 codes) + unknown fallback.

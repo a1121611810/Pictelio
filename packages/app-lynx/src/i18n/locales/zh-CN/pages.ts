@@ -67,7 +67,6 @@ const zhPages = {
   "later.title": "稍后看",
   "later.empty.title": "还没有稍后看内容",
   "later.empty.hint": "在作品详情或小说介绍页点「稍后看」，即可暂存到这里",
-  "later.remove": "移除",
   "later.badge.illust": "插画",
   "later.badge.novel": "小说",
   "later.me.entry": "稍后看",
@@ -297,7 +296,6 @@ const zhPages = {
   "muteTags.title": "静音标签",
   "muteTags.empty.title": "暂无静音标签",
   "muteTags.empty.hint": "长按作品标签即可静音",
-  "muteTags.remove": "移除",
 
   // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案
   //     码集 = EngineRoute.Reason 全 10 码 + unknown 兜底。

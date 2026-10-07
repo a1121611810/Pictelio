@@ -21,6 +21,8 @@
 // - 遮挡让位高度 = 边距 + 本体 = 19.2vw = 72dp。
 //   ⚠️ 竖向净空来自**底距**，与「右距」无关；两者今天相等纯属同一个常量兼作两用的巧合。
 //   改 FAB 时若把左右/上下拆成两个常量，占位高度只跟**下边距**走（见下方 `fabAllowanceHeightVw`）。
+// - 遮挡带的**水平**左右缘（`FAB_BAND_LEFT_VW` / `FAB_BAND_RIGHT_VW`）：由上面两个常量导出，
+//   与竖直轴**正交**的第二个轴，见文末小节与 glossary-app-lynx-hit-testing.md。
 
 /** FAB 本体直径（vw；56dp @375dp 基准）。来源：GlobalFab 的 inline style `:style` 宽度。 */
 export const FAB_SIZE_VW = 14.933
@@ -99,3 +101,56 @@ export const FAB_BOTTOM_SEARCH_VW =
 export function fabAllowanceHeightVw(mode: 'menu' | 'search' | 'hidden'): number {
   return mode === 'menu' ? FAB_EDGE_VW + FAB_SIZE_VW : FAB_BOTTOM_SEARCH_VW + FAB_SIZE_VW
 }
+
+// ─── 遮挡带几何（水平轴；ADR-0221 / glossary-app-lynx-hit-testing.md §遮挡带）───
+//
+// ## 这是什么
+//
+// GlobalFab 在屏幕上的**水平投影带** `[FAB_BAND_LEFT_VW, FAB_BAND_RIGHT_VW]`。
+// 落在带内的命中面**会被 FAB 整个吃掉**：原生 hit-test 取最顶层元素，FAB 恒在其上，
+// 而原生 LynxView 不识别 `pointer-events`（ADR-0123）⇒ 没有穿透手段可绕。
+// 票 #932 的原始形态就是它：`/continue` 行尾「移除」药丸 97% 宽度落在带内，
+// 点它开的是搜索弹层而不是删除。
+//
+// ## 为什么由本模块导出，而不是让门禁各写各的字面量
+//
+// 两个边界**都从 `FAB_EDGE_VW` / `FAB_SIZE_VW` 导出，本模块不引入第三个字面量**
+// ⇒ 改 FAB 尺寸或右距，带**自动跟随**。这正是开篇那次「假声明」的修法：门禁若把
+// `80.8` / `95.73` 抄进判据，FAB 一改尺寸门禁就静默放过（ADR-0221 §7 新增门禁的
+// 前提是「判据从几何常量推导，不得写字面量」，spec §缝 1 同）。
+//
+// ⚠️ 本模块的几何**不挂在任何 Tailwind 档位上**（不要为了「跟档位走」把它挪进
+// `tailwind.config.ts` 的 `spacing`/`borderRadius`）：那些是**编译期常量**，
+// 读不到本模块的运行期值，两边又要变成两个事实源 —— 就是开篇点名要消灭的形态。
+//
+// ## 与 `GlobalFab` 的关系：同一条恒等式，不是第二事实源
+//
+// `GlobalFab.vue` 以 `fabCx = 100 - FAB_EDGE_VW - FAB_SIZE_VW/2` + `translate(-50%,-50%)`
+// 定位，import 的正是上面两个常量 ⇒ 带的左右缘就是该恒等式在 `∓ FAB_SIZE_VW/2` 处的取值。
+// 两边共用同一对输入 ⇒ **改 FAB 几何时不需要同步改本模块**（这才是单一事实源的实质，
+// 而不是「两边各有一份、靠人记得同步」）。
+//
+// ## 两条易漏的性质（ADR-0221 §1.2 / §2）
+//
+// 1. **与路由档位无关**：两个边界是**常量、不接收 mode 形参** —— TS 层就不存在
+//    「按档取不同带」的写法。`routeMode` 只改 FAB 的 `top`（底边 4.267vw / 43.734vw），
+//    水平带两档**逐位相同**。⇒「只有 search 档页会撞上」是错觉：menu 档页同样横向暴露，
+//    只是 FAB 竖直位置低、19.2vw 让位恰好护住末项。
+// 2. **带宽 = FAB 本体，不是「本体 + 右距」**：右距是 FAB 与屏边之间的**空隙**，
+//    不在 FAB 的投影里。真机实测带宽 161px = 14.907vw ≈ 本体 14.933vw；
+//    若把右距也算进去会得到 19.2vw，多算 4.267vw，会让「行首动作已让开」判据**假绿**。
+//
+// ⚠️ 数值出处（测试的 oracle 溯源同源）：真机像素实测（票 #932 / ADR-0221 §1，
+//    emulator-5554 / 1080×2160）带 = `x[872,1033]` = 80.741vw..95.648vw；理论
+//    80.8 / 95.733vw（ADR-0221 §2 记作 `[80.80, 95.73]vw`），偏差均 < 1px
+//    （1px = 100/1080 = 0.0926vw）⇒ 是像素粒度，不是几何分歧。
+//    数值判据见 `tests/fabGeometry.test.ts`。
+
+/**
+ * 遮挡带左缘（vw）：FAB 投影的最左 x = `100 - 右距 - 本体`。
+ * 行内动作的**行首 vs 行尾**抉择就以此为界（ADR-0221 决策：行内动作一律置行首）。
+ */
+export const FAB_BAND_LEFT_VW = 100 - FAB_EDGE_VW - FAB_SIZE_VW
+
+/** 遮挡带右缘（vw）：FAB 投影的最右 x = `100 - 右距`。它到 100vw 之间的空隙是右距，不属于带。 */
+export const FAB_BAND_RIGHT_VW = 100 - FAB_EDGE_VW

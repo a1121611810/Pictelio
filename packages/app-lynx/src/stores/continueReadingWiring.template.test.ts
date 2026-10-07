@@ -156,3 +156,100 @@ describe("源级守卫（票 #926 / ADR-0219 §4）", () => {
     }
   })
 })
+
+// ─── 行内动作的行位契约（ADR-0221 决策 2 / 票 #932；术语文档「行首动作」）─────────
+//
+// 📌 **为什么守卫的是「位置」而不是「有按钮」**：票 #932 的失效形态是**按钮存在但点不到**
+//   ——行尾药丸 97% 宽度落在 GlobalFab 遮挡带 `x[80.80, 95.73]vw` 内，点它 100% 开搜索弹层。
+//   「有 remove 事件的按钮」这类断言对本缺陷恒绿（修复前后都成立），只有把位置钉住才是防线。
+//   ⚠️ 遮挡带本身的几何恒等式由 `utils/fabGeometry.ts` + `tests/fabGeometry.test.ts` 守，
+//   本文件只守**消费侧落点**（按钮在封面之前、不在尾部），两者互补不重叠。
+//
+// 期望值溯源（测试硬约束 #6，每条指回已拍板决策而非本文件自洽反推）：
+// - 动作置于行首、40dp 圆形            → ADR-0221 决策 2 + 术语文档「行首动作」
+// - 图标染 `text-error`                 → ADR-0221 §3 代价 2（丢失「移除」二字后的严重性线索）
+// - 状态层 + 载体                       → ADR-0221 §3 代价 3 + ADR-0211 决策 2
+// - `@tap.stop` 保留                    → 术语文档「行内动作」（与整行 @tap 并存必须 .stop）
+// - 标题 `[max-line:1]` 不动            → ADR-0221 §3 代价 1（标题列净值 ≈ +1vw 依赖它）
+describe("ContinueRow 行内动作在行首（ADR-0221 决策 2）", () => {
+  /** 去注释：约束说明本身会提到被禁止的类名与旧类串，负向断言必须落在代码本文上
+   *  （与 UserRow.template.test.ts / pressStateLayerTransition.test.ts 同一纪律）。 */
+  const code = readFileSync(new URL("../components/ContinueRow.vue", import.meta.url), "utf-8")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("📌 移除按钮落在封面**之前**（行首），不是行尾——反事实：挪回行尾即红", () => {
+    const iBtn = code.indexOf("v-if=\"detailed\"");
+    const iRestrictedCover = code.indexOf("v-if=\"restricted\"");
+    const iThumb = code.indexOf("<SkeletonImage");
+    const iTextCol = code.indexOf('class="flex-1 flex flex-col ml-2.5 min-w-0"');
+    expect(iBtn, "行首移除按钮消失（锚点未命中 ⇒ 本守卫已失效）").toBeGreaterThan(-1);
+    expect(iRestrictedCover, "受限徽章块消失").toBeGreaterThan(-1);
+    expect(iThumb, "封面 SkeletonImage 消失").toBeGreaterThan(-1);
+    expect(iTextCol, "文字列容器消失").toBeGreaterThan(-1);
+    // 行首 = 在**两种封面形态**（受限徽章块 / 正常缩略图）之前
+    expect(iBtn, "按钮不在受限徽章块之前").toBeLessThan(iRestrictedCover);
+    expect(iBtn, "按钮不在缩略图之前").toBeLessThan(iThumb);
+    // 且不在文字列之后（即不滞留行尾）
+    expect(iBtn, "按钮漂到了文字列之后").toBeLessThan(iTextCol);
+  });
+
+  it("📌 行尾药丸被**整体移除**，不得与行首按钮并存（两个动作 = 两个 remove 命中面）", () => {
+    // 旧行尾形态：`ml-2 h-[10.667vw] px-3` + 可见文案 `{{ t('continue.remove') }}`
+    expect(code).not.toContain("px-3 flex items-center justify-center border border-outline");
+    expect(code).not.toContain("{{ t('continue.remove') }}");
+    // 反向钉住：动作**确实还在**（不是压根没接）
+    expect(code).toContain("emit('remove', entry)");
+  });
+
+  it("40dp 圆形图标按钮 + `close` 字形走 AppIcon（禁内联字形，ADR-0208 决策 3）", () => {
+    expect(code).toContain(
+      'class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"',
+    );
+    // `rounded-full` 写全：裸方向类 `rounded-t` 取 DEFAULT(=medium 12dp) 而非 extra-small/full
+    expect(code).not.toMatch(/class="[^"]*\brounded-t(?![a-z-])/);
+    expect(code).toContain('<AppIcon name="close"');
+    expect(code).toMatch(/import AppIcon from '\.\/AppIcon\.vue'/);
+  });
+
+  it("📌 破坏性动作的严重性线索：图标染 `text-error`，不得回退 `text-primary`（ADR-0221 §3 代价 2）", () => {
+    // 反事实：图标改回 text-primary 即红 —— 丢了「移除」二字后二者会与普通动作同形
+    expect(code).toContain('<AppIcon name="close" class="text-error" />');
+    expect(code).not.toContain('<AppIcon name="close" class="text-primary" />');
+  });
+
+  it("按压状态层：顶层 `bg-layer-pressed-*` + `pressColor.className` 载体（ADR-0211 决策 2）", () => {
+    expect(code).toContain(
+      ":class=\"[pressColor.className, 'active:bg-layer-pressed-on-surface']\"",
+    );
+    // ⚠️ 顶层 vs `state` 嵌套：嵌在 `state` 下产出的是 `bg-state-layer-*`（不同名的死类名、
+    //   静默无样式）。本仓既有门禁 tests/pressStateLayerTransition.test.ts 判的是载体覆盖，
+    //   「类名是否写错层级」这条由本守卫负向钉住。
+    expect(code).not.toContain("active:bg-state-layer-");
+    expect(code).not.toContain("active:bg-state-pressed-");
+  });
+
+  it("a11y 与 `@tap.stop` 原样保留（`.stop` 与位置无关，是承重的）", () => {
+    expect(code).toContain(':accessibility-label="t(\'continue.remove\')"');
+    expect(code).toContain(":accessibility-element=\"A11Y_ELEMENT_ENABLED\"");
+    expect(code).toContain('@tap.stop="emit(\'remove\', entry)"');
+    // 反事实：`.stop` 去掉即红 —— 行根有 @tap，去掉后删除动作会连带触发整行导航
+    expect(code).not.toContain('@tap="emit(\'remove\', entry)"');
+  });
+
+  it("按钮仍在 `detailed` 门后（书架段 3 预览不渲染它；段 3 是 menu 档、不在票 #932 范围）", () => {
+    const iBtn = code.indexOf("v-if=\"detailed\"");
+    const iIcon = code.indexOf('<AppIcon name="close"');
+    expect(iBtn).toBeGreaterThan(-1);
+    expect(iBtn, "按钮必须受 detailed 门控").toBeLessThan(iIcon);
+  });
+
+  it("📌 标题仍是单行 `[max-line:1]`（ADR-0221 §3 代价 1：标题列净值 ≈ +1vw 依赖它）", () => {
+    // 行首按钮 + 缩略图右推 12.2vw，行尾药丸移除归还 14.3vw ⇒ 净值 ≈ +1vw。
+    // ⚠️ 动封面尺寸 / 动这条截断前必须重算，否则 1 行标题会被挤成 2 行（§2.1 有原型反例）。
+    expect(code).toContain(
+      '<text class="text-body-large text-surface-on [max-line:1]">{{ artworkTitle(entry.title) }}</text>',
+    );
+  });
+})

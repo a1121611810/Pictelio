@@ -272,6 +272,23 @@ onUnmounted(() => {
             :accessibility-label="WATCHLIST_A11Y_LABELS.openLatest"
             @tap="openLatest(item)"
           >
+            <!-- 行首动作（ADR-0221 / 术语文档 glossary-app-lynx-hit-testing.md · 票 #932）：
+                 「取消追更」由行尾药丸改为行首 40dp 圆形图标按钮，行尾恒落在 GlobalFab 遮挡带
+                 [80.80, 95.73]vw 内，点它原本 97% 概率开出搜索弹层而非执行动作。
+                 · **图标染 text-error**：破坏性动作失去「取消追更」四字后，严重性线索只剩颜色（ADR-0221 §3 代价 2）。
+                 · **按压状态层**：失去文字后按压反馈只能靠状态层（ADR-0221 §3 代价 3）；utility 必须是顶层
+                   `bg-layer-pressed-*`，嵌在 `state` 下会产出不同名的死类名 `bg-state-layer-*`（静默无样式）。
+                 · **@tap.stop 保留**：行根有 @tap（openLatest），`.stop` 是防止误触变成导航的唯一手段，与位置无关。
+                 · 二次确认由 askUnwatch → unwatchTarget 打开 M3 Dialog，不在此处直删。 -->
+            <view
+              class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"
+              :class="[pressColor.className, 'active:bg-layer-pressed-on-surface']"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="WATCHLIST_A11Y_LABELS.unwatch"
+              @tap.stop="askUnwatch(item)"
+            >
+              <AppIcon name="close" class="text-error" />
+            </view>
             <image
               v-if="item.url"
               class="w-[21.333vw] h-[21.333vw] rounded-[var(--md-shape-small)] bg-surface-container-high"
@@ -284,14 +301,6 @@ onUnmounted(() => {
                 <text class="text-label-medium text-surface-on-variant mr-4">{{ t('watchlist.chapterCount', { count: item.published_content_count }) }}</text>
                 <text v-if="item.latest_content_date" class="text-label-medium text-surface-on-variant">{{ t('watchlist.updatedAt', { date: item.latest_content_date.slice(0, 10) }) }}</text>
               </view>
-            </view>
-            <view
-              class="self-center h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="WATCHLIST_A11Y_LABELS.unwatch"
-              @tap.stop="askUnwatch(item)"
-            >
-              <text class="text-label-large text-primary">{{ t('watchlist.unwatch') }}</text>
             </view>
           </view>
         </view>

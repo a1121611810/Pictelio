@@ -28,6 +28,7 @@ export default defineConfig({
       //      随 APK 分发）与 src/test/resources/*.json（Java 测试资源，与
       //      novel-export payload 逐字节比对，重排即破契约）
       // Java / .gradle / .pro / .xml 不在两者的支持面内，不列。
+      "packages/.gradle/**",
       "packages/android-host/.gradle/**",
       "packages/android-host/android/.gradle/**",
       "packages/android-host/android/**/build/**",
@@ -164,6 +165,7 @@ export default defineConfig({
       // GRADLE_USER_HOME 在包根（`build:android` 用 `GRADLE_USER_HOME=$(pwd)/.gradle`），
       // 本块曾只列 android/.gradle/ 而漏了它 ⇒ oxfmt 扫进 Gradle 发行版的 JDK 文档，
       // `pnpm fmt:check` 恒红而诊断 0 条来自本仓源码。两个块各改一处就会再次漂移。
+      "packages/.gradle/**",
       "packages/android-host/.gradle/**",
       "packages/android-host/android/.gradle/**",
       "packages/android-host/android/**/build/**",

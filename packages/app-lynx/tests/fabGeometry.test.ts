@@ -16,6 +16,8 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  FAB_BAND_LEFT_VW,
+  FAB_BAND_RIGHT_VW,
   FAB_BOTTOM_SEARCH_VW,
   FAB_EDGE_VW,
   FAB_MENU_PANEL_HEIGHT_VW,
@@ -75,6 +77,77 @@ describe('fabGeometry：底部遮挡让位高度（数值 oracle，票 #922）',
   it('三档取值互不相同（防止两个分支被写成同一个值而门禁看不出来）', () => {
     const vals = [fabAllowanceHeightVw('menu'), fabAllowanceHeightVw('search'), fabAllowanceHeightVw('hidden')]
     expect(new Set(vals.map((v) => v.toFixed(3))).size, 'search 与 hidden 必须同值，menu 必须另成一档').toBe(2)
+  })
+})
+
+// ─── 遮挡带几何（水平轴；票 #932 / ADR-0221 / 术语文档 glossary-app-lynx-hit-testing.md）───
+//
+// 与上方竖直轴判据**并列而非重复**：底部让位管「末项能滚到 FAB 上方」（竖直），
+// 遮挡带管「行的哪一段被 FAB 吃掉」（水平）。两者正交，各需各自的数值判据
+// （术语文档 §「遮挡带与底部让位是两个正交轴」）。
+//
+// ⚠️ 期望值出处（Oracle 溯源；禁从被测实现反推 —— `expect(FAB_BAND_LEFT_VW)
+//   .toBe(FAB_BAND_LEFT_VW)` 是同义反复，等于没测）：
+//   - **主锚点 = 真机像素实测**（票 #932 取证，ADR-0221 §1 表第 1 行；emulator-5554 /
+//     Android 14 / 1080×2160）：GlobalFab 的水平投影带 = `x[872,1033]`。
+//     下面的 872 / 1033 就是这两个**像素**字面量，按 1vw = 1% 屏宽（glossary-lynx-units.md）
+//     折算后比较；容差取 **1px = 100/1080 = 0.0926vw** —— 像素量测的分辨率就是这个，
+//     再紧就是拿理论值当实测用（自证循环）。
+//   - **辅锚点 = ADR-0221 §2 记的理论带** `[80.80, 95.73]vw`，容差 0.005vw（纯手算推导，
+//     无像素粒度问题，故可卡更紧）。
+//   - 理论 80.8 / 95.733vw 与实测 80.741 / 95.648vw 的差（0.059 / 0.085vw）均 < 1px
+//     ⇒ 是**像素粒度**而非几何分歧；两条锚点因此不冲突，ADR 里的两个数也都对。
+
+/** 1px 在 1080px 宽视口下的 vw 值（1vw = 1% 屏宽）。像素量测的分辨率下界。 */
+const VW_PER_PX = 100 / 1080
+
+/** 真机实测（emulator-5554 / 1080×2160，票 #932）：GlobalFab 水平投影带的左右像素边界。 */
+const BAND_LEFT_PX = 872
+const BAND_RIGHT_PX = 1033
+
+describe('fabGeometry：遮挡带（水平轴，票 #952 / ADR-0221）', () => {
+  it('带左缘 = 真机实测 872px（80.741vw），容差 1px', () => {
+    expect(Math.abs(FAB_BAND_LEFT_VW - BAND_LEFT_PX * VW_PER_PX), '带左缘须对齐 ADR-0221 §1 实测 x[872]').toBeLessThanOrEqual(VW_PER_PX)
+  })
+
+  it('带右缘 = 真机实测 1033px（95.648vw），容差 1px', () => {
+    expect(Math.abs(FAB_BAND_RIGHT_VW - BAND_RIGHT_PX * VW_PER_PX), '带右缘须对齐 ADR-0221 §1 实测 x[1033]').toBeLessThanOrEqual(VW_PER_PX)
+  })
+
+  it('带宽 = FAB 本体（实测 161px = 14.907vw），不含右距', () => {
+    // ⚠️ 这条是**反模式**防线：右距是 FAB 与屏边之间的空隙，不在 FAB 的投影里。
+    //    若把带算成「本体 + 右距」= 19.2vw，右缘会落到 100vw、整条判据失去区分力，
+    //    「行首动作已让开带」会**假绿**通过。
+    const widthVw = FAB_BAND_RIGHT_VW - FAB_BAND_LEFT_VW
+    expect(widthVw).toBeCloseTo((BAND_RIGHT_PX - BAND_LEFT_PX) * VW_PER_PX, 1)
+    expect(widthVw).not.toBeCloseTo(19.2, 1)
+    // 旁证：带右缘到屏边留出的空隙 = 实测 47px ≈ 右距 4.267vw（1px 容差内）
+    expect(Math.abs(100 - FAB_BAND_RIGHT_VW - (1080 - BAND_RIGHT_PX) * VW_PER_PX)).toBeLessThanOrEqual(VW_PER_PX)
+  })
+
+  it('与 ADR-0221 §2 记的理论带 [80.80, 95.73]vw 一致（容差 0.005vw）', () => {
+    // §2 原文：「遮挡带 `[80.80, 95.73]vw` 由 FAB 自身尺寸与右距导出」。
+    expect(FAB_BAND_LEFT_VW).toBeCloseTo(80.8, 2)
+    expect(FAB_BAND_RIGHT_VW).toBeCloseTo(95.73, 2)
+  })
+
+  it('遮挡带与路由档位无关（ADR-0221 §1.2）：两档水平带逐位相同，档位只改 top', () => {
+    // 结构保证：两个边界是**常量、不接 mode 形参** ⇒ TS 层就不存在「按档取不同带」的写法。
+    // 数值保证：复刻 GlobalFab 的定位恒等式（中心 x 恒定，只有底边按档变化）。
+    // ⚠️ 诚实登记：本条是**恒等式的复述**，不是独立量测（真机数值由上面三条锚）——
+    //    它的作用是把「档位只改 top」写进判据，防止后人给带加档位分支时无人察觉。
+    const fabBox = (bottomVw: number) => {
+      const cx = 100 - FAB_EDGE_VW - FAB_SIZE_VW / 2
+      return { left: cx - FAB_SIZE_VW / 2, right: cx + FAB_SIZE_VW / 2, top: bottomVw }
+    }
+    const menu = fabBox(FAB_EDGE_VW) // menu 档底边 4.267vw
+    const search = fabBox(FAB_BOTTOM_SEARCH_VW) // search 档底边 43.734vw
+    expect(menu.left).toBe(search.left)
+    expect(menu.right).toBe(search.right)
+    expect(menu.left).toBe(FAB_BAND_LEFT_VW)
+    expect(menu.right).toBe(FAB_BAND_RIGHT_VW)
+    // 档位确实改的是竖向：两档让位高度不同 ⇒ 上面那句「水平带相同」不是靠「两档一样」蒙混
+    expect(fabAllowanceHeightVw('search')).not.toBe(fabAllowanceHeightVw('menu'))
   })
 })
 

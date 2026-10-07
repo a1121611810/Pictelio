@@ -14,7 +14,25 @@
 // ⚠️ **不复用 `RestrictedNovelCard`**：那张卡高度写死 40vw，是为小说列表大卡设计的；
 //   续读行是 18.667vw 的紧凑行，套上去会撑高段 3。受限**徽章块**改用 `RestrictOverlay`
 //   的流内模式（`overlay: false`）——那是徽章的单一事实源，两种尺寸下都适用。
+//
+// 📌 **移除按钮在行首，不在行尾**（ADR-0221 决策 2 / 票 #932；术语文档「行首动作」）：
+//   行尾落在 GlobalFab 遮挡带 `x[80.80, 95.73]vw` 内，真机实测行尾药丸 **97% 宽度**被盖，
+//   点它 100% 开搜索弹层而非删除。遮挡带由 FAB 自身几何导出、与路由档位无关 ⇒ 是**恒定
+//   不可交互区**，不是「偶尔空出来的地方」。故本按钮插在封面**之前**，40dp 圆形。
+//   ⚠️ 三条已拍板的代价，改动前必读（ADR-0221 §3）：
+//   ① 破坏性动作丢了「移除」二字 ⇒ **图标必须染 `text-error`**，严重性线索不得回退成
+//      `text-primary`（否则与普通动作同形）。
+//   ② 按压反馈从「看得见文字」退化为「只有图标」⇒ 状态层**不可省**（拇指遮挡下唯一线索）；
+//      utility 必须是**顶层** `bg-layer-pressed-*`，嵌在 `state` 下会产出不同名的
+//      `bg-state-layer-*` 死类名、静默无样式。载体 `pressColor.className` 同样不可省
+//      （background-color 须在 transition-property 覆盖内，见 ADR-0211 决策 2）。
+//   ③ 缩略图右推 12.2vw，但行尾药丸（14.3vw）同时移除 ⇒ **标题列净变化 ≈ +1vw**，动作的占位
+//      是搬移不是新增。⚠️ 该净值依赖标题的 `[max-line:1]`：**动封面尺寸 / 动标题截断前先重算**，
+//      否则会把 1 行标题挤成 2 行（ADR-0221 §2.1 记录过原型实测的反例）。
+//   📌 `close` 字形承载「移除」是**语义借用**（`delete` 未登记进 ICON_CODEPOINTS，重生成字体
+//      需联网 + fonttools，与本修复不成比例 —— ADR-0221 §2.3 已登记代价）。
 import { computed } from 'vue'
+import AppIcon from './AppIcon.vue'
 import RestrictOverlay from './RestrictOverlay.vue'
 import SkeletonImage from './SkeletonImage.vue'
 import { proxyImageUrl } from '../utils/imageUrl'
@@ -37,6 +55,7 @@ const emit = defineEmits<{ (e: 'open', entry: ContinueEntry): void; (e: 'remove'
 
 /** 按压反馈载体（ADR-0211 决策 2）：`background-color` 须在 transition-property 覆盖内，
  *  否则 active: 状态层挂错载体 = 静默失效（本仓既有门禁 pressStateLayerTransition 会转红）。
+ *  行根与行首移除按钮**共用**这一个载体（两处都是颜色状态层，形态同构）。
  *  时长与曲线一律取自 composables/motion.ts（唯一入口），本组件不写字面量。 */
 const { pressColor } = useMotion()
 
@@ -128,6 +147,17 @@ const chapterLabel = computed(() =>
     :accessibility-label="rowA11yLabel"
     @tap="openable ? emit('open', entry) : undefined"
   >
+    <!-- 单条移除（@tap.stop 防卡片导航误触）——**行首**圆形图标按钮（ADR-0221 决策 2 / 票 #932） -->
+    <view
+      v-if="detailed"
+      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full"
+      :class="[pressColor.className, 'active:bg-layer-pressed-on-surface']"
+      :accessibility-element="A11Y_ELEMENT_ENABLED"
+      :accessibility-label="t('continue.remove')"
+      @tap.stop="emit('remove', entry)"
+    >
+      <AppIcon name="close" class="text-error" />
+    </view>
     <!-- 受限：流内徽章块占封面位，标题/作者仍可见（不隐藏条目）；点击不导航 -->
     <view
       v-if="restricted"
@@ -163,16 +193,6 @@ const chapterLabel = computed(() =>
       <text v-if="chapterLabel && !entry.unavailable" class="text-label-medium text-primary mt-1 [max-line:1]">
         {{ chapterLabel }}
       </text>
-    </view>
-    <!-- 单条移除（@tap.stop 防卡片导航误触） -->
-    <view
-      v-if="detailed"
-      class="self-center ml-2 h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
-      :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="t('continue.remove')"
-      @tap.stop="emit('remove', entry)"
-    >
-      <text class="text-label-large text-primary">{{ t('continue.remove') }}</text>
     </view>
   </view>
 </template>

@@ -83,8 +83,39 @@ describe('WatchLater.vue 快照卡（行卡字段与交互，spec US5/US10/US6�
   })
 
   it('删除按钮存在，@tap.stop 调 store.remove(kind, id)（防卡片导航误触）', () => {
-    expect(page).toMatch(/@tap\.stop="\w+\(item\)"/)
-    expect(page).toContain(`t('later.remove')`)
+    expect(page).toMatch(/@tap\.stop="removeItem\(item\)"/)
+    // 按钮语义由 a11y 注册表承载（ADR-0061 element+label 成对），行内文案 <text> 已随药丸一并移除
+    expect(page).toContain(':accessibility-label="WATCH_LATER_A11Y_LABELS.remove"')
+    expect(page).not.toContain(`t('later.remove')`)
+  })
+
+  it('行首动作：删除按钮在封面之前，40dp 圆形 + close 字形（ADR-0221 决策 2）', () => {
+    const btn =
+      page.match(/<view\b[^>]*@tap\.stop="removeItem\(item\)"[^>]*>[\s\S]*?<\/view>/)?.[0] ?? ''
+    expect(btn).not.toBe('')
+    // 40dp（10.667vw）触控目标 + 圆形。必须写全 rounded-full —— 裸方向类取 medium 档而非 full
+    expect(btn).toContain('w-[10.667vw] h-[10.667vw]')
+    expect(btn).toContain('rounded-full')
+    expect(btn).toContain('border-outline')
+    // 字形走统一图标组件，不内联；`close` 承载「移除」是 ADR-0221 §2.3 登记的语义借用
+    expect(btn).toMatch(/<AppIcon name="close"/)
+    expect(page).toContain("import AppIcon from '../components/AppIcon.vue'")
+    // 位置：按钮在封面之前 —— 行首恒在 GlobalFab 遮挡带 [80.80, 95.73]vw 之外
+    expect(page.indexOf('@tap.stop="removeItem(item)"')).toBeLessThan(page.indexOf('<SkeletonImage'))
+    // 行尾药丸整体移除（不做「两头都留」）
+    expect(page).not.toContain('px-3 flex items-center justify-center border border-outline')
+  })
+
+  it('破坏性语义与按压状态层：图标染 text-error + 顶层 active:bg-layer-pressed-on-surface（ADR-0221 §3 代价 2/3）', () => {
+    const btn =
+      page.match(/<view\b[^>]*@tap\.stop="removeItem\(item\)"[^>]*>[\s\S]*?<\/view>/)?.[0] ?? ''
+    // 失去「移除」四字后严重性线索只剩颜色
+    expect(btn).toContain('class="text-error"')
+    // 本页原先没有按压状态层，本次补齐：静态类上写顶层 utility + pressColor 载体
+    expect(btn).toContain('active:bg-layer-pressed-on-surface')
+    expect(btn).toContain('pressColor.className')
+    // 嵌在 state 下会产出不同名的死类名 bg-state-layer-*（静默无样式）
+    expect(page).not.toContain('bg-state-layer-')
   })
 
   it('删除后 list 整树重建：refreshEpoch 代递增驱动 <list :key>（ADR-0162 危险面 / ADR-0107 D4）', () => {

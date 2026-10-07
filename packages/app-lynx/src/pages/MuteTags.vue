@@ -13,6 +13,7 @@ import { goBack } from '../router'
 import { useSettingsStore } from '../stores/settingsStore'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { MUTE_TAGS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 // 底部遮挡让位（ADR-0217 / 票 #922 / 术语文档 glossary-bottom-occlusion-allowance.md）：
 // `</scroll-view>` 之前的让位占位。本页是**非 tab 内容页** ⇒ 档位为 search（让位 58.668vw）。
@@ -67,21 +68,33 @@ function removeTag(name: string): void {
       <view
         v-for="(name, i) in tags"
         :key="name"
-        class="flex flex-row items-center justify-between m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
+        class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"
         :style="listItemStyle(i)"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="name"
       >
-        <text class="flex-1 text-body-medium text-surface-on [max-line:2]">{{ name }}</text>
+        <!-- 行首动作（ADR-0221 / 术语文档 glossary-app-lynx-hit-testing.md · 票 #932）：
+             「取消静音」由行尾药丸改为行首 40dp 圆形图标按钮，行尾恒落在 GlobalFab 遮挡带
+             [80.80, 95.73]vw 内，点它原本 97% 概率开出搜索弹层而非取消静音。
+             · **图标染 text-error**：本页移除文案刻意用错误色（ADR-0187 D5），失去四字后严重性线索只剩颜色
+               （ADR-0221 §3 代价 2）——不得为「和别处长得一样」抹平成主色。
+             · **按压状态层沿用本页既有载体**：静态 class 上的 active:bg-layer-pressed-on-surface +
+               :class="pressColor.className"（本页原本就有，另三处是本次补齐）。
+               utility 必须是顶层 `bg-layer-pressed-*`，嵌在 `state` 下会产出不同名的死类名 `bg-state-layer-*`。
+             · **@tap 不加 .stop**：本页行根**不带** @tap（不可点导航），`.stop` 在此无对象可停。
+               `.stop` 的必要性只取决于行根是否带 @tap，与按钮在行内的位置无关（spec 决策 6）。
+             · 行根的 justify-between 随之移除：它的意图就是「把动作推到行尾」，正是本票废除的那件事；
+               标签 text 自带 flex-1，剩余空间本就由它吃掉，移除后视觉结果不变。 -->
         <view
-          class="self-center h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] active:bg-layer-pressed-on-surface"
+          class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center border border-outline rounded-full active:bg-layer-pressed-on-surface"
           :class="pressColor.className"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="MUTE_TAGS_A11Y_LABELS.remove"
           @tap="removeTag(name)"
         >
-          <text class="text-label-large text-error">{{ t('muteTags.remove') }}</text>
+          <AppIcon name="close" class="text-error" />
         </view>
+        <text class="flex-1 text-body-medium text-surface-on [max-line:2]">{{ name }}</text>
       </view>
       <FabAllowanceSpacer />
     </scroll-view>
