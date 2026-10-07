@@ -1,0 +1,1 @@
+{"error":{"message":"The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed no-such-model-xyz. (request_id: 348ac41a-e01b-48a2-a375-3b09c0385289)","type":"invalid_request_error","param":null,"code":"invalid_request_error"}}

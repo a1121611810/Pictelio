@@ -820,11 +820,7 @@ public class PictelioTranslateModule extends LynxModule {
 
         TRANSLATE_EXECUTOR.execute(() -> {
             try {
-                JSONObject body = new JSONObject();
-                body.put("model", model);
-                body.put("input", new JSONArray().put("ping"));
-                body.put("max_output_tokens", 1);
-                body.put("stream", false);
+                JSONObject body = buildProbeRequestBody(model);
                 String url = responsesUrl(baseURL);
                 Request req = new Request.Builder()
                         .url(url)
@@ -889,7 +885,7 @@ public class PictelioTranslateModule extends LynxModule {
      * 默认 endpoint 与文档给的填写形态 100% 404（真机 + mock 双双暴露）。
      * 现在：baseURL 已以 /v1（或 /openai/v1）结尾则只补 /responses，否则补 /v1/responses。
      */
-    private static String responsesUrl(String baseUrl) {
+    static String responsesUrl(String baseUrl) {
         String base = baseUrl.replaceAll("/+$", "");
         if (base.endsWith("/v1") || base.endsWith("/openai/v1")) {
             return base + "/responses";
@@ -1054,10 +1050,34 @@ public class PictelioTranslateModule extends LynxModule {
     }
 
     /**
+     * 构造探测用的最小 POST 请求体。
+     *
+     * <p><b>{@code input} 必须是标量字符串</b>，不是裸字符串数组 —— Responses API 的 {@code input}
+     * 只接受标量字符串或消息数组（{@code [{role, content}]}）。曾写成 {@code ["ping"]}，DeepSeek
+     * 实测返回 422 {@code input: invalid input item}（#831）。该缺陷此前不可见，因为 DeepSeek
+     * 鉴权先于路由：dummy key 总先撞 401，把报文错误掩盖成「兼容」绿灯；「测试连接」用真实 key
+     * 才显形 → 同一端点两条路径判定矛盾。
+     *
+     * <p>选择标量字符串而非消息数组：与运行时路径（{@link #buildInput} 产出字符串）同形，
+     * 探测与运行时共用同一形态语义。
+     *
+     * <p>Oracle：形态要求来自 OpenAI Responses API 规约；422 响应为实测抓取
+     * （resources/llm-probe/deepseek-422-invalid-input-item.json）。
+     */
+    static JSONObject buildProbeRequestBody(String model) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("model", model);
+        body.put("input", "ping");
+        body.put("max_output_tokens", 1);
+        body.put("stream", false);
+        return body;
+    }
+
+    /**
      * probeEndpoint 状态分流（参考调研 #625 §Q7）：
      * HTTP 状态码 + body 关键词 → status ok/partial/unknown。
      */
-    private static JSONObject classifyProbe(int code, String respBody) throws Exception {
+    static JSONObject classifyProbe(int code, String respBody) throws Exception {
         JSONObject result = new JSONObject();
         result.put("httpStatus", code);
         String bodyLower = respBody == null ? "" : respBody.toLowerCase(Locale.ROOT);
