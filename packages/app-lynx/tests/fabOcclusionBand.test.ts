@@ -78,25 +78,25 @@ const LEADING_SITES = [
   {
     file: 'src/components/ContinueRow.vue',
     action: `@tap.stop="emit('remove', entry)"`,
-    row: 'class="flex flex-row items-center mx-3 mb-1.5 p-2 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"',
+    row: 'class="flex flex-row items-center mx-3 mb-1.5 p-2 bg-surface-container-lowest',
     content: 'class="flex-1 flex flex-col ml-2.5 min-w-0"',
   },
   {
     file: 'src/pages/Watchlist.vue',
     action: '@tap.stop="askUnwatch(item)"',
-    row: 'class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"',
+    row: 'class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest',
     content: 'class="flex-1 flex flex-col ml-3"',
   },
   {
     file: 'src/pages/WatchLater.vue',
     action: '@tap.stop="removeItem(item)"',
-    row: 'class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] active:bg-layer-pressed-on-surface"',
+    row: 'class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest',
     content: 'class="flex-1 flex flex-col ml-3 min-w-0"',
   },
   {
     file: 'src/pages/MuteTags.vue',
     action: '@tap="removeTag(name)"',
-    row: 'class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]"',
+    row: 'class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest',
     content: 'class="flex-1 text-body-medium text-surface-on [max-line:2]"',
   },
 ] as const
@@ -138,13 +138,21 @@ describe('ADR-0221 决策 2 · 四处已修站点的行首位置', () => {
 
   it('动作不被 flex/绝对定位推到行尾，且其间距写在内容一侧（mr-* 而非 ml-*）', () => {
     for (const site of LEADING_SITES) {
-      const tpl = templateOf(readPkg(site.file))
+      const src = readPkg(site.file)
+      const tpl = templateOf(src)
       const actionAt = tpl.indexOf(site.action)
       expect(actionAt, `${site.file}：找不到 ${site.action}`).toBeGreaterThanOrEqual(0)
       const tag = openTagAt(tpl, actionAt)
 
-      // 行根一旦有 justify-between/justify-end，任何「源码在内容列之前」的元素照样会被推到右端
-      expect(site.row, `${site.file}：行根出现尾推对齐类 —— 它的意图就是「把动作推到行尾」，正是 ADR-0221 废除的那件事`).not.toMatch(TRAILING_PUSH)
+      // 行根一旦有 justify-between/justify-end，任何「源码在内容列之前」的元素照样会被推到右端。
+      // ⚠️ 判据必须读**被测文件**的行根，不能读本文件自己的 site.row 常量 —— 后者
+      //   只能证明「常量没被改」，改动真实源码时恒绿（同 门禁冻结线 #3：自测绿不算数）。
+      const rowAt = tpl.indexOf(site.row)
+      expect(rowAt, `${site.file}：找不到行根锚点（${site.row}）`).toBeGreaterThanOrEqual(0)
+      const rowTag = openTagAt(tpl, rowAt)
+      expect(rowTag, `${site.file}：行根出现尾推对齐类 —— 它的意图就是「把动作推到行尾」，正是 ADR-0221 废除的那件事`).not.toMatch(
+        TRAILING_PUSH,
+      )
       expect(tag, `${site.file}：动作元素带尾推写法（${tag.trim()}）⇒ 位置不再由源码顺序决定`).not.toMatch(TRAILING_PUSH)
       // 四处已修站点的既定写法：间距在右（内容侧）。改成 ml-* ＝ 被当作尾随元素重排。
       expect(tag, `${site.file}：动作元素的间距不写在右侧（mr-*）—— 现行写法 mr-1.5 + 10.667vw 圆形图标按钮`).toMatch(

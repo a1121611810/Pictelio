@@ -429,7 +429,10 @@ export interface UseMotionOptions extends UseReducedMotionOptions {}
  *  ```ts
  *  const motion = useMotion()
  *  // 颜色状态层：R1 降级时 className 自动为空串
- *  :class="[motion.pressColor.value.className, 'active:bg-layer-pressed-on-surface']"
+ *  // ⚠️ 状态层写进**静态 class**、`:class` 只带 pressColor 载体（ADR-0221 §7 四处收敛形态）：
+ *  //   <view class="… active:bg-layer-pressed-on-surface" :class="motion.pressColor.value.className" />
+ *  //   两种绑定方式产出的 CSS 相同（Tailwind 扫文本），但本仓行内动作统一用静态 class，
+ *  //   continueReadingWiring.template.test.ts 对数组形态有反向断言 —— 别照抄数组形态。
  *  // 一次性入场：R2 降级时 animation 自动为 none
  *  const sheet = motion.enterSheet.value
  *  // 两段式退场：R1 降级时 holdMs 自动为 0
