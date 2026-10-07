@@ -907,26 +907,31 @@ public class PictelioTranslateModule extends LynxModule {
      *       分隔同一段落序列。</li>
      * </ol>
      *
-     * <p><b>下游各是谁（别再归错）</b>：
+     * <p><b>下游：两条路径共用同一个 {@code alignParagraphs}</b>（#943 第 2 轮 review 更正）：
      * <ul>
-     *   <li><b>native（本方法，真机唯一路径）</b>：切段在 <b>Java</b> 完成 ——
-     *       {@code TranslationSseParser} 用 {@code PARAGRAPH_ANCHOR}（{@code \[(\d+)\]}）
-     *       正则识别锚点、逐段 {@code trim()} 后以 {@code delta_all} 下发，JS 展开成逐段 delta。
-     *       故此路径下<b>空行分隔符在 Java 侧即被消费</b>。</li>
-     *   <li><b>web（dev-core 预览）</b>：切段在 JS 的 {@code alignParagraphs}
-     *       （{@code split(/\n\n+/u)} + {@code stripAnchorPrefix}）—— 该路径下<b>空行分隔符
-     *       才是承重项</b>。</li>
+     *   <li><b>响应侧</b>：native 由 {@code TranslationSseParser} 先按
+     *       {@code PARAGRAPH_ANCHOR}（{@code \[(\d+)\]}）正则识别锚点、逐段 {@code trim()}
+     *       后以 {@code delta_all} 下发；web 侧无此步，译文原文进 JS。</li>
+     *   <li><b>对齐侧（两路共用）</b>：{@code fetchChunkViaProvider} 把逐段 delta 用
+     *       {@code join('')} 拼回后交给 {@code alignParagraphs}
+     *       （{@code split(/\n\n+/u)} + {@code stripAnchorPrefix}），其返回值是
+     *       <b>两条路径共同的权威渲染来源</b>。</li>
      * </ul>
-     * 两者共同依赖的是 <b>{@code [N] } 锚点前缀本身</b>；请求形态（而非译文形态）不参与下游对齐。
+     * <b>由此得到一个既存缺陷（见 #948，本方法未引入、亦未修复）</b>：native 的 delta 已被
+     * Java 切好并 trim，JS 再用空串拼接 ⇒ {@code alignParagraphs} 看不到任何空行，整章被切成
+     * <b>1 段</b>、其余 N−1 段静默回退原文。实测：3 段译文 → fallbackCount=2。
+     * 请求侧的空行分隔符因此<b>只在 web 路径承重</b>；两条路径真正共同依赖的是
+     * {@code [N] } 锚点前缀本身。请求形态（而非译文形态）不参与下游对齐。
      *
      * <p><b>原「两端 input 形态必须一致」是伪约束（已删除）</b>：原文称「native 无 [N]
      * 锚定 → 无法按段回填」，与实现相反 —— 本方法逐段拼 {@code [N]}。而外层报文形态本就不同
      * （native 用标量字符串、web 用 {@code [{role:'user', content}]}），两者<b>都被 Responses
      * API 接受</b>（2026-10-07 以真实密钥实测，两种形态打 {@code /v1/responses} 均返回 200）。
-     * 该取证在本仓外；仓内可溯源的同类证据是 ADR-0173「探测报文的形态要求」一节与其
-     * fixture {@code deepseek-200-completed.json}（由 {@code PictelioTranslateProbeTest}
-     * 消费），但那是<b>探测报文</b>的取证，<b>不是</b>本方法运行时报文的取证 ——
-     * 两者形态不同，不可互相引用。
+     * 该取证在本仓外。仓内可溯源的部分：探测报文与运行时报文<b>同形</b>（均为标量字符串，
+     * ADR-0173「探测报文的形态要求」已约定），故其 fixture
+     * {@code deepseek-200-completed.json}（由 {@code PictelioTranslateProbeTest.classify2xxIsOk}
+     * 消费）可作「标量字符串形态被 Responses API 接受」的<b>间接</b>佐证；但
+     * <b>消息数组形态的 200 取证本仓没有 fixture</b>，勿把探测 fixture 当成它的证据。
      *
      * <p>把报文形态写成硬约束，会诱导后人去「修」一个并不存在的缺陷。
      *

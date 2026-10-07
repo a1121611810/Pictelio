@@ -24,7 +24,8 @@ import org.robolectric.annotation.Config;
  *   <li>锚点形态 {@code [N] } 与空行分隔 = {@code createNovelTranslator.alignParagraphs}
  *       的解析契约（{@code stripAnchorPrefix} + 按空行切分）；</li>
  *   <li>与 web 路径 {@code buildResponsesRequestBody}（api/translate.ts）产出的
- *       <b>锚定文本逐字节相同</b> —— 两端实测同一段落序列产出同一字符串。</li>
+ *       <b>锚定文本格式一致</b> —— 同一段落序列产出同一字符串（本测试内重算 web 公式
+     *       比对，<b>非调用 web 实现</b>）。</li>
  * </ul>
  */
 @RunWith(RobolectricTestRunner.class)
@@ -64,10 +65,13 @@ public class PictelioTranslateBuildInputTest {
     }
 
     /**
-     * 下游 {@code alignParagraphs} 只按<b>空行</b>切段 —— 若分隔符被改成单个换行，
-     * 整章会被解析成 1 段、其余全部回退原文。
+     * 本用例钉的是<b>与 web 路径的格式对等</b>（{@code translate.ts:241-243} 同样以
+     * {@code \n\n} 分隔）—— 若分隔符被改成单个换行，web 路径的 {@code alignParagraphs}
+     * 会把整章切成 1 段、其余静默回退原文。
      *
-     * <p>这是本测试存在的核心原因：锚定与分隔符共同构成跨端契约，两者的破坏都是静默的。
+     * <p><b>口径</b>：native 路径的请求侧分隔符<b>不承重</b>（Java 按 {@code [N]} 正则切
+     * 响应，与请求侧形态无关）。本用例保护的是跨端格式对等，而非 native 运行时行为；
+     * native 的既存对齐缺陷见 #948。
      */
     @Test
     public void separatorIsBlankLineNotSingleNewline() throws Exception {
@@ -95,8 +99,10 @@ public class PictelioTranslateBuildInputTest {
      * （native 用标量字符串、web 用 {@code [{role,content}]}），而该差异对 Responses API
      * 合法且必需（原注释「两端 input 形态必须一致」是伪约束）。
      *
-     * <p>期望值按 web 路径公式在本测试内独立重算（{@code [i] } + {@code \n\n}），
-     * 不读取 web 侧实现 —— 双实现互为 oracle。
+     * <p><b>口径澄清（#943 review 第 2 轮）</b>：本测试<b>不执行</b> web 实现，只在测试内
+     * 重算其公式，故它是「格式契约锁」而非真正的双实现差分测试 —— 改 web 侧
+     * {@code join('\n\n')} 本用例不会转红。web 侧的防线在
+     * {@code translate.test.ts}「锚定段落以空行分隔」（已实证可捕获该漂移）。
      */
     @Test
     public void anchoredTextMatchesWebPathFormatByteForByte() throws Exception {
