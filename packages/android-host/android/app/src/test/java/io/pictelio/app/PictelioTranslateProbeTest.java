@@ -51,26 +51,42 @@ public class PictelioTranslateProbeTest {
         assertTrue(
                 "探测 input 必须是标量字符串（Responses API 规约），实际类型=" + body.get("input").getClass(),
                 body.get("input") instanceof String);
-        assertEquals("ping", body.getString("input"));
+        // 注：此处刻意不断言 input 的具体字面量 —— Responses API 规约只约束形态
+        // （标量字符串 / 消息数组），不约束探测文本内容。断言字面量会把实现钉死。
+        assertFalse(body.getString("input").isEmpty());
     }
 
-    /** 探测报文其余字段保持最小 POST 语义：单 token、不流式。 */
+    /**
+     * 探测报文保持最小 POST 语义：单 token、不流式。
+     *
+     * <p>属<b>特征化（防回归）</b>而非规约断言：这两个值当前实现合理，但 Responses API
+     * 规约并不规定它们。因此本用例不作为「实现正确」的证据，只锁住不被无意改动。
+     */
     @Test
     public void probeRequestKeepsMinimalPostSemantics() throws Exception {
-        JSONObject body = PictelioTranslateModule.buildProbeRequestBody("deepseek-chat");
+        JSONObject body = PictelioTranslateModule.buildProbeRequestBody("some-model");
 
-        assertEquals("deepseek-chat", body.getString("model"));
+        assertEquals("some-model", body.getString("model"));
         assertEquals(1, body.getInt("max_output_tokens"));
         assertFalse("探测不 stream（只要状态码，不要 SSE）", body.getBoolean("stream"));
     }
 
     // ───────────────────────── 状态判定表（缝 1） ─────────────────────────
 
-    /** D3 表：2xx → ok。 */
+    /**
+     * D3 表：2xx → ok。
+     *
+     * <p>样例为实测抓取：修复后的探测报文 + 真实密钥，DeepSeek 返回
+     * {@code object: response} / {@code status: incomplete}（incomplete 是因为
+     * {@code max_output_tokens=1} 截断，属预期）。这是 #944「有效密钥点测试连接
+     * 返回成功」的机器证据 —— 与 422 fixture（修复前）构成同一报文的成败对照。
+     */
     @Test
     public void classify2xxIsOk() throws Exception {
-        JSONObject r = PictelioTranslateModule.classifyProbe(200, "{\"status\":\"completed\"}");
+        JSONObject r = PictelioTranslateModule.classifyProbe(200, fixture("deepseek-200-completed.json"));
+
         assertEquals("ok", r.getString("status"));
+        assertEquals(200, r.getInt("httpStatus"));
     }
 
     /**
@@ -112,10 +128,17 @@ public class PictelioTranslateProbeTest {
         assertTrue(r.getBoolean("keyInvalid"));
     }
 
-    /** D3 表：404 → incompatible（不是 Responses 端点）。 */
+    /**
+     * D3 表：404 → incompatible（不是 Responses 端点）。
+     *
+     * <p>样例为实测抓取：真实密钥打一个构造的不存在路径，服务端回空体 404。
+     * 这条与 401 fixture 构成对照 —— dummy key 对同一路径回 401（鉴权先于路由），
+     * 正因如此 dummy key 永远看不到这个 404，绿灯才失去「端点存在」的证明力
+     * （ADR-0173 D3 §能力边界）。
+     */
     @Test
     public void classify404IsIncompatible() throws Exception {
-        JSONObject r = PictelioTranslateModule.classifyProbe(404, "");
+        JSONObject r = PictelioTranslateModule.classifyProbe(404, fixture("deepseek-404-not-found.json"));
 
         assertEquals("incompatible", r.getString("status"));
     }
@@ -154,7 +177,13 @@ public class PictelioTranslateProbeTest {
         assertEquals("unknown", r.getString("status"));
     }
 
-    /** 缺 model 字段的 422 同样落 unknown。 */
+    /**
+     * 缺 model 字段的 422 同样落 unknown。
+     *
+     * <p>⚠️ 该fixture 来自<b>人工构造</b>的请求（探测报文恒定写入 model，应用无路径可触发
+     * 「缺 model」）。保留它只为钉住「422 一律落 unknown 而非 ok」这条分流 —— 防止有人
+     * 给 422 加一条「看起来像 invalid-key 就判 ok」的分支。可信度低于另外五份。
+     */
     @Test
     public void classify422MissingModelIsUnknown() throws Exception {
         JSONObject r = PictelioTranslateModule.classifyProbe(422, fixture("deepseek-422-missing-model.json"));

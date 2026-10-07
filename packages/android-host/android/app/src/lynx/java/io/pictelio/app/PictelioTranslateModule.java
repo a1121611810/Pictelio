@@ -1083,19 +1083,19 @@ public class PictelioTranslateModule extends LynxModule {
         String bodyLower = respBody == null ? "" : respBody.toLowerCase(Locale.ROOT);
         if (code >= 200 && code < 300) {
             result.put("status", "ok");
-            result.put("detail", "responses api reachable");
+            result.put("detail", "responses api accepted request (2xx)");
         } else if (code == 401 || code == 403) {
             result.put("status", "ok");
             // 401/403：端点存在（地址层成立），密钥无效 —— 同样标记，供凭据层判定
             result.put("keyInvalid", true);
-            result.put("detail", "authentication failed (endpoint reachable)");
+            result.put("detail", "authentication failed (address requires auth; path existence unproven)");
         } else if (code == 400 && (bodyLower.contains("invalid_api_key")
                 || bodyLower.contains("incorrect api key")
                 || bodyLower.contains("invalid api key"))) {
             result.put("status", "ok");
             // 端点兼容性成立（地址对），但密钥无效 —— 显式标记，供「测试连接」区分凭据层失败
             result.put("keyInvalid", true);
-            result.put("detail", "invalid api key (endpoint reachable)");
+            result.put("detail", "invalid api key (address requires auth; path existence unproven)");
         } else if (code == 404) {
             // spec §9.1：404 / unknown url → 不兼容（此前误判为 partial）
             result.put("status", "incompatible");

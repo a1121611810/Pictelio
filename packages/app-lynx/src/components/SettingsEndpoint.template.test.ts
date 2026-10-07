@@ -13,6 +13,12 @@ import { fileURLToPath } from 'node:url'
 
 const src = readFileSync(fileURLToPath(new URL('./SettingsEndpoint.vue', import.meta.url)), 'utf8')
 const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+// 状态并集住在 store 里，本文件读不到 —— 单独读，才能让「类型联合不得残留 vllm」
+// 成为**本文件自己**守住的断言，而不是靠 vue-tsc 索引报错间接兜住。
+const storeSrc = readFileSync(
+  fileURLToPath(new URL('../stores/novelTranslateStore.ts', import.meta.url)),
+  'utf8',
+)
 
 describe('SettingsEndpoint 按钮文案 = 动作（报障回归锚）', () => {
   it('测试按钮标题用 action 键，不得用 probe 结果键', () => {
@@ -39,10 +45,16 @@ describe('端点兼容性（地址层，自动探测）', () => {
     }
   })
 
-  it('vllm 死状态已清除（类型/映射/配色/i18n 均不得残留）', () => {
-    // 不可达状态留在类型里会让后来者以为存在这条分流 —— 「门禁全绿但语义是死的」
+  it('vllm 死状态已清除（本文件读到的映射与配色不得残留）', () => {
+    // 不可达状态留在映射里会让后来者以为存在这条分流 —— 「门禁全绿但语义是死的」
     expect(code).not.toContain('compat.vllm')
     expect(code).not.toContain('"vllm"')
+  })
+
+  it('vllm 死状态已清除（状态类型联合不得残留）', () => {
+    // 覆盖面与上一条对齐：上一条守 .vue 的映射/配色，本条守 store 的类型联合。
+    // i18n 两份 locale 文件由 tests/unit/i18n/novelTranslate.test.ts 的穷尽键集断言独立守住。
+    expect(storeSrc).not.toContain('"vllm"')
   })
 })
 

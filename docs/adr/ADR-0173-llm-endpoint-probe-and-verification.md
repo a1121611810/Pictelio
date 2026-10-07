@@ -64,7 +64,9 @@ spec/ADR 里**没有**任何关于「已验证状态」「免密钥重测」「�
 
 探测请求体的 `input` **必须是标量字符串**，不得写成裸字符串数组 `["ping"]` —— Responses API 只接受标量字符串或消息数组（`[{role, content}]`）。
 
-该形态缺陷曾长期不可见，因 dummy key 总先撞 401、把它掩盖成绿灯；「测试连接」用真实 key 鉴权通过后才显形（实测 422 `input: invalid input item`），造成**同一端点自动探测判兼容、测试连接判失败**。约定探测报文与运行时报文同形（标量字符串），二者共用同一形态语义。
+该形态缺陷曾长期不可见，因 dummy key 总先撞 401、把它掩盖成绿灯；「测试连接」用真实 key 鉴权通过后才显形（**修复前**实测 422 `input: invalid input item`），造成**同一端点自动探测判兼容、测试连接判失败**。
+
+**修复后取证**（#944）：同一报文、真实密钥 → `200` `object: response`（`status: incomplete` 因 `max_output_tokens=1` 截断，属预期）。两条路径对同一端点判定就此一致。该 200 响应存为 fixture `resources/llm-probe/deepseek-200-completed.json`，由 `PictelioTranslateProbeTest.classify2xxIsOk` 消费。约定探测报文与运行时报文同形（标量字符串），二者共用同一形态语义。
 
 #### 相关但不在本决策范围
 

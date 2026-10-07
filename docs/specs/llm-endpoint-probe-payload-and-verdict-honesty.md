@@ -163,12 +163,14 @@ ADR-0173 通篇为中文。修订段落保持中文，与既有文档一致。
 
 实测抓到的真实 DeepSeek 响应体将存为测试 fixture：
 
-- 401 · `authentication_error`（含 `invalid_request_error` code 与 request_id）
+- 200 · `object: response` / `status: incomplete`（**修复后探测报文 + 真实密钥的成功取证** —— #944 AC「有效密钥返回成功」的机器证据）
 - 400 · 未知模型名（**不含** invalid-key 关键词 → 落 `unknown`，非 `ok`）
-- 422 · `input: invalid input item`
+- 401 · `authentication_error`（含 `invalid_request_error` code 与 request_id）
+- 404 · 空体（真实密钥打不存在路径 —— 证明与「dummy key 打任意路径均 401」互为对照）
+- 422 · `input: invalid input item`（**修复前**的失败取证）
 - 422 · missing field `model`
 
-**200 / 404 / 5xx 不需要 fixture**：`classifyProbe` 这几行只读状态码，不消费 body 任何字段，故用内联惰性字面量即可。真正需要真实样例的是**关键词敏感的行**（401 / 400 / 422）——它们读 body 内容，手写样例会与实现共享同一错误假设。
+六份 fixture 覆盖 D3 表**每一条**分支。200 与 404 是 #944 票面点名的两条：200 坐实「修复后真实密钥成功」，404 坐实「真实密钥下路径不存在时服务端确实会回 404」——后者正是 dummy key 永远看不到、因而使绿灯失去证明力的那一条。
 
 **禁止手写自洽字段**——mock 必须来自真实数据源。
 

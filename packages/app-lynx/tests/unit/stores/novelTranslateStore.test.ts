@@ -1211,9 +1211,71 @@ describe('端点兼容性探测（地址层；dummy key）', () => {
     expect(store.compatibility).toBe('ok')
     const [baseURL, apiKey] = mocks.nativeProbeEndpoint.mock.calls[0] as [string, string]
     expect(baseURL).toBe('https://api.openai.com/v1')
-    // 探测是地址层事实：401（认证失败）也说明 endpoint 在，绝不能带用户密钥
+    // 探测是地址层事实：dummy key 恒为固定假值，绝不能带用户密钥
+    //（注意：401 只能证明「该地址在收请求且要求鉴权」，**不**证明 /responses 路径存在
+    //  —— 鉴权先于路由的服务上 dummy key 打任意路径都回 401，见 ADR-0173 D3 §能力边界）
     expect(apiKey).not.toContain('sk-user')
     expect(apiKey.length).toBeGreaterThan(0)
+  })
+
+  // ── classifyProvider 归属分支（#945 AC「classifyProvider 既有行为不变」的机器证据）──
+
+  it('归属：*.openai.azure.com → azure', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: 'd', httpStatus: 200 })
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://contoso.openai.azure.com/openai/v1')
+
+    expect(result.status).toBe('azure')
+    expect(store.compatibility).toBe('azure')
+  })
+
+  it('归属：api.deepseek.com → deepseek', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: 'd', httpStatus: 200 })
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://api.deepseek.com/v1')
+
+    expect(result.status).toBe('deepseek')
+    expect(store.compatibility).toBe('deepseek')
+  })
+
+  it('归属：伪后缀域 evil.com 冒充 openai.azure.com → 不得判 azure', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: 'd', httpStatus: 200 })
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://openai.azure.com.evil.com/v1')
+
+    // endsWith('.openai.azure.com') 要求点分隔的前缀，故伪后缀域必须落回 ok
+    expect(result.status).toBe('ok')
+  })
+
+  it('归属：非 ok 的原生状态不得被归属覆盖（azure/deepseek 只在 hostStatus==="ok" 时判定）', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'incompatible', detail: 'd', httpStatus: 404 })
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://api.deepseek.com/v1')
+
+    expect(result.status).toBe('incompatible')
+    expect(store.compatibility).toBe('incompatible')
+  })
+
+  // ── 兜底告警（测试硬约束 #3：降级路径必须显式可观测）──
+
+  it('原生返回未知状态串 → 回落 unknown 且 console.warn（不得静默）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // 'vllm' 是被清除的死状态：即便原生（不该）发回它，白名单也必须挡住
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({
+      status: 'vllm',
+      detail: 'd',
+      httpStatus: 200,
+    } as never)
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://api.deepseek.com/v1')
+
+    expect(result.status).toBe('unknown')
+    expect(store.compatibility).toBe('unknown')
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('原生返回未知兼容性状态'),
+      expect.objectContaining({ raw: 'vllm' }),
+    )
+    warnSpy.mockRestore()
   })
 
   it('六态原样透传（不再压成 boolean）', async () => {

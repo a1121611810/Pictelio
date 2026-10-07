@@ -160,7 +160,7 @@ builder.registerModule("PictelioTranslate", PictelioTranslateModule.class);
 
 | 场景 | 回调 |
 |------|------|
-| 成功探测 | `cb(probeJson, "")` —— `probeJson = {"status":"ok\|azure\|deepseek\|vllm\|partial\|unknown","detail":"..."}` |
+| 成功探测 | `cb(probeJson, "")` —— `probeJson = {"status":"ok\|partial\|incompatible\|unknown","keyInvalid":bool,"httpStatus":int,"detail":"..."}`（值域以 ADR-0173 D3 为准；`azure`/`deepseek` 由 JS 侧按 hostname 归属，不经原生。~~`vllm`~~ 已于 #945 移除——该值不可达） |
 | 网络错误 | `cb("", errMsg)` |
 
 ### D5. JS 侧 TS 接口 + native bridge 探测
@@ -464,7 +464,7 @@ public void abortStream(String token, Callback cb) {
 | `new URL(baseUrl + "/v1/responses")`（D4.2 示例） | `responsesUrl(baseUrl)`：baseURL 已以 `/v1` / `/openai/v1` 结尾则只补 `/responses`，否则补 `/v1/responses` | 用户按 UI 提示填 `https://api.openai.com/v1`，早期写法实际请求 `/v1/v1/responses` → 100% 404（真机实测） |
 | JS 传 4 个 callback（chunk / done / error） | 单个 callback + `type` 判别（`delta` / `reasoning_delta` / `done`；错误走第二参） | 与 ADR-0053 §2 双参契约统一；lynx 侧同一 handler 多次回调实测稳定 |
 | `probeEndpoint(baseUrl, cb)`（D4.5） | `probeEndpoint(baseURL, apiKey, model, cb)` | 探测需向真实端点发最小 POST；前端传 **dummy key**，与凭据无关（ADR-0173 D2） |
-| 探测值域 `ok/azure/deepseek/vllm/partial/unknown` | 原生只发 `ok/partial/incompatible/unknown`（+`keyInvalid` 布尔） | 原生只能从 HTTP 状态码判「通不通」；provider 归属由 JS 按 hostname 判定（ADR-0173 D3）。404 由 `partial` 改判 `incompatible`（spec §9.1） |
+| 探测值域 `ok/azure/deepseek/vllm/partial/unknown` | 原生只发 `ok/partial/incompatible/unknown`（+`keyInvalid` 布尔；`vllm` 已于 #945 移除） | 原生只能从 HTTP 状态码判「通不通」；provider 归属由 JS 按 hostname 判定（ADR-0173 D3）。404 由 `partial` 改判 `incompatible`（spec §9.1） |
 | 流式复用 `PixivApiCore.getSharedClient()`（D3） | 流式走**专用 OkHttp 客户端**（`callTimeout=0` / `readTimeout=45s`） | 共享客户端带 45s `callTimeout`，会掐断正常长流；掐断后 `call.isCanceled()` 又被当成「用户取消」而静默不回调 → JS promise 永不 settle（真机「永久 N% 翻译中」）。用户中断改由显式 `USER_ABORTED` 集合标记。<br>**实现期修订**：`readTimeout` 由 120s 收紧到 **45s** —— 帧间静默超过它视为链路已断；否则「连上了但正文永不送达」会让 UI 永久停在「N% 翻译中」（模拟器实测形态） |
 | 终态只认 `response.completed` | 流结束时若未见终态事件 → **合成 done** | 真机实测 DeepSeek 只发到 `output_item.done` 就断流（无 `response.completed`）；不合成则 promise 永不 settle。另：`response.output_text.done` 是 item 级事件，**不得**当流终态 |
 | `instructions` 由调用方传（spec §9.4） | 调用方传，段落以 `[N]` 前缀锚定；增量按最近锚点归属段落 | 段落回填需要按段对齐；web 与 native 两侧共用同一 `buildSystemInstructions` |
