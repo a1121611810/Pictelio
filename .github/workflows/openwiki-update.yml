@@ -70,9 +70,16 @@ jobs:
 
       - name: Install OpenWiki
         # mermaid + jsdom are optional; they add high-fidelity validation of Mermaid diagrams. Remove if your wiki has none.
-        # 0.7.0 → 0.7.1（2026-10-06）。0.7.1 在本仓库两次"worker exited without
-        # submitting"（10-06 planning worker、10-08 quickstart worker）之后发布，
-        # 尚未验证是否含对应修复——升级本身是排查手段，不是已确认的修复。
+        # 0.7.0 → 0.7.1（2026-10-06）。本仓库两次 "worker exited without submitting"
+        #（10-06 死在 Planning、10-08 死在 quickstart 页面 worker）都发生在 0.7.0 上，
+        # 而 0.7.1 恰好收录了对应的上游修复：
+        #   #981 保留 openai-compatible 模型工具 schema 的可选参数（strict 默认 false）
+        #        closes #978——本仓库正走 openai-compatible；#978 报告模型反复给新 Claim
+        #        塞 id、撞归属校验而始终不调 submit_page，与本页症状同源，疑为根因
+        #   #913 页面 worker 未 submit_page 时先重试一次再跳过，closes #850——10-08
+        #        quickstart.md 的失败路径逐字对应（"restored…skipped" + interrupted finalization）
+        #   #865 限定 planner 只在页面图/导航真变了才刷新 quickstart.md，closes #797
+        #   #979 同一 wiki 页面的并发文件操作串行化，closes #968（page worker 并行的竞态）
         # 0.2.5 → 0.7.0（2026-10-02）。与本仓库直接相关的上游修复：
         #   #817 updates 模式兼容 openai-compatible 流式分片 · #861 规范化嵌套 text content
         #   数组让严格 vLLM 端点接受回放 tool output · #888 禁 agent 任意 shell ·
