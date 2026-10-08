@@ -33,6 +33,8 @@
 > - `delivery-probe-cold-start.spec.ts`（#942）：触达探测「强杀 App → 点通知 → 落通知中心」。
 >   已知失效面写在 spec 文件头（点通知依赖固定坐标、依赖权限已授予、强杀必须用 `am kill`
 >   而非 `am force-stop`），失败时截图落 `tests/android-e2e/evidence/`。
+>
+> **断言方式的物理边界**：模拟器 E2E 的交互靠 adb tap/swipe 驱动、内容断言走**截图像素比对**（区域帧差分），因为 Lynx 4.0.1 的 `LynxView` 无障碍树不暴露 view/text 节点，且 `uiautomator dump` 在参考 AVD 上被 SIGKILL。由此不可结构化断言的面——触达尺寸、圆角、对比度、状态层 alpha——是 E2E 的覆盖面上限，不是遗漏。
 
 ### app-lynx 侧的单测与 E2E
 
