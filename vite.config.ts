@@ -183,8 +183,7 @@ export default defineConfig({
       "**/*.d.ts",
       // 字节一致性契约的数据 fixture 禁重排（novel-export payload 与 Java test resource 逐字节比对）
       "**/tests/fixtures/**",
-      // oxfmt 0.70 起 md 规则变更：md 全域退出 fmt（冻结现状；openwiki 为 CI 生成物
-      // 本就禁手改，AGENTS.md 有行数锚点契约测试）
+      // oxfmt 0.70 起 md 规则变更：md 全域退出 fmt（冻结现状；AGENTS.md 有行数锚点契约测试）
       "**/*.md",
       "docs/**",
       "scripts/audit-real-interaction/**",

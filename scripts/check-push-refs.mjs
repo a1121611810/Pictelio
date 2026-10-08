@@ -91,7 +91,7 @@ export function defaultRunFmtCheck(targets, cwd) {
 // 分叉/历史改写的人话报错（ADR-0142 D2）：分支引用给 rebase 指引（按实际远端与分支名生成），
 // 非分支引用（tag 等）rebase 不适用，给覆盖指引。
 function divergenceMessage(remoteRef, remote) {
-  const head = `❌ pre-push: 远端 ${remoteRef} 包含本地没有的提交（常见于 OpenWiki CI 定时合并 docs 更新）`;
+  const head = `❌ pre-push: 远端 ${remoteRef} 包含本地没有的提交（常见于 CI 定时合并 docs 更新）`;
   if (remoteRef.startsWith("refs/heads/")) {
     const branch = remoteRef.slice("refs/heads/".length);
     return (

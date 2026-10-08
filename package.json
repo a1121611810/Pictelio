@@ -55,7 +55,6 @@
     "kill:app-lynx": "node scripts/kill-dev-server.mjs app-lynx --force",
     "kill:website": "node scripts/kill-dev-server.mjs website --force",
     "kill:all": "node scripts/kill-dev-server.mjs all --force",
-    "openwiki:update": "openwiki --update",
     "prepare": "husky"
   },
   "devDependencies": {

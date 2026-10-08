@@ -20,11 +20,11 @@
 - `test:mutation`（Stryker，仅 ugoira + update-check）—— `package.json:40`
 - `dev:all` / `build:all` / `preview:all`（多包并行）；`check:all` 带 `--cache`、**`test:all` 不带** —— `package.json:14,19,24,29,43`
 - `release:android-host:transition`（过渡期发布分支固定 `release/transition-6.2.0`）—— `package.json:51`
-- `sync:app-lynx-bundle`、`kill:all`、`openwiki:update` —— `package.json:54,57,58`
+- `sync:app-lynx-bundle`、`kill:all` —— `package.json:54,57`
 - 宿主包独有：`appium:setup`、`sync:android-version`、`sync:credentials` —— `packages/android-host/package.json`
 - `test:lynx-web` —— `packages/app-lynx/package.json`
 - pre-push 三域触碰校验（app → E2E 锚点 / app-lynx → 单测 / `.agents/` → skill 校验）+ fmt 门禁 —— `.husky/pre-push:2`、`scripts/check-push-refs.mjs:2,7,181`
-- commit-msg 走 commitlint —— `.husky/commit-msg:3`；**pre-commit 当前是空壳**（OpenWiki 已移交 CI）—— `.husky/pre-commit:2`
+- commit-msg 走 commitlint —— `.husky/commit-msg:3`；**pre-commit 当前是空壳** —— `.husky/pre-commit:2`
 - CI 三个 job：check / test / android-unit-test（Robolectric）—— `.github/workflows/ci.yml:16,41,68`
 - 第四个 workflow 未在 `AGENTS.md` 提及：`.github/workflows/sysbars-acceptance.yml`
 
@@ -37,9 +37,8 @@
 
 1. **触达探测** —— 强杀 → 点通知 → 落通知中心的单点信号实验 —— `docs/testing/conventions.md:40`
 2. **发版前过渡矩阵门** —— 单引擎后 3 行 Lynx —— `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts:3`；矩阵事实源 `docs/specs/qa-defense-lines.md` §3.T2
-3. **openwiki 每日重生成 + PR** —— cron `0 1 * * *`（北京 09:00，90 min timeout）—— `.github/workflows/openwiki-update.yml:9-13,22`
-4. **五片串行实施模式** —— 判定链+存储 → 汇总 → 落点 → 报告 → 发布门 —— `docs/adr/ADR-0220-notification-delivery-channel-probe.md:6`
-5. **模拟器/真机取证通道** —— `adb --es benchNav <scenario>`，**已知不保证动画时序**（登记于 2026-10-05，#908）—— `docs/testing/conventions.md:104-107`
+3. **五片串行实施模式** —— 判定链+存储 → 汇总 → 落点 → 报告 → 发布门 —— `docs/adr/ADR-0220-notification-delivery-channel-probe.md:6`
+4. **模拟器/真机取证通道** —— `adb --es benchNav <scenario>`，**已知不保证动画时序**（登记于 2026-10-05，#908）—— `docs/testing/conventions.md:104-107`
 
 ---
 
