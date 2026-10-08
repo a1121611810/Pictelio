@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:65b5fbfa20b6383a75c14202bc1c0c647a1eed9fc3d294e2a19b9d4bf06c93ed",
+  "pageVersion": "sha256:81ead61e10e6734b45b1fca3f16e8ce1dd799762b96aa30de4d93e4e89eabb9a",
   "claims": [
     {
       "id": "claim_d0caf478abe743d48fa9f120b44eccd3",
@@ -192,27 +192,35 @@
     },
     {
       "id": "claim_06eb9f7a0b4747f08ca35ee5f8a62609",
-      "statement": "`openwiki/` is CI-owned and generated: the scheduled `.github/workflows/openwiki-update.yml` regenerates it on a daily cron into an `openwiki/update` pull request, and auto-merge is enabled only when `openwiki/.last-update.json` reports `status: complete` and the no-op detector confirms a real content change; agents must not hand-edit `openwiki/` files or run `pnpm openwiki:update` locally, and a failed or delayed regeneration does not block local work or commits.",
+      "statement": "`openwiki/` is CI-owned and generated: `.github/workflows/openwiki-update.yml` reruns `openwiki code --update --print` on a daily cron (plus manual dispatch) into a `docs: update OpenWiki` pull request on the `openwiki/update` branch, and auto-merge is enabled only when the `poststate` snapshot of `openwiki/.last-update.json` reports `status: complete` and the no-op detector saw a real content change — so an interrupted or empty run still leaves its finished pages as a hand-reviewable PR that is never auto-merged.",
       "evidence": [
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L15-L15",
-          "version": "repo-lines-v1:sha256:fb4d883abfb24c8d2a2a2d07fdb1ca2e46bc2b84da546fca09dc449b0416518d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmI0ZDg4M2FiZmIyNGM4ZDJhMmEyZDA3ZmRiMWNhMmU0NmJjMmI4NGRhNTQ2ZmNhMDlkYzQ0OWIwNDE2NTE4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmI0ZDg4M2FiZmIyNGM4ZDJhMmEyZDA3ZmRiMWNhMmU0NmJjMmI4NGRhNTQ2ZmNhMDlkYzQ0OWIwNDE2NTE4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDZlY2ZjOWM1MDVlYmMxMjdjODcxNzNlMWY0ZWFiOWZmMDBjYTIyYWY2MzhjNzI2N2E3YWY4MjY5NWMyYmUzOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzk0NjJkNWYyYzIwN2U2YjRmODI4NDNkOTE1NGZmMGJiYWQwMzQzOTI0YjJjM2M0YmFiZDk5Yjg3Y2NkNGI4MiJ9"
+          "resource": "repo://.github/workflows/openwiki-update.yml#L10-L15",
+          "version": "repo-lines-v1:sha256:9faab6504fab23a67e29879cdcf5f1b4385f7df35779a5a868558a9ce24d78cc:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTI4ODQwYTZiN2U2MDMwM2Q4N2JlNGQ0ZDgyYTUwYjMzMjg0MjkwZGVjNGUzNDI4ZDQ3ZDkzZmJlZmQxYzU5MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmI0ZDg4M2FiZmIyNGM4ZDJhMmEyZDA3ZmRiMWNhMmU0NmJjMmI4NGRhNTQ2ZmNhMDlkYzQ0OWIwNDE2NTE4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmU3ODMwMDE1YjFkYWE3ZWY1YTI3NTNlMmFhZjI5ZTFkN2Q0M2NhNDI4ZDgxOTJhODUzOGFlOGM2YjU5ZDNkNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzk0NjJkNWYyYzIwN2U2YjRmODI4NDNkOTE1NGZmMGJiYWQwMzQzOTI0YjJjM2M0YmFiZDk5Yjg3Y2NkNGI4MiJ9"
         },
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L194-L217",
+          "resource": "repo://.github/workflows/openwiki-update.yml#L105-L129",
+          "version": "repo-lines-v1:sha256:36eb25147009718a45d50ab0fd721f3fee3d93e8c878ba349ac14038d37de66b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZThmOWZhNDBlN2JkMDQ5OWQxYzBkODNmZDc1OGFhODViMzA4NDJkYmQ2MWYwZWE2YjdhZTEwZWZlYzc2ZDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1Y2VhNTVlMDc3NzgwMDFhMTQ2YjA1YjMwOWM1ZmM1MzM0ZjY4ODFjMjA2YmVhMjJlNjVjZDM3MWQ2MDFjYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwMjk3NWNjYjBhODU5MDQyYTEwN2Y0YWExNGM2OWEzNGMyYWJkZDM4MDE5NzA5Y2Y0NTJmZTE4YjBlYmM3YTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmM2M4ZWQ1NzVlNmQ5MDkxMWM3N2NjMmUwMzEwZDVkYWFiNTg5YWMzNDAzMDZkYzQzNjlmNzUzOTgxYTA4YWMifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L131-L156",
+          "version": "repo-lines-v1:sha256:f9dfadd26d3f1e95b01bec109c946696c1d60dfe8e94644561fa7e6a6b86b356:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNjAzODZlZGFhYmM5NjcwOGQ2NWRmNzgwZGI5NTExZjc5MTc1NDJkZTJlNWVkMzEyOWNlODIwOTc2NTVmZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViNzg5MGYxNTY4NWM2YWM1MDgxNjM4OGMzODg4NGQyN2RhMjk5M2YyMTUxNGZhZDljNjkyY2NiNmE2MTgzZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwODY1YTk0ZTI4YTgyYjU1ZDFmZDE3NzAzYjE1YTJjZGQ0ZTcxZGFiMzQ0ZTcxMDgwYTEwZDIzODg2NzU4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwYzgyNDI5MDFlMTY5NTliZWJjYzAzMmU0MDBhZTM3MDcwZGJlMmViM2U0MDZiYWRmNzBlN2I0ZTZjYzFjN2UifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L175-L219",
+          "version": "repo-lines-v1:sha256:22e06995666dd2ee98bc70ba9b2c333401241893d984eef12e15c28061afa8c2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3ZTQwMzAwYmQ5MTFmNDNkYzY1ZTIwMzUyYTM1MTkyZDA1MTMwODk1NmMwYzMxZjJmOTgxMzk4NGY2OWNkY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlMDg2NjVkMjgwODdiODgzNDlmNzQ1MDA4MjE3M2VkNThiYzhjYTE1NjZjMzdlODgwZWE0ZmI0MjE4ZDQ5NzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkZWVlZWUzZTEyMGQ5ZDEwNGI3NmU1YzcxYTYyMjZlNDVjMDkzNWNiNWM2ZjI1MTIyZTUyNTdmYjFjMzgyNDIifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L221-L244",
           "version": "repo-lines-v1:sha256:d82d1be04a1de20562f21ac82282902dc8da491498264dc3d0906b25aa1c84f8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxY2ZmNGFkMzNiYTkxYjE0OGUxYjFiODI5MGI4ZmZmMjdiMjAzZmFiZmVlNTg3MDI4MmRlMzY3MzgzYjFiZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwMTJmZTZiNTlhMzE3MWJhYzkxZGVhYTY1YTg1NDc2MTRhMDUxMDRhZjNhODUyNTcyMzEyNjgxZjExODBhZDUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwMzFjNjJkNGE5NTVlOWI5NjhjNThiZjZmZjY0MjgyYzc5YjdlZWU5NGNjMGQ1NjMzMTVhMWE4NTQ5NDk2NDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNhZmM3YWFlMGI0NzNlZjA4YTk4NzRmN2RiOTYzMjdiNDljMWNlZDJjNWRmMDlkN2UzODQ2NzJmZDcyMmUwZjIifQ"
         },
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L219-L258",
-          "version": "repo-lines-v1:sha256:0a0456d20c2f0431dc9e50ec6887070b337f4581bcd140a4fa7b8d52117ad029:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxODNkOGE4OTA3ODMzZTkxYzYxYTczNmMzMmNlMzcxMjIwMjE4ZmYxZGFkYWVhZTI1N2UzMjVkNDQ5ZmU1NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxODdjZTRmMDJhYjRmY2Y3Y2Q4MTc2ODMxNTgzNDVjN2ZjNTI0OTc5MzEwMWMxYWVkNWM4NGMxNGViMjg3ZmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5YzE4ZTY0MWQ4NGM0NDczMzVkZDRjNTkzMjZiZjIwNTgzM2QxNDM3NjMyNjY2YWIwYjlkMjg4OTk2MWNkZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI0YTQ1ZDcyMzdkYmQ0NjVkYzc2Mjc0NTVmMzg1OWVhNjRmNzEwMjY1NDNkZDE3YmY2Nzc3ODkxOTQyZDVjYzMifQ"
+          "resource": "repo://.github/workflows/openwiki-update.yml#L246-L270",
+          "version": "repo-lines-v1:sha256:cbc1ac141fd79d555e56384601077ff34dec825e9a8dcd52af483859168e38cd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxODNkOGE4OTA3ODMzZTkxYzYxYTczNmMzMmNlMzcxMjIwMjE4ZmYxZGFkYWVhZTI1N2UzMjVkNDQ5ZmU1NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5YzE4ZTY0MWQ4NGM0NDczMzVkZDRjNTkzMjZiZjIwNTgzM2QxNDM3NjMyNjY2YWIwYjlkMjg4OTk2MWNkZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkZmY0ZjJlZTcxYjRiNWI0MGQ1NTE3ZTE3NWQ0NzEwM2JjOGNmM2ZhMGYxZWMzNWZiZDc1NmZhYzQwNjg2NzMifQ"
         },
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L264-L275",
-          "version": "repo-lines-v1:sha256:8d64bde3cb38c68fa792ea1506e0f3350bff2c2095130725642b1693ee58e53f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3MjQ2MDVkN2RmM2JlMDhlNDQ4ZmQ0N2EzZDFjNjhmYTdlZmQ4NDIwNTNiMWM4N2MyZGRmYzhkMmUxZmJjYTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiNmY1MDcxNjk2NDkyODNkODA0YzAyNTg2YjgwNzVmOTFhMjJhN2FjYjRlOTQ4MGIzODI5NWYyYmM4YjIyYWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUxMWEwMDk1MDdmMTA5MjRiY2E2NDJlZTczOTkxNjk3MjZlN2E5YmZmZGVhYTExZDlmYWM4NDAyNzYwMjk0YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUifQ"
-        },
-        {
-          "resource": "repo://AGENTS.md#L321-L332",
-          "version": "repo-lines-v1:sha256:d967a0db5bc72fc2c980aca9d60a6e49ba108a1079c8f7ced54b0b50c8215f1d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzM2Q3Y2FjNzE1MzczNjVjMWYzMmJhZmRhMzhhM2VmODVmMDNkZGMzZDQ1ZjkxMjM4MWVjZjU2YjcxMzI5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwN2I5NDZiOTI3ZmVmNGM5Y2RlZjhmYTA1MzJiNjUxOTM0YmYyZmRlNDkwMjcyNzI0ODcyMTIyODIyMjVhODYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5MzkxMmNkM2MzM2VkZmQyM2QzNzY0ZTE3YWIyOTc0N2IzNzkzNzQyMzZjNjRhNzZiMGE1ZmZlNDhhZDM4MGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0MzMxNTEzNTJiYmRlYjJkODBlMWYwMDJiNmQ2YTg4MGMxY2E4MmYzOTA1ZDk3YWIwMzZiYTcwNTliZTM5MDcifQ"
+          "resource": "repo://.github/workflows/openwiki-update.yml#L292-L304",
+          "version": "repo-lines-v1:sha256:fc35c4d74003c747113c1523e4f296926b77e10ebaa119b22b35221bd9180e0f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3MjQ2MDVkN2RmM2JlMDhlNDQ4ZmQ0N2EzZDFjNjhmYTdlZmQ4NDIwNTNiMWM4N2MyZGRmYzhkMmUxZmJjYTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUxMWEwMDk1MDdmMTA5MjRiY2E2NDJlZTczOTkxNjk3MjZlN2E5YmZmZGVhYTExZDlmYWM4NDAyNzYwMjk0YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
     },
@@ -301,10 +309,82 @@
           "version": "repo-lines-v1:sha256:3850ee970174432f189a2de16dc7574a2094c865d4987925f80e7bd34c944d7d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ODMzZDU5NDljMDNhNDBjYTk1MjQ5MTYxMGE2NjU5NjQ0YjNhYTQ2NjM2MmY3OTkwMjBkYmYxOTgxNTQ3ZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNWNkMmZiNGYzZGY4ODQ1MTUyNTViMzk1MjNmMmY4YjU0NzJiZWVhOWY1NjZmZmNhMjA0ZGI4MDI1NjEwNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzNzJmZGEwNDkzNjQzMWYwYTY1YTI2ZGI4ZmQ2ODk4MzRlNDNjNGE2NGU2NTk4ZmMxMzg3MDcyODFiNjgyZGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlMDE1M2IxZjgwMDQyMzI0MzQzN2E2NWYwZWYwYTE0NDkzYzdmOWE2YjhjMjcyYzM3Y2Y0Mjg0ODRlYmMyZTgifQ"
         }
       ]
+    },
+    {
+      "id": "claim_e1ae7e9c03974d65b646f4cbe0cae9af",
+      "statement": "Agents must not hand-edit files under `openwiki/` and must not run `pnpm openwiki:update` locally (ADR-0099): regeneration is CI-owned, the root script is retained only for deliberate human use, and a failed or delayed regeneration does not block local work or commits.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L321-L332",
+          "version": "repo-lines-v1:sha256:d967a0db5bc72fc2c980aca9d60a6e49ba108a1079c8f7ced54b0b50c8215f1d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzM2Q3Y2FjNzE1MzczNjVjMWYzMmJhZmRhMzhhM2VmODVmMDNkZGMzZDQ1ZjkxMjM4MWVjZjU2YjcxMzI5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwN2I5NDZiOTI3ZmVmNGM5Y2RlZjhmYTA1MzJiNjUxOTM0YmYyZmRlNDkwMjcyNzI0ODcyMTIyODIyMjVhODYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5MzkxMmNkM2MzM2VkZmQyM2QzNzY0ZTE3YWIyOTc0N2IzNzkzNzQyMzZjNjRhNzZiMGE1ZmZlNDhhZDM4MGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0MzMxNTEzNTJiYmRlYjJkODBlMWYwMDJiNmQ2YTg4MGMxY2E4MmYzOTA1ZDk3YWIwMzZiYTcwNTliZTM5MDcifQ"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0099-local-openwiki-disable.md#L21-L27",
+          "version": "repo-lines-v1:sha256:5a881b684e1aaafe545f1fc198263bb09d4c139e228af5b60e474e0d28290380:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc4NjFhNDI0NGZlNjg2ZmIwMjUyMTEwYWQyMDVhOGQ0Yzg2ZGZjZWU4MjgwYjcwNjcyMThkOTk4YzEyOThhMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZkNzFlNzY1MTVhYzhhMjkwYTM0YjVlZjdhZjhiOTdjNTc1OTc3NDdkYzczZDRiNGU4YWExN2NlMWIwMmE2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmVmNWNjMmMwOWU0MTAwNjcwZDE0MTY3NDlkMTgxNGIzZDJkNzIyMWFiOGRlNTAzNTY5OGI0MDVmMDNlZGIzMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzUyYmZlODk4MTFjOWJkNDYwNjFkM2I2MzVjMTAxNmEwZWFmY2M2Yjk0ODNhNmQ1NzU1NTExZmQyYWY1MWJkYyJ9"
+        },
+        {
+          "resource": "repo://package.json#L58-L58",
+          "version": "repo-lines-v1:sha256:c3715ab02bc8b1a928dbaa4f6dae1e0745b413c465cb91abdd6aa4cfbe08a8d9:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzM3MTVhYjAyYmM4YjFhOTI4ZGJhYTRmNmRhZTFlMDc0NWI0MTNjNDY1Y2I5MWFiZGQ2YWE0Y2ZiZTA4YThkOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzM3MTVhYjAyYmM4YjFhOTI4ZGJhYTRmNmRhZTFlMDc0NWI0MTNjNDY1Y2I5MWFiZGQ2YWE0Y2ZiZTA4YThkOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWRmNGEzZWFjNzQzNGFlYzc1M2E0N2MzZDkzMzEyYTgzZGUyNzUyNTlmNTUwY2ExMmEyNDU5NjkxODY3YTQzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmNlYTI5NGNhMjZmZjBiNzFhYjMxOTBmZTUwNGY5OGYxMjk4YTkxMzZlY2E5MWNiYzNhMGY0NGI2YjRhYmNhMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_10566210b3ec4451b49469a356e52812",
+      "statement": "The auto-merge gate consumes the `poststate` step outputs (`exists` / `status` / `gitHead`) rather than reading `openwiki/.last-update.json` directly, because `peter-evans/create-pull-request` restores the workspace to `main` after the snapshot is taken; a gate reading the file afterwards would see the previous run's values and deadlock the PR.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L131-L156",
+          "version": "repo-lines-v1:sha256:f9dfadd26d3f1e95b01bec109c946696c1d60dfe8e94644561fa7e6a6b86b356:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNjAzODZlZGFhYmM5NjcwOGQ2NWRmNzgwZGI5NTExZjc5MTc1NDJkZTJlNWVkMzEyOWNlODIwOTc2NTVmZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViNzg5MGYxNTY4NWM2YWM1MDgxNjM4OGMzODg4NGQyN2RhMjk5M2YyMTUxNGZhZDljNjkyY2NiNmE2MTgzZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwODY1YTk0ZTI4YTgyYjU1ZDFmZDE3NzAzYjE1YTJjZGQ0ZTcxZGFiMzQ0ZTcxMDgwYTEwZDIzODg2NzU4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwYzgyNDI5MDFlMTY5NTliZWJjYzAzMmU0MDBhZTM3MDcwZGJlMmViM2U0MDZiYWRmNzBlN2I0ZTZjYzFjN2UifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L246-L270",
+          "version": "repo-lines-v1:sha256:cbc1ac141fd79d555e56384601077ff34dec825e9a8dcd52af483859168e38cd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxODNkOGE4OTA3ODMzZTkxYzYxYTczNmMzMmNlMzcxMjIwMjE4ZmYxZGFkYWVhZTI1N2UzMjVkNDQ5ZmU1NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5YzE4ZTY0MWQ4NGM0NDczMzVkZDRjNTkzMjZiZjIwNTgzM2QxNDM3NjMyNjY2YWIwYjlkMjg4OTk2MWNkZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkZmY0ZjJlZTcxYjRiNWI0MGQ1NTE3ZTE3NWQ0NzEwM2JjOGNmM2ZhMGYxZWMzNWZiZDc1NmZhYzQwNjg2NzMifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L9-L24",
+          "version": "repo-lines-v1:sha256:596a22fc25e4136fb2526f77974aa8d0abe9404facdaaa5715a4f633e3b6edc6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwMzgyYzk4YjljNzNjODNiYzAwOTQwZGRhMmFlYmFjNjQ5MDE2MWQ5ZDBmMTgzNDQwMDhiMTMyYTYwZWFiZjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwNzc2ODYwYzQxODUzNDdhZDI1NjhmNTU5ZGE0OTU4NWFhOTk3OTYxZjE4YTY5ZDQ4OTY0MjZhNGQxNDM4MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5MWUwYTFlNzI1M2M2ZTFlMWMxYjQwYWYyZTY2MTlkYzYzMjdkNGViYjQ0ZjgzYjg2MmFmNGMyM2YwZDA0YTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE5N2EyN2ZiYTNhZWIzMjk3YThjNTc3NGZlZmQ4NWIzNTYzZjI0M2QyNGQ4Mzk5ZWRjNmI1ZmIxZWU1OWM5YzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d15efe3924b740028b08392502eac94d",
+      "statement": "The OpenWiki pull request's `add-paths` list is limited to `openwiki`, `AGENTS.md` and `.github/workflows/openwiki-update.yml` itself, so an OpenWiki run can rewrite the workflow that gates it.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L169-L173",
+          "version": "repo-lines-v1:sha256:cde6f96b11000f8222e500bfb9aaac92e639e79629411e6dfa4d3d910d5c6152:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQ1NWJiN2MxZGU3ZTNlMDUyZWViYjkwOTA5NjBmOTZjMDJkMjdlNzljMGVhNmE5NzIzMjkxYWU0ZjJmYjFlZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGViOGZlOGEzMGE2ZTQ5YTRjYjVkODI3MzBlZjg5MGU0YTZjMWE2OTg1Y2IwN2I1MmFkN2QzODFkMzI2NTFkOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTJiZWY0NTlmMjg0MDIzZGY3NGFiMzZkZTcwY2EzODIxYTBhMzRkYjFlOTY3ZTUwNDFlMjEzODEyNWZkNWNhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDliNzJhMjQzZTQ2YWQ2MDY2ZmZjNjFjZmQ2MDBhNjhmNzc5NDc4NTVlZjVjYWJjMmU1YjU3YjkzY2RhOTI1MiJ9"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L226-L232",
+          "version": "repo-lines-v1:sha256:52434b8e4eefae618c0c73b5a0356f4d575ca84cf18ae74be3a1d6bf880f4dd5:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGNhNDE2NDZjZTlkYzhkNmI5NDQ2ZTQ3ZTE1NWQwNjI0NTRhNzg5MzFiZmQ5M2IzMTRmNTdlZjdiZjZhYzI4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzlhN2I5ODEzNWNhYWY1YTIxOGE2MDI2Y2RlZmVjYjgzMmQ0OWI5YzgzMTQ0ZDExYzkwNTg4NmVkY2FiZDYyMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2QzNGZkNTUyNGM5ZmYyZGY3ZDViMGFjMjQyYzZhZjU2MDI4ZmIzYzU0MGRmNTI2YmU2YWYwMDE5MWZhNzFlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmExYzE0MTcyNTM5OTExN2JkMTBhOWJhMGQ3MzBhYzExNjkwM2I5OTlmZTM2NjA4YjYyMDZiNmVjNmMxZmJjYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_950094a074e84d2385d28381d9cc759f",
+      "statement": "`packages/android-host/tests/unit/openwikiGateDeadlock.test.ts` pins the auto-merge gate's shape as a repo invariant — the `poststate` snapshot must precede `Create OpenWiki update pull request`, the gate must consume `steps.poststate.outputs` and must not read `openwiki/.last-update.json` directly, the snapshot step must read that file, and the `status != \"complete\"` check must survive — each backed by counterfactual positive controls, and it runs inside `pnpm test:all`, so a workflow edit that re-breaks the gate fails CI.",
+      "evidence": [
+        {
+          "resource": "repo://package.json#L41-L41",
+          "version": "repo-lines-v1:sha256:d62059c5ddce68b1e91219984a52db6a11599abc98721c30e498f10584261577:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyMDU5YzVkZGNlNjhiMWU5MTIxOTk4NGE1MmRiNmExMTU5OWFiYzk4NzIxYzMwZTQ5OGYxMDU4NDI2MTU3NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyMDU5YzVkZGNlNjhiMWU5MTIxOTk4NGE1MmRiNmExMTU5OWFiYzk4NzIxYzMwZTQ5OGYxMDU4NDI2MTU3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYThjMDdmNjY3MTY5NjE3Y2JiZGRhMDgzOTgyZjY1OTgwZjE2MTA4NmYxOWM0MTRhYThiODE4NGMyMjc3NDAwMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjc5MGUzN2M5YmE5MGNjMDgzMmY1ODYxZjZmZGNhM2JjM2ZmNzY5YTQzMDkwNGQ0ZjVlYzY0OGFkMzVjZmU3MCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L51-L95",
+          "version": "repo-lines-v1:sha256:506150a8e593454d08d40e77a079b8825ba447112f38c57bd8fe8171b5a97d19:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyY2QyN2MzMzQ3ZDRhOWY0YTc1MmQ2ZTBmZTY1MjE5ZWM1MTQ4MGExN2NlNDliNzk0YTA1M2M2OTMyZDIyOTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkMGYyZDNhM2FhZGEyNzU4NjQ1NzhkMGE0MzkxNTYzOGQ1NDNmZWNhMmM5NDg1OGRiOTQxMjExZTg2Y2VmMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1YThjNGE2ODRmYWQyNWIwYWQ2MWU2MzUyN2RjNTJlNmFkYzMzZWUyOTJhYTU5YjMyMjkyMjc4Y2M2YjU0NmEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L97-L138",
+          "version": "repo-lines-v1:sha256:59f251cec08e35d0797f616dd35f3ff80d1c597d61f096fc2533e3512bdd058a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1MWE1MmZkN2FlNzJjM2U3NGRhMTVhYWQ1ZTQxMWE3ZTY2MTk3OGEwMjU5Y2Q4NzkxZjFmYzczYmVhZTBmNTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhM2U0NmY5NDI3NmI2ZjZmNGVkMWYwMmFmNzhiZWY2YTJlZTFjNDM5ZGQ1NTg0Yjk3Mzk0ODMxMzIxNGQyYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjMWQwMjc3Yzg0ZDYxYTUxYjdmNzQ5YWMxODJjY2NmZGZhNjNkZWE4OGU2MzBhNzgxOWYwMGZhNTY5NWJkYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/vitest.config.ts#L17-L22",
+          "version": "repo-lines-v1:sha256:0b37b23cc2e764d73fc368bc5e8d1846fefd062f8a05d4a38c6f90fa74322934:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFlYzI3NjJlYWNkYjYyNTlkYjRjZWU3MmE5N2ZiMzFkNzVlNWM3OTU5ZGZiNWM5YWIwZWU5ZTM0MGYyMWYzZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdkYWY0ZDI3Y2I2OGJhNzQ1NWJkMjgzN2E0NTM5MzY3MWE3MzEzOTQ1NTFkZGI2MGZiMTc4YzU4ZDMzZDZhYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTMwYTU3NjgwNjE0ZjA2ZDFjYjA3YTUxYTJmOWMyYjY0ZGY0ZmJjMjM2ZGNhNGM1NjIzZGIxMThlZjgwZjA2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjgzYzAzZmJkZjliMzQ2YWE1NTI3ODZiNWVlYmIzYWFkNGZhYzgzYWI5ZTVjNmI1ZDUxNWEzZWI1OWNlZWQ1MiJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.1",
-    "at": "2026-10-08T01:48:11.384Z"
+    "at": "2026-10-08T02:38:27.827Z"
   }
 }

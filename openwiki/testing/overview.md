@@ -1,11 +1,13 @@
 ---
 type: Concept
 title: Testing & Quality Gates
-description: How Pictelio verifies itself — the CI gate boundary (check:all, lint:all, test:all, Gradle testDebugUnitTest), the manual emulator and device tiers that never enter CI, the six test hard constraints and the evidence discipline behind them, and the ADR-0163 QA defense lines.
+description: How Pictelio verifies itself — the CI gate boundary (check:all, lint:all, test:all, Gradle testDebugUnitTest), the manual emulator and device tiers that never enter CI, the six test hard constraints and the evidence discipline behind them, the android-host repo-invariant gate for the OpenWiki auto-merge deadlock defense, and the ADR-0163 QA defense lines.
 tags: [testing, vitest, e2e, ci-gates, unit-tests, android-host, app-lynx, mutation-testing]
 sources:
   - id: openwiki-source-164e2da859b5277df81c7d94
     resource: repo://.github/workflows/ci.yml
+  - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
+    resource: repo://.github/workflows/openwiki-update.yml
   - id: openwiki-source-9235a60f74870443a2f8379b
     resource: repo://.husky/pre-push
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
@@ -46,6 +48,8 @@ sources:
     resource: repo://packages/android-host/tests/unit/android/proguardRulesConsistency.test.ts
   - id: openwiki-source-175a5213f7bab01e121e652b
     resource: repo://packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts
+  - id: openwiki-source-720973935af6ee0acf5c8618
+    resource: repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts
   - id: openwiki-source-86d531e485614cbf25868569
     resource: repo://packages/android-host/tests/unit/scripts/check-push-refs.test.ts
   - id: openwiki-source-72d139290e826ee90c935947
@@ -98,10 +102,10 @@ sources:
     resource: repo://scripts/check-push-refs.mjs
   - id: openwiki-source-ef4ef42dc4e88b6541eb6f3f
     resource: repo://workflows/review-fix-loop.md
-generated: { by: "openwiki/0.7.0", at: "2026-10-08T00:43:21.663Z" }
+generated: { by: "openwiki/0.7.1", at: "2026-10-08T02:38:27.827Z" }
 verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-08T00:43:21.663Z
+  - by: openwiki/0.7.1
+    at: 2026-10-08T02:38:27.827Z
 ---
 
 # Testing & Quality Gates
@@ -120,7 +124,7 @@ The active tiers are:
 ```mermaid
 flowchart TD
     A["app-lynx Vitest — in CI"] --> A1["Stores, utils, API params, MD3 and template guards"]
-    B["android-host Vitest — in CI"] --> B1["Repo invariants, AGENTS.md contract, release tooling"]
+    B["android-host Vitest — in CI"] --> B1["Repo invariants, AGENTS.md contract, OpenWiki gate invariant, release tooling"]
     C["Gradle JVM and Robolectric — in CI"] --> C1["Lynx native modules, encoders, WebDAV, secure storage"]
     D["Emulator E2E and device scripts — manual"] --> D1["Appium specs, adb reachability probes, geometry and contrast measurement"]
     E["Stryker mutation — local only"] --> E1["ugoira and update-check pure functions"]
@@ -165,6 +169,10 @@ The authoritative boundary is `.github/workflows/ci.yml`; [AGENTS.md](../../AGEN
 - [webviewRemovalInvariants.test.ts](../../packages/android-host/tests/unit/webviewRemovalInvariants.test.ts) — the authoritative "WebView client fully removed" gate: **10 invariant groups** (no `packages/app`; Capacitor dependency declarations zeroed; host assets present; persisted-format literals still intact; app-lynx does not cross-read the deleted dir; root command table points at the single client; facade wording converged; client-switch capability gone; Gradle entry generation present; pnpm call sites resolve), plus **19 counterfactual positive controls** (a compliant tree is built in `os.tmpdir()` and each violation is injected back to prove the same `evaluateInvariants` turns red) and **2 scan-coverage assertions** pinning the scan root/exclude list itself.
 - [agentsMd.contract.test.ts](../../packages/android-host/tests/unit/agentsMd.contract.test.ts) — the AGENTS.md contract gate: a ≤30 KiB (30,720 B) volume hard gate, Fluent-spec verbatim assertions now pointing at the archive file plus an entry pointer in AGENTS.md, hard-constraint anchor survival, single-engine facade wording (`LynxActivity`, no `MainActivity`/`registerPlugin`, "Lynx 单引擎" present and "双引擎" absent), OPENWIKI marker-pair survival, stale-phrase zeroing, and root command-table reachability (every command in the AGENTS.md table must exist in root `package.json` scripts).
 - [e2eContractSuiteCollected.test.ts](../../packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts) — guards that the 8 `tests/android-e2e/unit/**` contract tests are both on disk and matched by the host `vitest.config.ts` include globs, so they reach `pnpm test` → `test:all` → CI. `passWithNoTests: false` can detect "nothing collected" but not "one directory dropped", and the guard is deliberately placed in `tests/unit/**` rather than in the guarded directory so that removing the glob cannot remove the guard with it.
+- [openwikiGateDeadlock.test.ts](../../packages/android-host/tests/unit/openwikiGateDeadlock.test.ts) — the repo invariant for the OpenWiki **auto-merge deadlock defense**, living outside the artifact it guards exactly as the collection guard above does. Here the guarded object is not product source at all but a **CI artifact**, [`.github/workflows/openwiki-update.yml`](../../.github/workflows/openwiki-update.yml) — which an OpenWiki run can itself rewrite, because the PR's `add-paths` list includes that very file. No `yaml`/`js-yaml` is installed and one invariant does not justify a new dependency, so the test extracts the step list itself (a `/^ {6}- name: (.+)$/` line scan that slices each `- name:` line plus its body — the header comment states this explicitly) and then evaluates five invariants against the real workflow text: the post-run snapshot step `Snapshot post-run OpenWiki state` (id `poststate`) must come **before** `Create OpenWiki update pull request`; that snapshot step must read `openwiki/.last-update.json`; the step `Gate auto-merge on a complete run` must **not** read that file directly (the defect's exact shape) and must instead consume `steps.poststate.outputs`; its `status != "complete"` check must survive; and an extraction that recognises fewer than 5 steps is itself a violation.
+  - **The failure mode is a permanent deadlock, not a cosmetic ordering preference.** `peter-evans/create-pull-request` restores the workspace to `main` — measured to happen with any one of `git stash push --include-untracked`, `git reset --hard origin/main`, or switching back to `main`, so no single command can be blamed — so a gate that reads the state file after that step keeps seeing the *previous* run's `status: interrupted`: the run fails, auto-merge never fires, the interrupted state is merged back into `main` by hand, and the next run locks again. The registered evidence is Actions run `37714665688` (2026-10-08), where the PR branch reported `status=complete` / `gitHead=fdf2052c` while the gate read `interrupted` / `666fe1de`.
+  - **Four counterfactual positive controls** keep it from being a tautology, and they are the page's standing "a gate must prove it can go red" rule applied to a workflow file: pointing the gate back at the state file directly, moving the snapshot step after PR creation, gutting the complete check (`if false; then`), and feeding a non-workflow input to the extractor must each yield violations from the same evaluator.
+  - **Registered blind spot:** what is pinned is extraction against the workflow's known 6-space `- name:` structure, **not YAML semantics**; the extractor-failure control is what stops a collapsed extractor from turning the five invariants vacuously green. The gate is collected by the `tests/unit/**/*.test.ts` glob in [packages/android-host/vitest.config.ts](../../packages/android-host/vitest.config.ts) and therefore reaches `pnpm test:android-host` → `pnpm test:all` → the CI `test` job — which is the point: a workflow edit that re-breaks the gate, or a snapshot reordering that re-arms the deadlock, turns CI red on the PR instead of silently reinstating it.
 - **Release-tooling units** under `tests/unit/scripts/` cover the publish pipeline: `release-preflight`, `release-build-steps`, `release-notes-ai`, `release-branch`, `release-overwrite`, `release-uploader`, `release-version-json`, `release-panel`, `release-retired-flags`, `release-utils`, `upload-release-assets`, `changelog`, `check-push-refs`, `git-refs`, `proxy-probe`. `tests/unit/android/proguardRulesConsistency.test.ts` guards ProGuard config against source constants.
 
 ### 3. android-host JVM/Robolectric
@@ -239,7 +247,7 @@ The **six hard constraints** (AGENTS.md summary numbers):
 
 The gates above are only trusted because of three repo-wide rules, stated in detail in [docs/testing/conventions.md](../../docs/testing/conventions.md) and [`workflows/review-fix-loop.md`](../../workflows/review-fix-loop.md):
 
-- **A gate must prove it can go red (counterfactual).** Every non-trivial gate ships a positive control. The convention is enforced structurally in the strongest gates: `webviewRemovalInvariants.test.ts` builds a compliant tree and re-injects 19 violations against the same evaluator; `md3GuardScans.test.ts` feeds two re-spellings of each violation plus a hit-count floor for its extractor.
+- **A gate must prove it can go red (counterfactual).** Every non-trivial gate ships a positive control. The convention is enforced structurally in the strongest gates: `webviewRemovalInvariants.test.ts` builds a compliant tree and re-injects 19 violations against the same evaluator; `md3GuardScans.test.ts` feeds two re-spellings of each violation plus a hit-count floor for its extractor; `openwikiGateDeadlock.test.ts` carries the same rule outside the source tree, injecting each way the OpenWiki auto-merge gate could be re-broken into the workflow text it reads.
 - **Known blind spots and false negatives must be registered, not just wins.** Files like `captureScriptInvariants.test.ts` and `bottomOcclusionAllowance.test.ts` carry explicit "what this cannot catch" lists, because "fake green is worse than no gate" — a gate that lies gets trusted. Conversely, "searched and found 0", "I ran it once" and "the gate is green" are all treated as idling evidence, never proof.
 - **Expectations must trace to an independent oracle.** The gate-freeze discipline also fixes the mutation-testing denominator: "N/N bypasses caught" counts only when the N was chosen by someone other than the gate's author, and only an **external re-check** that turns a gate red counts as sealing it. Priority always runs real device / real data / user-visible behavior > gate signal.
 
@@ -284,6 +292,8 @@ Operationally this shows up as: `passWithNoTests: false` (T0, rejects empty or l
 | Repo invariants gate | `packages/android-host/tests/unit/webviewRemovalInvariants.test.ts` |
 | AGENTS.md contract gate | `packages/android-host/tests/unit/agentsMd.contract.test.ts` |
 | E2E contract-suite collection gate | `packages/android-host/tests/unit/e2eContractSuiteCollected.test.ts` |
+| OpenWiki auto-merge gate invariant (workflow step order and step outputs) | `packages/android-host/tests/unit/openwikiGateDeadlock.test.ts` |
+| OpenWiki update workflow (guarded artifact) | `.github/workflows/openwiki-update.yml` |
 | android-e2e contract-tool units | `packages/android-host/tests/android-e2e/unit/` |
 | Release-gate transition matrix | `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts` |
 | Release-gate three-state classifier | `packages/android-host/tests/android-e2e/support/releaseGate.ts` |

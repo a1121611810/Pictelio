@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:cf10fc26f1165da26317ca9c31f23c91945ad14f2798ea9d168455317b0a9f25",
+  "pageVersion": "sha256:3803c9c75033d903846645448214be239cde17cd33a1d9c9ca0c9c4c547ab6b1",
   "claims": [
     {
       "id": "claim_28697105e1194dc0a5ea30128f90c883",
@@ -485,10 +485,104 @@
           "version": "repo-file-v1:sha256:fcdf8a89e4df785ecbd417b2f3dc22dd03297e29d2d96c62b269ad09880af4f8"
         }
       ]
+    },
+    {
+      "id": "claim_921f6976f88e4dfe92ac08ea938ec8f5",
+      "statement": "The android-host unit tier carries a repo invariant, packages/android-host/tests/unit/openwikiGateDeadlock.test.ts, that guards the CI artifact .github/workflows/openwiki-update.yml: because no yaml/js-yaml dependency is installed, it extracts step blocks itself with a /^ {6}- name: (.+)$/ line scan and then asserts five invariants on the real workflow text — the 'Snapshot post-run OpenWiki state' step (id poststate) must precede 'Create OpenWiki update pull request', that snapshot step must read openwiki/.last-update.json, the 'Gate auto-merge on a complete run' step must not read that file directly and must consume steps.poststate.outputs, its status != \"complete\" check must survive, and an extraction recognising fewer than 5 steps is itself a violation.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L131-L156",
+          "version": "repo-lines-v1:sha256:f9dfadd26d3f1e95b01bec109c946696c1d60dfe8e94644561fa7e6a6b86b356:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNjAzODZlZGFhYmM5NjcwOGQ2NWRmNzgwZGI5NTExZjc5MTc1NDJkZTJlNWVkMzEyOWNlODIwOTc2NTVmZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViNzg5MGYxNTY4NWM2YWM1MDgxNjM4OGMzODg4NGQyN2RhMjk5M2YyMTUxNGZhZDljNjkyY2NiNmE2MTgzZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwODY1YTk0ZTI4YTgyYjU1ZDFmZDE3NzAzYjE1YTJjZGQ0ZTcxZGFiMzQ0ZTcxMDgwYTEwZDIzODg2NzU4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwYzgyNDI5MDFlMTY5NTliZWJjYzAzMmU0MDBhZTM3MDcwZGJlMmViM2U0MDZiYWRmNzBlN2I0ZTZjYzFjN2UifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L221-L231",
+          "version": "repo-lines-v1:sha256:cf69836f811238a3610a621ddab2dd7f7fd016f5909a330605ff68068835bdd6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxY2ZmNGFkMzNiYTkxYjE0OGUxYjFiODI5MGI4ZmZmMjdiMjAzZmFiZmVlNTg3MDI4MmRlMzY3MzgzYjFiZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxNjNiMWQ4NzlhMTQ5YTE4MTA2MjM5ODJlZWRiOWYxODdjZmFkZDJjMGRlNjEyMDE3YjUxZGEzZDA2YzE3MTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwMzFjNjJkNGE5NTVlOWI5NjhjNThiZjZmZjY0MjgyYzc5YjdlZWU5NGNjMGQ1NjMzMTVhMWE4NTQ5NDk2NDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc2MzZmMzlkMzA3YTkwMTA1NzIzODIyMGQ3NjJhODk0NDE5OTExMWQyZDgyN2Y2MmY4ZTJmYmNlZjU4MmU3NTUifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L246-L270",
+          "version": "repo-lines-v1:sha256:cbc1ac141fd79d555e56384601077ff34dec825e9a8dcd52af483859168e38cd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxODNkOGE4OTA3ODMzZTkxYzYxYTczNmMzMmNlMzcxMjIwMjE4ZmYxZGFkYWVhZTI1N2UzMjVkNDQ5ZmU1NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5YzE4ZTY0MWQ4NGM0NDczMzVkZDRjNTkzMjZiZjIwNTgzM2QxNDM3NjMyNjY2YWIwYjlkMjg4OTk2MWNkZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkZmY0ZjJlZTcxYjRiNWI0MGQ1NTE3ZTE3NWQ0NzEwM2JjOGNmM2ZhMGYxZWMzNWZiZDc1NmZhYzQwNjg2NzMifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L36-L95",
+          "version": "repo-lines-v1:sha256:a4b96eb1a7e27444d2ef439b04ff28e057811e57b3919951f80473db7e7d5aad:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YzdlYTQzMDAxZjAxMjRiY2ZiOGIyZjQ0NDQyMjFlMjJmNGY3YzQ1ZjQxZTE5Yzc2Zjk5NjhkMDliMjRjZjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2NzAzMTkzMWVlZmU2NjMyMWY0YmZmNmI4NTk5OWU2ZmZiODA2Y2Y5YzAwNzEyYjQyYTk4NmQ3ODhiZThkMmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1YThjNGE2ODRmYWQyNWIwYWQ2MWU2MzUyN2RjNTJlNmFkYzMzZWUyOTJhYTU5YjMyMjkyMjc4Y2M2YjU0NmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_400926f2890941e0bbdc1f01feda06e5",
+      "statement": "The OpenWiki gate-deadlock invariant ships four counterfactual positive controls living inside the test file: pointing the gate back at openwiki/.last-update.json directly, moving the snapshot step after PR creation, gutting the complete-status check to 'if false; then', and feeding a non-workflow input that must break the extractor each have to make evaluateInvariants return violations, so the file cannot become a tautology.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L17-L20",
+          "version": "repo-lines-v1:sha256:cc6006a42f73a1d6f7da0a7ca3e26b234a6f37de64abc9d982ac65a66966c815:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjIzY2I0YzEzZDY3NzU5ZDU0Zjc2NzFkNDQwMzQ5NzJkMDkwM2EzOWQwOGFmYWU3M2JiOTgxZWI5YWIwZGNmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTNmMzM2ZGUxNjA2MDZmMzM1ZTNiZDNjMTIwZGExNDFjN2I2YzhhMmUxNDczZWY3ZDAzNzA4OTAwMzZjMjNjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjU3MDZmNWYzZDhkOTU0NWU4YzllYTVmMzIwMjA5MjZkMzcxZTUwNDEzYmFlMmY5ODM0ZjAyYTM0OGZkMzZkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTE0NmQ0ODc0MWU0ODQ5ODU3MWVlMWQ3NTUwYWU2MDAyZWJmNWM2ZGZkODYyYjRjMzMwMmI0OGE5MTEwMDlhZCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L97-L138",
+          "version": "repo-lines-v1:sha256:59f251cec08e35d0797f616dd35f3ff80d1c597d61f096fc2533e3512bdd058a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1MWE1MmZkN2FlNzJjM2U3NGRhMTVhYWQ1ZTQxMWE3ZTY2MTk3OGEwMjU5Y2Q4NzkxZjFmYzczYmVhZTBmNTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhM2U0NmY5NDI3NmI2ZjZmNGVkMWYwMmFmNzhiZWY2YTJlZTFjNDM5ZGQ1NTg0Yjk3Mzk0ODMxMzIxNGQyYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjMWQwMjc3Yzg0ZDYxYTUxYjdmNzQ5YWMxODJjY2NmZGZhNjNkZWE4OGU2MzBhNzgxOWYwMGZhNTY5NWJkYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_36b6a2499d8c4dcdb7f501d9d469fb74",
+      "statement": "The step ordering pinned by the OpenWiki gate invariant is a deadlock defense rather than a style preference: peter-evans/create-pull-request restores the workspace to main (any one of git stash push --include-untracked, git reset --hard origin/main, or switching back to main reproduces it), so a gate reading the state file after that step keeps seeing the previous run's status: interrupted — the run fails, auto-merge never fires, the interrupted state gets merged back into main by hand, and the next run re-locks; Actions run 37714665688 (2026-10-08) recorded a PR branch at status=complete / gitHead=fdf2052c while the gate read interrupted / 666fe1de.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L131-L156",
+          "version": "repo-lines-v1:sha256:f9dfadd26d3f1e95b01bec109c946696c1d60dfe8e94644561fa7e6a6b86b356:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNjAzODZlZGFhYmM5NjcwOGQ2NWRmNzgwZGI5NTExZjc5MTc1NDJkZTJlNWVkMzEyOWNlODIwOTc2NTVmZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViNzg5MGYxNTY4NWM2YWM1MDgxNjM4OGMzODg4NGQyN2RhMjk5M2YyMTUxNGZhZDljNjkyY2NiNmE2MTgzZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwODY1YTk0ZTI4YTgyYjU1ZDFmZDE3NzAzYjE1YTJjZGQ0ZTcxZGFiMzQ0ZTcxMDgwYTEwZDIzODg2NzU4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwYzgyNDI5MDFlMTY5NTliZWJjYzAzMmU0MDBhZTM3MDcwZGJlMmViM2U0MDZiYWRmNzBlN2I0ZTZjYzFjN2UifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L246-L254",
+          "version": "repo-lines-v1:sha256:b6698758be2837528369f739870b4bb63f634d20e947f4750832f6c9154678cb:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDE4M2Q4YTg5MDc4MzNlOTFjNjFhNzM2YzMyY2UzNzEyMjAyMThmZjFkYWRhZWFlMjU3ZTMyNWQ0NDlmZTU2NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZhNjFmZmYyNTU3NGFiYzNjNTA2ZGM5YzUxM2M5NGZmYWY0ZWEwYzRjZjg0NGMxYzViYzMzMWYzNDRlODVlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTljMThlNjQxZDg0YzQ0NzMzNWRkNGM1OTMyNmJmMjA1ODMzZDE0Mzc2MzI2NjZhYjBiOWQyODg5OTYxY2RmMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ZlZGRjNTY2YjEzNWRmNTE5NDliZGUwMzdmNDFiNzQwM2FhN2EyM2E4YjQ5MTU1M2FiODc4Mzg5NmE5ZWFkZCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L9-L16",
+          "version": "repo-lines-v1:sha256:30f2fd6afe50daa768105a8685b291fb05468ce36cee87d0c94f42cfdfaacd20:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzAzODJjOThiOWM3M2M4M2JjMDA5NDBkZGEyYWViYWM2NDkwMTYxZDlkMGYxODM0NDAwOGIxMzJhNjBlYWJmOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjczNmUwNDM5ZWI0MDRkZjAxMjI2OWZjMDE0OGU0ODgyZDY1ZDg5MzlkY2M1NWYwNjg1MjIxNTI4NmMxZTEwOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjkxZTBhMWU3MjUzYzZlMWUxYzFiNDBhZjJlNjYxOWRjNjMyN2Q0ZWJiNDRmODNiODYyYWY0YzIzZjBkMDRhMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzcwNmY0Njg1Yzg2OWNlN2NiYTg3NmQyMzJhNWMzNWNiNjVkZTFhNGU4MjMzNDgzOTAyNDBmOTc0M2Q2YzM4MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9e059afeb5d6465888311eb4282bf313",
+      "statement": "The OpenWiki gate invariant reaches CI through the ordinary android-host collection path — the tests/unit/**/*.test.ts include glob in packages/android-host/vitest.config.ts, hence pnpm test:android-host, pnpm test:all and the CI `test` job — so a workflow edit that re-breaks the auto-merge gate turns CI red on the pull request; this matters because the workflow's own add-paths output includes .github/workflows/openwiki-update.yml, i.e. an OpenWiki run can rewrite the file being guarded.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml#L46-L70",
+          "version": "repo-lines-v1:sha256:0a5ad41682b4ac277a348cb75fd2edd74b3da5c4c971013e76e2d4e9afb95877:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMDA1Nzc3NzZjNjY4YjcwMWQ3MTY1YTk3MmNiYWJiNmVkZWQxMjhiYjg1ZmE3MGMzMjYwYjU4ZTBlOWIwNDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0YWU4YjY0NDE4ZjZiY2RkZDE5OGRkY2UyNjM2ZjBiMTk2ZmEzZTZhNjdkYzliODk1N2MwMzQwMjY2NjI4MjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc2NWYxZDk5MzEwOWYyZTMxMTYyYmRiM2FkNDM2M2I3YzkwZDk3MjM0MjUwZTEyM2M5NWIwNmMwZDFjYjRhOWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0NzUwMDZmMDU1MTkzZTk1MzMxNmMwNjI5NmQwNzc0NjhhZmEzMTljMzQ2YjUwOWNmMWQ2NDc1ZTJmOTZiZTEifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L169-L173",
+          "version": "repo-lines-v1:sha256:cde6f96b11000f8222e500bfb9aaac92e639e79629411e6dfa4d3d910d5c6152:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQ1NWJiN2MxZGU3ZTNlMDUyZWViYjkwOTA5NjBmOTZjMDJkMjdlNzljMGVhNmE5NzIzMjkxYWU0ZjJmYjFlZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGViOGZlOGEzMGE2ZTQ5YTRjYjVkODI3MzBlZjg5MGU0YTZjMWE2OTg1Y2IwN2I1MmFkN2QzODFkMzI2NTFkOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTJiZWY0NTlmMjg0MDIzZGY3NGFiMzZkZTcwY2EzODIxYTBhMzRkYjFlOTY3ZTUwNDFlMjEzODEyNWZkNWNhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDliNzJhMjQzZTQ2YWQ2MDY2ZmZjNjFjZmQ2MDBhNjhmNzc5NDc4NTVlZjVjYWJjMmU1YjU3YjkzY2RhOTI1MiJ9"
+        },
+        {
+          "resource": "repo://package.json#L33-L41",
+          "version": "repo-lines-v1:sha256:8a65a2900993f36f97d21f7fd8f0cbaf22b3021e27d7169ae4ed9f51a58a2b35:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjY4OTY0NmFhMjg5NjkwZDNmMGUxYmJlZmZkNGIwMjg2ZDVmZWRkY2QxZDUzYzFjZWNiMjFkZmU4NGUzOWUwOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyMDU5YzVkZGNlNjhiMWU5MTIxOTk4NGE1MmRiNmExMTU5OWFiYzk4NzIxYzMwZTQ5OGYxMDU4NDI2MTU3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjEwZmEwZDk0M2JlOTc1OTViYzNkMmEzOGQzMGRiNWZlODBmYjIyODJlZGMyNzY3MjNhMzlhOWRkNmFlYmEzYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjc5MGUzN2M5YmE5MGNjMDgzMmY1ODYxZjZmZGNhM2JjM2ZmNzY5YTQzMDkwNGQ0ZjVlYzY0OGFkMzVjZmU3MCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/vitest.config.ts#L17-L22",
+          "version": "repo-lines-v1:sha256:0b37b23cc2e764d73fc368bc5e8d1846fefd062f8a05d4a38c6f90fa74322934:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFlYzI3NjJlYWNkYjYyNTlkYjRjZWU3MmE5N2ZiMzFkNzVlNWM3OTU5ZGZiNWM5YWIwZWU5ZTM0MGYyMWYzZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdkYWY0ZDI3Y2I2OGJhNzQ1NWJkMjgzN2E0NTM5MzY3MWE3MzEzOTQ1NTFkZGI2MGZiMTc4YzU4ZDMzZDZhYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTMwYTU3NjgwNjE0ZjA2ZDFjYjA3YTUxYTJmOWMyYjY0ZGY0ZmJjMjM2ZGNhNGM1NjIzZGIxMThlZjgwZjA2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjgzYzAzZmJkZjliMzQ2YWE1NTI3ODZiNWVlYmIzYWFkNGZhYzgzYWI5ZTVjNmI1ZDUxNWEzZWI1OWNlZWQ1MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_09f0f7d188da46b989879feff8d5cd07",
+      "statement": "The OpenWiki gate invariant registers its own blind spot: it pins text extraction against the workflow's known 6-space '- name:' structure rather than YAML semantics, and it deliberately depends on the extractor-failure positive control so a collapsed extractor cannot leave the five invariants vacuously green.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L135-L137",
+          "version": "repo-lines-v1:sha256:d8cb29a6f4b2140c60ab1156801034363e476bb2c22e1dc935a859e5707bb259:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDVmMTNhYzNlNzM5YTM5MTJmMWE4Mzk1OGY3OTkzOGExNzhjOTA1YWEwMzBkMGZmYmRiMWRiZmRjNTlkMWQzNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjJkMTFjYWY0M2U5N2VmMzY5ZTZiZWVkMWEyNjhiZDA1ODM4ZjI5YjlkZDI1NGJmNjliYTY0ODg0MTQ3MjM0YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTYyYjFkYzFhZTlkNDNhODk3Mzk2MWRkYzljYjU1MDdhNDllNzU2YTQ5ZmFiMmE5M2NmZjhlMjc0NzljOTdmNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDgxN2ZiYjczYzkyYjM2ZDVlNDg5NmZmNTFjMWI1OGVlYzMzMGJiZTk2MWJhMDVmYzYyMDVmODY3ZWExYmNmNiJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L22-L24",
+          "version": "repo-lines-v1:sha256:0b8a098679d603403ed8134108b074882134cbefc5614bf9265b11bae089db6a:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmUxY2Y3MTEzZDBmYmE2N2M0YjQ0ZjJlZmUwZjUzZDhjOTQxMGU1NmVhMjNlODUyYTA3MzRkODAyMWNkNTQzOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA3NzY4NjBjNDE4NTM0N2FkMjU2OGY1NTlkYTQ5NTg1YWE5OTc5NjFmMThhNjlkNDg5NjQyNmE0ZDE0MzgwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjdmZjMwODIzMGYzYWEyYWNhOTk5YWM0NGY2YjgyNTI4OGU3YTMxNzJjNGJiNGMzZTg0ZTE3ZjU3M2EwMWY2YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTk3YTI3ZmJhM2FlYjMyOTdhOGM1Nzc0ZmVmZDg1YjM1NjNmMjQzZDI0ZDgzOTllZGM2YjVmYjFlZTU5YzljNiJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts#L56-L60",
+          "version": "repo-lines-v1:sha256:ac96fd7ec0842577564df3dffa7399f0dad46d590f7d6bac5c9b5b12565af3a4:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODJhZTE2OTg1MGY1MDZhMDAyZmNkMDVlZjRmMTBlOWEyNTAyNzhhMWM1ZDBiYjMzNWRkOTAxNDQ1YjA1YTZmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2Q2YzlhMjUwNGU2MGM3OTEwMDE3YzAyN2Q5MWI1ZGE1MWExODYxYTkxY2JmMTlhYWVjZjk4N2M5MDI3NGU1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGMwYzVjN2ZmNjcyOGQyNjExZDE4ODU5Njk0M2QzM2JhZTEwM2Q3ZTMwMGViN2E2YTgzNjdmOWM5MzIxNTlkOCJ9"
+        }
+      ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.7.0",
-    "at": "2026-10-08T00:43:21.663Z"
+    "by": "openwiki/0.7.1",
+    "at": "2026-10-08T02:38:27.827Z"
   }
 }

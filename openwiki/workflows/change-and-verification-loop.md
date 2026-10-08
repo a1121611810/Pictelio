@@ -3,9 +3,6 @@ type: Workflow
 title: Change & Verification Loop
 description: Routing map for how a change is made and proven in Pictelio — the mandatory Grill → to-spec → to-tickets → implement pipeline and its allowed exceptions, the review–fix loop and its stop rules, gate discipline and the freeze line, the commit/push hooks and the three CI jobs with their deliberate exclusions, the ADR-first decision-record conventions, and the CI-owned OpenWiki regeneration.
 tags: [workflow, code-review, pre-push, git-hooks, ci, adr, verification, openwiki]
-verified:
-  - by: openwiki/0.7.1
-    at: 2026-10-08T01:48:11.384Z
 sources:
   - id: openwiki-source-4f854fe8b3b2ba360222b843
     resource: repo://.agents/skills/code-review/SKILL.md
@@ -53,6 +50,8 @@ sources:
     resource: repo://package.json
   - id: openwiki-source-0c986189d1217c3e6214fe46
     resource: repo://packages/android-host/tests/unit/agentsMd.contract.test.ts
+  - id: openwiki-source-720973935af6ee0acf5c8618
+    resource: repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts
   - id: openwiki-source-86d531e485614cbf25868569
     resource: repo://packages/android-host/tests/unit/scripts/check-push-refs.test.ts
   - id: openwiki-source-76f42986ee5e8b672e9a9f62
@@ -71,7 +70,10 @@ sources:
     resource: repo://vite.config.ts
   - id: openwiki-source-ef4ef42dc4e88b6541eb6f3f
     resource: repo://workflows/review-fix-loop.md
-generated: { by: "openwiki/0.7.1", at: "2026-10-08T01:48:11.384Z" }
+generated: { by: "openwiki/0.7.1", at: "2026-10-08T02:38:27.827Z" }
+verified:
+  - by: openwiki/0.7.1
+    at: 2026-10-08T02:38:27.827Z
 ---
 
 # Change & Verification Loop
@@ -261,6 +263,20 @@ Guards on the rules themselves — changing a rule means changing its guard:
   fail-closed with human-readable guidance, fmt exit-code → verdict mapping (including the
   ignore-surface `skip`), multi-ref union/dedup, and a **negative** guard proving that touching the
   retired `packages/app/(src|tests/agent-browser)` path dispatches no domain at all.
+- [`packages/android-host/tests/unit/openwikiGateDeadlock.test.ts`](../../packages/android-host/tests/unit/openwikiGateDeadlock.test.ts)
+  pins the OpenWiki auto-merge gate's **ordering** as a repository invariant. The guarded object is
+  a workflow file — one the OpenWiki run may itself rewrite, because the PR's `add-paths` includes
+  it — and no YAML parser is installed, so the test extracts the step list itself (a
+  `/^ {6}- name: (.+)$/` line scan that slices each `- name:` line plus its body) and then asserts
+  against the real workflow text: `Snapshot post-run OpenWiki state` comes **before**
+  `Create OpenWiki update pull request`, that snapshot reads `openwiki/.last-update.json`, the gate
+  does **not** read that file directly and instead consumes `steps.poststate.outputs`, and the
+  `status != "complete"` check survives. Each mutation has a counterfactual positive control that
+  must turn the evaluator red — dropping the gate's `env:` block, moving the snapshot after the PR
+  step, hollowing out the `complete` check — plus one for extractor failure (fewer than 5 recognised
+  steps is itself a violation), so the test cannot decay into a permanently green fake. It is
+  collected by `pnpm test:all` through the android-host `tests/unit/**` glob, so a workflow edit that
+  re-breaks the gate fails CI.
 - `oxlint` runs with `expect-expect: error` and a zero-warning budget from the single root
   [`vite.config.ts`](../../vite.config.ts) config, so tests must assert something.
 
@@ -285,19 +301,85 @@ Guards on the rules themselves — changing a rule means changing its guard:
 
 ## Generated artifacts: `openwiki/` and `CLAUDE.md`
 
-`openwiki/` is generated documentation owned by CI, not hand-editable content:
+### The CI-owned OpenWiki run
 
-- The scheduled workflow [`.github/workflows/openwiki-update.yml`](../../.github/workflows/openwiki-update.yml)
-  regenerates it (daily cron plus manual dispatch with an optional `--debug`), with
-  `fetch-depth: 0` required for the `gitHead` diff, a 150-minute timeout, and an early preflight for
-  the required secrets (`OPENAI_COMPATIBLE_API_KEY`, `OPENWIKI_PAT`).
-- It removes the transient run-state file (`openwiki/.run.json`), removes the deprecated
-  `CLAUDE.md`, opens/updates a PR on branch `openwiki/update` with `add-paths` limited to
-  `openwiki`, `AGENTS.md` and the workflow file itself, gates auto-merge on the state file
-  reporting `status: complete`, and additionally fails on a silent no-op (gitHead advanced and
-  source changed, but `openwiki/` content diff empty after excluding the pure state files) so an
-  empty run cannot merge as a green. A run that fails mid-way still leaves the pages it completed as
-  a hand-reviewable PR, but never auto-merges them.
+`openwiki/` is generated documentation owned by CI, not hand-editable content. Its only producer is
+the scheduled workflow [`.github/workflows/openwiki-update.yml`](../../.github/workflows/openwiki-update.yml)
+— a daily cron plus a manual `workflow_dispatch` with an optional `--debug`. Unlike the read-only
+[`ci.yml`](../../.github/workflows/ci.yml), it declares `contents: write` and `pull-requests: write`,
+because it pushes a branch and then merges it.
+
+The **order** of its steps is the design, not incidental:
+
+```mermaid
+flowchart TD
+  S1["Secret preflight for the required secrets"] --> S2["prestate — record the previous gitHead"]
+  S2 --> S3["openwiki code --update --print with continue-on-error"]
+  S3 --> S4["poststate — snapshot status and gitHead as step outputs"]
+  S4 --> S5["Remove .run.json and CLAUDE.md"]
+  S5 --> S6["Detect silent no-op"]
+  S6 --> S7["create-pull-request on openwiki/update — restores the workspace to main"]
+  S7 --> S8["Gate auto-merge on a complete run — reads the poststate outputs"]
+  S8 --> S9["Enforce no-op detection — hard failure only when detected is true"]
+  S9 --> S10["Propagate the run outcome, then enable auto-merge by branch lookup"]
+```
+
+The workflow's real step order. The snapshot and both gates sit where they do because
+`create-pull-request` rewrites the working tree before it commits.
+
+1. **Secret preflight** — fail early, with configuration instructions, when
+   `OPENAI_COMPATIBLE_API_KEY` (DeepSeek is reached over the OpenAI-compatible endpoint) or
+   `OPENWIKI_PAT` is unset. The key check prints only length, all-whitespace and the first/last byte,
+   never the value.
+2. **Checkout, Node 22, generator install** — `fetch-depth: 0` because the `gitHead` diff needs the
+   recorded commit to exist locally (in a shallow clone the change summary is empty and the run
+   exits as a silent no-op while still reporting success), a pinned `openwiki@0.7.1` alongside
+   `mermaid`/`jsdom` for diagram validation rather than `latest`, and `timeout-minutes: 150` so the
+   buffered `--print` hang becomes an explicit failure instead of a dead runner.
+3. **`prestate`** — read the previous `gitHead` out of `openwiki/.last-update.json` *before* the run
+   overwrites it; this is the only moment at which it is still available.
+4. **Run** — `openwiki code --update --print` (`--print` is required in CI: bare `openwiki` starts
+   an Ink TUI and fails without a TTY), with `continue-on-error: true` so a mid-run failure still
+   leaves the pages it completed, and with the provider environment pinned to the OpenAI-compatible
+   endpoint (`OPENWIKI_PROVIDER`, `OPENAI_COMPATIBLE_BASE_URL`, `OPENWIKI_MODEL_ID`) plus optional
+   LangSmith tracing.
+5. **`poststate`** — snapshot `exists` / `status` / `gitHead` from the state file into step outputs,
+   still **before** the PR step.
+6. **Cleanup** — delete the transient resume state `openwiki/.run.json` and the deprecated
+   `CLAUDE.md`.
+7. **Path listing** — the `add-paths` allowlist: `openwiki`, `AGENTS.md`, and the workflow file
+   itself.
+8. **No-op detection** — compare the recorded and the new `gitHead`; only when `gitHead` advanced
+   *and* non-docs source changed *and* `openwiki/` shows no content diff (excluding the pure state
+   files) does it set the `detected` flag.
+9. **`create-pull-request`** — branch `openwiki/update`, PAT token (a bot-authored PR would make CI
+   wait for maintainer approval), `add-paths` from the listing step, `docs: update OpenWiki`.
+10. **Complete-status gate** — refuse auto-merge unless the poststate snapshot says the run finished.
+11. **No-op gate** — a hard failure only when the no-op flag was set; its known false-positive
+    surface (a source change that legitimately touches no page) is registered in the step's own
+    comment rather than left implicit.
+12. **Failure propagation, then auto-merge** — re-fail the job when the run failed, then enable
+    squash auto-merge by looking the PR up by branch name, because an update run does not emit a PR
+    number.
+
+**Why the gate reads a snapshot instead of the file.** `create-pull-request` restores the workspace
+to `main` before committing — the workflow comment records that `git stash push --include-untracked`,
+`git reset --hard origin/main`, or simply switching back to `main` is *each* sufficient, so the
+cause cannot be pinned on one of those commands. A gate reading `openwiki/.last-update.json` after
+that point therefore reads main's copy, i.e. the **previous** run's file. Since 0.7.x writes
+`interrupted` at run start and flips to `complete` only at the end, main stayed at `interrupted`,
+every run's gate failed, auto-merge never fired, a manual merge carried that `interrupted` file back
+onto `main`, and the next run was locked into the same state — observed on 2026-10-06 and 2026-10-08
+with `status=complete` on the PR branch and `interrupted` on main. The fix is the ordering
+(`poststate` before the PR step) plus the indirection (the gate consumes `steps.poststate.outputs`,
+never the file), and it is held by an invariant test rather than by the comment that documents it.
+
+### Discipline around the generated surface
+
+- **An interrupted or empty run still leaves its finished pages in a hand-reviewable PR, but never
+  auto-merges them.** A run that fails mid-way keeps the pages it completed as a PR body that spells
+  out the partial-progress contract; the two gates are what separate "keep the progress" from
+  "merge it without review".
 - **The wiki is optional context, not startup reading.** Agents are told not to preload or search
   the wiki at task start, to retrieve just-in-time when unfamiliar architecture or dependency
   behavior matters, and to treat source code and tests as authoritative over wiki prose.

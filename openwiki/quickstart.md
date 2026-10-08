@@ -3,9 +3,6 @@ type: Quickstart
 title: Pictelio — OpenWiki Quickstart
 description: Entry point and task-routing map for the single-engine Pictelio monorepo — the one vue-lynx client plus the @pictelio/android-host build host, the six shared pure-logic packages and the Astro site, the root command surface, the ADR-first and workflow rules, and the CI-owned OpenWiki contract.
 tags: [pictelio, pixiv, lynx, vue-lynx, android, monorepo, quickstart]
-verified:
-  - by: openwiki/0.7.1
-    at: 2026-10-08T01:48:11.384Z
 sources:
   - id: openwiki-source-164e2da859b5277df81c7d94
     resource: repo://.github/workflows/ci.yml
@@ -15,6 +12,8 @@ sources:
     resource: repo://AGENTS.md
   - id: openwiki-source-f9cfb243e2af63b22910dffd
     resource: repo://CONTEXT-MAP.md
+  - id: openwiki-source-3402d7277fc710d22f072ad2
+    resource: repo://docs/adr/ADR-0099-local-openwiki-disable.md
   - id: openwiki-source-af98b36e6440cac152de8efd
     resource: repo://docs/adr/ADR-0185-vite-plus-1rc-toolchain.md
   - id: openwiki-source-3308c9211dcd0235ba53208e
@@ -41,6 +40,10 @@ sources:
     resource: repo://packages/android-host/package.json
   - id: openwiki-source-c77a2d8f001277042a57526c
     resource: repo://packages/android-host/scripts/sync-android-version.mjs
+  - id: openwiki-source-720973935af6ee0acf5c8618
+    resource: repo://packages/android-host/tests/unit/openwikiGateDeadlock.test.ts
+  - id: openwiki-source-76f42986ee5e8b672e9a9f62
+    resource: repo://packages/android-host/vitest.config.ts
   - id: openwiki-source-1a2f2bb2203c560331e95f34
     resource: repo://packages/app-lynx/lynx.config.ts
   - id: openwiki-source-27ad4aacc4aecfa67f873e90
@@ -55,7 +58,10 @@ sources:
     resource: repo://vite.config.ts
   - id: openwiki-source-ef4ef42dc4e88b6541eb6f3f
     resource: repo://workflows/review-fix-loop.md
-generated: { by: "openwiki/0.7.1", at: "2026-10-08T01:48:11.384Z" }
+generated: { by: "openwiki/0.7.1", at: "2026-10-08T02:38:27.827Z" }
+verified:
+  - by: openwiki/0.7.1
+    at: 2026-10-08T02:38:27.827Z
 ---
 
 # Pictelio — OpenWiki Quickstart
@@ -134,8 +140,8 @@ Route by task: each row says what you are about to change and which page owns th
 |---|---|
 | Change native modules, `LynxActivity`, the Gradle variant/source-set layout, Keystore-backed storage, system bars, or the notification channel | [Android Native Integration & Build](integrations/android-native.md) |
 | Sign, version, release, or deploy — keystore and env-var rules, the interactive release and overwrite flows, version/credential sync, the GitHub Pages site | [Release, Deploy & Runbook](operations/release-and-deploy.md) |
-| Decide what must be tested and which gate proves it — CI boundaries, manual device tiers, the test hard constraints | [Testing & Quality Gates](testing/overview.md) |
-| Make a change, run the review–fix loop, understand the hooks and CI jobs, or check when OpenWiki is regenerated | [Change & Verification Loop](workflows/change-and-verification-loop.md) |
+| Decide what must be tested and which gate proves it — CI boundaries, manual device tiers, the test hard constraints, the repo-invariant guards | [Testing & Quality Gates](testing/overview.md) |
+| Make a change, run the review–fix loop, understand the hooks and CI jobs, or check how and when OpenWiki is regenerated | [Change & Verification Loop](workflows/change-and-verification-loop.md) |
 
 Per-topic design decisions are deliberately not enumerated here; each page above links the ADRs it depends on, and [`docs/adr/`](../docs/adr/) holds the rest.
 
@@ -188,7 +194,7 @@ Decision records live in [`docs/adr/`](../docs/adr/) and its sibling glossaries;
 | [0201](../docs/adr/ADR-0201-single-engine-facade-consolidation.md) | Single-engine facade consolidation — the codebase speaks one engine |
 | [0202](../docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md) | OTA web-bundle update channel retired; only the APK update check remains |
 | [0203](../docs/adr/ADR-0203-webview-client-source-removal.md) | WebView client source removal — `packages/app` deleted, host moved to `packages/android-host`, credentials and version moved to `packages/app-lynx` |
-| [0204](../docs/adr/ADR-0204-root-command-naming.md) | Root bare commands re-pointed to `pictelio-app-lynx`; host actions carry an `:android-host` suffix |
+| [0204](../docs/adr/ADR-0204-root-command-naming.md) | Root bare commands re-pointed at `pictelio-app-lynx`; host actions carry an `:android-host` suffix |
 | [0205](../docs/adr/ADR-0205-md3-baseline-and-scope.md)–[0209](../docs/adr/ADR-0209-md3-filled-text-field-alignment.md) | MD3 baseline and scope, type scale, shape and state-layer guardrails, icons, filled text fields — the current design contract |
 | [0211](../docs/adr/ADR-0211-ui-continuity-motion-contract.md) · [0212](../docs/adr/ADR-0212-tonal-elevation-surface-over-shadow.md) · [0213](../docs/adr/ADR-0213-immersive-media-view.md) | UI continuity motion, tonal elevation over shadow, the immersive media view |
 | [0219](../docs/adr/ADR-0219-lynx-continue-reading.md) | Continue-reading and browsing-history design for `/continue` |
@@ -211,10 +217,17 @@ Glossary files (`glossary-*.md`) hold the terminology and the row-by-row applica
 
 ## How this wiki is maintained
 
-`openwiki/` is **generated**, never hand-written. The scheduled workflow [`.github/workflows/openwiki-update.yml`](../.github/workflows/openwiki-update.yml) reruns generation on a daily cron, commits the result to the `openwiki/update` branch, and opens a `docs: update OpenWiki` pull request; auto-merge is enabled only when `openwiki/.last-update.json` reports `status: complete` **and** the no-op detector confirms a real content change. An interrupted or empty run still leaves its finished pages in a PR for human review, and is never auto-merged.
+`openwiki/` is **generated**, never hand-written. The scheduled workflow [`.github/workflows/openwiki-update.yml`](../.github/workflows/openwiki-update.yml) reruns generation on a daily cron (`10 10 * * *`, plus manual `workflow_dispatch`), commits the result to the `openwiki/update` branch, and opens a `docs: update OpenWiki` pull request. Whether that PR merges itself is decided by two gates, and the first one is deliberately an indirection:
+
+- **`Run OpenWiki` (L105–L129) is `continue-on-error: true`**, so a run that dies halfway keeps every page it finished; the job is later marked red by `Propagate OpenWiki failure` (L288–L290) while the job itself is capped at 150 minutes (L24–L28) so a hung run fails loudly instead of burning runner time.
+- **`Snapshot post-run OpenWiki state` (id `poststate`, L131–L156) reads `openwiki/.last-update.json` *before* `Create OpenWiki update pull request` (L221–L244)** and publishes `exists` / `status` / `gitHead` as step outputs. The ordering is the whole point: `peter-evans/create-pull-request` restores the workspace to `main`, so a gate reading the file afterwards sees the *previous* run's values — the shape of the deadlock that once kept the gate red forever.
+- **`Gate auto-merge on a complete run` (L246–L270) consumes `steps.poststate.outputs.exists/status/gitHead` through `env:`**, never the file, and refuses auto-merge unless a parsable state file exists and its `status` is `complete`. `Enforce no-op detection` (L272–L286) separately refuses it when `gitHead` advanced and source changed while `openwiki/` produced zero content diff (detector: L175–L219). Only then is auto-merge enabled, by branch lookup on `openwiki/update` (L292–L304).
+
+An interrupted or empty run therefore still leaves its finished pages as a **hand-reviewable pull request** and is never auto-merged: the gates block the unattended merge, they do not discard partial progress. That step order and the step-output indirection are pinned by [`openwikiGateDeadlock.test.ts`](../packages/android-host/tests/unit/openwikiGateDeadlock.test.ts), a repo-invariant test that runs inside `pnpm test:all` — so a workflow edit that re-breaks the gate fails CI. [Change & Verification Loop](workflows/change-and-verification-loop.md) carries the full step list.
 
 Consequences for contributors and agents:
 
 - **Do not hand-edit anything under `openwiki/`.** Change the source, the ADR, or a package `CONTEXT.md`, and let CI regenerate the page. Page content is a derived view; a manual edit is overwritten.
-- **Do not run `pnpm openwiki:update` locally**, including after changing `src/` or `packages/`; regeneration is CI-owned by design.
-- A failed or delayed regeneration does not block local work or commits — CI converges on the next run. `CLAUDE.md` is deliberately not kept in the repository.
+- **Do not run `pnpm openwiki:update` locally**, including after changing `src/` or `packages/`; regeneration is CI-owned by design ([ADR-0099](../docs/adr/ADR-0099-local-openwiki-disable.md)), and the root script survives only for deliberate human use.
+- A failed or delayed regeneration does not block local work or commits — CI converges on the next run. `CLAUDE.md` is deliberately not kept in the repository; the workflow deletes it (L164–L167).
+- The PR's `add-paths` covers `openwiki`, `AGENTS.md`, **and the workflow file itself** (L169–L173), so an OpenWiki run can rewrite the very gate that governs it — which is why the invariant is enforced by a test rather than by comment discipline.
