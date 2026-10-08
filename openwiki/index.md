@@ -4,7 +4,7 @@ okf_version: "0.2"
 
 # Files
 
-- [Pictelio — OpenWiki Quickstart](quickstart.md) - Entry point and task-routing map for the Pictelio (pixivizer) repository — a single-engine Lynx (vue-lynx) Pixiv client packaged into an APK by the @pictelio/android-host build host, orienting engineers to the monorepo, commands, ADRs, and the wiki hierarchy including the continue-reading-and-history domain page.
+- [Pictelio — OpenWiki Quickstart](quickstart.md) - Entry point and task-routing map for the single-engine Pictelio monorepo — the one vue-lynx client plus the @pictelio/android-host build host, the six shared pure-logic packages and the Astro site, the root command surface, the ADR-first and workflow rules, and the CI-owned OpenWiki contract.
 
 # Directories
 
@@ -14,3 +14,4 @@ okf_version: "0.2"
 - [integrations](integrations/)
 - [operations](operations/)
 - [testing](testing/)
+- [workflows](workflows/)

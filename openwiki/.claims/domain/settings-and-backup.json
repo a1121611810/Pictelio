@@ -1,0 +1,490 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:755159e30c0795efebbe2053337a9078c856b0c633ee534e031046d507b15e0b",
+  "claims": [
+    {
+      "id": "claim_6be29a76123148fe987e32ad76334b92",
+      "statement": "The dual-engine WebDAV bridge described by ADR-0156 D1 and the backup spec (a Java core plus a WebView `WebDavPlugin` and a Lynx `PictelioWebDavModule`) is historical: the WebView client package was deleted, and the only live bridge is `NativeModules.PictelioWebDav` → `PictelioWebDavModule` → `WebDavClient`/`BackupCrypto`, consumed by app-lynx's `utils/webDavBridge.ts`.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
+        },
+        {
+          "resource": "repo://docs/specs/webdav-backup.md",
+          "version": "repo-file-v1:sha256:210af0726c976f96f761d8485bd4abb6146a547548cd63bcca4c2b7528057dd5"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioWebDavModule.java#L22-L41",
+          "version": "repo-lines-v1:sha256:db94d99f9f2957c7068e7143373512c4b0a7b4e4b5a1416a8be5dc2ceca43768:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwNWM5ZDFjZGRmNjQ3MWM3NDZlNDFhMzkzZGY0NWViNzlkZGY2ZGQzMmE4YjExNDI1MTk2ZGI4MDRjZDhhZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhOTE4MmU2ZjRlZGFmZjVhM2IyMjExZjQ4ZjdhMzg2NDVhYTgzNmU1MzJmOGJlNGFmZDk5NTdiMzI5NmNmNGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxYWRjOTE0MTRlNDM0MjNlNGQ5ZDNjMDk3OThjNWE4ZjI5NWNmNGIxOWY5MzNhNDM1ZWJmYzU0OWYxYmRmNTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/webDavBridge.ts#L1-L5",
+          "version": "repo-lines-v1:sha256:a433e9550dee5c7f86b43f1c9e4ca611828070c988338579810b21d7202f58e7:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGIyZDE2NjVhMGJhNmM0NTc4ZjRkOTc4ZmUzNzQyZjcyNzFlYTMyNWI3MjZlNWRlMzU3NGZlYjRjYWI2YTA1NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmMzZmVmYzM0YjE5MzYyZjljOWIwNmM3OTVmZjI1MjA2ZTQyNTZlMTEyYjAzYjA1MmRmY2IwMTZhOGI1MDM1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDY3YmYxYzBhZDNiZWVmYzRlODYzMjZmYWZiNTMyNzI2YzAxMGI0ZDI5M2RhMWZlZmI5NTI4MjVkMzM1NDRiMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f2b8afd913df4d758dddd7114b633aa1",
+      "statement": "`stores/settingsStore.ts` is the single registry of persisted keys for app-lynx: it declares every key as a module constant and exports `BACKUP_DEVICE_KEYS`, `backupAccountKeys(uid)` and `BACKUP_IDB_KEYS`; source-scanning tests require every `*_KEY` literal to appear in `BACKUP_DEVICE_KEYS` and every entry to have a matching `applyRawKey` branch, so an unregistered key silently falls out of the backup domain.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.test.ts#L1058-L1077",
+          "version": "repo-lines-v1:sha256:84d073312e7d0fa16b7e5d26fc7df8ed20663d772f3554ac8938316f3a979a84:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmM2IwMjdlYjY2NGVlMjA2MzJiZDMxNGZjZDEwMzk5NDViMTEyMGE3YjVhM2U4NzQ3NWFkOWM0MTA5Zjg3NmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM5ODNhZTg5MTJmMTRjNzlkNzA3NjU5ZWNlMDgzM2FiMzA3ODIxYzk4MjFhZjI0NjMyNTRiY2FlMGQxY2I3NjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZjMThmMTYyZDlhMTc5NjdiOTJkMzFjYjAwODBjOGQ4YzM4ZTVhZmJhODA2ZDFmM2NiZWMzYWJlNzFmOTgyNTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L132-L179",
+          "version": "repo-lines-v1:sha256:66f08ba60df613179f68486715c3f6d724ffffb63b9135a2f6965ba6b664aa39:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmNTY0ZTc3YWFjNmY3YjdlOGMzMmIzYTM3ODZlNTFjYTgwZGNiMmE2NTZjYTA0ZTA3YTBiNjNkM2M5ZjllYzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2MWRhN2ZhNWU4MmM3ZWZjMmFkODZjYmVmZWNlYzIzMDU0YTEyZGJlYTYwMGE2MmRhMjIwNDQ0MTBjNGE4NGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkOTRlMzBhZmY5NWQ5N2MwNmU5MjI1NDNiMmIyYWVmZDk1OTkyMzY0OWEyNzFkMGJhNDJiMDgxMDA3OTUwMWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9eae18043b344f3bae00c7064ed89633",
+      "statement": "`prefs()` is the single storage seam exported from settingsStore: in native mode it wraps `NativeModules.PictelioPrefs` (SharedPreferences file `CapacitorStorage`), and in web-core dev it uses the IndexedDB KV adapter; other stores must reuse it instead of hand-rolling a native/dev split.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L181-L265",
+          "version": "repo-lines-v1:sha256:9c6cb1391946d1d446bcc61f8e4e26538be9dec947cc88c0299631b79f47d255:eyJzZWxlY3RlZExpbmVDb3VudCI6ODUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhOTg0YmI1ODQ1NmFkMWRjOGVlNmI1NjljMjU3OTg1OTY4YTkyZTY3NGU0ZDA5ZDQ2N2E4ZDRlMGFjZGFkY2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJmNDdiYWFlMTU4YmZhYjQxNGRkN2U4MjZjMTI3MjcwMGU5ZTBkMzRiNjYwMDRkMGNiNjcwMDY5Yjk1YjY5YWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmZmZlZjRmODY1ODA0Y2E3MzljM2RjNTk5Nzk1OGRiYzgwZDc1ZWIyZmVhNGVmYWJmZjIzZmJkZjMyOTlmNTIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_aa2bab4c391049b39dfc64eb6568600d",
+      "statement": "Account-scoped settings are uid-suffixed keys read and written only when a uid is known: `loadSettings()` runs after `restoreToken()`, loads all device-scoped keys first regardless of login, then with no uid resets account refs to defaults and writes nothing, otherwise reads `show_r18_${uid}`, `show_r18g_${uid}`, `ai_filter_mode_${uid}`, `mute_tags_${uid}` and the two translate-consent keys.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L619-L621",
+          "version": "repo-lines-v1:sha256:b51a9299725e16082a12a5049190cc24171b072f86ce614e7a143cfb2bbce37b:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDlhNDQyYThiM2IyNGUyNDZkYTQyMzE1MjcyNmY3ZTZkYjEwNzIwMDVhYTA1ZDE5NGQ2MDZjNGE2NjNiMGI4OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFjZDIzOTM0ZDg4NDIwNTA3Njg4NDJmMGZiNGM2MzllYzVjZDYxNjM3OWI2MWNjZmU3NTViMTIwYzNlMDY0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTYyYjNlMjQ3YTVjN2E4ZDNlZGZhNjJlYTljMWJjNGE2MTk0OWZhM2EzYjVjZGQ5OWUwMjg2MDQ4MDk4NDgzYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmRiYWI3MTJiNGU5ZjgwOGYxYjExZjA4YzJhZTA0ZmI0NDg3OWJjZjRkMThiMDMyNWNjOTE2MGM5YWFkZmJkOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L461-L465",
+          "version": "repo-lines-v1:sha256:b4e199123ce1d112a25ef02a22cbee1e01f148bf5b166619fdb1a7b4a87eaf73:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGYyYTJmOTk2ZjA4ZTY4MGJkMjkyMTM1YTZmYTQ5NzhiZGEyNmU2MDJkODRmMzNjYjFkNTk0Nzc1ZDQzMDRiNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGEwMWZlNzIzNGNmMWNlNWU5NDIwOGU3NDgxYzRiY2NkYjIxZTkwM2M0NzBkZTgzZDU3OGQxZDQxZDdlMDg3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTdkODYzMmU1NGU5Mjk4YWJiOTU4NzI3ZTJkNTE0MDhhYmFmMTM2NjAzNTM3OTEwMTQwYWJmNjViMzBhYjYxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTZiNGExZTAzODQyZTIyNjg4YTI2ODk3NTFiMWMyMDA2YmQyZThiNDM5NDM5NDY3YWNiOTVmMTgzMDMwNmY4MCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L740-L805",
+          "version": "repo-lines-v1:sha256:ca56f066773bc630ef6a2c652931fab2a18d45d5b635046c489b887f6d3c3429:eyJzZWxlY3RlZExpbmVDb3VudCI6NjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMjJjYWNlNzEyMjE4NTlhZTc2OWQwM2E1MzgzMTQ1ZjUwMWFkNTFlYWZhMzIxYzQxNGM1NWNhYTQ2OWZhMzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlMzE4MTAxYjYwYTFjNTNmNDM3OWYyMWY0NGRlZjZhYjAzZGM0MDUxNjBiNTk1ZGQ5YTkyNDllZWNlZGE0YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZjZGFjNTM0OTk2YTg2NjQxMGM4MGY0YjBmNTg2NWJlYjdmNTdmNWY5YzkzZDc5Y2JhNDIwZDFjNDY2NjY2NGMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1558707b929f485abd4b46572f353147",
+      "statement": "Legacy account-key migration is idempotent and ordered: if the account key exists it returns, if the legacy key is absent it returns, otherwise it seeds the new key and only then removes the legacy key; the legacy set is environment-dependent (native `show_r18`/`show_r18g`, web-core dev `settings_show_r18`/`settings_show_r18g`).",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.test.ts#L257-L298",
+          "version": "repo-lines-v1:sha256:4b50f51dca90f9f1d76d5f395bdcb028c84cf9a198fe2698ef0d4cc03626a216:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhNzg4YjVjOWQyZWZiNTE3ZGU0ZDAzMDliZjA0MWNkOTczN2IyZTVjNmQ5YTIyZGQ1NzcyZjdmYWNmZGM0NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM4ZDIxOGM1OWYxMDQ0MTllNTg1ODZkYzBjNzdmOWNiMTI5ZWIzOWNhYzJiN2IxMTc1Y2VkYTA0ZTMzOTU0ZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ1NmQzN2UyMTZhODBmODZiMzNlMzg1NjNmNmY4ZDFkM2Y0MDdjMTQxMmJlNmYzOWJjZDUxMjQxYmViMTJkZmEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L267-L279",
+          "version": "repo-lines-v1:sha256:4f127452ba3428d13aa5eedd8e3eb67d0ac81c1bcfab05c3885675f51c3da4cb:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmOTU1MWZlZmUwYjc4OTdhY2I4ZTJjZWNkMWJkZmM3ODVjY2E2MmJhZmZmZjU5MTYxYmVhNGVlOWM0ZjU4NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkZDI5ZWNmMWZlMzEyMjI5YzU3YWZlMWEzYzgyMzJjNTZhYzAyYjRjMTYwNWI1MmMyNjU1Yjk4YTFiMGIxYTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU3YjQ5ZTA4MzQ5NmRhNTQyOTI5NGFlNzVjYzRjMDMyMjMxZDEwMjhhZDU4YjFiZWM4OTg4OTM4MTA0M2IzYTgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L55-L60",
+          "version": "repo-lines-v1:sha256:c89f93a69d9362001ba3875e4c80542a47adbb6ff0441dc95001b2477e194177:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzlhYzdmMDcyMmEyMGUwOGI5MTcxNTFlZmU0NTQxNThkYmQ5Nzg5YTBlYTI2ZDQxZGVlZTU5MDljMjI4ZmQxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTU3OGZkODgwZTYzMmNkMWQzMTQyZGE5MzRhYTk3ODdmMmU5NjIyZDU4N2RlNTdiNmMzMjQwYzRhYTYzOGRiOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDRhMzk4NWQwMjQ5ZmI5ZTI1ODU5YTg0NzNiNzJiYTYxMzY5ZGQwNjQwNTdiNzJlY2Y4MzU1NDNlZGY3OWM0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODYxNDJkZjc0ODQ2OWRmNGVlY2YxODU1NGI0OTMyZTg1ZDA0ZDBmM2JlYWVjYzI5ZGZlMDM5Yzc1ODZkOGVmMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9653d5653c33496abeec72220924e621",
+      "statement": "On logout a `watch(currentUser, …, { flush: \"sync\" })` immediately resets the account-scoped refs to their defaults, and every account-scoped setter early-returns without persisting when no uid resolves, which is what prevents one account's switch state leaking into another session.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L1301-L1314",
+          "version": "repo-lines-v1:sha256:66c11ea8aaf75ab6ae30f09e6002133d7c4d6298addd44636f418bd828671841:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmY2NmN2Q3MzdlMWU4M2I3ODBkMzE2ZDMzYTRkMzkxNThmZTRmNjEzOTE2M2QyMGE3Nzk2MzdmNDM2OGQwMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2MjY3OTM1ZmM2MzM0NjVkODQ4YjQwYTRlZDY5NjdlN2I3YTMyM2Y4MWNkNTNjMTEwYWUyMTAyOTY4N2FhMTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmODVhY2NkMWY4MDgxYmE5MzViNTg4ZmE1ODRkNGZmYTg0ZTM4NTA4MmY0ZWRmNDgwZTRmN2IyNGQ0ZDQ5MjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiOTViOTVjZGNlZGZkMWY0MDgzZTVjMjJkZjZiMGExZjc5NGNlYTdmNmEyMjg3MGE3ZDU4NzdmZTBmZTM2YWMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L807-L823",
+          "version": "repo-lines-v1:sha256:f0bfc00c0810821fe8f0311db1c30562d485cfb3b7edf826c59589bbea6b11ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkN2NhZjk2ZTJlZTYxYzJjYzA2ZDYzOWJmOGU5YTJlMjAyYjRmYTE5ODliN2M4NGE3ZmUwNWM2N2IyZjQxN2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3ZDg2MzJlNTRlOTI5OGFiYjk1ODcyN2UyZDUxNDA4YWJhZjEzNjYwMzUzNzkxMDE0MGFiZjY1YjMwYWI2MTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1M2Q4MjYwMTVjYWM0YWM3MGI2YjRkYzQzYTUzODQ2OTI0NDBlZjlkODRmODlmMTFjYWQzMzMwMTk1YjQxOTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2b5710afff484a9988b247d7b053cae9",
+      "statement": "Keystore-backed secure storage is the only home for secrets: `SecureStorageCompat` uses AES/GCM/NoPadding with one AndroidKeyStore AES key per storage key (alias = `capacitor-storage_` + key), stores ciphertext in the `WSSecureStorageSharedPreferences` file as `Base64(ciphertext) + \"\\u0010\" + Base64(iv)`, and backs `refresh_token`, `webdav_password` and `webdav_backup_password` via `NativeModules.PictelioSecureStorage` (IndexedDB in the dev preview).",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java#L21-L42",
+          "version": "repo-lines-v1:sha256:2b34696a2d2ec5dc0f5e38831009532a45bd848abcc8d010a6c62223f7fa58c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmNDRlYTI2NmQyMjMwODdlM2NhZDRhNmMwY2Q4NTVjYzRmZmI3MDBhYjhjM2RjODNiZWQ1OGNhODRmZTRlYTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzMDdkNTlmZTY2OGQzNTljOTUzNGE5MmExNzFjNDdkNzNmNTZiMDAyNThhMDdlMDViZjcxZDliN2M3ZTQxZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzMzJmOGFiMDA5MjRkMjI5NzYyNTk4NmEwZDRkOTliOTQ5MTA5OTJjZGJmZDA5MjE0NDM2M2UzNTk5ZmQ0MDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/tokenStorage.ts#L1-L9",
+          "version": "repo-lines-v1:sha256:e294469c85cbc2d6e9629183abe70bc516ca5b84574d0a91fdc2f09309814c48:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY4YTQ1YzAzYWNjZmE4ODNiNjgwMjNmZmE3MzMzOGRmNmRjMWUyOGZkZmVjY2U4M2MwOGJmNDA4NmY2N2E2MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTE4MzFiN2I1NmRhMjlkM2MwNGFhODhlYzY0NzJlNzhiOWJlNjgzMGFlOGNkY2RhYmYwY2NlODEwZTIxMGNhYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZThjOGUzZmQ0M2VhZjY5MjI1NGNjZmE3ZWQ3MjI1YmM2NGViYjJlYWZiZDkzZjRjYmM2NzRhMTlhMmE5YzNhNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/webdavCredentials.ts#L1-L11",
+          "version": "repo-lines-v1:sha256:0f32e85b1238771f2609b3e190804e97a72bff1c28586393ee8054f80b07c355:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiNWQ2MjgxZmNkYzNkMjlhNDMxZjMxNjM3NTJjZGIxMzVmYzMzYjhiYzFmZTRjMzcxY2YwNTQyMDBlNTNiZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2NGJkNTc1MzhlMzk4MDVlYWNhZmFkOWEwNjdiMzg4MWI3YTBmNmZhZDM2MzIxMGUxNzQ4YjY3ZTdhZDlkMTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM4NjU2ZWRjNzEzNDQzMmM1NTc0YTE4MTE1NDhlYTk0NGJhOGU0MTUyZDkzMmMzZTM0YjU5NTQyMWQwM2RjYzEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0179bec4e2074af49ee4545c077b80ff",
+      "statement": "WebDAV credential isolation is pinned by contract test: the two password keys `webdav_password` and `webdav_backup_password` must not be declared in `settingsStore` (only non-sensitive connection configuration enters the backup domain) and the credentials module must read and write through `PictelioSecureStorage`, not ordinary preferences.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/webdavCredentials.ts#L28-L78",
+          "version": "repo-lines-v1:sha256:ac89482584359722df27510f22cfb14bb91ebcceac48707bdf3f97c228b6ae2a:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3ZjI1MzNmYjA5YTQ0OGRhYjlkNTg3ZGY5MzUwMjg2NzE0YmY4NzNiYjU0NDlhN2Y2ZmM3N2FjNzg3Y2RmODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ1ZTU2NzNhNTUwNDE3MmIyOGViM2EzNzFkZjI1ZmU1OTdmOGVlZmEzOTQ3ZTU3NjkxZjlkMDAxZGQyM2RmZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk0NjhjMDYzZmQ1NmNiYzQxNzhiZGFjNTI1NmY3NmYwNjIyOTA1ZmFjZTc5YWIyZjQxM2Q1YjdmZDZlNmJjMDEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/webdavSettingsBaseline.test.ts#L72-L88",
+          "version": "repo-lines-v1:sha256:aa0c8a717d3346d6b1d1903afa547bb9b3c6d5131c2fea84bde17c3edc0c55d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjOWIyOTdjMTdiODYwMDg1MTEyMzAxODZkMDA0NWEzNzBmZDU2MDFlMTY2NDhmMjA2NGRmNGZjNTQ2MGY0OWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZjBiOWRjMmI1ZTFiOWFiZWNiZjJmMTAxNWE0NTIzY2IyYTc1MWVlZDgyNDQyYTBhNzA4ODBmZmNhZjliZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a43e8fffd0a64745bcf0019b20c04aef",
+      "statement": "The persisted-format strings `CapacitorStorage` (SharedPreferences file), `WSSecureStorageSharedPreferences` and the key prefix `capacitor-storage_` are frozen and must not be renamed, because renaming them orphans every installed user's stored settings and refresh token.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java#L35-L36",
+          "version": "repo-lines-v1:sha256:991fcd7e7e265fe8338ccc13538cc2c4ca8783f14e66b20212c9b8fa7e8ff718:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWYwOWZlYTFiYThhZTIyNjlhMDQ4MmFhMzQxNDMwNTk2Nzg2MTI3NzVkOTIyZTQzZDE1NDQ2OGVlZTM4OWNmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzYxYzRmYzJlNzI0MjJkNzAyNWY0NTYxYzRjNDRmOWZiMjhmNGExZDllMjI0ZDcwM2ZkOWMyNDIwODI4ZjMzZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODU3MTYxMjU3ZmYzMjQ2MDhkNmUwODAwM2VlOGM1ZWU1YzJlMTcxZjk3ZmViM2YxZjJiZGFhNGM4ZDgxNTJmMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmE3MDQ2NTJhYzkyMDc4YmY5ZTE0ZWMzZmE0MmU1MDFmNzkxNTM5ZWQ2NWM0MGUxYzE5NDI4ODFhMmUzYjgzYiJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java#L34-L42",
+          "version": "repo-lines-v1:sha256:0d89ccd23d17b28a4f5e6f7ad526bca5498cfb00a4e86bf68ecf842d43c6cc0f:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGM2ZjQwODM2ZGM5N2Y4MDc0YWZlY2ZiN2JiMWEyZGJkMWYxMjEwNjg2NGJiZDg4NTQwZmUzMzg0NjNjZTFhNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGY0NGVhMjY2ZDIyMzA4N2UzY2FkNGE2YzBjZDg1NWNjNGZmYjcwMGFiOGMzZGM4M2JlZDU4Y2E4NGZlNGVhOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDljNzQ5MjkxMTNkNGVkYzEwN2IyYWFiZDFkMmYwYWI2OWUzYWE5NzZmYTc5NGMzOTk4YWYwMGZmYzJjYTYxMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTMzMmY4YWIwMDkyNGQyMjk3NjI1OTg2YTBkNGQ5OWI5NDkxMDk5MmNkYmZkMDkyMTQ0MzYzZTM1OTlmZDQwMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_903cd0025efe458eb1637e497ae71f53",
+      "statement": "`PictelioPrefsModule` returns `\"\"` for a missing key (never null, because the Lynx callback implementation crashes on null arguments) and Lynx JSON-quotes string callback arguments, so the JS preferences adapter runs every value through `unquoteNativeString` before use.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java#L19-L26",
+          "version": "repo-lines-v1:sha256:ffcc73414a9eedefbd50b92b516ad147f4219e147d173e69c60bcc4701e6dc37:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjNjNTEzZGMzOGVjZTVjNjFjY2RjOGQzNjExNDcxMTRkNmY3YmNlNmUzZjgwZjMyM2NmMmM2M2I3NzdlNzNjZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTlhMzFhZTg2YTFlMWFiYjc3MjNkMGNhZTI2NjNmYTlmODNlNjllMmM4OTUwNWE3ZTZkZGIzNjU3OWNlZDFjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDkyNmFmMDZjZDdjYWI3ZWQwMDJkZDliM2UwMDNmM2VjNDk2NDE1Mjk1ODM5ZjRlYTY5NWY1NTMwYzRjNzIwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzMwYzJmOWU3OGQyYjIxZGJhZWU2NjFlM2I2NjYxNTQxYjI5MjBhNTgzN2JiODZiNmFkNzY2MmU0M2M5NDVhNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L198-L217",
+          "version": "repo-lines-v1:sha256:a25700396600b2cc4a48f6fb46a85aa0ecc029a9329ca379833b4bca47d19b48:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5NWZhMGYxMTE3YjVlYTQwNDM0MTQwZGRlMWEzNDBjNzIwZGRiZjMyNjIxMmUxOTE4MzhkNGIxNTZkMzE2YmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmMGNkYjk3MmE3YmZiN2VkMjQ2ZjlmZjY3MjM4NWU1NWY0OTY4ZmMxMTA0M2RjNWI2ODRkNTFkZmEzMWRiY2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZjZDI1ZmZjZDEwYzU3NTc4OTgxYzhlODBlNTllYjcxNDcwYmUwOTEwNmU5NTM1Mjg5ZTE5YWNjODVlODcxYTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxMTdiYTcyYzdiMGNmMjZmNzQzZDMzYTc5YzU2YTIzYjFjMTBkMjdmMWNkNzhlYmRiMzdmYTYyNWRhYTFlODgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/tokenStorage.ts#L64-L81",
+          "version": "repo-lines-v1:sha256:f0fffbcaf510338a29fb141c0a6e7c36509cad4e95bc0fcfd298b6983cbe3656:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ0NWFlMmRlNGM0MWY2M2JlMTg5OWFjNjQ1OWEwNjIwMWJmMzU1YTgzZTY4MmM4OWE2ZTIwMTNjMjc3ZjVkMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkZDVhNzQ2YzA2OGI2YTJjZmY1MWRjM2E2MGM2YWM4YjAyOTA5Y2ZlOGYzZDUyYjhjOGEyZGJhN2Q1MmExODAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_620a98e979094850bbafb5182e235232",
+      "statement": "`utils/idbKV.ts` opens the `pictelio_lynx` IndexedDB at version 3 with the `kv` and `translations` object stores, creating every store under one version and converting `onblocked` into an explicit rejection so an upgrade can never hang silently.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/idbKV.ts#L5-L39",
+          "version": "repo-lines-v1:sha256:43fa13488b664b5c61e24f8eff3752c845eaadf4a8de2d4ee86c210654fe6989:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwODI3NzRiOGExNWU1NDMzMzA2NWUwZDhmZGEzN2ZhYzg5MzYyNjlkMDAzMDc3YzBhYWU0ZjJhYzI2YzQ1NjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjMjZmNjgwNWM4YjE1MDBjMDI5NDQxY2ZmZTE0Y2ZmZTAyMGI2ZTEzZGQwODM1MTZkNjU5NTVmZDJiNDg5MWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkODM3ZTY2YzVlMzFmODJkZGY1MTljMjcxMjhmN2Y5ZDJmY2U2OTY2MGQwYWFmOGMyNTkzZjQ3MGFlZjk3NTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e63d39ce3a7348afad14336c841b8277",
+      "statement": "The IndexedDB layer is a dev-preview and cache store, not a production one: on native PrimJS `indexedDB` is undefined, `idbGet`/`idbRemove` swallow the failure, and `idbSet` rejects — so the two keys read and written directly through idbKV (`settings_ugoira_mode`, `settings_detail_quality`) never persist on device and are absent from native snapshots.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0172-app-lynx-runtime-web-api-constraints.md",
+          "version": "repo-file-v1:sha256:05bc6171a2ca17a76e2861ecf42c464642511f00be16ee2bdceb88fd283c7fa1"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L466-L468",
+          "version": "repo-lines-v1:sha256:16b4a1e03842e22688a2689751b1c2006bd2e8b439439467acb95f1830306f80:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzRlZjNlNzZhMDg3NGZjYmNiMTljMDJhOGE2Mjk3NjQxOGRkMDFlYjhhMzdkNjhmN2M1YTNmMjkxYjM0MWFiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODNlNmIyNTBlNTBkYzRmNmM5MjE4Y2IzZDg0ZjExNzA2Yzc5NzExZmZjMjViNjg1NWI0ZGUwNjI0MjI3MDY0OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGEwNDZjOWE4NmEyMjk5NWZjNzBkMjIzNzljMjk4ZTJiNTk0ZTM4YzgwN2Y0NTUzZGQzNGIzZmRmMDY3NjA5OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzU5ZjZiMGJlMWNmYWM2MzlhMjhhMmFmYjc2MTIxMjAyNTZkYzAzZjc2NjIwZjI3YThlYjliMGE2MzAzODIwMCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L966-L978",
+          "version": "repo-lines-v1:sha256:76cb60e396ec4c1c09ac25e2a83f20c566096d15aca6826c94b7da889007e694:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM0MGYwNzgzYmY1ZDMyMmZmZDE1NDA4OWYzMGEwYjhkMzYyNGNkOTc4Zjg4NTY3YTJhNzk1NTRlNmQ4MzA2ZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU4MzA5NTQxNTJiMjBlMzZhMmVmYmIyYWY5MWI4NDg3OWMxOWMzNjUyOWNjNjkzNDU0MGUwYzNlN2RlMDAzYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlmMzI5ODIzZWM1ZDFjM2IzNWQ2ODJkZTg5ZDY1MmZjMmM0OTFkNTM0YzZlZDhmZDdlNDUzZGJmMjcyZjFhZTQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/idbKV.ts#L41-L79",
+          "version": "repo-lines-v1:sha256:16d838afe2c2f753d0d20a67c3df3d3859b4cb820d8574feef2d5dab940062a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjNGFiNDJjOTg3ZjU0ZjlhYjQ2NGJkNDllMDEyZDI3ZDlhOTA2Nzk4ZTM3MTAzNzFjODE1NWQzMmI0YTQ2ZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRjZjk1ZjJhMmZmNDU0NDJlMTM1ZDA0ZjY2ZmIyNTRiYTcwMTBlZTMyYmU4YjNhY2EwMDI3M2UxNzdkMDlmMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c3b9ee135534345957e06228ade902b",
+      "statement": "Settings loading never trusts stored values: each key is validated against its own domain (enumerations, `\"true\"`/`\"false\"`, numeric ranges, JSON shape) and an illegal or unreadable value keeps the default and logs a warning, while setters update the in-memory ref and report write failures through `.catch(warn)` rather than swallowing them.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L1219-L1261",
+          "version": "repo-lines-v1:sha256:4bda2e35173e12a5dc15daca8a029e008a1dc977aa1da997f298612919560deb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkNWZjYWFmZjUwMjg4ZDEwNTk0OTZkYWZmMDI0NjU0NTAxYTg4NTAzZWE0YWJlNmIwYzM1MzJkOGUyY2RmN2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2YWM5ZmJlYTNlYWFjZjE1YThkZTMxYjlmMjkzNDAyMGJlZTg2ZmU0NjRhY2JmNzE1YWU1NjYyOGQ1M2MyYTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1MWY5ODU5NDdjZDVhNmJjM2MzMjU4OGI4MjFjMGY0OTk4YzM2ODQ4ZTBlMzliOWU1N2ZiMzY2MjkzMGVhNDUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L440-L459",
+          "version": "repo-lines-v1:sha256:9065969c7220e5d59e38015a6e5f10233bb70421610233250d59c76c301e802b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZDY2NGM2OWZmOTUyMGQ5NzI1MDg5ODM4NzgzZjQ2MDk2MTNiOGViZWVmZjI4NDhmYTUzNWQ3ODY3NmVmMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNDhiZWNlN2JhOTYxZWVkNWZlNWFhNDI3YmQ1MTI5YTY2ZDRjZDE3MTdmMzU4ODIxNmJjMzQ1ZDkwNGQ5MGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzMGVmMjIzNTEwNjM0MTA4Y2IzYTI3N2Y2OWFhNzc1ZTNhZGViNzhlZTJhODljMTY4MWM2MWNkMTc3ODc4MDgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L634-L683",
+          "version": "repo-lines-v1:sha256:edb36a368a6c82000b3618d407ed4a3baf50cab65194714ae27f51c1501ebf9c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwNWEwZmFjNDAwN2Y0NjM2MTI0MDY0MTgwNDE3N2U5OWEwMDNmMzkyYzEwZmY1YzMzY2EyMjJiOTVhMjgyMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyNDI3NWZkZWU1Y2Q2YzM0MWVkNGVhY2NjMWE3NjdmZDk3YjU3ZDA5M2VmODVhZTkwNmNjYzBlZTMyNWZiZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlN2Y4YWNiMWRiOGMyOGFlMTdmMDE5NmYzM2MxYzM5NGVlMjJhZmE0Zjg2ZGE3ZTBkZGM1OWUyMzFmOGY5ZDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b24635491ea846e5a321cb482334ef74",
+      "statement": "The restore rollback affordance rests on a single idbKV key: `savePreRestoreSnapshot` writes `webdav_pre_restore_snapshot` through `idbSet`, `applyPreparedRestore` awaits that hook before any write-back, and `undoLastRestore` replays the same key — so because the path requires `indexedDB`, its behaviour on native PrimJS is unverified.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L25-L30",
+          "version": "repo-lines-v1:sha256:45cfb548068f95c5602486f5c91cb320f5ff9b1339d4cc14aaaecd45fa3c9576:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmIwYWQyYjhiNTkxMDZiMWJkN2ExZGI5NjkxNmI1MTI2ZmNkNjNmNTZlYjgzZDQ3MjNmMWUxMjM2MWI2MzQ2YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGZiYmZiYTA2MTkzZDA0NmFhYTg4ZmIyNmJkMTljMGEzY2I4ZWYyYjNmZDY2M2NhZGJhYTg1MmVhYWQ0Y2YzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzc4NjBjMmJjMzVkMGUwOTE1YTg4YTgxY2JhZWYxMzFjYzRkYWY2MWY2YjQ0YmYzOTg3ZTc2YTczMDVlZmNlZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L69-L110",
+          "version": "repo-lines-v1:sha256:1b43597e4bfedd3fd447612395254055f648398434ee7c37be98857e7ca734c4:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3YzRkNmY4YTNlMDNlNjM4ODYwYTkzNmE4NmUwYTMyNzk4MGZiYmYyZGFmYTUyMjNmOTJjM2QxYThiNzg1NjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJmYTVjMTAxMTU0OGM2OTNhMjY3YTE5OWJlOWQ0YmE5ZDQ4NDJhOThiYzZhMTcyMTJjNmYwZTFlNzY2NGE5NmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0ODM0MDg2Zjg4YjQ3NjZjNDA1YjI1NjZjZmU0OTIwMWNhZDAyY2ZjZmZmN2E2ZmQ0OTg0MDZlM2FhOWRhZTQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupService.ts#L244-L254",
+          "version": "repo-lines-v1:sha256:76db07b4c455aec4a4a7341c54edcb7d2c62af99a6ee8ec6921608fcbe2c75ac:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyMDQwZTA5NWE5NGUyYWRhNzRlNDIxZjM3MTg3NTFhOTFhODEwYmZkNjZmNDhmNGU5MzljN2I3NDgwZWI2NzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkNjZjNGEwY2U2ZmI3NzRlN2NhOGM3YThhYmNkZWQ3NDFjMmNiMjJiNDY2NmY5OTg0ZjU1NWQxYThlMGU2NjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8c019dda458f4fcba4a6ec57b3b81add",
+      "statement": "The v1 snapshot envelope is a fixed nine-field object (`format: \"pictelio-backup\"`, `schemaVersion: 1`, `appVersion`, `engine`, `createdAt`, `excludedKeys`, `deviceKeys`, `accountKeys`, `sets`) whose values are the raw storage strings, and parsing refuses a file in three distinct ways — `NOT_BACKUP` for a wrong/missing format, `SCHEMA_TOO_NEW` only when the version exceeds the supported one, and `CORRUPT` for a missing, non-numeric or malformed field set.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupCore.ts#L146-L197",
+          "version": "repo-lines-v1:sha256:d9639368c2c5f3045a044c735c0d32a6e402d5c23a7b57920e0f39503e934fb6:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkODg4NmY5YjdlODA4MmE3NzIxMzk3ZWE2ZDA3NjUyNWM4NTgzMTQ0MzgxMzQ5M2Q3NGU3NGVhYjc5Y2Y3MzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiZGMxMWIxMTg3ZTAxM2I3M2RiOTRkMzM0NjY0MTM3MzFlYjEyZjY1MmRhZDFkNWE1YzE4MDk1ODU0YmM3NTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupCore.ts#L19-L47",
+          "version": "repo-lines-v1:sha256:f52d88039e5a232ade3385b547d1782afaf5ad1f95cb98f5476f5608328c8211:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAyOWM5NmY2MGVkZjg2NzQxZGY5YmU2ZGY3OGQ0ZmZiYWU4ZmE5YjJkY2E4YjE0OWI1NWViNzExYzhlNDQyMTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczYjI3NmRkZjRmOTM4MDUzODM0MDZkZThjZTRjMmRkZTkyMzVlYWZmMDE0ODllOTEwMjUwOGZjODlmYjk5ZDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMGJkODI2YjJhOGM1OTgxZDNiOTM3NWViMDVlYmNhNGZhNzk5ZTFlYTYyMmNiYWE5MGRhYzM0OTQ4M2VlNjAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/webdavBackupFormatContract.test.ts#L124-L144",
+          "version": "repo-lines-v1:sha256:0f9b1cc34fbeadd626d27efffef4a3ae653a292c0e848e0bf714638e08fe9bb6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmYmZhMWQ1N2E4YTQwYWU5ODFkMWE0Njc5NGQ5MTkxMjkwMzBkZDMxODhlYzM4Y2UwNzM3OWRiN2Y1ZDY4ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMzFmYmZiZjdmZmI3YjgzMjFlZmI1OTg5OGZmMDlkZWE3ODc0ZDQxODg4Mjk0MzI0Y2U1OGJiZmFiMzdlYTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2YmE5ZGVhYWIzZTkyZGYzZDkwZGI5MmI2N2UyOGRjZDExYThjZGM0OTMyZTQ5Y2U0Yjg0YWNlMmZhMzUyNTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1f4e7602b49e41d0b54e179ebbae5829",
+      "statement": "Restore uses merge-by-keys: only keys present in the snapshot are planned for write-back (locally-added keys are untouched), account-scoped keys are applied only when their uid suffix matches the logged-in uid, snapshot `excludedKeys` are never written, and the write-back runs through the store's own setters so values are validated identically and unknown or foreign-account keys are reported as skipped.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L1348-L1363",
+          "version": "repo-lines-v1:sha256:f23e616947fcdc53400d81e3e984c1bc051dd8442dd56aa21022a4a30d56b23c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFiODU5ZGFlYWY0NjU3ZmQ0MDk3YTIzZmY4NTQ3MjRjN2FhZGM3YzNlMmIwZGMxMzQyZTg5NzIxZGEwNTYzYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIyYzVhNDM0M2NmNTI0M2FjZTFhYzBmMzA0YzBmMjljMjU0ZWVlYTYwNjgwYjUxM2M3ODkwZjhlZWFmMDJhNTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L1509-L1538",
+          "version": "repo-lines-v1:sha256:3587b098dd901bda5c8adc8a6cd5bee84fdd0f512cbb6c53af3b58cd152fb0a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkMjNhMzhmNDFhNDFmMzk0NTgzZWM1MThmNzk0OWJiNjc2ZTQ0Y2IxNjU4YzhjN2ZmMzM0NjVmOGQ0YTRmNjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhNDg2ZTU3MmY4MGM0NjAxOWFiYzMwY2VhMjAwYmYzMGE4NTY3ODc0ZmM0ZWIyNTI4YTA5OTM2MWRmNDc2MzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgzYTUyZWY1Mzc4MWRjOTcyYjdlYWQxNmIzNzgzNjc0NTM3N2FiNGVkZjEwMzQ0YWU4NDExMjY4NGZhZTQzZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI1ZGFhZDk0YWJlNGViOWM1NzU5MGZlOThkOGZmZjQ3NjQ3Yzk5MjQxOGM0ZDVlOTIyZTlhMDcyMjBkYTJmMTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupCore.ts#L199-L236",
+          "version": "repo-lines-v1:sha256:01dedc6bdd7eb3e4d8f4111fe7fff9b4ba89c94249c65b41277cbc086e66ec0b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjN2UwZGY4YmU1MTNiZDNhMGViMjU0N2I5OTcxMDI2OGE2OGNlZGFlODA3Y2QyNDMyZjljMzQ4N2VlMjdiMDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI2OTc0OWM2Mzc2MTMzZjViZjdjOWRjY2YyNTUwZjA2OTZkNzBhMjQ0YmVhYzFhMDcwNTI0MTdlYTUxZWYzYjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7f3f0dccdf4248edb26f3c389daddec3",
+      "statement": "Restore is deliberately two-phase — `prepareRestore` downloads, decrypts, parses and builds the plan plus the user-facing summary without writing anything, and `applyPreparedRestore` performs the write-back only after confirmation; on app-lynx the plan's `sets` are ignored because the client has no block/report store.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Me.vue#L330-L375",
+          "version": "repo-lines-v1:sha256:1e4e00b7d49747efc5949bc6a0e53efc3df49416975787e9deeff4badda826fe:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM0NTI1NGNjNjQ4YzhlYWM4MTJlN2Q4OWNhZGQ2N2YwOWI5NDc4YjBlZGYzNjcxODExNTgxNmMxM2U4NGJmMmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5YTNjY2RlNjAzNmI1MGFlY2JiZmRhM2U4MzRkOWRjMTZkOGE1N2QyZjIwZDVkMzc4ODE5OGFhOGUzNTc5NDgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L56-L60",
+          "version": "repo-lines-v1:sha256:9707c6b300d25eff9c99a7b6be8efee0aab25529b76e3049df723540e3da1524:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTI0MzI4ZTdhZjgwYzA0ZWViNDEwZTMyNDA5YjBiZDc2ODFhMTQyYmJjZjY5YWJlNzQyNTRmNTJjMGJkNDI4NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjhiZjkzZDBlYzIyNjAxZTdiMWQ1NzNjNzQxZjNiYjM4Yzc1NWNjZjViNjIzOWY5NWE1MjgwMDU3ODFlNGNiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDBlMGVmZTM3ZjI1YjU2MzFlNDZiMzk5YTUyMmYwYzY3MzI1ZWZhOGEwMjUzM2U0ZTQ5M2ExMTFkNDZkYzc3YSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupService.ts#L195-L254",
+          "version": "repo-lines-v1:sha256:394b24476c20cb8380d498bd096d572774eb27fb40b4c14f70559594f7e5703e:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4MmE2ZGM0NjA4Zjg0MjFkMzZlZDM2YzQ4ZTNkZjU2MmUzYWZmZmRmNWY3MWZlY2U0MTZmZGM2NzE2NmJhMTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhZjFkYjYzODViMGI5ZGE0NWI0MzdiOGY2ZTI1YWViNDkxNTFhMGQyZWJlN2M1ZDIyY2JlOGQ2MjRkNDgxMTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkNjZjNGEwY2U2ZmI3NzRlN2NhOGM3YThhYmNkZWQ3NDFjMmNiMjJiNDY2NmY5OTg0ZjU1NWQxYThlMGU2NjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_64661a5c309e45d1a3359f8f4f2d5fcd",
+      "statement": "The backup pipeline is: collect the raw values (device keys plus current-account keys, with the runtime key `settings_webdav_last_backup` stripped and `sets` always empty) → build and serialize the snapshot → optionally encrypt on the Java side → `ensureDir` (MKCOL, 409 success) → `uploadWithVerify` → `prune` → stamp the last-backup time and clear the pre-restore snapshot.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L148-L172",
+          "version": "repo-lines-v1:sha256:8df958940e1195ea7d957d829b304da04549944f9c3aec69eaa4f9201f3b02dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmZDQxMTIyYjllYjMyNTk3MDdiNGQwZDIwYzE2ZGUwM2RlOTRhZWMxYzAzMTc2ZTY1MmNmZWI1ZjM1ZTJlYmIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L28-L61",
+          "version": "repo-lines-v1:sha256:7486dc8dd88d80841cd6f67065d96b232388a4d47d8cf9767d14ee690f99757e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1YmM4MTBiZjFhMzNjODAzMWU1ZWE0ZjVmNzcyMzRiMmFkYWViMmY0Mjc0YjhjYjQyY2U0YWZmMTFiMDI5NmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZjOWRkYWVmMmMxZGYxNjYwZjBjN2ZlN2NlYjY0NzdmNzJmNDgzYWI2OWY2YTdhOTcyNDNhNjg1NWNiZTYwY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ1MTBiNjBjYjk3MjI4MGU4YjQ4M2NhN2E5NjY3OWI3MmI4Zjg4MzcxY2ZiMWY1ZjBiNzgzNDQwNWZmNzFmMTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupService.ts#L156-L185",
+          "version": "repo-lines-v1:sha256:f4aed1ae405af5849db351040cf79c0d44f0508561c5b173da5e4b5a5c23d2fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MWNhMTYxMWEzNTEwOTQ3YTFhMzlhZjU1MzdmNTliMTZlMWJjNTgyZjNkZDUxYmUxOGIyMmUyMDE4ZDc0YTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlNGZmNjYxNWEwODZlMzdiZGFlNDEzOTk2OTBmNTlmNTc2YTQ4NzQwMDU0MGRiODVjZWFhYmFhMzJkZTdlYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExYmY0NDI1MzE2ODVhMjAzMjVkOGM3MmI4ZDQ3NzFiZmQ0MTQzNTM4ZDI1NzA4NTM4ODdkYzJhOTZlYTU4OTQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a287042c60bb4f3fb686f3a909eebe5d",
+      "statement": "Write-after-upload verification compares the remote `getcontentlength` (PROPFIND Depth 0) with the local byte count and falls back to a full GET byte comparison when the server omits the field; only `NETWORK` and `SERVER` failures are retried, other classified errors propagate immediately, and rotation keeps the newest 10 candidates by filename with delete failures logged but non-blocking.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/WebDavClient.java#L135-L173",
+          "version": "repo-lines-v1:sha256:6fcbd96cc85776b44508f389e540806e4f1a68fca035651c3d8e5fa874677a2c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU4OTA1M2U4YmU1NDJjNmYwMTJhNjVkODFiYTBjZmMxZTllZmIxNTM2NWY5YWZhYmFlMzRjNDA2NTlhMTg1NWEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/WebDavClient.java#L213-L243",
+          "version": "repo-lines-v1:sha256:5955b2a25b893c33f0f86486f8f1715165caa798dbfc0bd1e8bbe5b4e4204072:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMTI1ZGNjMDc1NDE4MDkwYjMxNjcxMzg3MDQyZTJkZmJkNTFlYmZmNmU3MTliZTgyOGFlZTQ0YjY0MmY3ZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_de41f85c59e241d1bfbf6981d7d6b9d3",
+      "statement": "The two fixed pipeline values — 3 write-verify attempts and 10 retained snapshots — have a single Java source of truth (`WebDavClient.VERIFY_MAX_ATTEMPTS` / `KEEP_BACKUPS`) mirrored by app-lynx constants, and a contract test asserts both sides equal the spec's literals.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/WebDavClient.java#L71-L75",
+          "version": "repo-lines-v1:sha256:ee9468aca72ee81a8f28688a4ce2c8382cb92692cd9414dfebd064cc4762f69f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM5MThmYjAxNmRmNWZhNmEzZjkwOTljZmE4ZWQ4MGM1MWRjNTg3NGZjOWY1MTk1N2I1MjgzYWJiMDY1OTQzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzhkYzZlOGE3NGNmMTJlYjNmYzEzODA3NGQxMTdmODA5YzE5NWE0MjdlZGY2ZTIxNWYyM2M2YjgzN2ZhOGU1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTk5YmRlZmVlYWNhNjM0MGUwMjkwZGM4NmU4ODljODlkNWUxODlhYTViYTQ0YjU4NWIzYjcwNzM0ZjRhNjJkOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWNiN2I2NTgxYjVkOGM2NjU5M2Q0ZTkyNzU0NGJiYmFlZWQyM2VmNjUxMjRhZmFlYzc5NTNlN2E0NTFkYzgwZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupService.ts#L22-L29",
+          "version": "repo-lines-v1:sha256:e466092476177d30c38bc53aa95185579c972d9a0dddf00ea1c8130585ee9c0f:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjdjNDc2NzAxODZiOWM5MTc3ZmRlMDNkMTcxOTRkODMxNTA2MWYyZjFkNzQ0N2FjYjYyNzMxNjJlYTBkOGM0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2M4Zjg2OTdmMDJlZjAwMzJiNGVlNmQ0MDUwNzhiYzU4Mjg5Y2Q3ZGFiNjFiZjY2MmZiN2ZiNzdlNTQ0NDllYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTc0MDRiZDhmODhlMGNhOGU0MzRmZGNjMWRlNmJiODg4MmI1MTk4ZTAwYWYyZjQxMjdhNTBmZDgxOGZmOGE2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Q2ZDRjYjIyOGYxYzg5MDVjZjA3NjczMjMwOTAyYjhiMjZiODY2NWI1N2ExNTY3NTc5NmEzMDVlN2U0NjNhOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/webdavBackupFormatContract.test.ts#L182-L189",
+          "version": "repo-lines-v1:sha256:4682fb213a1c3ff6031e36c2a4a8a4635bc98a7c4565a817f440a46655d73569:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzhkNWRjNTBlYzNhYzg3Y2JjYjUyMjhlMTFlMDI1MWMyY2Y0N2RkYTRlNWJmNmMwY2Q3ZDBhNDI3MGQzYzJiNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjIzNTI1ODljMzRkM2M2MDY4NTkzMWI2ZWNjNGQ1MDk5MWE3YzU2YzhmYmEyODk0MTE0NjU3NjkwMjcyY2FjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTYxNTk5NzNiNjRlNWUyYzgzOTI3OWViY2UxMjc1MTk4ZjU0M2Q0ZTY0YWQ0MjVhNjIxYTczYWE3YTQxOWQ2NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTU2MTcyZjUzMTYzM2VmNmMyNTc3ZDg5YWMyYWRjMDI1YmJkZTRiZDk1M2MxOTA0ZDk1MGMyZTg3OWMxYWQ1NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_382d2b4f6cff420ca14375a85e544276",
+      "statement": "Snapshot encryption is implemented only in Java and is self-describing: `PICTELIO-ENC1` magic (13 bytes) + salt (16) + iv (12) + AES-256-GCM ciphertext with the key derived by PBKDF2-HMAC-SHA256 at 600 000 iterations, so the TS layer passes plain bytes plus the password and never implements crypto; a wrong password or corrupt file both surface as the `CRYPTO` kind (\"password wrong or file corrupt\").",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioWebDavModule.java#L103-L116",
+          "version": "repo-lines-v1:sha256:6aeb4df34914465f346f5c1629c277fd7c58289869fe8c4e3fefa70ed82a021c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1YWUxMDg0ODNlZDg2YmRmMTFlYzkzMTU3NGI5ZmQyZWI1YmJmMDA4MzRjNzI2YTI5YTA0ZDY4ZTY0OTc4ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI2NzM2YWE3NmYzYWI1MTE5ZGYwMmNhYTUwNzU5N2QyYmVhYTFlOGY1NmJjMGY5OWYwYTQ0N2Q3ZTAyNWJjNzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlYjBjYzhlZTIyZDg3Y2NlYjYyNDVkZWI3MTUyMGMwMzhjMGQ2NWY2MjliMGQyODk3OTMyZWIxMzlhYmVkY2UifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/BackupCrypto.java#L15-L43",
+          "version": "repo-lines-v1:sha256:4d644342c14dffe0e00bc146c3afc15a835494c020ae2a244d5075366f426dec:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYjdlNmI1YzBiNWU2ODRmYzc3MTc0Mzg1NmFhOWNmMTBiMjU5NjkzZDZjODgzYmVhOTAxZTM3NTRkOWIyNjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNhNGI5YTg1MzNmMGUwMWY2NjVhODUwMWFkN2JiNDYwOTQxMTM3ZGY4NmM5YjM1Mjg0ZTU4NTFjMzk1YjExMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlYTE1NTJkNWZkODBjNTliYjU1MjM5ZDg1YzRiNGI2MGU1MDFiYjgwYWMzZWFlZjEwMzI3MWU4NGVlNDRlZGUifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/BackupCrypto.java#L75-L100",
+          "version": "repo-lines-v1:sha256:fda6a475dcb97d291caa66bc7082e0bf2dd39d9eca4fcc3482f06dc87f7337c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzNzk1OWIwYmZlMDAyYzBkOWQ3MDY5OTU4NjZmNTU4NTcxOTdiNWZkMDAzMDE4ZjU2NzQ4NGVlYjM4NjQ5NzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJhMTU0MDFjMjQ4Njk1NzFiMDRmYjA2MGY3YzQ3MzQ2ZjBlOTExY2NiMzFhZTAyNzllNTk2ZGViM2U5OTZhZjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_496a8eca499d4f89a20ccbc9af7c6840",
+      "statement": "Error handling across the bridge is a closed vocabulary: the UI renders eight kinds from `WEBDAV_ERROR_MESSAGES` (`CRYPTO` is added by the bridge while the Java `Kind` enum has the other seven), an unrecognised kind is downgraded to `SERVER` with a warning, and every bridge callback uses the two-argument `(code, payload)` shape because null callback arguments crash the Lynx runtime.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioWebDavModule.java#L118-L142",
+          "version": "repo-lines-v1:sha256:343b4f45dbe72385056f66c53a683f3546979a1f8a9ef576ae93574137f64b14:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2YWI3YTYyZWQxOGViMzE5ZjIwNjdkNGVlYzRlNjQ5NjlkZTQyNzhjNWQxYWEzMTBmZGI3YTM1MTUyNDQ0MTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0Y2QxNGM0YTVlN2Y0ZGIxOTg4MGY4NjIyNTI5ZDJlZDdhOTYzNTViZDQ3YWYyNGM0ODQ3OWNmYzcyOTQ1MTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY3MmMxYzBkNGQwNDA4ZmIwNjI3Nzk4ZmU1MmNjOGM1MjljYThkMmNmMzg4N2EwMTg0NzI5MzNlNzA5MWFhYWEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupCore.ts#L263-L273",
+          "version": "repo-lines-v1:sha256:cf41459a85c6e68dd372c23757cbb354f13be1b1eb8a0c61f3144ff71553f388:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NzYyZWNmMzlkNmZlNGRhMzQyOGFkNWNmYThkOTFkZTY4Y2MyMGNlYjAyNGNjM2RiZmM0MjcwMmZlMTdkZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/webDavBridge.ts#L129-L167",
+          "version": "repo-lines-v1:sha256:c5ec5dd1f4feec9a398415f5cbe8ad545cf10258cee6bcfec5a1f5763b3ba73a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmMzc0MTgzM2MwOGQ5ODNkNDU1NmU0ODlmMDMzODZkYjBkNTBjNjQ3ZWYzMjMwZDQyNGFmOGI3OTczY2M2OTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkNzhlMGUyYjM4NTM5NWMwYTE1NDk2ZTk5MjY0Mzk3OWM1YTRiOTcxYTAxMTdlYTYxYTU0ODFjMWVkOGFlYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRiY2ViYzhjNzA2NGYzMjY1ZjQyM2E5YzQxNDJkOTJkMzQ0MDcxODQ1YTdlMWQ4MWVkZjNkNGZlZWY0MTExNGMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/webdavBridgeJavaContract.test.ts#L81-L133",
+          "version": "repo-lines-v1:sha256:06aa0c67d579e14f016c57fb5dd5a1fea0ac36cd265b6b603a73edcf0ff3d86f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzZWQ5NjM5OTQzZTVmZjQ3ZWIwNDE2ODhiZjZiNTU0NTgzMjVlYjI0ZDlkNDk4YmEwNmU5ZmUzM2JjMTgwOGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc2NTIwZmUwZWU3MzkzNzdmNWMyNGU0MWFkNGYyOTNjZDMwODU0ZmJjNWFhZWNjOTg0MTljMzNhODQxYTQ0NDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4ZDkwMmNiYzdiOWM4NTY1ZjVkMmQyNDNlM2QwYzJkMDkxOTMwZjIwM2MwZmFjM2ZmMDU4ZTgyOWVmMmM5MzcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cb81553fef004bc6908fa6949b325fbd",
+      "statement": "Startup auto backup hangs off the application lifecycle only: `initRouter()` calls `runStartupAutoBackup()` after `loadSettings()`, a disabled master switch means no IO at all, a never-back-up or unparseable timestamp runs the backup (with a warning for the corrupt stamp), elapsed ≤ N days skips, and any failure only warns without blocking startup.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L632-L634",
+          "version": "repo-lines-v1:sha256:ab9ca7779355aa2f61ca543399c44bdf6499e81885c0d4ff3adfaf5942987387:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjk0YTg2ZjBiYTc5NjMxNDExYmM3ODUyYTRmMzU2YzBjMjk3Mzg3NDQ0YmU5ZGU4MTQyZTk2M2EzZWNlNjUzMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDIyN2VjNDBjNDQzN2MyMTliMzBmOThkNmM1MDViZjAyMTQ3MGIwMjM2ZWYzNzA5M2Y3ZTgyYmZjZWQ2OTEwYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTg5ZTQwM2RjMjE3YzNhNDViMmFiOTE4NGVhYTBiYjNmMmU4YWRiYmNmMzllOTgyMDFkMmY3OWM2MjdiMDVhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTA1MGZmMzZhNmExYzBkNTBmMDRlMWE3MjBiOTUyNmFlODNmNDA0NTRiNGNiNWU5YjliMWMwZDhmZDdiMGJjMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/services/backupWiring.ts#L148-L172",
+          "version": "repo-lines-v1:sha256:8df958940e1195ea7d957d829b304da04549944f9c3aec69eaa4f9201f3b02dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmZDQxMTIyYjllYjMyNTk3MDdiNGQwZDIwYzE2ZGUwM2RlOTRhZWMxYzAzMTc2ZTY1MmNmZWI1ZjM1ZTJlYmIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupService.ts#L284-L307",
+          "version": "repo-lines-v1:sha256:1b75c5a0a8ff49321449649035c197bafb022c2e42b8d89341c9d949a7d6cfce:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA4ODZjZmRjZDM0MDRmOWQyMTkzYTQ3ZWQ0ODNjMzIyZGNmYmEwMWZhMjI3MjRmMDFkNDNkYTllN2M3NzE2YjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2ea09ff20b74659bcf7b9ce1311b609",
+      "statement": "The backup domain is a whitelist plus account keys, and device facts and rebuildable data are kept out of it: browsing-history, continue-reading, watch-later, search-history, engine device-fact keys, usage metrics and notification read-time keys are not exported and cannot be restored, which is asserted behaviourally for several of them.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/browsingHistoryStore.test.ts#L356-L360",
+          "version": "repo-lines-v1:sha256:c0a53e92a7d624f4947276070a83c32284edbe2c3ad6c740a5076064bac55d48:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDk5ZTU3MWY2Nzg2YzU4ODZhNTFkMWY4YWZhNGFkZmRmOGY2ZjhkMTdhMGVmMTM3Y2Y0Y2EyZTc5NmVmZmUzZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjIzNTI1ODljMzRkM2M2MDY4NTkzMWI2ZWNjNGQ1MDk5MWE3YzU2YzhmYmEyODk0MTE0NjU3NjkwMjcyY2FjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWVmMGI5ZGMyYjVlMWI5YWJlY2JmMmYxMDE1YTQ1MjNjYjJhNzUxZWVkODI0NDJhMGE3MDg4MGZmY2FmOWJmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODU4MGI3NjUxOGRhZTk3OWZhZWJkMDIzNjdhMjkyOTJhNTBkOTc2MDkyMjUxYTM4YTZjZTMwODgwYmE0MjgyNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.test.ts#L1617-L1680",
+          "version": "repo-lines-v1:sha256:36bffd369fce0a6f818671012fd79d2b4373408e5c8964865ac6a4bcc0d7e4b3:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzYTEzMDFlOTU1MGFiMzQ5NWU2MzdkMzU1NzUwZjY0NjE4MDdmN2M2MjlmNDYzMzI0ZGVhOTFhYzdhNjAzM2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNDAzNzc4YTBmNTg4YmYyYTEzZGUxZDBhNDNiNTQyMjU3NjBmYWNjNWVkNGRiMjllOGI4YTEyMjgzYjBjY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRkMmFhZjFlYWNkNDUyZGQ3OTdlZjcwOGJlOTRlODI5NGQwZDAyNDcyOGYxNjZhYmQyOTJiMTE3NGE3YTk2ZmEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L132-L179",
+          "version": "repo-lines-v1:sha256:66f08ba60df613179f68486715c3f6d724ffffb63b9135a2f6965ba6b664aa39:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmNTY0ZTc3YWFjNmY3YjdlOGMzMmIzYTM3ODZlNTFjYTgwZGNiMmE2NTZjYTA0ZTA3YTBiNjNkM2M5ZjllYzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2MWRhN2ZhNWU4MmM3ZWZjMmFkODZjYmVmZWNlYzIzMDU0YTEyZGJlYTYwMGE2MmRhMjIwNDQ0MTBjNGE4NGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkOTRlMzBhZmY5NWQ5N2MwNmU5MjI1NDNiMmIyYWVmZDk1OTkyMzY0OWEyNzFkMGJhNDJiMDgxMDA3OTUwMWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_663fb5d364814e6c80fd395a2e9d5bbe",
+      "statement": "The WebDAV configuration surface is exactly eight `settings_webdav_*` keys whose defaults are a blank URL/username, directory `Pictelio/backup` and an auto-backup period of 7 days; the Me page renders the block only on native (never in the web-core preview) and shows a non-HTTPS warning when the URL is not https.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Me.vue#L1302-L1310",
+          "version": "repo-lines-v1:sha256:97e1427b2703fdb867107036c02f0ad9efc6b4e59ea33d4db129f0c2d6cf3458:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTMwNGMyZTgxOTAyY2QxMTBhNDU4OGQ2MjJhZGEyYTE5OTcyYzgxMDkxOTFiNTU1YzRkYjE3ZDhjZGM2YTc4OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2JhYTYwZTljODNiYmQyNjBjNTQzYWUwMGNhNjM4MTgwOTEzZGRhY2Q3ZWQxZTdjMDVkNjk0MTVjYmRhYjdmZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWQ2MDU1OWNkNWJjODg0MzEzZjBhMjFkNzE4YmE4YjI3NjFlNzFjZDQ5MmFlOWNlMjUxYTdmNWFhMDU3M2NmNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGE0OGFkYTIwYjJlMmUzYTUxMDhlNWM4N2FhNmI4MzZkMjk5YWEyNGI2ZjU0YzdhNzUyNjIzYzcwNWEzYzBjMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/meWebdavTemplate.test.ts#L92-L95",
+          "version": "repo-lines-v1:sha256:446fb5f09621408cc644528ac83cbc9c5f4dbc9014f2f4ae47834aec10fcbc9c:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjMxMWVkZjE4NzdlY2ZlN2ZkZTJjZTViN2UzMzU2YzZmNzg5NGU4Y2MyNDE5ODRkMjBhMDU5MmYxMGM3MWE3MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjIzNTI1ODljMzRkM2M2MDY4NTkzMWI2ZWNjNGQ1MDk5MWE3YzU2YzhmYmEyODk0MTE0NjU3NjkwMjcyY2FjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTE3NThhOWZkYjQ2YzBkZGVhMjQ5MDhlNjg2NTk3ZmRlMWJmMWI5MTI5N2EzZjQyNWQyNGM3MTgyZDE3ZTMwZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWE5M2NhMjJkMWE5ZTMxZWI2MjZlYmRjZDMyMDZkZWQ2ODkxMDViZjMzMzM0NTYyYTczY2U3NzU1N2YyZjAxOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L113-L122",
+          "version": "repo-lines-v1:sha256:faeb60bbeddfbbe7e50162fcc0902497121b9a9423062222d0918ecb906be6b5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3ZWMzODYwYjA3YTIxN2NjMjcwMmRjZTI2Zjk0OGEzOGE5YzZhNWQwZjkyMzE0N2ZhZWI4NGZhODBiYjk5ZTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkMzkxM2QyMTZhOWI5ZjdjZGU4MzUzNTVmOThiN2NjZDdhZGYxMzAwNmRjMDI3NTkzNDQ2OWU2ZDcwZWExYmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxMDU1MzYzNWJmZmU5YmYzYmEyOTQwN2QyMGEwOGNjYmMxNjFiMTkzYzAwNzlhNWM4N2EwODU0ZmU3MGNkYWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0OTExNTk2NGQzZjEzNWVmZDQwM2JhMzZmNTgzMGUyZTVjOTEwMDg5MTdjMjgzMDg5MmU5NmFmYTg5ZjUzZWYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/contract/webdavSettingsBaseline.test.ts#L49-L69",
+          "version": "repo-lines-v1:sha256:c66446b4ed5485a43d6bea5e612d8a32d80aebe9098c9fac2babae99ada6646f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxY2QwMmIyMDg4NmQ1MmMzZDRkM2Q5ZDU3YTJhZjA3MTM4ZjE2Y2Y1OGUzZmUwODkzZDFmYjlmOWY3ODk0OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM2YTNkMjMwMmU3YWRmOGIwOGFmM2EwMjJhYzZjZTBlMzQ2ODMxMDg3MTliMDZhMTg4MDZkYzc1YmY1NzBjMjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3NTlkNzY3YzU1NWE4YjlkMjQyYTUyOGFiYzc2MzQyMGJkYWRjNzc1MTU1NDc1OGIxNzhjNWIxYzcyZGE5ZjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_30c1f2b6344f4c56b184c27796753dae",
+      "statement": "`utils/webdavCredentials.ts` returns the raw value from the native secure-storage callback without the `unquoteNativeString` step that every other Lynx string-callback consumer applies, so whether a stored WebDAV password arrives JSON-quoted (and would then be sent verbatim as the Basic-auth credential) has no test or device evidence behind it.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/tokenStorage.ts#L64-L81",
+          "version": "repo-lines-v1:sha256:f0fffbcaf510338a29fb141c0a6e7c36509cad4e95bc0fcfd298b6983cbe3656:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ0NWFlMmRlNGM0MWY2M2JlMTg5OWFjNjQ1OWEwNjIwMWJmMzU1YTgzZTY4MmM4OWE2ZTIwMTNjMjc3ZjVkMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkZDVhNzQ2YzA2OGI2YTJjZmY1MWRjM2E2MGM2YWM4YjAyOTA5Y2ZlOGYzZDUyYjhjOGEyZGJhN2Q1MmExODAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/webdavCredentials.ts#L45-L78",
+          "version": "repo-lines-v1:sha256:b3e8942ebd1989d92cc0ed972e9a0dcb6f378dddebf34fc89dc20fbe1eaee989:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwOTBlNjc5YTdiOTk3Mjg5ZDA1MmUyZDVhMmQ4YmNhZDdhNDJmMTVmNGQ5MDVhOTA4MDBhMmI4OTRkNjRkYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ1NGQyMGEwMmFiMDIzMjE3MmY0YmQ0YjI5MDAzNTc5Y2Y4NzBkOTFjMDY5ZjZjN2UzOWUxYWQxOGFkNzFlMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk0NjhjMDYzZmQ1NmNiYzQxNzhiZGFjNTI1NmY3NmYwNjIyOTA1ZmFjZTc5YWIyZjQxM2Q1YjdmZDZlNmJjMDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_037777b731ed4e01a89a5085106ccd31",
+      "statement": "The device-level end-to-end gate covers the backup upload path only: it seeds the WebDAV preferences, lets the startup hook run, and asserts a new snapshot with `engine: \"lynx\"` and a real build-injected `appVersion` plus the `settings_webdav_last_backup` write-back into real SharedPreferences; the restore path is not exercised there.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/webdav-backup-lynx.spec.ts#L79-L127",
+          "version": "repo-lines-v1:sha256:fb64efb5ff02e0f29e94ea7d15b690678e688904d8299ddfe6a364291886aad1:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmZGJlMzE2ZWQzNjNhM2VhNjlmYzJlNzVmMDkyODQzNzJhMTc5NzJiNzk4ZjE3MTk4ZGE1YTlkMjQzZjBkNDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhNmYwYzIyZTMwOTIwMGJmZWI0ZjcwZDI2NmE2M2Y1YzdhMzJmMGI0YjFmMDlkMDIzNzdhMWJkYmY0ZmE3ZjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5NzAxZDZiZDQxYjAxZWVhOGU3ZWZkMTZkZTdkY2ZiNDM2Y2E2MjA5MWE4ZjI2YTUxY2FjY2JhZTUwZmQxMzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3b9d274a684841d287c6d329ed4aaaf4",
+      "statement": "`mute_tags_${uid}` is collected into the snapshot through `backupAccountKeys` but classified as a device key on export, because `backupCore`'s `ACCOUNT_KEY_PREFIXES` covers only `show_r18_`, `show_r18g_` and `ai_filter_mode_`; write-back remains uid-gated because `applyRawKey` matches only `mute_tags_${current uid}`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L1526-L1537",
+          "version": "repo-lines-v1:sha256:d1516ed56f0e2cef469c5ca71aaaab3eeff793015580e7e96adc85f48d65475d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhY2Q0ZmE4ZmFlYjg2MmQyYmNiOGJhNzE2OWU5MTgzZmY1NmRlYTk2NmJkNjVkMmVmYmIyMmMwNTc5OWY3OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhhOGE4NTdlMjBiMGQ0NGMzNGY5YTU5NTUxNGQ0MzA0ZDgyN2YzNzBjZDViMGE3YzU3ZTE5OWU0YTVmZDI3YjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRjNGM1NDQ5MTE1MzQ0NGNiMThhOTkxM2JmNmU1Yzg1YjQ3NTM0YzBmMDE0MWM4NmQyYzcyYzAzYjJlMTI5NjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L169-L172",
+          "version": "repo-lines-v1:sha256:f01abb5a918636620e852891ea2d4148e1988ad875f5ce0d65956ba67fc1b384:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmY2ODJkZWFmYWE4Yzc4NmUyMmZmNDMxYzljYWNlMDllN2JhMzNhN2Q4ZjA0MmViMDU1YzRhMzYxNDhkYzdmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjhhM2JmNzBkYjM5NjA1Yzg0NmJlNGU3NDMwMGZmM2I4NjA3NjRiMTNlMjhjNjMwNjRkZDE4YWFiY2Y3Nzg1YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjJjMWYzM2MzNTI1ZTBkZTVlMGVjM2ZjZWM4YmQxMTYwMTU0NjJjOTM4MDQ2ZDM3YTMyYWE3M2QzODVjNmY5NCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts#L61-L68",
+          "version": "repo-lines-v1:sha256:a1f0b90370d43381c12b799a26aa92b2e529bd57a5c465905d99af91cf9399aa:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFiMDQ5OWNjNzY5YWUxMjc2NGMwNmRlZTA1MTgzYWZiMmEzNmU3MTU3YjQ5OTMxMTc3NTZlYWM2YzY5ZDY3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E3MDBiNjM0NTRiMTM1NWY1MTYzZTNjY2ZmNGQwMmU3MTAzYjdjYTQzYmQ1NGQwNWFjYmZmYzM0NGFkODc1OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDU5YWM5M2VmODgwZjI3OGY4MmZlMGM5OGNiMWZmMzA4MTcyMjBkYTJkYjE2Njg1NWM3NGU2NGU3YjE1ZGE3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDU0YjVlODJjMzg5YTQ4OTBlOTMxZjcxNGE5OTY5MDI3MGVlMTkzNjQ0ZmZjNTZlYWQwNWIxMjlhZjUxYjc1OSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/backupCore.ts#L24-L28",
+          "version": "repo-lines-v1:sha256:ace5b7c0189235b8f87f8de19f2152251d9c31277f440d7b61fd7edc657e75ae:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWFmMjJjZjA3MzI1OTJjMjQ3MTQxY2JlNjFlZmExMTAxMjYxMmY1YTMxMjJiOWFmOWJiYWY1MmY1NzI0ZDE5NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmQyMjdlZTIzMDRlNTIwZjE4NGY4NzNjODg1ZDNkM2ZjMTE5NWU4ZjhjY2E4ZDcwNThmZWY3MmNjZjQ4YjQzOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2IwZWViNjViNmRmZmY4OWFkYzI1NmJmYzNjNDI5NjU5MTRlMGVmNDdhOTZhNDEwOTIzZmUwMjA0OGU2YjRmNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2FmMDE1ZTJiZmFiMjFmZGJjMGUwN2RlMTM3NjUwZmEwYTEwZGM3MDQ0NmY3MTI0YmIyNDNhYzBkZTdhN2E5NSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.1",
+    "at": "2026-10-08T01:48:11.384Z"
+  }
+}
