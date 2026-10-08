@@ -129,9 +129,10 @@ jobs:
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
       - name: Snapshot post-run OpenWiki state
-        # 必须在 create-pull-request 之前快照。那一步会先 git stash push
-        # --include-untracked、提交完再 git checkout main 并留在 main，于是门禁读回的
-        # 是 stash 前的旧文件。后果是永久死锁：main 上的 .last-update.json 停在上一轮
+        # 必须在 create-pull-request 之前快照。那一步会把工作区还原回 main，于是门禁读回的
+        # 是还原后的旧文件。实测 git stash push --include-untracked、git reset --hard
+        # origin/main、切回 main 三者任一即足以还原，故成因不能只归给其中某个命令。
+        # 后果是永久死锁：main 上的 .last-update.json 停在上一轮
         # 的 interrupted → 门禁每次都判失败 → 永不自动合并 → 那份 interrupted 又被
         # 人工合并进 main，下一轮继续锁死。2026-10-06/10-08 两次 run 实测踩中：
         # PR 分支上 status=complete，main 上仍是 interrupted。
