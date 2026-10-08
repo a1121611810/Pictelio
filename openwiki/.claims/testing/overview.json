@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:47ad0e92cb2e7a8f9dcf07fb316184dde7f5f178b1c0b36886fbf932b46baca6",
+  "pageVersion": "sha256:cf10fc26f1165da26317ca9c31f23c91945ad14f2798ea9d168455317b0a9f25",
   "claims": [
     {
       "id": "claim_28697105e1194dc0a5ea30128f90c883",
@@ -12,7 +12,7 @@
         },
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
+          "version": "repo-file-v1:sha256:292a4e0713da26d401e2b960a28f6c00a8a57dc510938dfb093236c496d9f79d"
         }
       ]
     },
@@ -22,7 +22,7 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
+          "version": "repo-file-v1:sha256:292a4e0713da26d401e2b960a28f6c00a8a57dc510938dfb093236c496d9f79d"
         },
         {
           "resource": "repo://package.json",
@@ -32,19 +32,23 @@
     },
     {
       "id": "claim_e0b9326e81494ef49af482a713f8c01a",
-      "statement": "The active testing tiers are app-lynx Vitest unit/template/contract tests, android-host Vitest contract gates, android-host JVM/Robolectric `testDebugUnitTest`, manual Appium/WebdriverIO emulator E2E, and local Stryker mutation over @pictelio/ugoira and @pictelio/update-check; the agent-browser, Playwright, and Vitest browser-component suites were removed with the WebView client (ADR-0203).",
+      "statement": "The active testing tiers are app-lynx Vitest unit/template/contract suites, android-host Vitest contract and repo-invariant gates, android-host JVM/Robolectric `testDebugUnitTest`, manual Appium/WebdriverIO emulator E2E, the manual desktop-side device measurement scripts under `packages/app-lynx/scripts`, and local Stryker mutation over @pictelio/ugoira and @pictelio/update-check; the agent-browser, Playwright, and Vitest browser-component suites were removed with the WebView client (ADR-0203).",
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
+          "version": "repo-file-v1:sha256:292a4e0713da26d401e2b960a28f6c00a8a57dc510938dfb093236c496d9f79d"
         },
         {
           "resource": "repo://docs/testing/conventions.md",
-          "version": "repo-file-v1:sha256:4de88de27a63d15a1687efce0013b1b88e380030f66ca1e6d0def5e1cb4fc87c"
+          "version": "repo-file-v1:sha256:f18986948526ea1e91c2cc3a6475d40373f87d91341dd3a6dc52474fed667fef"
         },
         {
           "resource": "repo://packages/android-host/tests/android-e2e/README.md",
           "version": "repo-file-v1:sha256:dd1a532621c60433ba6bf8c83d8c3945803e6d62393dd1f20fcb7fc59c42e915"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-top-inset.mjs",
+          "version": "repo-file-v1:sha256:ec4e8363f4cd9a19cfe62f2e1eab626a78584643801081cc67290b065d877e9b"
         }
       ]
     },
@@ -168,11 +172,11 @@
       "evidence": [
         {
           "resource": "repo://AGENTS.md",
-          "version": "repo-file-v1:sha256:6b0d612a79807ef9db493c05e19578d10b139c74e5c5df7422751262a6337c6f"
+          "version": "repo-file-v1:sha256:292a4e0713da26d401e2b960a28f6c00a8a57dc510938dfb093236c496d9f79d"
         },
         {
           "resource": "repo://docs/testing/conventions.md",
-          "version": "repo-file-v1:sha256:4de88de27a63d15a1687efce0013b1b88e380030f66ca1e6d0def5e1cb4fc87c"
+          "version": "repo-file-v1:sha256:f18986948526ea1e91c2cc3a6475d40373f87d91341dd3a6dc52474fed667fef"
         }
       ]
     },
@@ -234,11 +238,15 @@
     },
     {
       "id": "claim_5d858449504c47f4abb6fc2682d718a8",
-      "statement": "Beyond the Appium spec harness, `packages/android-host/tests/android-e2e/tools/` holds local-only, non-CI device-side verification scripts: `verify-translation.sh` (navigate → PIL pixel-detect the blue translate button → tap → assert `translateStream 入口` fired) and `verify-abort.sh` (issue #653: translate against a slow mock SSE server then stop, asserting `abortStream 取消:` appears while `response.completed` does not). Both use `BENCH_NAV=1` deep links, the OpenAI `/v1/responses`-compatible mock SSE stub `mock-responses-sse-server.mjs` on `127.0.0.1:8811`, and an APK build-freshness guard that refuses to test a stale APK so a swallowed compile failure cannot silently replay the old build.",
+      "statement": "Beyond the Appium spec harness, `packages/android-host/tests/android-e2e/tools/` holds local-only, non-CI device-side verification scripts: `verify-translation.sh` (navigate → PIL pixel-detect the blue translate button → tap → assert `translateStream 入口` fired, retrying otherwise; default `deepseek` mode uses the real API endpoint, `mock` mode uses the local stub via `adb reverse tcp:8811`) and `verify-abort.sh` (issue #653: start a slow mock SSE server, wait until the worker entered the read loop, then stop and assert `abortStream 取消:` appears while `response.completed` does not). Both use `BENCH_NAV=1` deep links and an APK build-freshness guard that refuses to test a stale APK so a swallowed compile failure cannot silently replay the old build; the directory also ships the `mock-responses-sse-server.mjs` SSE stub and the fail-then-recover mock.",
       "evidence": [
         {
           "resource": "repo://packages/android-host/tests/android-e2e/tools/README.md",
           "version": "repo-file-v1:sha256:7ca4ac3bba3a3291435c99dcfcc40519c89488a1c43821105e5c2b86cbd75c91"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/mock-fail-then-recover.mjs",
+          "version": "repo-file-v1:sha256:926da09a9b8208e7ae23dbb5fbb2dc3f98cb8526dd7bec770526f2b7860e3e9c"
         },
         {
           "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-abort.sh",
@@ -246,13 +254,241 @@
         },
         {
           "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-translation.sh",
-          "version": "repo-file-v1:sha256:8b680dee5b767191bf6b94493e6439502fa85b5ce1f0ea00262bc0d673c0864a"
+          "version": "repo-file-v1:sha256:3fe698bdf19569e81ed8f96de968b64a12816df21f90419663f52dcdd1740501"
+        }
+      ]
+    },
+    {
+      "id": "claim_57a869cee25f472b8d5585259d5c7bbb",
+      "statement": "`packages/android-host/tests/android-e2e/specs/` contains 12 emulator specs — background-resume, delivery-probe-cold-start, fab-hit-testing-regression, lynx-bookmark-tags, lynx-boot-renders, lynx-detail-image-probe, lynx-network-check, md3-visual-tokens, settings-sync-contract, smoke, transition-matrix, webdav-backup-lynx — of which only `transition-matrix.spec.ts` carries the `@release-gate` tag.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md",
+          "version": "repo-file-v1:sha256:dd1a532621c60433ba6bf8c83d8c3945803e6d62393dd1f20fcb7fc59c42e915"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/delivery-probe-cold-start.spec.ts",
+          "version": "repo-file-v1:sha256:258e9955b175fc6fde02cea49fe3aa8cb5f4d965139fc392e73cf9407582a951"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts",
+          "version": "repo-file-v1:sha256:4a221624a31054daa6d2f257e3435d12ebdcb8b40e7283e79b099e1e0df25695"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/vitest.config.ts",
+          "version": "repo-file-v1:sha256:53e350f5a3146b333feff84837b9c404f2f5e5f5f89b37b4a5b46daae97b02a2"
+        }
+      ]
+    },
+    {
+      "id": "claim_0ce041c38c3844ee84655811ef3e39ec",
+      "statement": "`delivery-probe-cold-start.spec.ts` (#942) is the manual cold-start gate for the notification delivery channel: dev-intent login, reset `notifications_last_read_time`, wait out the 90s probe quiet period for a summary notification, `KEYCODE_HOME` then `am kill` (not force-stop, which clears the notification), tap the notification, and assert landing dispatch, the four-window rebroadcast, exactly one recorded click sample and a foreground `LynxActivity`; its oracle is native logcat rather than Lynx UI selectors, cold-start-ness is proven by a precondition (`pidof` empty before the tap) after the broadcast-count criterion was falsified in #940, and screenshots land in `tests/android-e2e/evidence/`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/delivery-probe-cold-start.spec.ts",
+          "version": "repo-file-v1:sha256:258e9955b175fc6fde02cea49fe3aa8cb5f4d965139fc392e73cf9407582a951"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c638910a92f42fabecd5e056b781752",
+      "statement": "The cold-start delivery probe registers its failure surfaces: the notification tap uses a screen-ratio coordinate that drifts when the shade's content changes, notification permission must already be granted (the probe deliberately does not request it, so an unauthorized device fails at \"waiting for notification\" by design rather than flakily), and the 90s quiet period makes one run take at least ~2.5 minutes — which is why it never runs in CI.",
+      "evidence": [
+        {
+          "resource": "repo://docs/testing/conventions.md",
+          "version": "repo-file-v1:sha256:f18986948526ea1e91c2cc3a6475d40373f87d91341dd3a6dc52474fed667fef"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/delivery-probe-cold-start.spec.ts",
+          "version": "repo-file-v1:sha256:258e9955b175fc6fde02cea49fe3aa8cb5f4d965139fc392e73cf9407582a951"
+        }
+      ]
+    },
+    {
+      "id": "claim_3a3087d45cf44473905ec3384b9c1615",
+      "statement": "`packages/app-lynx/tests/adrClaimConsistency.test.ts` is a declaration-vs-reality gate: it recomputes ADR-0212's `md-elevation-1` consumption count from production `.vue` sources at test time, requires every `<!-- measured:level-1=N -->` marker in the ADR to equal that recomputed value, and re-parses the measured number asserted in its own trailing note so prose cannot drift unobserved.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/adrClaimConsistency.test.ts",
+          "version": "repo-file-v1:sha256:84ea8febacd02cc49a4f4766d4d00fce8cc20ed531579b5c6dc3c7e12250cb72"
+        }
+      ]
+    },
+    {
+      "id": "claim_00590429a69145bdb11029c413f30450",
+      "statement": "`packages/app-lynx/tests/bottomOcclusionAllowance.test.ts` structurally gates ADR-0217's bottom-occlusion allowance: every page reachable from `router.ts` whose template contains a scroll container must carry exactly one `fab-allowance` spacer inside it unless listed in `NO_ALLOWANCE` with a written reason (listed pages must not carry one), spacers must not be conditionally rendered, and a value-flow rule requires the template height to reference a `fabGeometry`-derived identifier; its registered limits are that it is a source-text gate with no render seam and that the two `NO_ALLOWANCE` diagnostic exceptions depend on runtime content length.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/bottomOcclusionAllowance.test.ts",
+          "version": "repo-file-v1:sha256:1b5178a38c54dd5f3f054ce571c507e11295b45c687287717b68d9760b197edb"
+        }
+      ]
+    },
+    {
+      "id": "claim_32ed535057f74fb3b2ce94be441ebc93",
+      "statement": "The app-lynx device gate scripts split device I/O from judgement so the semantics stay unit-gated in CI while the device run does not: `verify-top-inset.mjs` measures the rendered top-inset amplitude against platform truth (`dumpsys` status-bar inset plus the 17.067vw top bar, with a registered +3.3px title-glyph bias and a 12px tolerance) and delegates to `topInsetVerdict.mjs`, while `verify-statusbar-contrast.mjs` measures WCAG status-bar text contrast over the composited scrim and delegates to `statusBarContrastVerdict.mjs`; both verdict modules are pinned by node-only gates `tests/topInsetVerdict.test.ts` and `tests/statusBarContrast.test.ts`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-statusbar-contrast.mjs",
+          "version": "repo-file-v1:sha256:ecb5303bfdddb18cdd3b5f6254a812ea4d0108f9b386129a510510c399970da9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-top-inset.mjs",
+          "version": "repo-file-v1:sha256:ec4e8363f4cd9a19cfe62f2e1eab626a78584643801081cc67290b065d877e9b"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/statusBarContrast.test.ts",
+          "version": "repo-file-v1:sha256:ca5d61f895c4988dcc08f84294c0bb4999c7d9f903e131f2a149d75524657332"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/topInsetVerdict.test.ts",
+          "version": "repo-file-v1:sha256:1ee93b24543536eefe132e293a1f69a65da8166479009748c1912a43d864be71"
+        }
+      ]
+    },
+    {
+      "id": "claim_c57fedcb808c4782a3a565111418be2d",
+      "statement": "The device measurement scripts use three explicitly non-equivalent exit states — 0 PASS, 1 FAIL, 2 REJECT — where REJECT means the sample cannot answer the question at all (page without a top bar, dark backdrop, inconclusive reverse derivation), and top-inset and status-bar contrast are deliberately not merged into one script because their page preconditions are mutually exclusive and a merge would collapse \"not applicable\" into \"failed\".",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-statusbar-contrast.mjs",
+          "version": "repo-file-v1:sha256:ecb5303bfdddb18cdd3b5f6254a812ea4d0108f9b386129a510510c399970da9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-top-inset.mjs",
+          "version": "repo-file-v1:sha256:ec4e8363f4cd9a19cfe62f2e1eab626a78584643801081cc67290b065d877e9b"
+        }
+      ]
+    },
+    {
+      "id": "claim_c4de2863942a483a9c6855d3156d378b",
+      "statement": "The `find-*.py` picture probes use a different four-state contract (0 found, 1 NOTFOUND, 2 usage error, 3 input unreadable), and `tests/scriptExitCodes.test.ts` pins 1 and 3 separately with distinct stderr text because a plain \"non-zero\" assertion is vacuous for the defect it guards: a truncated `screencap`, a zero-byte file and a genuinely absent control previously shared one exit code, so device or cable failure was reported as a layout change.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/scripts/find-ui-band.py",
+          "version": "repo-file-v1:sha256:2939ac3b9574c7863cbb4c575308fd51be2aea45114f639efe531031a6879d1c"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/scriptExitCodes.test.ts",
+          "version": "repo-file-v1:sha256:bde6cbb07c9aec99c586b85d280902c9008a7bb4014c583747b53293f3e3efa0"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6478615123f40f08d5f907a5df329f9",
+      "statement": "`packages/app-lynx/tests/captureScriptInvariants.test.ts`, the only CI-visible defence for the `capture-md3-matrix.sh` matrix orchestrator, is frozen under the gate size line: it reached 46% of the size of the script it guards while yielding one real product defect against 20+ gate defects, so its unclosed blind spots are registered in the file header instead of adding further detectors, while the sibling python-probe gates test probe criteria with mutation-proven discrimination tables.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/captureScriptInvariants.test.ts",
+          "version": "repo-file-v1:sha256:63b5e97771442abd0b7db47c0346d74da17a1c3e4b26714579b3e2cf65624234"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/md3MatrixInventory.test.ts",
+          "version": "repo-file-v1:sha256:0af98c15faa0399f4342d34ba7fa9935e9bcb13f4eb21f93b970f21fa4678e01"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L117-L131",
+          "version": "repo-lines-v1:sha256:99b1b8548a342f490d20e0643d4619ef5efe73519f3bdac1016c7cdcadf2e828:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwYTFjM2E2YzRkNDYyMzg1MDY2MTg1Mjc4YTUwYmZlOGI5ODU4NDQ4Y2ViZmEyYjcxNzJkY2IzMzZiYmU4YTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkZDJlOTVjMTA1MDRhMTJjZmFiMmJlNDVkMjFmN2YwMGQzOWVlNWJhNTE3YmJiYjMwNzA3N2E3OGIxMzQ5Y2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMwOThlMmM1ZjhkYzdlZDU2MDdjMWM2ZDdjNTA3NTc4ZDhlOTc2YmQ5ZjllMDY5MjhlZDI3ZmNiNDkxZWI3NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhM2M0OTQxZGU3NGI4OGMyMmYyNTg2YTAxMDExZjBjZmZjNTZhYWE1MDMyN2JhYmQ1YzI2Mjg2NTM5NzAwY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5c2813b0def840a1b4a7866ae2d5771d",
+      "statement": "AGENTS.md no longer carries the gate freeze line text: it delegates to `workflows/review-fix-loop.md` §门禁冻结线, which holds the five rules (30% size line relative to the guarded object, single-round idling diagnosis, a mutation denominator not chosen by the gate's author, the Goodhart warning that real device/data/user-visible behavior outranks gate signals, and \"fake green is worse than no gate\" requiring registered blind spots), and repo-wide citations of \"AGENTS.md 门禁冻结线 #N\" refer to that section.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L275-L279",
+          "version": "repo-lines-v1:sha256:9fb00c20be7adedad1ae3ac049614d8981b83640df7096145a0bf0ada5f47097:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjBhMWMzYTZjNGQ0NjIzODUwNjYxODUyNzhhNTBiZmU4Yjk4NTg0NDhjZWJmYTJiNzE3MmRjYjMzNmJiZThhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMwMTAzNGI2YjM1MDIyMDU3OGFiYTI3ZmY5MzM3N2EyZGQ1OGUzMDFjOTEwYTE5MWMxZjkyY2E2MzhmMDBkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmVjMzdkNjViYzI1YzU3MWQ3NGQxZjBhZDBjYTA0MmZjNGVjMTY0YzdlMzg5ZDAyNTMyOTQzYjExYWM0NmQ5OCJ9"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L117-L131",
+          "version": "repo-lines-v1:sha256:99b1b8548a342f490d20e0643d4619ef5efe73519f3bdac1016c7cdcadf2e828:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwYTFjM2E2YzRkNDYyMzg1MDY2MTg1Mjc4YTUwYmZlOGI5ODU4NDQ4Y2ViZmEyYjcxNzJkY2IzMzZiYmU4YTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkZDJlOTVjMTA1MDRhMTJjZmFiMmJlNDVkMjFmN2YwMGQzOWVlNWJhNTE3YmJiYjMwNzA3N2E3OGIxMzQ5Y2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMwOThlMmM1ZjhkYzdlZDU2MDdjMWM2ZDdjNTA3NTc4ZDhlOTc2YmQ5ZjllMDY5MjhlZDI3ZmNiNDkxZWI3NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhM2M0OTQxZGU3NGI4OGMyMmYyNTg2YTAxMDExZjBjZmZjNTZhYWE1MDMyN2JhYmQ1YzI2Mjg2NTM5NzAwY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5538e4b347a54290a4a44540a63bb70b",
+      "statement": "AGENTS.md's E2E-coverage hard constraint still names the removed WebView-era state-construction helpers (`driver.mockFetch()` and `driver.spyOnWindowOpen()`); the live mechanisms are benchNav deep links (`BENCH_NAV=1`) and `loginViaDevIntent`, and `docs/testing/conventions.md` marks the old driver and aiAssert sections WebView-only.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L272-L272",
+          "version": "repo-lines-v1:sha256:8e658cbb7038eec211f8d69ae4b51357fdeb5e1b9f5341b5c430e49fe835054e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGU2NThjYmI3MDM4ZWVjMjExZjhkNjlhZTRiNTEzNTdmZGViNWUxYjlmNTM0MWI1YzQzMGU0OWZlODM1MDU0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGU2NThjYmI3MDM4ZWVjMjExZjhkNjlhZTRiNTEzNTdmZGViNWUxYjlmNTM0MWI1YzQzMGU0OWZlODM1MDU0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTkzMzFkMDYzNDc5YWQyNDU4M2RkODM1ZWMwM2YzN2FhZGExZjQ4ODQ3MGI1NDFlYTIzMjM3NmM0ZDgxMjNkZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWY5Y2QwYWM1ZGRkYmU1NzZjY2M0ZDMwOTE3YzgwZWE5NzM4M2E3MTllYzliYzk4Y2U5NjI1OTkxNTVhOGY2ZCJ9"
+        },
+        {
+          "resource": "repo://docs/testing/conventions.md#L141-L149",
+          "version": "repo-lines-v1:sha256:2002c073823a3417772dd9ff8f19477854fb970e9b266130bd844e78f3726150:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRjYWViZDc2MjMyNTQ1NWViZWY2MjVjNDgyNjFkNWIyN2UxZjM4ZWYxNmZhNzJmM2Q3YjYyOTM4ZmI5MGY1YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzk4YzUyNzllYjBlMDY2MzJhODNkNzEzNWQ2ZjkxMjhiNzA3MmRiYmE0NjQ2YmYzOWI2NWQ0ZjdlMTZkYjU1OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWVkNjNmMWU0ZDgwYjQ0YTcxNjJhMGI1YjU1YzVkNDIxMjIxYzAxZjQ4NThjZTc5YWVhYjQxOGRlZDg2N2U0MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ExN2Y3M2NmNDliOTMxZDRiMWZiZTA3NDEwMWFkNDY1NDAzNzljNTFiNDNkOGY3OTBjN2M2ZjFhNDExMTUxNCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/README.md",
+          "version": "repo-file-v1:sha256:7ca4ac3bba3a3291435c99dcfcc40519c89488a1c43821105e5c2b86cbd75c91"
+        }
+      ]
+    },
+    {
+      "id": "claim_f972cde67fe44fb59b435b7283d32c82",
+      "statement": "Besides the three gate files, `packages/android-host/tests/unit/` covers the release tooling pipeline (release-preflight, release-build-steps, release-notes-ai, release-branch, release-overwrite, release-uploader, release-version-json, release-panel, release-retired-flags, release-utils, upload-release-assets, changelog, check-push-refs, git-refs, proxy-probe) plus `android/proguardRulesConsistency.test.ts` guarding ProGuard config against source constants.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/android/proguardRulesConsistency.test.ts",
+          "version": "repo-file-v1:sha256:fd70fb516a3454e541423f5d705c96927501be8ca16a29ec1a9df84c7564ca0f"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/check-push-refs.test.ts",
+          "version": "repo-file-v1:sha256:783d0d11734fac145962dbb5cdc489202092d8f0eb9688c23787a812a2c150a1"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/release-preflight.test.ts",
+          "version": "repo-file-v1:sha256:5bc91c1a994d75636404f5a979e68df8a914b1ceca726083c9210fdf7a8a9e5b"
+        }
+      ]
+    },
+    {
+      "id": "claim_e0a8ce2ee14545a5b6cc73d3fdbe71b7",
+      "statement": "Pre-push routing is a thin shell: `.husky/pre-push` execs `scripts/check-push-refs.mjs`, which runs an oxfmt gate over the pushed files, the app-lynx unit run (`packages/app-lynx/scripts/check-app-lynx-anchors.mjs`) when `packages/app-lynx/(src|tests)` is touched, and `scripts/verify-agent-skills.mjs` when `.agents/` is touched; the former `packages/app/(src|tests/agent-browser)` anchor domain was removed with ADR-0203.",
+      "evidence": [
+        {
+          "resource": "repo://.husky/pre-push",
+          "version": "repo-file-v1:sha256:441ea2e967e31105af6cfb9b98531e2ca9352e8b0726e5f564c139af92f6022c"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs",
+          "version": "repo-file-v1:sha256:9f5f6ade59303204f7a191665c7d6167b3119fc656861213a3fb4995deb6d73e"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c577063436b430d9f008c9b227045e1",
+      "statement": "The emulator suite declares its coverage ceiling instead of implying that E2E backs everything: because Lynx 4.0.1 exposes no element bounds, touch-target size, corner radius, contrast and state-layer alpha cannot be structurally asserted, and only `md3-visual-tokens`' four A-class assertions (light surface, dark surface, theme switch, CTA visible bounding box) have machine defences, each with a negative control, while typography rhythm, elevation feel, icon optics and overall cohesion stay human-review-only.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md#L158-L199",
+          "version": "repo-lines-v1:sha256:134271ec407f51db3ca22b2fa8d535bbd52d0b1d5bee6ffe0e698afcf9c248a3:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjkxZThjNjgyNzRmZDkxNjg0MTRkMzcwNTFjODgyNThiYTg0NWU3ZjZiMzdlZmUwNWRjN2NiMmRkYzczMDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmYmFkMWQyZDcwZDE5MGY2YTE3YjQwN2Y3YTRiN2EzYjFiYTEyNDIyMDVkMTcxMTBkZTU2ZjM0OWZjYTc0YjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlOWI4MzAwN2IzNzQ1ZjFjMmJiYjFjYjUwZTU3M2UxMzkxMzRiZTQ5YTJjY2UxMzA4NzIzNTY1MzU0ZDgwZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwNmQ2ODJiMDQxMDc1ODFmODNkMzA1NGIwNzAxOTQ0Y2VkZmQ0MTg0ZmRhZWQ4NjY0MmI1ZjQzY2ExMmQzOWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ec41962bacf8496eaac0db70ee9d6be7",
+      "statement": "`packages/app-lynx/tests/md3GuardScans.test.ts` is the MD3 form-regression scanner over `src/**`, deliberately disjoint from `md3ConfigTokens.test.ts` (which checks official token values): every rule must recognise at least two written forms of the same violation, each rule carries counterfactual and extractor-validity assertions with hard hit-count floors so a collapsed regex cannot go vacuously green, and whitelists are `(rule, path, form)` triples with mandatory reasons.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/md3GuardScans.test.ts",
+          "version": "repo-file-v1:sha256:581a34fc04656640adc7db338e6004fd3a1dce5e762acd764679f1adb3a591aa"
+        }
+      ]
+    },
+    {
+      "id": "claim_93eae2c2556b474eb1d22b8ddaa44169",
+      "statement": "`packages/app-lynx/tests/motionContract.test.ts` gates the single motion entry point (ADR-0211) by walking exported structured values, Tailwind class-name tokens and CSS duration/easing slots rather than grepping prose, and defines its guarded object as the whole motion consumption surface (the entry module plus all production `.ts`/`.vue`) so the 30% size line still leaves room for real assertions.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/motionContract.test.ts",
+          "version": "repo-file-v1:sha256:fcdf8a89e4df785ecbd417b2f3dc22dd03297e29d2d96c62b269ad09880af4f8"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-05T06:49:09.686Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

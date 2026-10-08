@@ -1,0 +1,672 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:e13d4cfb68c4f717d7da9b18d3bf6f3f7cf868946c751974377247ff5015cee6",
+  "claims": [
+    {
+      "id": "claim_dcc39844cbb64e7d8e5b444b896bcbf5",
+      "statement": "The in-app notification center's data layer is `api/notification.ts`, which wraps exactly two GET endpoints — `/v1/notification/list` for the first page and `/v1/notification/view-more` with `notification_id` required — and thereafter passes the server's `next_url` through verbatim (carrying the `older_than` cursor for group expansion); no Java change was required because the native API bridge forwards arbitrary paths without an endpoint whitelist.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0188-notification-center.md#L11-L22",
+          "version": "repo-lines-v1:sha256:f8d0fdae2d6f17ada1a80e1c3e1b61be8fc666196f6b57ce74118c697782602a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3YmNlNGU3ODExYTc4Y2NkZmRmNGFkZWZmNzg0NDNjNjkxOWY5NDk2ZDJhYTg1NTI1YTczNTJjN2Y4ZjRiZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhmZmMzMjRiMzI1NjZiNTY1MjdlOWIxZmM5OTc2ZTU5Yzk4OWFkOWEyOWE3NWI2NzczNjg2MjEyMGJmZTdjZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ0NTViZmE2ZGUyMjVlNTY5NTg4NGY0YjQwNjZiNzEyYjViNWNjMDEzMzRhYmQzYmI4ZjI2YjJiMmU5MWQxZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU1MjcyZGE1OTIxNTM0YWFlMWEwNzcyZWM0ODJmYTdhNWQ3NGU5NjI5MmMxY2QzYjY3ZGE4ZjY3ZDM0NDI2YjEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/notification.test.ts#L63-L133",
+          "version": "repo-lines-v1:sha256:f94afe78857026102ec4785c3e780a9f1744b1e0c423585b23acb38657562b9c:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmYTA3ZDU3MzhjNDc2ZWUxZWJmOTE3ZGNmNzUxYmM4NTNiNzgwMGQ5OWEwN2Y1NDhiM2U0YWU0ZWUzZjk2NDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZjBiOWRjMmI1ZTFiOWFiZWNiZjJmMTAxNWE0NTIzY2IyYTc1MWVlZDgyNDQyYTBhNzA4ODBmZmNhZjliZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/notification.ts#L1-L36",
+          "version": "repo-lines-v1:sha256:90ad9267901ecb0dc5195f017bb7d8b5b66892a470a0058e266fb59ae1ee488f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1MmZhMWQ2MjI4YThiMjg1MDY1OWIzZjAxNDkzMTJhZjAwYzcyZTIxZDQ2YTY2ZjM5NTQzNDY2YzE0Mjc3MzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_27da21c53188462a9fe8a8d73e6f15b4",
+      "statement": "Notification response types are deliberately permissive — every field except `id` and `created_datetime` is optional — and rendering depends on `content.text` with `type` treated as a hint only, so a new server-side notification `type` value cannot break parsing.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-center.md#L48-L54",
+          "version": "repo-lines-v1:sha256:582f2669e48188701850a017456931d74823a4d55709251feda714c2b2965c6c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmFjMTA2YmQ5NzUyNTE2ZTQxMWU4OGE3Y2E2ZmZlNWY1MmM1YWRjNzZmNjcyZDRhNmNiZjcyY2U4ZjI1N2JhOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2RkMzU1NzNiYWM2ZTIzODhiYTVjZDAxMmVkMzUwZTdiZGE1MGM0NzEyNDZlZDk2Njg2NzgzOGRmODZlZmMyMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzE3MzJhYzIwYjMxNTUzMTBlMzFlODcyM2Y2NjBkNzY2ODBjODU5NDVlMTZjNzcxNTJlOGZmMjYwMWZmN2VmOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2VlODZkN2E5ZWRiMTU4YmEwZTVlYzY0NDI5MGJmN2FhMWU4NWUxZjViYWI4NjQ3ZjE1ZGE2NTJkM2ExNDg1NSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/types.ts#L251-L292",
+          "version": "repo-lines-v1:sha256:2536ad9b483687003e5f42850008e3adcb30ade819dedf833d3dcc794887149a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmZGQxMWM4MTJkMjc0ZmI2ZWY0ZjhlMmZlMjE4Yjk0OTQzY2E4OTAwOGE2NDBiMmU3Y2YwNzYxNTQ5MGU4YzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiNDJiZDUwMGNjYmRkYWZmNWE2YjkyYmVjZTI2MWZiZTk0NzQ0YTYwZTAxMGIxNjM1NzM1MjRlOTJiMTg2ZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkYjRiMjdmZDcwMGJjZTM3MjEyZWE3NTZlOTQyYmY2YmY2NGRhODUwODIzMTIzMGZlNTI5YWQ3N2JiZDk3NDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b7a7e1a2b66b4461996ccb10a14b58a5",
+      "statement": "Unread is derived locally, not from the server's `is_read`: `countUnreadNotifications` counts entries whose `created_datetime` parses to a millisecond value strictly later than the device-level `notifications_last_read_time` timestamp, counts every parsable entry when the key is absent, and excludes an unparsable entry while warning instead of degrading silently.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/glossary-notification-center.md#L14-L15",
+          "version": "repo-lines-v1:sha256:caf1a660312e3ab79e1170aedddac33621bdb1470856ab7528e3b337528815e8:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2I2ZDc4YzUxNTk0MDdlMjExMDVhMWVhNmYyNDRmNzBjNzg0ZTYxMmYyM2FmZmU1ODVmN2JmMzA1YjZjN2IxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Y4NWZjMzcyYzNmYzM3M2JlZjhmODdiZmY5OTFjMzU4NmIyM2U4YTQ2ODI3ZGJmYzczMDVhYjg4NGYwNDJjNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWY4NzU4MTQ4N2JiZjU3NjhlNWVjOWZkYjAxNTkzNjM3ZDY0ZjYyODM0NGJlNzU2MTllNTAzM2UxMzRmYWNlMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDI3NDJjZjQ1NGI3NWI5ZTdlNjNkMjRmNDA2NDgyNmI5NjI3MWRhZDU4NWViMWQwODA5NTFiMzg3NjI4YmUwMSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.test.ts#L187-L209",
+          "version": "repo-lines-v1:sha256:176dd792ac2721cba96e9737022d04d0d01c771b6f5b4e4821af3afd50d137e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhZmU0ZGYzNGFmYWMyZDUzNzllNTI0OGQ4MGNlNzNkZDNhOTI1ODI3NjQzNzVjODU2ODk1MmFlZjRhZWQzZDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5MTNlZTk0YWRiNzhiZmUxYjJiNDhlYzZlZmNmZmQ5MjVjYmVlYTc2ZDA0OTNkZWM3ZjU3OThlN2ExOGZmOWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkNjU1MjQ5MTAzNjNlMDM0MzU2ZjFkYzcyMjJlZDVkYzM1OWMwYjI4N2NjMTM0NjFjMjZjOWQ0MzQ3MTRkMTAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.ts#L33-L64",
+          "version": "repo-lines-v1:sha256:d5e61fcaf50d20778eeb67ac44c9a0898488286aa3350b11dad34a343b859c7f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzZjI1MWI3YzdjZGQyNTk0MmQ1Zjc2ZTA4M2JiNTdmYTMxMTJlYmNiNzE0NmE5ZmMxNDI0MDViNzIwN2U2MWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3MDFkNTBkNWQ0ODJhZmQxMjJmNDgxYjhhY2VjN2NkZTlkYzIwYWRhNmM2OWM5NTFmNTk3OWUxMjg5NmE4NGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2YTUxNzczZmJiMzdjZDY3ZWI3YzUzZjZhMjdkMGY1ZmRhZTQwM2U4ZjU2NzBjYWM0OGYwYjYxODJkYjFhYzEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5577d5386002424db24380e9b591da65",
+      "statement": "The read timestamp advances only after a successful notification-list fetch: the notifications page watches `list.isSuccess` and calls `notifyListLoaded(true)`, which writes the current timestamp and zeroes the badge, while a failed fetch never advances it and a failed write warns and leaves the old value so unread is not lost.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Notifications.vue#L91-L98",
+          "version": "repo-lines-v1:sha256:2866888f696db97c144d9b60f977ae222c719f9e5c6067db601e2f1f3f6eedb4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE4ZmQwNTNhMmRjZjhlY2JkNTM3MzYxZTNiYWMxNTU3NjA2ZGIyZDkxZDdlZTBhNjk3ZTE1ZmZjOGMwMzM4MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmRiYmI1Nzc2MzdjODU0YjU2ZDYwZmZjYjM0ODcwYzAyYTY1NjYxMjMxMTkxODk4MjAzYWMyOGI4NDc1OGQxZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjkzNTRlZjAzNjhkOTMyMGNlMzY2NGU5M2JkNmJhZmI5YTlmYTQwMWQyMGFkMWEwZDBkZGU5OWRiZWUwNTE3OCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.test.ts#L168-L185",
+          "version": "repo-lines-v1:sha256:de52e0628c543c37f80c3ed8bf9001276c2480d67946fc9b990c2d7cc3c3f515:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmZDIzYTUxNTM4NjRkMGRiYjNlNmYzYTk2NWZjNDNmMWY3ZWJmMWQyNTE1MmFhYzA1MDJlYjgwMGQzYzhlZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5N2RhMDdiYzA4ZmI1MjhlZjUzNWMzNzRmY2RiMGEyNDFiZDRmMjNmOGY5YWRiMmY4M2U3MjNmMzcyM2I2MWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVkOWMyNTUxYWE1ZTM4NjlkZTliODZhZWVjYWIwYmIwN2I0NTc4Y2Q1MjA2YTZlMzI4NmVkNjNmMGNlMTA0OTkifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.ts#L253-L270",
+          "version": "repo-lines-v1:sha256:34aaecd009e5146515eafb11b1fbcdc91982a34169f1c1806fc8c15f4ad1ab0d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3ZDg2MzJlNTRlOTI5OGFiYjk1ODcyN2UyZDUxNDA4YWJhZjEzNjYwMzUzNzkxMDE0MGFiZjY1YjMwYWI2MTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg2MjA5MzQ2NDNiOTljZGMwNjdjY2I1NDc1MWY0MjcyOGUxMmRmNjRhN2U1NDFmNDU3ODFhZDg1MjM2Zjk1NDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9a47144b2ede4214869f07d88a5c2dc8",
+      "statement": "Posting a probe system notification must not advance the local read memory: the trigger chain never calls `markNotificationsRead`, and the contract gate asserts that absence so that the badge and the probe's own comparison baseline cannot be erased by its own send.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/glossary-notification-center.md#L42-L45",
+          "version": "repo-lines-v1:sha256:3c53ce005e4d49d591fb46c324341a18e9d32448e127186b721038ca1f246b97:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWFkMzFkZTI3MWFhNWRhOTI3NTI4Y2JjMGIxYTgwYjY4NjhlMjQ4YTMzMDc4ZTI3YTExNTU4MmU3ZmFmMmI5MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjBmYzAwYjA3MThiNTljNjJhOGRiYmUyNmRmODY0NDg1YzJlOTY3ZWRiNjdiNGFiMWFiZWIxNmVjNjNkYmM0YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjUzM2NiMWZlMWFmNjRiZWRmNzgxNTEwMzJlOTEwNjY1ODhhYTNkMTFmMTk5MzVhMTRmNTI0N2RmZjU4N2VmOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQzNjAyYThhYTJkMzhiNjMxZWI1MGYzNmMwY2ZhN2I5NDgxNGMxYTk1ODNiZTlmMDBmNWUxNTY5ZTYxZWFkZCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L629-L634",
+          "version": "repo-lines-v1:sha256:ca3892d7c0193e68b5f7e1038d89328ad88b364fb96d3dc31caa3702e7333ac7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDUzYWFlNjE1MGJhNjE5NDEyYWFjZDc3ODZlZmI0YjRmM2M0ZDE1MWIzZWNiYTJhN2U0N2NlMWZlZmQ5YWUyOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ3NWU5NGE5MDRhYzQ5YjMxNTRkNDY3MmE2NmU4NjI5Yjg2ZGFjNzRlM2UyOTM3YmU2OTI3YWUzZGExMWM1MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTMzZmE5ZTUyYTlkMDRkYzZjYjc5M2YyNGYxMDBjZjRmM2NkNGM1Mjk1MDUwYzE3OWUzZTE0NWE2NDUyNjAzMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM2OGEzODM4ZTViYjkwZTU5YmRiMGI1OWM3NWY5MzYwNDAxZDljYzFjYTkyY2JlYmEzM2FkMGFiZDFmNDQ0MSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L100-L116",
+          "version": "repo-lines-v1:sha256:30f43946b132c54934ffcd54cffe7564d0f646daf322d900ca4c5005c098a0ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3OWYzNTk1NGMzMzM1NTlhOTliNTdmNWQzMjBhOGUzMzAzNDUzMDEwZDFiYWM2OTNiNjJjMTFlZmY4MjNhN2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ2OWJhYTM4ODI3ZWJlNTY0YzM4MDNhZTA0NjMyZjU3YTE1N2ExZWM3NjZhNzliMmE2MzE2OTA1YmRiNjIyMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_86661946da26430f9e74c636c1144876",
+      "statement": "`refreshUnreadBadge()` returns a boolean because on failure it keeps the previous `unreadCount`; callers that treat the count as fresh input (notably the delivery probe) must check that return value, and the trigger treats a failed refresh as no unread instead of using the stale count.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L620-L627",
+          "version": "repo-lines-v1:sha256:c0442967e07d11ff30f2d3429849357c2a0cccdd50b1d13972b56d6114b3ec92:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY3MWE0ZGVhN2Y0ZTAzNjFlZTdhMTIwZjQ3YjhiYzk4NTc4Y2U4M2QwZTgyZmU3YzQxNDQ5NTExYzA4ZmNjNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ3NWU5NGE5MDRhYzQ5YjMxNTRkNDY3MmE2NmU4NjI5Yjg2ZGFjNzRlM2UyOTM3YmU2OTI3YWUzZGExMWM1MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDAwZTEwYWYwNTAwMjk2OGYyOWI5ZWY1OTEyNWI4NjgzMTIwNmU1NTA5MzkzNjgzZWRhNWFjZmY4YTJiYjQwZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjM0MmNmYjcxZDViNzE3NzU2ODM0YTJhYWRiMjI0ZDIyODI3ODdiYjkxODM2NzM0OTZjZTBlOWJiZDI5OTMwZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.ts#L226-L251",
+          "version": "repo-lines-v1:sha256:b5803c51dff65eb7260fea3825173c22c6d9f9d07b12fe6313d3a5d22082472f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzMThlMzgxZTY4YjJmZjJmZjM1MDMzY2MzMWY2Y2RiNGQ2ZDc5ZDQzNjdkMTYyZDA0NzU1ZTZhZGQ1OTgwYzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM5M2FmNTM2Mjc5NDQzMTI1ZGQxMTY4MGVmOTNlZjUwN2RjOWFlNmM0NTNmMjFhNTk3NTZlNWI0ODBjNDk5NDUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L73-L86",
+          "version": "repo-lines-v1:sha256:682efd8cd5df3afed99c9f0386dcdd9aaa55f6c070c9b017a9dcc314b1912faa:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyYWI2ODU0YmU1Y2E0ZWI0MWIyYmM1OTUxNTU3ZWIxMDAzODM3YzBlNjYzYjFlZWVlODJjODJhMmNjMDc4NWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhkZWFjZDIyMzZlMDk2MWY2NmVmMTVmM2RkYzhiNmQ0ZGU3YThmYTE2M2ZiMDY3MWQxMDI4MWFkNDRlMDQ5YTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNiYjI4YzAwYjVkYWM3YWFlYmI0NjM2ZDI0Yjg4ODM1MWIzM2EwM2NmZjJkYjY3ZTJmZDY4ODRmNjk4OTk4NWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7afb7080549f43b486a8f98c1a17a0a3",
+      "statement": "The unread badge value is read at three points — the radial FAB's `navBadge` for the `updates` ring item, the Me entry row's dot, and the Updates page segment — and it is prefetched once at cold start in `App.vue` and re-refreshed by `Me.vue` in `onActivated`, because Me lives inside the KeepAlive include where `onMounted` fires only once per session.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue#L108-L119",
+          "version": "repo-lines-v1:sha256:64117138e4bc866ad6444fa9f40308cb41bd2ba81bdcbcece675ae5c34d54eca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyZWQyNzEyMWZhNDE0ZGFjNmE4ZGU2NDdlYzA0MGJjZjQzNGY0OGUzNjRlZTQ1YjMwMmU4MDlmOWEyNTZlOWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ5MmRhZWZiYWVkZmVjYTY2MTdlNGVkOWMzNDAyZWUxODQyMWM5ZWJiYjEyNzI3OTUyZjZkYjFkNzAzMzZlZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwMWYxYTQ4NzAwNWU0NzNjYjM3NzAyZWRkOGQ0MGZjYjM1MGRlZjk3NzI5NmMzMGRhMGIzODA1NGQzOGRkNmQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Me.vue#L391-L397",
+          "version": "repo-lines-v1:sha256:77f1207ed238d4a017802b0c3dc48b83d91f8d7d4ed3cae6b08db1d2a704e415:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWZmN2FmZTU0YjdjYjg0NTFiMWUzOWE2N2NjNWYwNzcyOGQ4MDU0M2NmMzVjMjk3MjhkZTRiZjZiOTY2YmE1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODU4MGI3NjUxOGRhZTk3OWZhZWJkMDIzNjdhMjkyOTJhNTBkOTc2MDkyMjUxYTM4YTZjZTMwODgwYmE0MjgyNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYThmZmIzZjliN2FlZDFjYjA0YTI0OGMzOWNiZmI0MDhhZTlmM2VkM2FlZmY2MzIwZGI3Mzc3ZWRmODUxYjhjZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGM3YTIyZmIyYzk2N2ZmNGE4ZjhhYjM3OGZhNmUxMTJjMzZhZjFmYjc0NDE1YjYzNGZlODUyY2I2ZDQ5YjMzYyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/globalFabNavBadge.test.ts#L1-L11",
+          "version": "repo-lines-v1:sha256:f200360589ac77639fb276b3f476f54a04bb1561444907d426d31e9f7a8792af:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5YWQ2MGYyYmUzYjkwODliY2VhOGU0ZDgyOWNhZmRiNDgzMjE5ODQ0NjgzZTljNzg1ZWIxY2ZjNThmYmU4MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxODQ0MjAxODNhZDY5MWIxNWI0YmQ5NDg3NWRiYWJlMjBjN2E0YzE4ODFiM2EwN2RmNDBiNzZmNWY0MWE3MzIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIyMTRmNzNlZDVjODc4MjZjODE5MGFkYmJkYTJiNTZiMDYxMjIxMDVhZjg4MWRkOWU5NGE3ZmE1YmU4YmQ2NjcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/globalFab.ts#L21-L33",
+          "version": "repo-lines-v1:sha256:f45db91b0fd6cb817fa825858cbf998b2b946d6ee520aaded1bfeaf7b25ae968:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5NGQ2YWVkMWNiOTQ1NDU1MzU3M2VmNDYxYzkxZGMwOWYzNzcxYjRlYjU2NDFiOTA3ZmE1NGVlMDA2ZDNjODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyNzg0NThmZWFkNzhkMTVjM2M0M2Y2MDlmOTNmYWQ0NGIyNjU5MTI1MWZiMTM1ZDExNTU5YjA3YzVjY2E1M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2ZjQ3ZTgwZTZmOGJiNDNhMWU1MTA5NDM0OWI0YzE5YjBiYWU5ZjgzYWNhYjI3ZDAzY2U0NWEzOTAyZTRjMmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d1570f88465b4d0aba5f0dad451a46eb",
+      "statement": "Group-header expansion is modelled as a flat row list where `view_more != null` marks a header and expanding only flips a boolean on an existing row (stable `h-{id}` / `n-{id}` keys, one-way, no collapse), so the native list's row count never changes; the child list renders inside the header row's own `list-item` root because inserting a `list-item` mid-list is silently dropped by the Lynx patch layer.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0162-lynx-related-inline-section.md#L17-L26",
+          "version": "repo-lines-v1:sha256:3332f77eb2c1edf045e7b8daee06efdd08a3a09f6bf6dbe8d124336b41a14bed:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MzU5N2EyMTczNmE5M2FiNWY2YjVjNWI0NzY2YWM0YWU1NmY3ZTNjNzgxNmJjMjAxZmExZjIwMTM3YjAwZGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0MTEzOTE5MDdhNmFlM2I4Njg0M2MyODMwYjZmMWRkZTBhMDUyM2E3NjNlYjEzZmRhZWQwNTNhYzBkNzQ4M2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmNDBmMmFmZjgyYjg0NjkxZDE5YjIxMjA0ZGYyNWNlNDUxNjhmOWEzY2U1YTllODUzNzNhMDU4Y2I2NmY1MmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0MzVhZjMxNGE3NWNkZWEyY2JiMjRjNTg3ZDRjOTEwZGZkZjNjMWE0NmQ5ZDk5NmRhYzMzMTBhNzQzMzZiNTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/NotificationChildren.vue#L1-L27",
+          "version": "repo-lines-v1:sha256:87561a77585189aa0ee7ab2faff1879b8bd16bdf5c3d26dc180aa1c2e6b352c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmNDMzNTYxNDJhMWEyMzRiMWEwMzE5ZmIyNzYzYmU3ZWQxMDhmYjgxYWM5YzNlNmQyNDQ5NmY5MmVhYjk2YWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmYzA2ZjUyMDZkOGQxOThhNGFhOWQ5N2FmOGExYmFlNDVlMjFkMTE0Y2RhZTZiNzA2NmM4N2YxNTkzZGUxOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyZDk1NWNiY2Q2Y2ZkMzIyODM2NWMwN2QyZWUzZTM5MGNmMDk0MWNjMmM1ODQ4ZDMwZGYyMDdhMWFmM2Q3OTMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Notifications.vue#L255-L260",
+          "version": "repo-lines-v1:sha256:32735524df89b38a1073d127e2f5117606f2a85e1dda836d8f177e0fe1e538ba:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzg3MjVlMWRlMDFiMjQ2YzEzZDlkMWEzNTQ2ZDQ2Zjc4ODAwN2VlYTRiYzUxODc4MmFjNmM1ZWQ2MThjMjczMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQ3MjE3YjUyMjg5ZjQ3ZmZiNDAyMTAwNGQ3MDYxZWUyNmY5NTRkMzVjZTJjM2FhYWVlZWUxYzk0NTNmZjQxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTFjZWY5ZjQ0NWUzMzc2NmFjYzdiYzkyODI0ZTZhMThiZTViYzRjYmNlY2IyODMyMjNjMWM3MDU1NmJkMDBjNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ViM2Y1MTY2ODFjYWU0Nzc3ZTA3YzdjNDk4ZWM1NDcxNzEwZTg1ODNjMDk0NGU2NzI0ZTcwNDQ3OGVkZjk5NCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Notifications.vue#L59-L66",
+          "version": "repo-lines-v1:sha256:45263225fcfee6a6c403f5246ded263cafef8481747e68b632088e25429f3fe4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTNmZjczY2Y2YzMxZmEwMDBhZTgyYTkxMWNhYjhjMzkzMTUxM2FiYjg2MjVmYmZhODgyNjZkN2VmZDkwOWI3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmRjNjE3MjVmMDQ3MzE4NmEwZWEyOGY0MTVhZjYyNDYzYmQ3NGEzZTFkMTNjZjkxZmE1ZjI3NDI1ZDRkZWI3MSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.ts#L66-L118",
+          "version": "repo-lines-v1:sha256:498db9b703891e726c172459a058dffdc662cb6c103ce9ef1c3bfc71cdf30953:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljOGEwYTE3ZmY3M2ExYmFjYWRlOWExZjI5Mzg3ODZjMzM4NmNjZmMwNGU2NTYyOGQ3ZDA1ZGZlOWM3MjY0ZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkYzU4NDU1MTAzMjhjNzAxZWNmNTQyMDQ2MzEyNjNlMjBjYjk5ODM3NjlhZWQzNGUyMGRmMjE2YzMwYjJhYjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRiZWYwMzlhN2FjYzQ4MjFmMzc1ZjFjZjJlNWI2NTEzMjUwZGM2MWFmNGU5MmJmOTFiOTI0OWM5MjgzZWIxY2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_da2e27a0260f40e1ace8f8044a713733",
+      "statement": "`notificationPlainText` strips all HTML tags while keeping inner text, decodes a fixed entity subset in a single pass (so `&amp;lt;` decodes one level, matching DOM semantics), trims, and maps null/undefined to an empty string; the result is never handed to an HTML rendering channel.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/notificationText.test.ts",
+          "version": "repo-file-v1:sha256:bb492cb4f4f24ff36d24e23c221dc3ad933db4fda1d184d83799fd69a870ef18"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/notificationText.ts#L1-L35",
+          "version": "repo-lines-v1:sha256:7abe50dcedaab6c936f711708404f5229bb7a50c6717106360fcc02df22e651a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmODNiNWQyNmIwYmEwYmYyN2ZjOTZkNTY0YzdjN2JjYjQzMTYzMDZlNjY5ZWJkYTUwZDRiNzgxNmNkMzhiYTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1fbde65a0c324fd6a0249a59e26009a1",
+      "statement": "`target_url` routing is a pure string-based resolver plus a thin jump layer: `pixiv://users|illusts|novels/{numeric-id}` maps to `/user/{id}` / `/illust/{id}` / the novel entry point, `http(s)` goes to the system browser, and every other case — unknown scheme, unknown host segment, empty or non-numeric id, missing value — is silently ignored rather than thrown; parsing is string-based because the Lynx URL polyfill has no working `hostname`.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/notificationTarget.test.ts#L15-L67",
+          "version": "repo-lines-v1:sha256:88e9aa263f02503e9d119adbd1d32adfe3459df7e7a6bbec8b5390c0c9943042:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1YzEyMmMxOGVmNTZhMzY5NDZhYzliMzc5YzExODczMzJlZDg4OGM3OGY2YmM2YmMxNjQzNzY3OWI3MDA2ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA0MDMxMzIwOWI1MTQ4MGViMjg1MTQzNGIzMmYxOWNmYTEzY2M1OGJiZDM5NTAzMDZkODc0ZjQ5MjczMGQ3MTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/notificationTarget.ts#L1-L84",
+          "version": "repo-lines-v1:sha256:660246a8da4ece4e7c15a746c69b034fdf6297b5f0d60b136aacc53683e15c1c:eyJzZWxlY3RlZExpbmVDb3VudCI6ODQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjMjRlNGNiZDQ4MGVhNzY1YjFiZmJhOWNkNTQ3Y2JkYjdmYjNlYjNkZDM2ZmU4OTEzNzJiM2VlY2MyOWJkZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5eb8428dd1c54307938d6af76ced76e4",
+      "statement": "Notification thumbnails are routed through `proxyImageUrl`, which rewrites `i.pximg.net` paths to the local `/pixiv-img/` path, passes other trusted `*.pximg.net` hosts (the public `s.pximg.net` icons) through unchanged, and returns an empty string for untrusted hosts; a row's image area is hidden after a load failure, keyed per row to avoid a retry storm, and `left_image` is preferred over `left_icon`.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-center.md#L52-L52",
+          "version": "repo-lines-v1:sha256:64ac7a7390617bfa8cb0b50f43576d4b6951ff46b7f11c6ed064c94c7e7dc54b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjRhYzdhNzM5MDYxN2JmYThjYjBiNTBmNDM1NzZkNGI2OTUxZmY0NmI3ZjExYzZlZDA2NGM5NGM3ZTdkYzU0YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjRhYzdhNzM5MDYxN2JmYThjYjBiNTBmNDM1NzZkNGI2OTUxZmY0NmI3ZjExYzZlZDA2NGM5NGM3ZTdkYzU0YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODQ5MGE5M2Q3MjY0YTUwYTM2Y2Q3MWNiNjgwNWZiMWU2OTIwMDkwNDE3NjdkMzI1MmNkZmZjMmE4ZDdkNmQ3ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjk4ZTUyMDgyOWZhNGE2YjJlOWRmZWZhM2M0NWVkZDNlYTE5NjU0NGZkMjIxYWM0ZGU4MjgyMDQ2YTIwNmYxYiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Notifications.vue#L126-L141",
+          "version": "repo-lines-v1:sha256:7edb0898e0fb32b8b64bedb0d9ec5483dcf3aaebc3e26fef6ea71f0a978777e7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxMDliYzM0ZTQzYmExODEyNDgxMzUzMDcyNWZlODc2NzI1Yzg5MDZhYWYzMzIwOThlNmFhODcwNDljNTg5Y2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkYTFhYTM0MWJhNTI4Zjc0ZWFiNTQ3ODI1YTFjYTZkYjcxMzk5ZTczZTcxMGMxOWNkZGUzNmQ1MjgwZDlmZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMzMjdlZjQ4MzM5MDkyOWM5MDUwYWJjNzI5YzBhYTk0ZjUxMGM0Yzk1NjEyZTY4YTQ1YWMyYWNiNzBjOWUwMzIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/imageUrl.ts#L6-L33",
+          "version": "repo-lines-v1:sha256:d2d0166eac3dc38215ff3d8132a96571713cf85ccf796e6ba01615ea25a02526:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YjdiZTliNTg1NTZlY2Y3YjU2OWFiMWVhZTllYTE4MjMwMmNlZTdiNGY3MTZjNmI0ODFkNzNkMGZlYzE3ODIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVlMjNiMjcyMzEzZWNkMDgyNDUxMzJmNWM3NDRiYTUwYzI5Y2Y5ZThhNDI5NmFhZjJiZTE1YmNlYjkzZWRiZWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk0MmI1ODJiY2YxY2IwOTU3YTQ1MjJiYmNmZTNjNjQ4YzI5ZGQ1NjAxYmRjMjdlMTUwOWEzZmRiMDhjNzUyMTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3fa4689ed2dd4495a1f5494eaf495fa2",
+      "statement": "`pages/Updates.vue` is not the notification center: its third segment reads the store's shared infinite-query cache instead of calling the endpoint again (so the badge and the preview come from one response), and it derives unread with the same rule into a page-local `unreadCount` ref that is a different variable from `notificationStore.unreadCount` — the degradation path and the probe must use the store's value.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L119-L124",
+          "version": "repo-lines-v1:sha256:5936e69cbf4006c534ce4100d4d86a6d3d3e7fa267cb70304e09250d0e5fa70a:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWEyZGYxNDIyNjBkMDAyYzY2MTMwOWM3ZGQ0NTdkMWJmMDZmOGIxM2EyNDIyYjRlYjZmZDBlZDA3OTQ0ZTczNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjExODBhODJiZWQwMWEwZmM2ODAxYTIxMTljMjAyMDllZmZjOGMxYWJmMGZlOTAxNDM1ZDBjMjU0MmU1MGU0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDc2ZDA2NDJkNzlkNTY5YTBlNWFjYTY1YTFiYzE0Y2U1ZmY2OWFlMWRiZjdjMWU4MDMyNGY2OWZkY2EwODAzMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDAxOWI4MjI0ZjQyZTJiNTM5ZGI2ZTI4ZGM3ZTc2YTAwZDM2MTA4ZmJiMmVjZGM4NDBlZjkyMmU1Njc4YTAyOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Updates.vue#L119-L176",
+          "version": "repo-lines-v1:sha256:4d88b4d44cfec9d622dad3b7f255ff14ea42d18d700e3c7a61475aa76d054e43:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3NzAwYTFiNDE1MzE0ZThiMDhjMjVjZDZkNTNhYzhjMmI4OGY1NmEzYTY5YjRkZjJiYWRiNjg5Mzk3YjE2ZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA4MTdkNmI4NDY5M2ExZjAwZjZkOTRiOWRiOWNmZjA2ZGM3NDZmMWUxZWExYmI5MjA5MGVjOTI3YTc1NzEzZDgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L1-L10",
+          "version": "repo-lines-v1:sha256:dd44b9f521bdc630868df5b4900124d86f141c4a6cfdb0b4c8b780321aaac991:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1MzJkOTdiNzY3MWMzNjRiMmEzNjZkZmU1MDI5ZTc5ZTM3NmNlZjE2YTMzNGUwOTRhNWRjMDdmN2M2NGNkNzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ZTBmNTRlZWU3ODYzZjRjMGYxMjE4ZGQ4MWM5YTQ1MzgyMmQ2MWY2NzA2MjNlN2U3OGU2NDVmMjYxY2Q2N2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlM2I5MjUzZmJmNWM4YzhiMWUxYTBmYmUzZjNhMDVmZjQ4NmE4ZmRmNTdhMWM4YzllYzRlNjBmNGYwYjFjNjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3288001731f247d7ad8b6462d6578f49",
+      "statement": "The delivery probe is framed as a measurement rather than a feature: acceptance is one decidable data point about whether the user wants the receipt, it measures only `clicked ÷ sent` against how often the user opens the app unprompted, it sets no statistical threshold because a single user's sample ceiling is their open frequency (on the order of 14 sent samples a week), and its conclusions are therefore qualitative — \"nobody clicked\" can argue against server push while \"somebody clicked\" cannot be generalised.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L30-L38",
+          "version": "repo-lines-v1:sha256:87e41a1b66f7a6e57adf82f2a4952bc1a0eeb7e4a9e7b522040ad0672108060f:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjgwOTliZDZlM2JhMmUwNDFjMDA0YWEyNWM2MmRlYzRmYTE2OTYwZDYzMjllYjcwNDg3ZTZmZDIwMjMzNjE1MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E2Y2I4OWZhOGUxNTRkMDc5ZWIzMGE5MmM4MThmZjU0MGJjMjg1NGU2Y2UwMGM2ZGUxMDJkMjdhZTE1MzExMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTc5NTY1NTY2OGU0OWY4MjUyODZiMGVlYmQ2MzNjODA5ZTViM2YxOGM4YWYwYjQxN2I5YThjNTJkN2UwZjgxYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDZmM2E0MzI1Y2E5NDFhZTg5MWQ4MjNhZmIzYWU3OWM4ODRhNGRiM2RkYjM3ZWVjOTI1ZTkxMDk3ODc5YzcyOSJ9"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L57-L82",
+          "version": "repo-lines-v1:sha256:ec0dc4c57ed3c2c5c154c29ddd30d0e81d4c1854ca282a45510f60a0419fb0ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlMzkwNTZjODRlM2NlNWM0M2VhMzQ4YjYyY2ExZjI1NWIyMjI0MjY1MGY1NDJiZGU1MTk1MDkyNTM2MDgzMDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlZGEwOGZkZjlmYmJkMDA2YWMxMDdkN2E4ODBlMGEwZmYyYmFhODZhODc2OWRjMjMwNGVhMDI0YzkxNDBhMzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY3Y2JhOTYxMzc0NTFmNzhkNDY2YzI5MTAyZGIzNWU0OTU2NzNmNGIwOWQ0YWE4ZTc3ZDg0MWRhMzRiNGQ0ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMGFlMWRhZTQyNTg0ZTI5YzVkNzk2MDM5YjZjYmQxOTg1MzdkYmU0ZmI3YTZiNGE0MWZkMDM5ZDA0NTJhOWYifQ"
+        },
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L84-L98",
+          "version": "repo-lines-v1:sha256:494bca0bf7f3065e855275719eedff685b7d4cf5bae70ebaadc6584400634075:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYmZiYjU1MWRmMmIwNTVkNGM3ZDI3NmI5MGEzYTNkNTdjODZkZmEyMWMxMGNiOWUxNjU3ODRkOGIzNmFjZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1NDkzNzgzMGE4OThkMjJjNzUwN2M5ZjcyNzJkNmVlMmRmNjhhOTQ1OWVhMjNmNWNiNWQyYWVhODJlNWU5NjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk1Mjc0ZmRmMGZjNTk2ZGRlYzIzNjU4NzU0NjZiZmIwMTg3OWY3NTYxNzJhY2NiOWJkMWI3NjRiMzdjNjdjZWIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L1-L17",
+          "version": "repo-lines-v1:sha256:96883e0b5683e8a6ddac9a53e45bc67d7b7fa88369eac707147cf690621d902f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjNDhmMGQ1NTYxZTliZDA2OWJhMWE2MjRkOTZjZjZmZWNlNWFjYTliMGU1ZDMwZTliODQyOTY5MTdkNDFhNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZGNjY2Q3NDZmZDRhYWYzMDE5ZTQ3MWQyNDZmOWJlYTcyMDg4Y2JhYzAxMzMwZWRiNzM0MTk5ZDk5MjdhMjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFiN2E3YTYzNTgyZTk1MDA0YjFjM2FiNjdmOGMwZjBhZTZiZTIzZDg2MDI1N2EyMjczZTZkNzAwM2U5YzQzNDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_77021453bb2740d4acbd76c411ef8a8b",
+      "statement": "The probe triggers on \"entered foreground plus quiet period\", not on `WorkManager` scheduling (deliberate deviation from ADR-0188's Phase 2 wording): the host emits `pictelioAppForeground` in `onResume` and `pictelioAppBackground` in `onPause` via the same `sendGlobalEvent` mechanism as the insets and dark-mode events, and JS approximates \"the user is not actively looking\" from those lifecycle events because the Lynx side has no window-focus event.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L84-L93",
+          "version": "repo-lines-v1:sha256:8732ea97802154983e42990dc720d64b0085dffa12e4ed54ecbae82282e0d862:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2ZGJkNmQwM2I4ZjIwZWNlNGFiMzRkZTc1OWYyMjgxMmE4NDdmNWUyNjJkNzQwZDdjMGNlMDgyZTE3NTQ5YjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU4ZTQxOGQzMTIxNWU1ZTViZTYwMDhkOTEwY2FkMTFhNzQyOTBmYjQ1YWFkNWU5ZjNjNDEzNjE5M2JlOWE4ZTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU3N2RhYjFjZjVlMjMzNzlkMTc3ZjgzMzM1ZDJhODNhYTRjNDBhYWQxMzRhMmY4MjhhZGM5Zjg3Y2Q3ZTY0NDAifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L1085-L1126",
+          "version": "repo-lines-v1:sha256:575b9a88e3f54d222b379178e65cb4074c516f3a2f1b0c4782c10ad03707b369:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkYzJiMzExYWJlODc1NzJlOGE3Y2MwZDk5NmE2NTg0NDA3NmU1MjMyZDIxYjdhODU0NzVmOWI0MDU1Yjc0OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJlNjNjZGQ4MWJkOTQ3MmNhMWZkMjYyZDBkZDMxMmE0NWNhYjQwMjBhMDY5MTFjNjBhYjkyMDFmMGExNWY5OTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwN2Y1NDA0MzVkNmU3NmEzNWJhYTMwMzVmMTc4MjU3OWVhZjE1YjE1ODBhNzdhNTg0NzcwODUyOTljMjU0NWYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/queryClient.ts#L1-L30",
+          "version": "repo-lines-v1:sha256:52f8ed71958e7211dd6b1d11adb5064bd6a709268a9287f8dbe3b7d052b33e9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzODdkZDc2NGIzZjYxNTQwNTE1MjI0OGVlYzM0MjEzODAwYTMxNWVjZTI5MDA5Njk2MzBmMDVkMzQyODI1OTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5NzhlMjUwM2I4Y2YzN2EwNmY3ZDZmMGEzYTZiNmZlMzU2OTFmYmNhYjUwYjg3NzVjYWI2ZmFiYzcxYzU5MmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlNDcyYzI4YjYzY2Y3YzcwZDI5NDllMzI0ZDZkMzI4MTJmNDY1YjhiODcwYmU1YjNhYzg0MjViY2ExZGVmNzkifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLifecycle.ts#L1-L22",
+          "version": "repo-lines-v1:sha256:161309d1f011415f34801ec3f8cb2d0b677cddd10c77b9d9439f99d79521b1c7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmMTczOGEyNDViMmY3N2ZiZGI3ODRmYWZiZGI0NWE4ZTQzYjZmOTEwY2FhYjdkZmE1M2E2ZTQ0MGJmOTZhMWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEwMGVhNTkyYTRiNmY0MDAxOWYzOWQxMmY1YzA5MmMxZjc0YzIyYmJkYzk2Njc3MTcwMGIwMmJmNTg2ZGFkYTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b5964f37d0464362807224a5a3707b69",
+      "statement": "Cold-start backfill is mandatory: because Android's `onResume` precedes JS mount the first foreground event is always lost, so on subscribe the lifecycle module treats \"subscribed\" as currently foreground, records the instant, and schedules a round — both the event path and the backfill path schedule, and the contract gate pins each of them separately so one cannot be dropped silently.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L158-L183",
+          "version": "repo-lines-v1:sha256:8dff85474fd891054da131c469e89d1d58d42abc214fbf90bec9edb93b17f2bc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3YWJmNGEzODdiM2I4ZjJhNmEwYjdmNTRhMzg2MmZiMjdhMzI3Y2NmN2RjMTE3M2IxY2QwYzRhNTUzY2M3NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMGVjOWI3YWQ3YTFhZDk3MjVmNDM0YmM3ZjFlYmM3NmIwMjU3MWVjMjgyOTU2MmUxYzdjNjc1ZDhjYmM0MjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkyYzFmNjU3NGI4MmU3YTkxYzgxMGZhZGVmMGEzNmYzZTY2M2Y3MTJjYmFhZjJkNmViZWM1M2VlOTk2N2Y5YWMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L518-L560",
+          "version": "repo-lines-v1:sha256:5ca2b68e107c500ee3e0e46aa9cce99573f7eab17d04ec3bed026720f74d2923:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxOTU4MDllMGUxMmFjZjU0MmY1ZWI0NzNiOTczMzI2ZGM4ZDRkNjk0YmQxOGM1NTcyYjcwZWE3MWUxY2NiNjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhY2ExZjUwODJjYzkzZGEzZTc2NjhhNDQ4MGYyZjk4ZDJlZWNkYjI3ZDJjMGNjMGNmMjUwNWUzNGM1ZTI0YjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1ZmE1NzI2ZGQ1NDY4OGJiZDJhY2RlZmRhOTVlNTUwNzY2ZGIyMjE4ODFiOTUyZDU5NDgwOWIyOTNhNjcxY2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLifecycle.ts#L92-L136",
+          "version": "repo-lines-v1:sha256:7ba64547b7d3ccb7d59dc754ac4777e3d027e7dbde119d4a83882407b36dca23:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyYzE4ZDZhZWU5MmRhZjcwMWExMTNmOTZkYzdiOTVmYTFlYzM5OTZkZTc1Mjg1MzE4ZGMwZjM4YzYxNWUyYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4MDAyZmUzNzllZWFmNGU4MGJiNzRlMGI3ODU5NmRhZGNmZGIyNjE1ODVmYTlmNzM5MTkwOTdmMzYxZmZmYTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a51d00e70c044cd8acea9117fdb2446c",
+      "statement": "Every foreground/background transition increments a generation counter, and a scheduled round captures that generation and re-checks it after each `await` (permission query, unread refresh) before posting, so a round still in flight when the user leaves is abandoned; a plain \"is the app foreground now\" test would let a stale round double-post after backgrounding and returning.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L562-L599",
+          "version": "repo-lines-v1:sha256:56ff02b300122bcd0904852955a56eaf3561cfdd0bdddfc9766a8665881a1499:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkNmE3ZDhiMjVhZDUxYTczNzNlNTBkYWY0NGRlMDJhZjUxN2QzYWIwNTQ3ZDk5N2I4MTlkZWM4MDliMDk2MDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU2ZGNhNWY0ZTZhNmFiNjQyZjczZWUxNDg2OTcxNjM4ZGE1YjNhNTY1NzJiODdkMWY3ZTg0NTQwYjA5N2Y4MzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0NWQ2MDY0ZDMyZmM2YmYzYWYxZDhjYWJlNWYwYWE5M2ViNWQ1OGExNjBjMmI3ZDgzY2U4MTUwZjk0Yzg3NGEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLifecycle.ts#L28-L90",
+          "version": "repo-lines-v1:sha256:79af2065e1d414c53aa382035ed70c49db833faf87633726168ae3403ab1e70c:eyJzZWxlY3RlZExpbmVDb3VudCI6NjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwY2Y3YzZlZGQxNTNiNzk4NTA3ZjRkNjQ4ODJkNjYwMTIxNGU2Y2U2YzJiNjhjZWIxYWFjN2VlNDg5NjY5ODYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMwNTA2ZjM3NjA0MTdkNGY1ZDU2MmM4ZGRiNDI3ZGE0ZDlmOTNjMGUyOGNkMTc4MTRlNTQ5MGI5NWVhMDk5NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5YjA4OTc0ZmM5M2QyOTI0YzBkODAxMmMzMWQ4YzA2YjAxYTU5NDk3ZjUxY2VjYzllNjNjMzlkNzk3ZDQ3NjYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L60-L95",
+          "version": "repo-lines-v1:sha256:1727bc23c8adf8cd8b730a494f99feda0139eb0d2237c697f2e5540f0e4ffc25:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiYzM1ZTc3Zjc3ZmM3Y2U2YWQ1YTU3NDFlNDhkMjlhNjM3NTExZWVkY2MwMmI1NjFkMmNmYzU5ODY5NzkxMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2MGJlYmM0OWNhNzBkOTc4MjRiOWVlNzc0OTlkZmIyMDU4MjBmMDJhMzZhMDBkZGE4ZTg4YWI2ZmEwZDhiMjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0ZGZhMDdiZDliZGY3ZWM3MzJhMTkyYTI4YzFjYTY3NTg5YmJhOGM1ZTI5OTk3YjNiNGI3M2FlOTc2OWQ4YzEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a23a3f07487e49eba7bef901f78ad126",
+      "statement": "The send decision is a pure function, `decideProbe`, whose ordering is the semantics — a 90-second quiet period first, then `POST_NOTIFICATIONS` permission, then a non-zero unread count — and every round logs its decision reason whether or not it sends, because otherwise a report cannot distinguish \"nobody clicked\" from \"nothing was ever sent\".",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.test.ts#L140-L175",
+          "version": "repo-lines-v1:sha256:a11686fbd495ff3af7cec5df636be1bb6675c59a44c47ac4b0d3ffd068e78748:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwNGZlY2JmZTI2YWZhMmVhMmFjYmM2YmJhZDk5NGY4OTkwMWY3MjYyMTY0NjZlNjE2ODdkMGFiZjU1NmQ4YzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMGVjOWI3YWQ3YTFhZDk3MjVmNDM0YmM3ZjFlYmM3NmIwMjU3MWVjMjgyOTU2MmUxYzdjNjc1ZDhjYmM0MjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L130-L159",
+          "version": "repo-lines-v1:sha256:14af666ef9e9c6672600f16170d841c5099069c82a786a075b3616d98ac73a28:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY0MWRjZDkzZGM5YzJjZDQ1ODllOGU0NGE0NzY5NmRkODk1ZDAzOTYwYjdlOTA3NzUzNzRlMzNiODU3MDRmNjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmYzU2YjIyZTExODRhZWJhYTllZDQ4ODVkOTgzMmE5MDg0NjcyZGYyYmFjNDI5ZTJmMDRkYjJmNjgyMTA0ZTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgxMzQ2ZGE4MWUyMmFlNTA4OTNiNDhmMWEwYzFiNGFhMGEwZDFjZjgzNjJiODc5MGUwZGM5YmZhNDdkYmRkNDcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L88-L94",
+          "version": "repo-lines-v1:sha256:ce8afb93531d909586e6cd93d650a0324fb08e571e8bfc5f9a0dc05ee0df0744:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjRmMGE5YjE2NTcyZDg4MDNlZjZjODUxMzEyN2NhMmU4NDNmODM5ZGRmM2UwMWU0MjA0MDQwMTFmYTlkYjliNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjdjNTAxZDQ2ZWViYTBkOWM2MDA1ODNkYjM5ZGFmZmE1M2I3OGM0YWMwY2NlYjNlNzdiOTVjYWQ2NGEyNjlhOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTYzNDVlMzNkMTczYTQwNjA3NjIyMTI3MDMyYWFkM2VkODU5ZmZkNDkzZWNjNTMxYjhlZWM0NzkxOWM2NTc0ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_38b6fce1ce344615bcd5196bce3ec596",
+      "statement": "One poll produces exactly one aggregated notification, counted as one sent sample regardless of how many updates the batch contains; the body states only the count and never the notification text, the wording and channel names are assembled in the host from a locale string JS passes in, and a fixed notification id makes consecutive rounds overwrite instead of stack.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L115-L116",
+          "version": "repo-lines-v1:sha256:d6ea83c19914952ccd6f1952e3db01faefc45dd69a5d9d84b0c11488a4bc6341:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWU1NTA4NzNlYjliNzgyNWUzMjZlN2ZkMjYxNDhkZWQ3ZTlmMTMxNGEwZDhmNjZmZGVjYTU3ZDgxMTkzMjVjZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWVkMWVmZTYyMjUxZTk1YjBlODAwMmJjMTZhNTZhYWM5Mjc3OWY1ODQxYTM4ODFhMmVkOWU3YTNjZjQxYmFlNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGVhYjliNjA3ODBkY2NkZWU0NWFlMWY2MjEwMzA2MDI3MTgyYzIzMDMxMmI3OWY3MGRhMTAwYzU2MjY5MGEzMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTMwYzUwOTgwZmY5ZjZiZmIwOGM1YzRmOTE2MjAzNzBhOGNhYzFmYTVjOWNhY2VjOTQ0MzVhNzFlZTlhZWU0ZCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L56-L192",
+          "version": "repo-lines-v1:sha256:97adc7e794f0407b0142991c1cebd4e33032b5803bed58fb4dd7ebf2e275a37c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwMTY1ODlkZjE2YzE2NGI4OGI0ODc0MzI1ZWUwM2EzN2IxNDQ3YmQ0YjcwNGQxZWY1YzNmMjJiZDY1ODExNWM2IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI0ODkzZjQwZTM3ODFlYjg5NmM4MmQwNDZhMDgwNjdhMTFlMzVjZGYyZjFkZmFmMjZmZWE5MGI4ZGI2Njc2NDEzIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJiZTJkNjVjMmRlYzU1ZWU5NWVlNDZiNmQ3ZWY3MjNmODE5OTAxN2VmYzM3NzExYWJlZGQ2NjBmZjFiYmY0YWU0IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJmY2I4MDVlMDJmNTRkODRmOWM0ZTlkYjc4YmQyNjMzMDk5MGFkMjEzZGZlZTk0YWVkMmVlYWQ2YjI3MGI3ODQxIn0"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioNotificationModuleTest.java#L65-L144",
+          "version": "repo-lines-v1:sha256:76b9d0c461cc5536b4fe8bd0d080be1c244afd2c428319be27018028f860bea5:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxZWEwN2ZiZDkxNzBmNjlhOTg1ODU2ODJjZmQ0MDFjMTZjMTU1MzY1ZDdkMzdkNzlkMTMwNTgwZTM5YmM2YTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5NjY3MDlmMjgwYjJkZGEzMzk3NDQwOGMzODNiZjMwOGIyZTcxOGM3YTc2YmVjY2Y4MjhjNjUxYjZlNWYxZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA1YzFjZjlhM2M1MjU3MWY3MWU2YWM3MWNmOThmNjM3MDkwYWVlYzQ0ZjI1OTA2NThjNmUxNGM0OGRjZjk5Y2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L107-L115",
+          "version": "repo-lines-v1:sha256:4cebe21cb2d66077f39f48791406d133b9fff09ce444e88ad5c2185336dee933:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGYyMDAxMDQ4NTE2OGJiNDQ3MjczYzNiNjhkOWM1ZmM2ZDk2NWY5MmYxYjAxZTNjZjVhMmU1YWMxZGFiNWM1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTBmYjE0YmIwMGI3MTdhMmM4OWZjYTBhODBjODcyOWEyODFhYWVhMjEyMDcwOWJlMjVmMDA5YThjYTIzOWFmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmY4MzhjYzU4NmJmNTNhNTYwYWM3ZGUwOTQzMWM4MGI4ZmQ0MTYwNjZlN2U3MWM1ZTE2MmFjZjdjNWFhY2ZiOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2b0f7384ccd340feb5d7c1ebd985e3d7",
+      "statement": "The notification channel must actually be registered, not merely constructed: a \"channel\" object that is never passed to `createNotificationChannel` makes Android 8+ drop the notification silently, which the probe would then read as nobody clicking — the contract gate targets the call specifically and a fixture proves the weaker assertion cannot catch it.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L172-L192",
+          "version": "repo-lines-v1:sha256:28de0353e6b99fbbdb0ad95178077d5e46ae85b8dfa41113bd1eef688c8ff770:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMxNDA2NTU1MzU5MmRmZTFjZmEzZTRhZTA0MzAxMTczODcyZWU1YTllYWRhZmZjMGY1MThkOTUyMmI0YjI1YmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc2YTFkMTVkMTMxYzQwZTZkYmIyNmE5ZjRkMzdiNjVlMGMwNmQ3OGEzOWNkYTQ0OTlhZTZmNTFmMDNiOThjZTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjYjgwNWUwMmY1NGQ4NGY5YzRlOWRiNzhiZDI2MzMwOTkwYWQyMTNkZmVlOTRhZWQyZWVhZDZiMjcwYjc4NDEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioNotificationModuleTest.java#L100-L117",
+          "version": "repo-lines-v1:sha256:3703ef48d95d084568af873630254242e285b918fa2240c8ffb537e2e4cfa27e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlNDJjYzcxMzIyODU4MDlmMWE3YmRmMjk1NmE3Y2I0MTdjN2NjZjE2YWRhZTcyZjk5ZDhhMThkZTEwMmFhODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE4YjY2NjYxMTU4ZjUxMjA5ZmQyODMwNzM5MmIwZWNhMWMzZGE0NzM1NmZkNmI2Y2I4YzM4YTljZWE4Y2MxMTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyYTVmOWRiMjU2NDgzZDAxN2MzODE0YWQ4MTdlMWE1ZDAyYzAzOGRlMjdjNmVlMGNkZDM5NjZhMzAyZDZmZGYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L203-L223",
+          "version": "repo-lines-v1:sha256:d64669dc30d33f6152d50b53e61b58752048ed0da044e1e51318a0a0d1da0419:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllZjY0OThkMmJkNjk4NjE4ODZkYzAyZWYyNTZjN2NiMDdhYTdhNmU3OTI2ZWI1YTdjNmQ3YjZiYjI1MmNiYzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZhOGVjZDQzYzI5ZjE2ZjAzNDA0ZWI4ZTVmN2QxMWEwNzcyZjE5OWFmNDJjY2M4NzQwNmQzNDliNTE0MTlmOTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1NjFiMTJlZWNjZTI1YTdhOTE3NjJmMjBmNzU2N2IwNDQ3ZGY0M2U4MjE4ZTcyN2FkMzU1Njk4NmY1OWU1YjYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ac4175daeb064f3d9e4046763759a79d",
+      "statement": "The native notification bridge only queries permission and never requests `POST_NOTIFICATIONS`: `areNotificationsEnabled` reads the real `NotificationManager` state, a query failure resolves as not granted so the caller degrades to the already-shipped unread badge, and the callback contract forbids passing null — meaning a fresh install is structurally data-free unless permission is granted out of band.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L146-L156",
+          "version": "repo-lines-v1:sha256:7063199f80ed9aad74032ae63ccd19edc49b5d029639e86838d353c2c51b44b8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhMTk2ZDYzNzZmZTcwYWM4Zjg5MWQ4NzMyMjcyM2RhMjQ4ODYxOTQzOGQxZDVjZWNhZjNjMTk0Zjk1MmUwODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJmYWE4NmQ1NDU0YjkwMDA1NDU5ZmM2ODI5ZTI4MThjOTU3ZDVlMGJlYTc2ZGNjMWZiZDYxMGU5YTg3MjQ0YzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxYTcyNTM0OWQ1YmJjNWY5N2YyZWQ5MGRkOTU0MDVjMmM3YTkyYWYxNmY2YjIxMzA1M2UyOWIwNjYxY2E5NmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiNzA3YjViNzU2MTExZmE5NzMxMTg0NGRjNGJjNDMzOGQxN2FjYjFhMTc4OTlhMTU3YjQzNzllMWJlODA1ZGYifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L79-L130",
+          "version": "repo-lines-v1:sha256:71bd2702766c6ac900d6b47284eb0d256a423da6ab778875680c32f4c6d0de19:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlMmE5M2IwMDQ3MTkxMDAxOTkxMTcyNzA5ODc0YTdlNDYzZDZlZjhjZmI1ZTg2OTQwNGNlMDM5NDI2MGFmZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNhNGVjNGE5ZjdjZGMyNTU5OGQwZTFmN2JiYzYxOTA5YjBlYzYwMmVhODljODBlZDIwNzIxNzg4MjQ3YmEzZDkifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeTrigger.ts#L29-L43",
+          "version": "repo-lines-v1:sha256:38ffcdd16b0cf7e4a3921fdaeb53bacdf29d493ef2dd29c7fa0b79d8bbdad68a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkMDU1MjMwYWYyZjAxMTkxYWRhYjg4MzhiY2U0ZGM2ZjlkZjU2NWIwNDA2YjRmMWM2ZWFhZTViNzlmOTJhNDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNzRiNzBkMzkyNzRlMDYxMDk3Yjc4YjAzMTQyNjA5YmJjNmY3MTEyOWViYjlhMTEwNTcxZWU5ZDc4MGQ0YmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2YzQxNDg3N2ZkZDY5Yzg5MzRkMzA3Mjc4ZmNmMmM3OTdiY2U3OGMzMTUxMmRhM2M0MjgyNzc2OGZjMzMxYjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f6c4101aed5d4c51b9c1a7c1923aafaa",
+      "statement": "Probe counts are one JSON value `{ sent, clicked, startedAt }` under the key `delivery_probe_v1` in the shared `CapacitorStorage` preferences file (IndexedDB in dev) rather than three keys, so a reset can clear the counters and keep `startedAt` in one atomic write; `startedAt` is stamped on the first send and preserved by `resetRound()`, keeping successive rounds on one timeline.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java#L30-L40",
+          "version": "repo-lines-v1:sha256:97ccbfb1ce6cca5a2a8ae9b5309fda94093add13dd6b37013c18cd64bb0be1de:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3MmE0MjkzODJiMmUxNDcxOGUwZTM3YjA1NzBhOGExNzAyOTkxZmNkODQ5OGNkODQwNjBhOGJmNGYwNTAxN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzMGMyZjllNzhkMmIyMWRiYWVlNjYxZTNiNjY2MTU0MWIyOTIwYTU4MzdiYjg2YjZhZDc2NjJlNDNjOTQ1YTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEyMGNiZjU1MjExYTVlODNmM2E0YmQ5ZTQwNjk1ZTVhOWU2MTlmMjA2YWMzOGIwYThkZTY3MzAxNjQ2Njc0MjcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.test.ts#L79-L116",
+          "version": "repo-lines-v1:sha256:9343f5b74c4ce7e76a25830b4966c1167038a2f91a48b172e227b93d8aa0fc78:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwZjA0MjdkMGQwMjU0MmY3ZjNiMzIxNDY1YWQyYzJiNmJlYTgxNDRhMGMxMWI1NTU2MTQ5OTY0MmQzOGM1MTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMGVjOWI3YWQ3YTFhZDk3MjVmNDM0YmM3ZjFlYmM3NmIwMjU3MWVjMjgyOTU2MmUxYzdjNjc1ZDhjYmM0MjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwNWQ4MDMzYzJhN2UzNzE0NDg4YmU0YjUxNDg1ZTRjYTBiNTViZDRiNmU3NDc0NTI3NDRiN2ZkNzk3OTIzODAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L207-L219",
+          "version": "repo-lines-v1:sha256:e6ad44582101e02c87ba476c0843fb517c070f48999841b7d1b455c25fdaf2c5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkM2QxZWQzMGJmZDU2YTIyOTkzNjFlYzI3YmYyYjZiZTlkYTg5OWExZjQ5NGQ3MzZkY2NjNTBiNjJjZTJjY2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3ODY2ZGNlNjQyMDM3NDVmMjlhMTc5MjI3MWE3NzJiODJhZmEyNTgzNzI1ZTI1MGE1ZTk3ZjEyZGI5NTE3MjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2ZWE2Zjg4Njg4NWU5M2VmZTYzMmJhODAxOWYxNzc3MWI5YzQwZGI0NWEwYmQxYjVmOGM4MmM5MmJhM2YzYzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L24-L47",
+          "version": "repo-lines-v1:sha256:e0ee58d1f4d768505f89432c5007aaa97a0569f18657f12335690fe51a74a496:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwYTcxZDk3ZTczZDQ3YjdlYTE0YTFhY2I2OGJjZjM3YzU5ZTRhNDBmOWE2NzczZjI4ODk0ZDBiNGVmMjliYzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1ZGYwYmNhNTdkZDI5ZjdjNzdlNzIxMmE1MTJlNDc2Y2I4N2RmODNhNjAxMThjMTMwMWUxY2YyNmIzOWU1YzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljOTYzZDMxYzM3YWU2OWE1MWJkOGY4YjRmYjRlN2I2NmE0MzVlMmY2NDE4N2U1NGEwYWRkZWJjY2RjMGFhODAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ab71d01d54fd47bb896646bfe3186075",
+      "statement": "Missing, malformed, or partially malformed counter values fall back per field as \"no round has run yet\" with an explicit warning, and the native preference bridge's JSON-quoted strings must be run through `unquoteNativeString` before `JSON.parse`; a silent fallback or a missed unquote would turn real device counts into a zero denominator that reads as \"nobody clicked\".",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L49-L74",
+          "version": "repo-lines-v1:sha256:8ab8ce5382215162739654b1904458120c6547cd1515f950d4a3f924ace592ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1YjhlZDBmMjhiZDM5Y2UyY2RjMjBkZjRlZDAwMmNkMzljZTljMTYwM2Q4NDI0M2VmMjA5ZjdmN2U5MDZhNmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhZWJlY2E1MGM3YWFmMjViZDA2YWViM2Q1OWM0Njc5MDlmNTUyYzNjNTgwMDk3NGYyYjU5ZTJjNzRjMWNhZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4MWE2MDBhZDIxNDJjNTVhYTdiZDE0YmJiZTE4YTNjNWEzYjkwZDEyM2ZlN2ExNmY4NmRmN2U4NWE5YjBmNzAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L83-L103",
+          "version": "repo-lines-v1:sha256:868e0034572c7cfe59cb76505a3eb36fa3123a56c8bce76a29f6a3e8541dcedf:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5MTEzY2ExMTA1ZDFlNzBlMDgwNDRlNjkyYTM3NGJlNjFhZDBjYzlkMzRjNjhkMzc2OGRjZGIyNzU0YmZlNjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmMGNkYjk3MmE3YmZiN2VkMjQ2ZjlmZjY3MjM4NWU1NWY0OTY4ZmMxMTA0M2RjNWI2ODRkNTFkZmEzMWRiY2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgwYzZkNTQ4NGE5ZTM0ZmQ3OTFjYzRhMzFhM2Y0MDc5YjA0YjY4ZWEwNzEwZGFjMWViOGNiMWI4MGMzYjUwMjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyZDlkMWJjODg0NzRkOGZmNTNmMGE0NDA5ZDdkYjUxYzBhNDk2N2EzNmRhODE5NTYxOWM4MDEyYmY5MThlNjcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.test.ts#L133-L158",
+          "version": "repo-lines-v1:sha256:33ec276bce24c12207e9502a2b860d6b7f34aa7252f5f2aeb18bc3574952e690:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MDVkNjUxYjBkMWVmODIwOTk1ZmNmN2IxYWMyYjJhMTcwY2I4MmNlMjcyYTU1YjRmNzZlZmZkYTczN2IwMjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyZDExY2FmNDNlOTdlZjM2OWU2YmVlZDFhMjY4YmQwNTgzOGYyOWI5ZGQyNTRiZjY5YmE2NDg4NDE0NzIzNGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwNGU1YjkxY2E2MGY5ZGNhNzI3NjE4MTM2MTdjOWZkY2Y1YzM1N2FjMDMxYjhkYmY1YWFhMGYwYjQ2YTdkM2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlMTE4NmY1OGUzYjdjOTY3MWM0Y2I5Njg3ZjI1Nzc5ZjI4YWU0ZDVjMDE5MTdiZTA5NmIyMWY4YTAzYjY5MTcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/tokenStorage.ts#L64-L81",
+          "version": "repo-lines-v1:sha256:f0fffbcaf510338a29fb141c0a6e7c36509cad4e95bc0fcfd298b6983cbe3656:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ0NWFlMmRlNGM0MWY2M2JlMTg5OWFjNjQ1OWEwNjIwMWJmMzU1YTgzZTY4MmM4OWE2ZTIwMTNjMjc3ZjVkMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkZDVhNzQ2YzA2OGI2YTJjZmY1MWRjM2E2MGM2YWM4YjAyOTA5Y2ZlOGYzZDUyYjhjOGEyZGJhN2Q1MmExODAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ac27937cf994014a0869e7c9eae3e8c",
+      "statement": "The counter key has a single-writer invariant: only JS writes `delivery_probe_v1`, and the contract gate scans both the notification module and the host Activity to assert the native side never touches it, because two writers would split the count into two partial truths.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L44-L55",
+          "version": "repo-lines-v1:sha256:e447aac728cb703660da2bd192c53ba439ac97c191f7cc255c9b011fda9c684f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyM2NiNGMxM2Q2Nzc1OWQ1NGY3NjcxZDQ0MDM0OTcyZDA5MDNhMzlkMDhhZmFlNzNiYjk4MWViOWFiMGRjZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3MmE0MjkzODJiMmUxNDcxOGUwZTM3YjA1NzBhOGExNzAyOTkxZmNkODQ5OGNkODQwNjBhOGJmNGYwNTAxN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5YmJkMmFiMjA3MWNhMWUyZTE1ZmI4M2UwMTI3NzAxNTI0MmUzOWI5ZjFiODY3ODBlYzhhMzBkMWViNTI4ZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2ZjMwN2YwMDYyNmMyNDUwYzc3YzMyYmFiZDg0MzcyNDcyN2I0ZjMwZGUxMjhjYWNjYTQyNjQxODk3NGRmNTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L645-L670",
+          "version": "repo-lines-v1:sha256:70945bdc6d5cc7bcdbb23f03eb35e46019c6dabf73ed94f4865582cec61695d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQzZjc3YmY0MjgxZjFmMGM0M2FmNDJkZWM4NDI2ODA4N2NkYjBlOTcwNmI5MGRiNjdiMjg5MTIxNDQ0NDhhNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMGVjOWI3YWQ3YTFhZDk3MjVmNDM0YmM3ZjFlYmM3NmIwMjU3MWVjMjgyOTU2MmUxYzdjNjc1ZDhjYmM0MjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxYjIwODJhZGQ5YTI5ZTA2MmU2MGQ0NmRiYTFlMWY3YzUzYTBlMDUwYjg4MTE4YzExMDIxOGJjY2UwNTUyZDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_db7eaacea2f149a1ad91960822aac8d1",
+      "statement": "The probe has no product UI to read it: the operator extracts the counter JSON from `shared_prefs/CapacitorStorage.xml` (mindful that `&quot;` is XML-layer escaping while JS receives real quotes) and the permission state from `dumpsys package ... POST_NOTIFICATIONS`, then feeds both into `buildProbeReport`; `resetRound()` currently has no production call site.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L217-L237",
+          "version": "repo-lines-v1:sha256:243c71c8132341c1abd584ab40a2af08064d367d3f0bb4f093842441acda00e3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NjAyNGMwY2ZjNjYyNGI5YmM2NGRjNTI5NGVlNDFhOGQyYzE3ZTQ0ZWE2ZjdmNDM3NzZlOWYxM2ViYTZmNDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAyOWU3YTQ1ZjMxOWU3YmVlZWQ3OTgxMjYzMjc2YTJlOTE3YWZiN2MwNTMwOGVmMjYxMDgyMjZiMjBhYWY2ODMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwYmE5NWRkN2RkZmIyZDQ0YjU4YmZjNWI2MzM0M2Q0NGExZDllMjYzOWRkOGFhYjY2Y2M3YTQ2NDNjM2Q5YWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.ts#L19-L46",
+          "version": "repo-lines-v1:sha256:01b1049085d8fb25c2a314516300dc2e255fc188b26df9e099054f7e95d98d19:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRlMzc2MTNhMDczM2U4MGU5M2NlMTEwZDY1OWQ3ZjEwYzg0N2I5ZTNhZDBmYTU2ZWMyYzVkMmFiMDU2ZTUwYmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEzYWEwZjRhMjJhYzMwMzQ1NDg5OWZmZmMwYzBkMjc1OGM1MzNmOWU5MWEyMmE1ZGE3ZWViZjZkYWVlMGRiZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkM2M2ODVmOWIwMDIwNmNkNGRlOGJmZDE4ZjAzNGExNjE1ZGFhNGE4NTc3ZGNjYjNmMjNlYmJmNDBkY2E4OTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.ts#L64-L104",
+          "version": "repo-lines-v1:sha256:7f883099ffa0fe40d595492a8ed5999596ad345875e8704131bd923b508412b4:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwYmI1Mzg5NjAzMTg2NDhkYjM5ZmYyMmYyMDliOTZlMmZlZjM2YjUxNGZkYzA1YTk4ZjZhMWRlMjRlOGIyMGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEzNzRjOWE3MjIwODE5YzRkZDAzZDM4MjY3NWM3MTEwYThjYzY5YzFiMTlkYmNhMTA2ZWRiMTU1MzJlOGEzNzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxMGIzNmFhNzRhNTliY2Y0YTg4MTg1ODM3ZjY1OGFmYWYzNjQ2ZWZmMmJiMTZjMzkyOGQwZTkzMzVlOTQ1ZDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f7b76990fd1645f198449f0c3bcc2092",
+      "statement": "The click landing chain runs from the notification's `PendingIntent` (which targets `NotificationTapActivity`, a `NoDisplay` Activity exempt from Android 10+ background-Activity-launch limits because the system started it) through the forwarded target/clickId extras into `LynxActivity`, which persists the pending click id synchronously, broadcasts `pictelioNotificationTarget` at four fixed delays, and lets JS dedupe by click id, record one click and navigate to `/notifications` with push rather than replace.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L989-L1062",
+          "version": "repo-lines-v1:sha256:3caf3810d989a24279cba8ddaedff6f63ee34d5b8431c6663bddc8c247088df2:eyJzZWxlY3RlZExpbmVDb3VudCI6NzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmMDk3NmQxZTAzMDQ5Zjk3ZTY2YTA0YTM4MTA5MzA0MmYyZjEyNTUyNGE2MDgyZGFmYzAwYTAxNmJkM2JlZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBkNjI1OTZkNDQzMjRmNjNhMzkxYzkyZWI5NmM3NzhhMTVhZGRjNzNkMTYwZDA5MTZmYjk5MjNhMDk3M2FlY2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjMzNkZjM4M2RjNWUwOGZhYWU1MmY4ZmIyNzNiY2YzZThkMmNlN2Y2OTQ0ZTU4YmZjOWVjNTYwNDBmZDYwNWQifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/NotificationTapActivity.java#L8-L45",
+          "version": "repo-lines-v1:sha256:3d9a45dc59f718e782f1b5e126826245cd493b6610be81e0f8650855e9efc65c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYTA3ZWQ2NDFmNjJkNjY5MDIzMGIwNTBkNTI1ODIxNjI5MTBiYTA0MDMwM2Q3YTU0YzEwMjQ4MjQxMTYzM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L194-L218",
+          "version": "repo-lines-v1:sha256:3e7237143dbbbab5ea721cad266efec8ae20842519a05becaa31207b23b08de8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc2ZDc5M2RmNWQ2MjE0MzUyNWU0MTVhNDk0Y2VlMmFkMDNjOTJkMmJhNWQxMGU5MWE1YTE1MjhjNTk2NzQzYTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L551-L607",
+          "version": "repo-lines-v1:sha256:cd7ae6dbec7f42e994d8e1a3847d0eaefd57c29d63a03bae400ac91ebcff8b9e:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmYjU1YmUwNWJkNDZiZmUxNjY2ZmY3OGRhZmNmMDkzZmNhNjUwOTk0Y2EyZDRiMmQxODhhMzI4MmI0ZmI4YzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkZWMxMjViYmI4MTk3N2ViZjYyODBkNGRlNDhkZTA3Yjg1ZTRiOWQ0ODFkNjUwZTIwMTk4NzdkMTRmNzA5ZTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhOWJmY2RhMWNkMzIyODM3NWUzZTE3ZWI0MzQ2ODdhMzNlMDVjNTZmZDA0NjQxZjllYTFjMmY4OTFkNDExYmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f6b65337ecfb4e84b8ba6e8cdf746715",
+      "statement": "Click deduplication by `clickId` is required because navigation is idempotent but counting is not: the host generates one click id per delivery so the four rebroadcasts share it, JS accepts only the first arrival within a bounded seen-set, and the tap intent must carry that id through both hops or every click would collapse onto the same key and freeze the counter.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java#L42-L44",
+          "version": "repo-lines-v1:sha256:3ff666495254b06f3630fbc936143d4e32b7b11796e1f1ccc8970b5cf865b673:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzZhMjU5YTA2NGVlNzA2OGEzYzk1ZDdiZDdiOGY5OWE0NGVmNTZhOWVjNjkyY2FlYmI0Y2IyMzFhMjg4Yzg4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjIzY2I0YzEzZDY3NzU5ZDU0Zjc2NzFkNDQwMzQ5NzJkMDkwM2EzOWQwOGFmYWU3M2JiOTgxZWI5YWIwZGNmMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTY2ZDk1ZjgzMWFlNzRiNGE4YWI4OTMyMTk3MjQ4YTY1MDRkZTdkN2UzNWUxMzU4YmYwZDdjNGM3NGQyNDc1NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmFjY2NjZWU5NTEzODhjYmI3NjE0ZDZmZjc4ZTBhNjlhMjY2Yzg4OTNmOWYwZWVjYmNiZjg2OGUyMjQ1NDRiZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L333-L353",
+          "version": "repo-lines-v1:sha256:5bcf854983405702183c6b715a5aea17ebac8cbc568b0e25613c9b8ef46004f0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU0NTk4OTBiNDQ3MTYwZmFmYmE0NzViY2I3OTI1ODkzMGI5MWI5NmEyYjZmODcwZWE3YWQzMTExZmFkYTZjOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYTMxZjczY2I4MWIzOWEzNjkzMTlmYmJiZTA3YTk4MDg0Mjg1N2MzYmIzOWQzMGIwYjY0YThlMzg1ZDY2YjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkOGJlZWRlN2Y3MmQzZjVkYTgyNTFjZGE0YjZkNTRhYTc0OTdkMDZiOTZmZDI4ZDJkNDNhM2FiMTJlYjgwN2UifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLanding.test.ts#L27-L67",
+          "version": "repo-lines-v1:sha256:ed1ac625a1c1b597c8811347ccb5ef55eb7f607f34a39afbe42e4de9c5b6a330:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlMjAwNDBkNWQ2ZWI0N2ZhZmRmMzE1NmJhMjM3NDFhODIxY2Y0Y2QxODM4ZDIxMmVhNWIwMzI2NDZjNGNmMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg1NmRiMDg4YzRjZWRkZjQzZmZiZDcwNWI2ZTA2MGE5YTMwODNmZWUxMDY4ZDhmOWJmNmIxZDFlY2Q5MTg0M2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk2ZTMwYTI4ZDk0OGFkZmUxMTAwYjE1N2Y0YzQzZWIzYTJlMDQyMDc4MjZkNDhiZDk2ODQwYjVkYjU1MjdmYmMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLanding.ts#L1-L59",
+          "version": "repo-lines-v1:sha256:6b8733aeb45a80c730f026d917dc760fccacf4d0d5debf7928fae3838a8176a4:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMjU1MmE3NTQwZWMyMGZkOTJkODkxNzg2OTMyOWVlODJkNjRhNTBlNTFmZTg5ZTI2ZGE0YzY4YzI3MWJjMDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzMjg5NTg4NjRkMzAyM2ZlYzYwNWIzODVkMzdjNWMyN2Q0NTA2NGQ3MTk4ODVkNzBkY2Q5NWRmZDE3MzY0M2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4ae0e75edc7a4161adce28808a4b8cdd",
+      "statement": "The broadcast count is fixed at four and the earlier \"single broadcast / multi-window\" criteria were removed: both candidate criteria were falsified on device, so redundant arrivals are absorbed by click-id dedupe instead — the same fix shape as two prior reporting mistakes in this workstream, where the answer was to delete a criterion rather than make it cleverer.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L165-L181",
+          "version": "repo-lines-v1:sha256:5335556f8a9459f72a2a0e292fbe9f02f5a5a9477f2536d6e1db4b2a0d0a5c80:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyNDBmYjgzNjU5MWY3NmIyNmI2MjNiZTE1ZWE2N2VmNjI4ODhkZGNiZDVlYjRmMjg5MTdkOTQ2MTFmOTYzZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIxN2ZiMjEyZGZhMWY3OWY4NmMxNWIxNWQ3YzRjZjUwNjA5ZDUwMzZhYzc2OWQxMDljNWI2M2Q5NWU2NmM4NGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkZTE4MGU1NjdkYzg3MmFhZWUzYWFhN2NiNjIxMTg1M2RmZjA1Nzc3NzU5ZDY2Mzk1NzAyMjkxMjZhYTRkYTMifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L1028-L1062",
+          "version": "repo-lines-v1:sha256:d6a673235bd6f42056ccf3f75842e1136da8ac6472f4ceca9f488334204d86f1:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwMmY4Yzk5YzhlNjI3ZDJhMDUzNThjNTlkNmM5ZWJmZDQ3ZmZhM2FiYWQwZTM4M2Y4YTY0MzRiYzY4MjlhMjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNGFjMDAyMTQ1ZmRjZWRiYTQyODA2ZDc3NDgzZTMyOGUyNGM1NjRhMTYxOWZmZWM3YTZmMDFhYmY2ZjgwZTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjMzNkZjM4M2RjNWUwOGZhYWU1MmY4ZmIyNzNiY2YzZThkMmNlN2Y2OTQ0ZTU4YmZjOWVjNTYwNDBmZDYwNWQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L373-L388",
+          "version": "repo-lines-v1:sha256:4334889d83dd581e86adb14321213aa54d4069b0b9ad7bf06cef0044dd9c0aae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJmMjhiN2MwMjA1ZmI5N2FjZjU1ZTdmYWNiODdhOTIzMWQxYjlmNTFjOThkNmYwZjViNmIwMmVhMTM1YTUzM2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcwYjYwYjk1MjM2MmQ3YWJhZDhlNTRjODA2ZmViY2Q1Yzk1Y2U5NjkzNDZiMGZiZDE1ZDJlZWExOGE5MmIwMWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkOGJlZWRlN2Y3MmQzZjVkYTgyNTFjZGE0YjZkNTRhYTc0OTdkMDZiOTZmZDI4ZDJkNDNhM2FiMTJlYjgwN2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8ac76d937fab4cd3b68cffa0bd6f2620",
+      "statement": "Cold and warm clicks are deliberately not separable in the counter: an earlier `clickedCold` / `clickedWarm` design was withdrawn after four candidate in-process criteria (lifecycle callback type, in-process static flag, persisted foreground marker, process lifetime) were falsified on device because handling the tap is itself the state transition, so only the total `clicked` is kept and the report must not present it as the share of users called back from the tray.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L125-L145",
+          "version": "repo-lines-v1:sha256:6fb8c9a25a45a8c140e6e5f6394f9f8fcdf3a457c87af9cee3e21863f5eaa58e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YTYzMmU3N2VkZDZjODAwZjI2ODk3YTM0NmFjMWY4ZWZlMjVmNjY2NTcyNjdhMjZlYTZlNjU4ZjE0N2VjYzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5ZWY3YmQxZTQ1YWNhZmUzNDA1ZTUyNDhhZjI4Y2VhODFiNTQ0ZDc4NTcwYzU1MDg3NzcxY2NmZGE2MGRmNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2NmM2MDkzM2ZhMTEzNjgyN2I3MDkxMmM2YWQ1ZmU1YjJlMGM0YWY0ODYxMzJlOTY2ZGViNDI1NmE4ZjZlZjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwOTliYjRmMTZlMmQxOWUzMThkNGZjZDdkZWY1Yzc3MDQ1ZDBkYzcwYjQ2MjhlMGJlN2VkZTRlYzNkYWIxYWQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L463-L477",
+          "version": "repo-lines-v1:sha256:ed8f3f580059af149c2e5a377c8dd42a5f24ba197691dea71ceb59f0e3e987c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5NDExZTgxMWQ1MTlhZDBmZjQ5N2QxNzZjYjY4NmJmM2M5MjdhNzU0ZGYxOGUxZWEwNGE3NDc4Mzk3N2M1ZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFjOGQzMjY5MTNlNTAxNjgyY2QxMTZkYjM1MjkzZDEyNmM0MmRlNzNiNWQ2NzVkNjFjMDMzZGIyNjM5NDk4MTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmMzk4ZmE1ZTc1MTkwYjllMzZkODNiNzRmYmQ3NTVhYmE3ZjA2ZDVmNGM4YzlkMTEzY2FkN2QwNzRiYTdiMGQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.ts#L194-L208",
+          "version": "repo-lines-v1:sha256:b2458dbb3763ce9707868b191b389004a0a6124d250abc5e6f7594cbc3b5a168:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA4MmJkMmY3NjhhY2FkZGEyMDBkYmRiYjFkNTBiNzJiMzk2MjIxMzMyYjIzOTg1MzNhNTg3OGUxZmEzNTBlZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0ZWI4YmYzNWI2MjZjN2NkNGVmYTA1MzdjYmU3YWY2MDBkZDkyYmE3NmVhZjFiNWQzOTVkODk5MWQyNzQwMTcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.ts#L48-L56",
+          "version": "repo-lines-v1:sha256:b460567535087708d85c80febe53f7ad0d421892b87d428381021660d4707d17:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTIxOTkzZTRiMGQ0M2YwMDRlOTE3NjIzYzkwMzRhZTNiNGI0NzRkYzNlOGVmODAxOGRiZmQ5NjUwMmUyN2RmYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk0MTZlMDlmNzhiYTMxNmMwMzI1NjgyMTNiODU1ZWU3NTZlNDE1NjVkOTE4ZjA5NTE5YzgxZmQ2MjBmNDA2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJjYTJkY2QwMDNiNTBkNTdlZTlmYjZkZWZiOGVlM2E5YmUyNTg0MTkwYmU4NTIxZGQ1YTUxMTlhMjdlMWNhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2MzN2E0NWU4YzViNzYzN2ViNTA3OWJhY2M3OWJlMTJkOTE4ZDM5ZDc3MGJhNmE2MGFjMWI0NDc2MzhjOGIzNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1c20e1473bd04152a5df64b3770360cd",
+      "statement": "Warm-start taps must override `onNewIntent` and call `setIntent(intent)` before dispatching the target, otherwise `getIntent()` keeps returning the launch intent and the click extras are dropped silently, producing a tap that appears to do nothing.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L1064-L1083",
+          "version": "repo-lines-v1:sha256:4d243fc8172cded39c2a34bb5299b11e4b8dd86b2c0ff9f348a57f4a2036c788:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxYTcxMmFjZTJmYjU5ODdmZTdmODUxZTBhYjRhN2MwOWMyNTEzNjg2YTIwMmIwNmM4YjYzZmJmNmY5MzBiOWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiYjk0NWI5N2ViNDhkNGQ4YTgwZDA5ZWNiYTkxMTY5YzI1ODA1Y2NkZWFiMDlmYWZmOWY0NGYyZGM2ZmQwN2MifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L355-L364",
+          "version": "repo-lines-v1:sha256:d33e59c6181db0813536f1e521dd8e163d8bca871b4ce28d5755ae918c0c1380:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzNmY2NWY0Y2NhYzYyZmI3NzgzMzJhNjBkNjBhYjYzYWU5ZmRiYzNkOGM3ZjNjNWI0ODUzNzViZmU3MmUwMTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU0ZWQxNmZlY2E3ZWM4N2YwYjI2YmUzMWViMGJhZTNiZmNlNTJkYzNhNjdlNGRmNzE2NmNmNTUxNDMyMjhmZDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNmOTM5MmEyZjlmZTcyZDlhMzM1MjhjMTZlZWZlZjVjMTJkODkxZjlmOWY4ZGM3YzEzMDVhOWJiOTkyMDQxNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMyYzM5ZGJiNDdiNTIwYTJjZTM2NmY4OTVkZmE2ZDA4Y2I0ZjM1ODNjMWViNzk4NTkxNmM2NTNiZThhNjBiN2QifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_748b0a9fe2564b529d3d2e0aa49a9f20",
+      "statement": "The probe report encodes its honesty rules rather than leaving them to the reader: the rate is `null` (never 0) when nothing was sent or clicks exceed sends, the `no-data` verdict takes precedence over `not-clicked` and covers both a zero denominator and denied permission, permission has three states with `null` mapped to `unknown` rather than denied, contradictory counts surface as `anomalies`, and four fixed caveats in stable order travel with every report.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L209-L215",
+          "version": "repo-lines-v1:sha256:66c26bff43b37597970ab80022f05995918ba73effb18ff361fd7b0ff8cff59a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGNlMjA4NTc1OTYwNDdmZDBjMThjYTQyOGVmZmFiM2U1MDVlNDJkOTA5NGRkZjBiM2QwNTkxZWU5ZTcyMWI0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGYzMjMwMDhkMTVhNTc0M2Y2M2Q3ZGE3N2JlMTEzYjhmNTRlMDE1ZDA2NWEwODZkMDFkOWRjNjg4MzA1ZjA3OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDg2ZGFkOWZhNWE5NmYwMzMyN2RlOTMzMmIzOTVlMTAxODM2Zjc0MWQ3NDU2ZDBlMTk0NTEwMjU5NGFiNjliNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTFmYThlNzhhYTA3ODUyNWIyNGI1MjFlOTU0MzM4OWRlOTlmYmEyMmViZmI4YTU5ZDY2NWNhMjM0ZGU2MTE5OCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.test.ts#L15-L103",
+          "version": "repo-lines-v1:sha256:336ce76be11c3e597a9e42db2a4525d08da45aae88efa482895da5e406cf2b5a:eyJzZWxlY3RlZExpbmVDb3VudCI6ODksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRlNDhmYjJiNDI2NDdhY2NlYzdiMzAwNTMxMDk3NWMyOTBjM2JhMzdkYTg1NWUwY2YxZDk2NDFiZWM2NmVkNzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZlYmE5YWVlODJlMjFiMzY1ZDlmMmYwYTkzMTk5MTk1MDI0NmJhMWI4MDZkM2FjYzNmZTVhMzQ5MjNmMWFlNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhlYTIxYjI5ZjI3MmI1ZmQ2OGI5MzkyMWMwM2JhOTM0NGU1Njg1NDdkM2I0NTFjODU4ODZlYjVkNjJiOWNjMWYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeReport.ts#L17-L104",
+          "version": "repo-lines-v1:sha256:05562f164eb080652e0ee5bfffa9fb9d3a81048304bd620f4a9d1b986c9eb73a:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkZGNmMmJiYzlmY2YwNmJiMDk2YzJhYjQ0Y2RkODY3ZjQ4ZDJkNzY2MWNjOGMwNjFlYzQ4OWQyODI4MjBlZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFkZjUwYmNhYmUyYjhhNjViNTAwY2UxOTMzYWY1MWJhNmM0OWQyMDAzNmEzZjBjMTI0ZmI1ZGRmYTVmOTNiY2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxMGIzNmFhNzRhNTliY2Y0YTg4MTg1ODM3ZjY1OGFmYWYzNjQ2ZWZmMmJiMTZjMzkyOGQwZTkzMzVlOTQ1ZDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ec1de53dce44b69a95e86a6b4e1254e",
+      "statement": "The probe's own landing target contaminates its input across rounds: the notification center's successful fetch advances the read memory, so unread drops to zero and a subsequent round decides `no-unread` and never posts — a new round needs both a counter reset and a rewound `notifications_last_read_time`, which the cold-start e2e performs as step 0.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L170-L177",
+          "version": "repo-lines-v1:sha256:635bf3e9941ce47b97c0e88d17d950f3ec2f869521fa1d4ca7f7175ec0344f84:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTY0MGMxNjFkMDE2YWFjZDMzMmE0M2ZkYmRiYzY2ZDVhY2VkODZmZjc0ZDQyNzMzZjJkMzU0NWE5NWY5MDUzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDNmMTkzYjY5YjU3MmIyYWM4MDdkYzIzMzA4YTM2YTgyNmZiNGE4M2QyMTIzNWNjOTRhYmRmOWUzOTIwYzY1MSJ9"
+        },
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L233-L237",
+          "version": "repo-lines-v1:sha256:2e8c084507ee9cbc90666166206115b5ca12742cb5fc307961fb471338748ed4:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzgyYjRhOWIxZmI2YTk5MGU3Zjc2NmJhZDNiMDU1NDVkYmRhZmE4MmRhNWQ2OTEyNTg0MmEwYTUzZTAwMDYzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDI5ZTdhNDVmMzE5ZTdiZWVlZDc5ODEyNjMyNzZhMmU5MTdhZmI3YzA1MzA4ZWYyNjEwODIyNmIyMGFhZjY4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTdiMDI1MjdiNzdlMjhkNzFmMmNiNGQ2NTQ3NTg0MjViNTFkNGI3ZjMxODIyMmY4MjdkN2QyMWM5ZmViODkyYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/delivery-probe-cold-start.spec.ts#L140-L146",
+          "version": "repo-lines-v1:sha256:72797c93ac3bc14cff2d8a23afcb0eb4f13731da1ba4fa02ff43c7c4a012b5bd:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2I1MTU2ZGIwMzlhZmMzY2ExYWMyNzUxOWYzZTI0Y2NjN2E4YzUxM2ZlOGZjYjQwNDIzMzhmYmJkZWJhZmE1ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjQ3ODNjODljNDVlNjg3NjA5YzQ5MTZlNGI4MTRhODZmZjQ5NWJjMmZmMTcxZTliZDdkOTRhNWY2YWFhMTFkOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODZlMjMxYWQzMDBkMmY5NzM2OTE5MTgzZWNiYjRmZDZmMzhkZGZkMTBhMDlmZWE3OTlkZWIwYzhmNDIxNTkwYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_36d596ef34d64cf9b0c15944c4363752",
+      "statement": "The JS↔Java boundary is pinned by a contract gate that reads the host Java and manifest sources, strips comments, extracts the event names from the JS source, requires both sides to contain each symbol, compares the full expected set of `mod.*` calls against the module's `@LynxMethod` declarations, and asserts the channel-registration call and the `POST_NOTIFICATIONS` declaration — with fixture self-checks so no detector is vacuously true.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L1-L113",
+          "version": "repo-lines-v1:sha256:4cd80be25572ad1e9356e49ef09904a3cb55c914bff34a0d3884e555e3351d0b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJjYWUxYWY2ODNhODkzYjU5MzgyYTA1MmUwY2YyZDlmOGFiZmU4YjNkYWU5MGU3OTEyZTVjMDZhODU0NzExNjk5IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJjOTk0ZGM5ZTllZTRlZTYwYTEwZjY5ZGNhNTRlNDY4NjZlNmM4Y2FkM2Y0MjNjMWY4YjA5ZDdkNWI1ZDQ1YzhhIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MCwicHJlY2VkaW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlODUyODRiNzA0M2I0Mzg0ZDE4NGU4MjcyMzUyNzI0MzQ0MDE2NzgwNWZhMDFlNzNjMGYwZTJkNDVkM2JiZTUyIn0"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L139-L160",
+          "version": "repo-lines-v1:sha256:6f9c8bb9a68a18e8d6ca801de90a35294afd55048d5c74f3b6a68362b7b37bce:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiNTRkMDIxNmM4M2E2ZGE0MzFiMzJjN2Q4ZDMwZGQ2YzRkZjZmMjRiMGViYWFjY2VmY2Q4OTVhYTY4YjYwMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkMjk0M2ZjZjk5MmQ5NjQ5NGQ3NGY4ZGJkYmQwMDE2MTVmYjNjMDM5MzQ3ZjNiZGY1NTMwZTY2YWE2ODQ3Y2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMGVjOWI3YWQ3YTFhZDk3MjVmNDM0YmM3ZjFlYmM3NmIwMjU3MWVjMjgyOTU2MmUxYzdjNjc1ZDhjYmM0MjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmNzkwMzA1YTVmYjlmMTQxNjlkNWVlZTZkMjQzMDViMTFiOWQwOGVmMzJiYTRmZGQ1YjgyYTllMGU2OTBkZDYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L225-L277",
+          "version": "repo-lines-v1:sha256:318165a1637f56ef88f5110256d6780423d97740682aa820af9f66a9e43807a7:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxZDkyYzI5YmUzYmE5MThmMDZlZjFlNmZmNGE0NDJhMmRiYWFmOGM3OWM0MGEyY2VhNjY2ZThlNzU0OWU2NjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgzMzk3YWI2MTNjZDg3MjFkMzU5YTQzZjZlYTc2MDE1YTg0ZGNlYjdjYmExZjg5MGViMDJiMWExODg2ZWM1NWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwZWQ4MTkxYjVhODgwNmE2MTU1NDI5ZTNmMTA2MGIxMDQwNmQwMzllMzFmYzg5YWZlYTUxMjA2YjkwNGFkZmEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L637-L643",
+          "version": "repo-lines-v1:sha256:19805c3fb9067f04dc203a7fa7c370cdf614a92c8a5f991ef8c89d285423c58b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTU4NzFmMWZlN2ZiNmQ5ZDU3ZjFlZjBjNWVjOThlMjJkODBhMmY1OGMyMGFiMzhhMjhkYzQyNDkzYjc0MTkwYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjIzNTI1ODljMzRkM2M2MDY4NTkzMWI2ZWNjNGQ1MDk5MWE3YzU2YzhmYmEyODk0MTE0NjU3NjkwMjcyY2FjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmQwZWM5YjdhZDdhMWFkOTcyNWY0MzRiYzdmMWViYzc2YjAyNTcxZWMyODI5NTYyZTFjN2M2NzVkOGNiYzQyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGI4NTNhMDlmMzJlYjkzYjViYTlmOGEyYmEzMTQ0NTY2ZWM3N2QzM2MzNjA4NTNhMzM2Y2Y4ODdkNDg0Y2E5OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_686b142372dd485abfc78084288b2b4d",
+      "statement": "The host side of the probe is a thin bridge plus one Activity: `PictelioNotificationModule` is registered as `PictelioNotification` in `LynxRuntimeInitializer`, the manifest declares `POST_NOTIFICATIONS`, and `NotificationTapActivity` is declared non-exported with `excludeFromRecents`, `noHistory` and a `NoDisplay` theme so that only the app's own notification `PendingIntent` can trigger it and inflate the click count.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java#L70-L86",
+          "version": "repo-lines-v1:sha256:4eb1335731dfb0dc1493f27a9afc033654ce515eb8dee217aef38e01c66f0369:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2MmNiMWUwZWIzMWEwMDYyNjk0ZDg1ZjNhOTAzNWYwYzhmYzQ4OTJkNTM2MjA3MDcwZmY3MGUyNjkzMGM0OGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3Yzk0ZGU4YjlhMTJiMjJlYTI2OTUyYjFmZTA2OTI3ZDRlNjQzMmRkZWJhMTAxNzcyNTZkYjc5YTk1NmUxMTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVmY2FjZTA1MjlmZTRlODExYWJlMmM3NTlkNTc5MTY2ZDAwMTA3OWU1NjNmZGMxNzIyZTUyNzI5ZjRkN2Q3NmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlMmI5ZTIxZmRjODZmYzJjMmVlNDQ3MjE4NWQ2NzY0NjdiZGQxY2JmMmUyNGI0ZGM2NDRhYjFhYmIzMzI1NDcifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/AndroidManifest.xml#L58-L76",
+          "version": "repo-lines-v1:sha256:ff2c5217e32aea1786913c517a5d473b75c5c519ea600582e3a676a1f28ec0d7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0ZjNhNThiMWQ3ZTgwNjY2OWU3N2M5NzRiZGI5NmE1MWQ1NjY0MzhlYTZmYjc3OTg3NWVjYmYxNjE2ODZmNjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNjRlZjdhZmY5ZGY5NzBhMTM4NDM3N2Y4N2FiN2QyODcyYWRjNTFkOWZmMTE4NGI1MzA2OTNjMzRiYWU0NGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0YTI2ZDhlMjE1MzEzMDk0Yzk5ZDRhM2ZmZjIyY2U2ZWVjYTMwMTgyYThlYjZhMDRhNjYzYjkyOGI3ZmZkOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIyODY0MzNiZTcxNTdjZDZiNjIyOTdhZTdlM2JhZWI0ZDU2MjljZTRmZGI3NzMxYjg0YzY3MjcyMWFkOTViN2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fe9e5a5a0c37449489d04f34687bf462",
+      "statement": "The pull half of the click landing is unproven on device: the host writes the pending click id into the `CapacitorStorage` preferences file while `pullPendingClick` reads it through `idbGet`, the IndexedDB KV store, and the contract gate pins only the key string and the existence of both calls, not that the two sides agree on a store.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L1040-L1048",
+          "version": "repo-lines-v1:sha256:4540f13ac8654c902162db0404847c8d19dc7f54611142d4402a9c83c8484f03:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjIxMGJmNmI5YWY2ODg1MjdiYjE2ZDgxOGJlYjM1NWZiZTU0MmFiZjUzNzU1MTA1Mjc2NGMwMjI4NmY3NWU4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzU0NmI5MjEzY2M5NDM5MDk3YWRmNGYyNjhmODE4YzZhNGIxOWEwYWRkMmEwOTI1NmI4MWFhNjllMWI5ZDA1MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2RjMWIwMWVkMjQ5NzkwYjMwOTdjNTFjZmYxZDE2MmJjZDU1MTNjNzE2YmVlODEyNjk4Mjg4OWE3ODA5NWRhNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDFiOWU5ZDdlNzRiNDA0ODg2ZDJjZmUzZGI0ZjAzMjE1YzJhODYyYmRlMzRiM2M4M2JjMjhkZWVkNGY1MGZiZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeContract.test.ts#L402-L416",
+          "version": "repo-lines-v1:sha256:f1de4d2cf7aeb0c6a77bfd7b5317b3926ac45459b8d35629d8a818c79098e1ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4YzE1MGZiODg5MTgyYmE4NmYzN2E2MmVlMzBjY2JhOGQ4MGJjNWQzMzc1NGQ4YTUwNGZlMmM2M2UwZWQxMTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5YzdiNTEwZDBiNTFlMGFiYTdjZGJjZmMzNjRlOWI3YjNkNjFjNjQ5ZGIzNWJlYzNlOTFmMzBjZmFkYzdiYTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhhZmFiNmI5YTNiYzIxNTlmZGYyNmRiMmQxMzk1M2Q2ZDBlYWIzYWYwOGFjYmVmYzIwNWU2YjMyYmIxZjBmNzYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLanding.ts#L61-L87",
+          "version": "repo-lines-v1:sha256:78ef8f91d46f8deb89c0e9a507d5720a13baea97a8bf9dcf5694735bb1660ba0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmYjdkNzhkZGM0M2U5YTAwYmMzNzUwZTIxYjAzOTVmYTA4NzRiZDUwYzVjZTJjM2M3Nzc4NjIzZDRjZmY3ODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/idbKV.ts#L41-L65",
+          "version": "repo-lines-v1:sha256:f478d76bcb28685cc959b2213ec3604905fe38a436132165f5c1ffbf58dccaae:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjNGFiNDJjOTg3ZjU0ZjlhYjQ2NGJkNDllMDEyZDI3ZDlhOTA2Nzk4ZTM3MTAzNzFjODE1NWQzMmI0YTQ2ZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRjZjk1ZjJhMmZmNDU0NDJlMTM1ZDA0ZjY2ZmIyNTRiYTcwMTBlZTMyYmU4YjNhY2EwMDI3M2UxNzdkMDlmMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkMzY4MmQwZDdlMmRkOGI1NWVhYTUwNzU0MmUzNDI1MWQ4MGI5ZGQwYjE0MDY4YzY1OTdhMzNjZTU3MzhlYzkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bc3c732bf025482697a9e290eaff4bd4",
+      "statement": "This domain's focused tests are split across three tiers: Vitest unit tests for store, report, landing, target, text and the captured API fixtures; JVM/Robolectric tests that drive the notification module's static seams and assert against the system notification and channel tables; and a manual, non-CI Android e2e cold-start gate that asserts from native log lines and is explicitly an addition to, not a replacement for, the unit and contract gates.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/notification-delivery-probe.md#L150-L177",
+          "version": "repo-lines-v1:sha256:2a69113c6b2acd132d34119bb87b41a211eadb7074bc6636cebc6354ce999467:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY5MmE0YzhiMGE0NTgzOGQzZmJjZWI4ZGY1YTk3MzdmZmQyMzZkODE2Y2MyMzc3N2FjMTI2NWJhOTllMmZiMGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwMTcwYTE3ZmM1M2RkZDgyNmRiNzFhY2M3ZDAyMDBkODhhZDM1NTU5ZGYyYWQ2ZDE0MThhYWRmNDYxY2M0NzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlMTNhMTYzM2RmNDZmN2QxZGZiN2Q2MWFiOGEyNDkxNDYyYjU5MjJlOTIyMTM3NzFhNzBlMmRkOTNlYWUzYjgifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioNotificationModuleTest.java#L21-L40",
+          "version": "repo-lines-v1:sha256:de1f33894466916da54b9beed33e57c754b249620b59cc6b4b026dfbe0f0a6b6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkNDBiMjYwZWZmODQ2YzVjNGUwYWRhZjc3Yjc0Y2Q1MDk5MGI3ZTM2NzAxYzRjNWJkNWViOGFhYTA5ZjNhOWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0ZWZiNzAwNWVmYTgwMmVlZmJiODE2YzI2MGRhOGJiODk0Y2YzNjI5NjA0YmI2MjFmOTM4YzBkOTg4ODBjYTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk2NmNhNWI4MGQ3YjFhODY1N2U2ZTk3YTk1ZDQ0YjM4YjUxMWNlMGZjNWVhMTMzYzRjNTg0MGQ1MTE4Nzc3NzIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/delivery-probe-cold-start.spec.ts#L1-L31",
+          "version": "repo-lines-v1:sha256:a357abe67a0a4063fd53fb2711cdeb89277f4942614baa15e98def1aac2f3053:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3MmE0MjkzODJiMmUxNDcxOGUwZTM3YjA1NzBhOGExNzAyOTkxZmNkODQ5OGNkODQwNjBhOGJmNGYwNTAxN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0YTA0MmQwMTE1NTc5NWFmMWMxN2UxYjRlNWJjNWFhN2Y1ZDA1NmEyOGE2YzljNmNhMjI3MjY1ZmQ2ZTc0ZDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/deliveryProbeStore.test.ts#L1-L7",
+          "version": "repo-lines-v1:sha256:897162950c6205dc3aaf2864f1fdefb2e5aff929bc5778792edc070814e50d34:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmVlN2FkODU2OWEyYTUwNjUwMDlkOTU4OGQwZjQyYThhODQ0ZDNjMDc0OWRlNWQ0M2MzMjU4NWViNWNjMzkyMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWRiNWQxMWU1ZjFlYmZlODhjMWJlNzE5NDA0NTYyN2YyNzE0YzdhZTI3NTM3ODRiYmFjY2FjZTZjNmM3ZWM4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2ZlN2I0MzM5Mjc4YWFlNDMxMTI5NWIwYTc0YzYyMmY5YzgyMTkwMDZjOWUyZDRjOGVmMDI4NmMzYmNhOTg1NSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-08T00:43:21.663Z"
+  }
+}

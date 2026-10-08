@@ -1,3 +1,3 @@
 # Files
 
-- [Android Native & Build](android-native.md) - Native runtime for Pictelio's single-engine Lynx Android app, now living under packages/android-host. Documents the single-engine Gradle build, the LynxActivity host and its Lynx native module map, Keystore token storage, WebDAV backup, the download/export bridge, and system-bar/dark-mode behavior. The former Capacitor plugin layer, three-flavor build, and dual-engine fallback were removed with the WebView client (ADR-0203).
+- [Android Native Integration & Build](android-native.md) - The native runtime inside @pictelio/android-host — the single-variant Gradle build, LynxActivity as the only host Activity (splash, insets, system bars, dark mode, back bridge, notification landing), LynxRuntimeInitializer and the 14-module Lynx native bridge map, the shared Java deep modules behind them, Keystore token isolation and backup rules, and the notification / delivery-probe native channel.

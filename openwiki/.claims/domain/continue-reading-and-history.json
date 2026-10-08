@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:c85fe1355c36cb393f6a078a83f6f4c56baeb1d85f91e8d3f49c1f77a469d2da",
+  "pageVersion": "sha256:681d24026cb694397ef7e2f3e6fe4421c670500a9ca5ba69c267c5e67d726e32",
   "claims": [
     {
       "id": "claim_ab747b7ccc4142ec966fcde74fc30a01",
@@ -15,7 +15,7 @@
           "version": "repo-lines-v1:sha256:4e2c6189ec28e764a39efe145ef4298b07768039afb66ca2a99627adb8befb80:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzJkY2IxN2UyMzJjNDQ3NDkxMzYyMjVjNzQ2ODliZjg0ODUyYTllNjU4ZjM2MmY4MWFiY2ZmMmYwYWM1MGYzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UzMDljZTUxMzA5YTgzYThmYTA3NGM4YmI1MjEzOWVhNmJiZmNhNmNlMWNiN2RjMDk3NjdlZTNiMGI4OWQ5OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTJkYWRmOTE2ZjRlYzQ0MmU4NGM0YjU4MWQxYWQ3MmVmN2I2MWYyYzAyOTA3MjNhNjBjZGQ3Y2VkYmVhMDAwMSJ9"
         },
         {
-          "resource": "repo://packages/app-lynx/src/router.ts#L137-L139",
+          "resource": "repo://packages/app-lynx/src/router.ts#L138-L140",
           "version": "repo-lines-v1:sha256:90075762f31bd75b1a15e25b719ee870b55edddb0ed48006c94d3aa11f470ef0:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY3ZWRiYjYwMTk3NDg5NTI1NzNkOWJmZmJjYmJiNTJlY2JkNWNlOTZhZjRlYjNkYzg1YjQxNmZiODA4ZTRlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiZWNlNjFlZDU5OTBmYWViNjJhZmNjNzc4MTJlOTUyZTk0NDViM2NiNTAyMDYzYWRjMDM1ZGJhODhkZThjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWQxYmRkYzhjNDZiZTJlNDllYTMwNmY5OTdkMTg2YWI0Njk3NmYxMjYzMmYxZDU1ZWM4ODQ4MWE4MWZmOWE2MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmNhYzdkNjk3YWUwZmZhYjNmMjIxMjc4Zjg2MDIwMWI4M2FiODY5MjZiODVhZDc0ZjNhMDYxMzMwYjZlOWEwOCJ9"
         },
         {
@@ -210,7 +210,7 @@
     },
     {
       "id": "claim_c44641ac47c7474ea38ee94ef001d8e0",
-      "statement": "Shelf.vue segment 3 renders a 3-row preview of the merged entries, and ContinueReading.vue renders the full merged list plus a novels-only finished group from continueStore.completed; both pages hydrate both axes and gate their empty state on both stores' ready flags.",
+      "statement": "Shelf.vue segment 3 renders a 3-row preview of the merged entries plus a view-all link to /continue, gating its skeleton and empty state on a local continueLoading flag that is cleared only after both axes' hydrate promises settle and on the merged list length; ContinueReading.vue renders the full merged list plus a novels-only finished group from continueStore.completed (never the unfiltered items) and gates its skeleton and empty state on continueStore.ready && historyStore.ready with both the main list and the finished group empty.",
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L145-L156",
@@ -236,15 +236,23 @@
     },
     {
       "id": "claim_fb3df2b98fe84024b10c5b65287ed02d",
-      "statement": "ContinueRow.vue distinguishes the two axes by the presence or absence of the '上次读到 第N话' status line plus a type badge, and decides restricted and unavailable presentation locally from the snapshot's xRestrict without any network request, rendering those entries with an explicit label and a remove entry instead of hiding them.",
+      "statement": "ContinueRow.vue distinguishes the two axes inside the row by the presence or absence of the '上次读到 第N话' status line (rendered only for novels with a computed chapterNo and not marked unavailable) plus a type badge that is also interpolated into the row's single accessibility label, and it decides restricted (xRestrict > 0) and unavailable presentation locally from the snapshot with no network request: restricted rows swap the cover slot for an in-flow RestrictOverlay badge block, unavailable rows get an explicit label, neither kind is hidden or removed, and rows that are restricted or unavailable do not navigate.",
       "evidence": [
         {
-          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L113-L177",
-          "version": "repo-lines-v1:sha256:e140f6535f451b17cf937a0c5ab27fa15c7140d77b7f8d45c1106dbc4268f3ce:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkMTdjYTJhZTNmYWQ1ZDg1NGNjZTBlNThhM2VkMDNmZjc4ZGJiMjlkZWQzMjU2MTBkMGRlN2RmMzg5YzkzYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3YzM2YjMyYjU3ZWZiYjc0NDk0NWM5MDY1NzUzMDRiMGFkNDZiMzY3ZjVlNGNjMDU1NTVhYTQ3Zjk5NTJkNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjOGNlMGJjYzFkZWUzYTJjN2VmYjRhZjFmZTM0YTFkYjEyNzg5OTVmOGJkZjM3NDRmNzlhNWYzNWU2ZTE4ZWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA1MjI4NDBlZDVlYzU4YTM2MmYyMGI3MWI4YWViNjc1ZDdlZmI5NzQzOWM5MGMzZjYxNTVhZmVjNjUyODU5NDMifQ"
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L132-L139",
+          "version": "repo-lines-v1:sha256:acd70780427de9f439f4279005e67fdcc22d64843fcec4097dfe55a3228f0c86:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQxN2NhMmFlM2ZhZDVkODU0Y2NlMGU1OGEzZWQwM2ZmNzhkYmIyOWRlZDMyNTYxMGQwZGU3ZGYzODljOTNjOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmM4Y2UwYmNjMWRlZTNhMmM3ZWZiNGFmMWZlMzRhMWRiMTI3ODk5NWY4YmRmMzc0NGY3OWE1ZjM1ZTZlMThlYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjRlN2E2NmU1NGQ2NTBiZDA3MmE4YWQ0OTRiODA1NWU3MjJiYzEyZGFiMmFjNGQwMmJkMTc5MGJhMzhiZTg0NCJ9"
         },
         {
-          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L43-L64",
-          "version": "repo-lines-v1:sha256:d34d3c02186024330e202591cc1555d3eeb2b137e622cee84d639ae2e951c5a3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2ZTQ0NGUwN2Q1NDc0YzEzNDM2NjNmZTVmODZjYjBmOTA5MDBjYzNkNjNiNGM3NjdmZjdmZDRhYmY2MjhhN2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ODBiNzY1MThkYWU5NzlmYWViZDAyMzY3YTI5MjkyYTUwZDk3NjA5MjI1MWEzOGE2Y2UzMDg4MGJhNDI4MjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5ZTU5OWIyNmUwYjgzYWY0Y2EwNjg4OGZlNDhhN2ZkNjg3ZTI3MzlkMzg2MDA4ZjVmZThhMGJkNjJmZDc3MmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjN2Q0NjU3NDk0ZDk3ZjkyZWY5ZjZkZmJmNGJiOTg5NDE4YWQ3NjE2Y2NkMmRmOGZiMWNjYTY1MzQ2NGExNDgifQ"
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L161-L195",
+          "version": "repo-lines-v1:sha256:ecc2f8e6d45437c92732104dcde0cd4b758ddd355b03db4b179fe10af0c599a1:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiZjA4Yzg3MzM3OGRkNjAwNThmMGQ5NDU5NTkzZmRlYjMyZDY3NWVkNjc2ZTc2YzBmYjZhZjBmOThhOTk1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwMjJhYTJhYmY5ZTVlN2Q2ZTE1ODk1YTE1NTIyMWVmNzBlYmQ0MDdmODZjYzY2NTNkZTcwNzcwOTE4OGVhZTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxYTlmNzhkMjQyMzRjZmVlODRlNmU4ZWYzMDFmYTNhODUwNmIxMDdiYWE1NWFkMGY0NjBjNDU5MDFhYzJkMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjViYWJmNzYyZWNiMzYwODJlYTlhOGNhNTNiNWZlZmM1MWRkOWIzYmEyMDg2YzAzZDA1ZjIwOTFlZmRhNmU0ZGYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L62-L69",
+          "version": "repo-lines-v1:sha256:6002379119f8836dfcec6a6aa8f9d5275bc56e61bff63d93065b11249bcd2aa3:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDZlNDQ0ZTA3ZDU0NzRjMTM0MzY2M2ZlNWY4NmNiMGY5MDkwMGNjM2Q2M2I0Yzc2N2ZmN2ZkNGFiZjYyOGE3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjllNTk5YjI2ZTBiODNhZjRjYTA2ODg4ZmU0OGE3ZmQ2ODdlMjczOWQzODYwMDhmNWZlOGEwYmQ2MmZkNzcyZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmYyMjY3MDI5NDE3NGYyNGNkNjVjZGYwN2M1MDA2ZDk0MTgwOWUxNmQ4YjRjMWZiOGMzZjQ3ZTQwMGU3YWVkZSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L79-L83",
+          "version": "repo-lines-v1:sha256:94992eb69946f05ba65390da5d150a9969bf8c87528aaf42ece94750b1a29fd0:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTAzMGJkMjRjNDQzYzViZGFmMDU2MTIyNjI4OWI5OWU3MzdjOWQwODI3NWIzMWMwYzQ2MDFkZWJkMDNkNTE2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODU4MGI3NjUxOGRhZTk3OWZhZWJkMDIzNjdhMjkyOTJhNTBkOTc2MDkyMjUxYTM4YTZjZTMwODgwYmE0MjgyNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2E5OGI4YjU3YzEwM2EwMzljZjU3YmIxYWJkNGIwMjZjNjA1OGFkNGRkMTNkNjE2ODJmOGMxMDM1ZmRhYjc3OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM3ZDQ2NTc0OTRkOTdmOTJlZjlmNmRmYmY0YmI5ODk0MThhZDc2MTZjY2QyZGY4ZmIxY2NhNjUzNDY0YTE0OCJ9"
         }
       ]
     },
@@ -305,10 +313,122 @@
           "version": "repo-lines-v1:sha256:289bad4caa9bc1aa297da66918c37ccf5651b614cb70bcd5465069cd60a6b395:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMmEyZjk5NmYwOGU2ODBiZDI5MjEzNWE2ZmE0OTc4YmRhMjZlNjAyZDg0ZjMzY2IxZDU5NDc3NWQ0MzA0YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzUxZjgyOGNjOTM1NDAzOGVmOWQ5NjE5OTg3YjZmYWJlOTdhMzc4OGQ5MzgyZTU1NjAyMmE5MjAyNDAzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzZDIyNDJkZDA4ZTFkODZlODdiNjgzZmM4NWU3NTBhMjA1NmFkMTIzZWQ1YTI1YTViMzNjNGIwMmJhN2UzYWIifQ"
         }
       ]
+    },
+    {
+      "id": "claim_f90cb85aca0a4b76ab22a0b1dc91f950",
+      "statement": "components/ContinueRow.vue is the single row component shared by the Shelf segment-3 preview and the /continue list; pages/ContinueReading.vue passes the `detailed` prop, which is the sole gate for the single-item remove affordance, while pages/Shelf.vue omits it and therefore renders rows with no removal action.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L150-L160",
+          "version": "repo-lines-v1:sha256:b44fd23ede1156577c091c5ebfe2d9fea4564e6bfb038e1caef812be78fe43a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjNzdmMzQxNDg2MDIzYWYzZGMxY2MxZDZiMWJkYzIxZjVmOTM3MDU4ZWMyNTJjZjZkY2IwNWU5ODU0YTRmMjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2NzBlMTk0ZTExNzdhZDg1OGQ0NzZlODc5MjU2NzFmODg1MjEwMWMxYzkyMjlmNzY2MjkyNjFiMWY3NWUxOGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNhMjZhZDAyYTQ1Y2M0MmM5ODM0ZjhkODU2NTFlOTJkZTUxMTk0ZmY5NjZjOWJlNzVlYjYzYjg0NTRkNTM0NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZjMDE1Y2Y3MzU3YzVkZDFkMTc0YzFhMGM5ODUzZDgzMTBiYTJjMzllYzMwMjQ5YzYzMjBkODgyZmFmYTQ2NzYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L45-L54",
+          "version": "repo-lines-v1:sha256:cc8e6a6dddf6544775fdf0054fe26c5a2ba04e2ce68d131d8467d968cbd044a1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjYTZjYzY5ZDhhNjQ0YmY0MDFiMTExNjc2YTQ0NWI5NzJhNGRhMTljNmE1OTFkNGI0MzA5OGVlZGYwMDQ3ZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkOTU3MTI1ZjJkNGZmMzQwM2Q1ZjQ2YTAyNTFmMGUwY2JiNWIwYzAwZDNmY2EzYzlmYzA5M2ZmMzRjYzQ4ZjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjYjQ5MzI1NDNmZjk0MmZjNzdhN2RiNDllNjcwYjZiYWZhMDdjNTUwMjZlMTE4OGIwMzUyNzMzNjZmZTdhZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NWNjNTczMWE0NGI5NDdmYmQwNzE5NmEzMDExZjU4YTg3MTk1YTZmZGRlZjE3YjIwNGU4ZmE5ZTU4NmI2OTQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L246-L252",
+          "version": "repo-lines-v1:sha256:e3abc5a6e1bd3199cc89f4e40da7e7fa83c352126c5ffee208fdbccb1ad678a0:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDNkNTExZjdiMDgzOWY5YjVkNDY2MzNlNDg2YWJlNmRjNDRjNDhkOGMxYmQzMDRhYWNhYWJmMDhiODYzY2MwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI1OTJlMDdiNGNmNTNhODM4NmM1NjgwY2ZiN2YzZTRlNzU0Mjk2OWM4NzI2YWM1ZWQzMjc1M2Y4Y2E5NTk3NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmIxYjQ1YzQyMTk0NzY2YzMzMmVlYTQ4ODQwZmQ2YzMwMzZlYmI0ZGYyM2ZiZjQ0MzQ0OGQ2YTlmN2U4YTdmNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmM1ZDI2YzQ1MmU5YTQ3YjM5MzhlNzFmYWY1MDAwOTFlNTMyODM5M2UxYmZmMjA2OGQzMjBiMDE1MzFiMmNiOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue#L351-L353",
+          "version": "repo-lines-v1:sha256:50751cc56e994f24a50fb1ae7da08e897850952410c36ff775a7440c29b3fb3f:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTkwMzY4ZDRjMGMzZDJmMTc1MTYwYzVkZmZkMDRkZDg4YmNiNGNjMDBjMjZkMjAzMDI2YzYxYjlmOWQ1OTIyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjZmNTJkMDNhOGYwOTM1MDIyYjliZTQwZWFiNThlYjU2N2NhYzQzMTllZmUxNDgwMGI0NTBmNDc5YjBiYzAwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDUwNmQ2YzYyMDY0YWJiYTFhNWE4MGM3NDdiMGVlY2IzMTY5YmQxNzA0ZTcyODE2MDRjNjdmN2NhMDE2NWNjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGIyZTQ1ZTk1NDdhYzdlMDdlZmExOGJmODE1YWVhN2U0OWZhNjU2MjkxNmY4ZTkzYjhiNTZlOTJkMWQ0YzBiNyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingWiring.template.test.ts#L245-L250",
+          "version": "repo-lines-v1:sha256:d2cf52b51de92fea0fa3d60af6ce6e3182ce432552e33f76a4370cbb984cf8c4:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2MwZWY1NzMwZjRiZGM2MzIwNjc4ZTU4MzY5Y2EzZTJiMWQyNTU4MWY0MGE1ZWJmODY2MjQ4YTE0NzRmYTlhNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2EzZTQ2Zjk0Mjc2YjZmNmY0ZWQxZjAyYWY3OGJlZjZhMmVlMWM0MzlkZDU1ODRiOTczOTQ4MzEzMjE0ZDJiNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmUwYjZhYjMwZjFhODhjZmFhZmJhOTU3MmQ1MDg1MjBmODAzZDdhMDAxNDVlZWRhMjUxZGZiODYyMzljZjkyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzIzNDgxYWNiM2YxNWMwOTdlOGQ4NWJkMzhkMGYzNmVkOTM4YTE3Njk0YjE5YjVlZmY0Y2E4NTU5ZmU1NzMwZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7563e7f2b4cf4734b898486cfe915ccd",
+      "statement": "Per ADR-0221 decision 2 the row's remove affordance sits at the row head before the cover as a 40dp circular icon button, because the row tail lies in the constant GlobalFab occlusion band x[80.80, 95.73]vw where the former trailing pill was 97% covered and taps opened the search sheet; it bears the `close` glyph tinted text-error (a semantic borrow, since `delete` is not registered in ICON_CODEPOINTS), carries the press state layer via pressColor.className, keeps @tap.stop so removal does not also trigger navigation, and removal then bumps the page's list epoch to force a full-tree rebuild of the native list (ADR-0107 D4).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0221-row-action-leaves-trailing-band.md#L42-L49",
+          "version": "repo-lines-v1:sha256:68e0e0e000131f610875fa512328f4c5275d8a732c5bdb07d05d30aaa7411b47:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWI0ZjM5MjBlMzU1ZDU4Yjc4YmJlM2RhNmJmYWI4YzgwOGYzNDk1MDA1NjYwOTRiMGU0Mjc2NDYzNDE2MWJjYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTM3OWUxM2VkZDIzYjYxZDQ1ZjBhMTljY2Y4ZmZlYTkzMDE1ZjQ1NmJlMWMyNmZmNjFhYmY2MzY4NGEzNjE0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzFjNmY4MmJjNWUzMDEwMzNiNzQxMTlmZGM0NGQ2MTM0MDI0ODkzY2FiNzBmODZiNTJjMmE5ZDBhNTkzMGUyYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWUwZTc3ODA4M2ZkNWNjYzk0NDE1OGRiZTM4OTA2MDU4YjZiYWQxNjVlMjUzNThiNzk4NTVkYTM2MGQ4ZmFkNyJ9"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0221-row-action-leaves-trailing-band.md#L63-L71",
+          "version": "repo-lines-v1:sha256:5d05940f53415c9ddf457f518f410dc36587bfa7f608d644b05f7fd67ee4f2cd:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDRlYTc5NjMyMGRlMGZjNjU0NjI2YTg5ZDViZGFlMjkzOThhOTA5MGMzOTdlYTEzN2U0ZTJkMzA4ZmI3OTE4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzVkNzAyMzYzNDZlN2JhYzEyYzA5Yjg2MjAzMGI1OWVkZDllYTA3ZGRjYjQ2N2RjZDU4ZTk2YmI2MTg4ZmFhYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTkyZTJjZjE0ZDczZDk4NDBlNGI4MGFhNzBjZDIxMWYwZTJhZjE3MWMxNGY2ZWQ1OGYyZTFmMzNkMDFjYTM3MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDAxZjJlYzE3NTkzYzEwNTRlYjQ2MzY3ZDg0NTNlZjI0YTE3M2NlOTZiNzExN2Q5MWY5YTY4ZDQ0ZmVmOGIwMSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/ContinueRow.vue#L150-L160",
+          "version": "repo-lines-v1:sha256:b44fd23ede1156577c091c5ebfe2d9fea4564e6bfb038e1caef812be78fe43a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjNzdmMzQxNDg2MDIzYWYzZGMxY2MxZDZiMWJkYzIxZjVmOTM3MDU4ZWMyNTJjZjZkY2IwNWU5ODU0YTRmMjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2NzBlMTk0ZTExNzdhZDg1OGQ0NzZlODc5MjU2NzFmODg1MjEwMWMxYzkyMjlmNzY2MjkyNjFiMWY3NWUxOGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNhMjZhZDAyYTQ1Y2M0MmM5ODM0ZjhkODU2NTFlOTJkZTUxMTk0ZmY5NjZjOWJlNzVlYjYzYjg0NTRkNTM0NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZjMDE1Y2Y3MzU3YzVkZDFkMTc0YzFhMGM5ODUzZDgzMTBiYTJjMzllYzMwMjQ5YzYzMjBkODgyZmFmYTQ2NzYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L70-L95",
+          "version": "repo-lines-v1:sha256:ce674d52f4fa2314b97ecde808ebee2918fee75b44f66e447750f53b54a05845:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjZGE5Mzc3ZjUxMGRhM2E0MTgyYTVkODUzNGNmZTM0M2Q5YjYwMWM1ZmE3YmM5ZWFlYzYwMTgzZjViMWU5ZDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyMmMwYTU4NWFkNjlkZDE4NGMyMTcyMmRmYzkzMjFhMWY3ZGZiYTA4Mzk3ZDM3Nzg0MGFlNDBmODEyZjFlZmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4YWRlZmVlNDA2YmZhNTNjNWZhMGRhZjllN2VhY2QxOWY3MmJkMGE1MzZjMGJhMGM0MDU3MDM4MWM0ZDczMjQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingWiring.template.test.ts#L160-L250",
+          "version": "repo-lines-v1:sha256:3f79267263f292aa43dbe203f546c9362f82057054369e2f44ad5c9fe55bd714:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhhYTFhZmVlYjEwOWZhMjVlNGUyZTNhZWQ3MjkyMWZkMjMxMjMxYWE1YTczZTYxNDc2Y2FjNzljMzJiN2NlZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhM2U0NmY5NDI3NmI2ZjZmNGVkMWYwMmFmNzhiZWY2YTJlZTFjNDM5ZGQ1NTg0Yjk3Mzk0ODMxMzIxNGQyYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZjBiOWRjMmI1ZTFiOWFiZWNiZjJmMTAxNWE0NTIzY2IyYTc1MWVlZDgyNDQyYTBhNzA4ODBmZmNhZjliZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMyMzQ4MWFjYjNmMTVjMDk3ZThkODViZDM4ZDBmMzZlZDkzOGExNzY5NGIxOWI1ZWZmNGNhODU1OWZlNTczMGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6d68f1e6707843ecb323a0ba24d56edb",
+      "statement": "On /continue the skeleton (v-if), empty state (v-else-if) and native <list> (v-else) must remain adjacent siblings, with the bulk-clear bar rendered before that chain: inserting any v-if/v-else element between the empty state and the list orphans the v-else so the whole list silently stops rendering (a device-observed blocking defect), which continueReadingListChain.template.test.ts guards for /continue and continueReadingWiring.template.test.ts guards for the Shelf segment-3 skeleton/empty pair.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/ContinueReading.vue#L187-L237",
+          "version": "repo-lines-v1:sha256:037339bf520dc8a4ea3c2fe92e650fcfbbd1aae958f53a6af2ad55005172701e:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4ODJlNWEyYTA2YTEyNzYxNDhkMzNlYzNmNWE1YWZhYTkxYTIyMmY5ZjFmYzdmOTFhZjBmNmQyMWE3MDkxZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5Yzc3NTUzNGM5MjljMjVjYTZjNWU0NWQxOGRkNzJiNDcwZjg5MjliMzljN2ZhODJkM2VlNmM0YmJhYjU3OGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc5OWJmMjg4Y2NkZWQwN2JmNjFmNDFhMmE3ZjhlMWY3MTUyZTA1NDgyZTc4ODAwZDZjMGZmNzI4NmYwYTgwMzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzZmExNjYwOGQ0ZjY1NjBkMmYxNGZmYzdlMzdkNmE2ODFlNjU4MWMyMDIyOWE5YjVmYjI4NWYxYWYzZjYxNDcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingListChain.template.test.ts#L1-L80",
+          "version": "repo-lines-v1:sha256:2689e48c0645b2c96e973e24d75d77870fb1fb53b4bcc15b865ae819a77b023e:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkZjA3NjIxZjMwZjQ2Mjc0NTA0ODA1N2RjNTEyMDIxZWM0MTQwZjc1MjAyNGRjMmQ3MzBlMzQyODBlYjZjYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmOWJlYjRmMjc3Njg0YzExZjk3YzM0YTAyNTRlZjI5ZjY2YmZlNDNlMGE3NDc2NjUyNjI0YTZmMWFjOTM3YTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxYjIwODJhZGQ5YTI5ZTA2MmU2MGQ0NmRiYTFlMWY3YzUzYTBlMDUwYjg4MTE4YzExMDIxOGJjY2UwNTUyZDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingWiring.template.test.ts#L74-L112",
+          "version": "repo-lines-v1:sha256:a0a5a78013c5171db8d6677b8f3804dbf16776354cc7720d2ef39e0e0e8146ce:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3MzQ2ZDk5NmRhZDczMTI5MDk1YWU3NjRlZjY0N2QwN2ZjNGI5YzQwYjQ2ZDIyZTJlZTM0OTU4ZmIxZTY2MGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUwNzRlMzU2YzI0NDQ4NDVhM2JmZTA1MWZmOTMwOTQ0MzI0YzJlYzQ3ZWZiODNiNTBjY2FlNDgyNTY3YmExYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFhMDQxMzY5ODkzZjYyNTRkZWU1NTYwNDk1NTBiMjJmYThjOTY1NzU5MWYzODQxOThkYjg0MDQxYzNjZDExYjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_44a73371689b4bb3a04b11fdb57ed036",
+      "statement": "Novel completion is evaluated idempotently at three points — the @scrolltolower handler, the background chapter-coordinate response, and after re-pulling the native content-area size for rotation/split-screen — because coordinates and viewport size are asynchronous inputs that can land after the bottom event, and markCompleted is a no-op for an already-completed entry so the repeated evaluations stay safe.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L191-L200",
+          "version": "repo-lines-v1:sha256:bc6467acf80dc76e1128b35dc4507da3107bf6853fcebf235d7b619cf9216c75:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0MWM5ZDUzOWZhYWM4ZWMyNTVkYWIzMjg5ZDcxNmYwNmM1NTRiMGI2ZmVkZjdkMWZhMDIyZmU1YzZjZDg2MWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZjkzMDgzYzE5NzEyMWI5ODI3MDBiYThhZmFiZDE3MjJjZjFkM2U3NDA0NTA5ZTgwZWZhMjcyNDdmNjJmMDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNmZDk3MDA5NjM2MDAxMzY5ZjIyYTg1ZTJiODYyNDcwZjM4NTJkMTY1OGYxZDI4MzkwNDQ1YWUxZDNjMGI2MTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L425-L465",
+          "version": "repo-lines-v1:sha256:0201907522cd022901c8e1532301be8a96f0f07caae91a0d6378b1cffaf8e34b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQyZGEzMDdiOTUyYjg3YmNkNDczNDhlZGY0YjI1OTA5ZjMyYzQxYTUwNmM3YTZlNWE1ZjUzYjI2N2UyMzkxMTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlYjc1N2ZmOTg2ZjQwMWExOTZlZTdjZTg0ODk1ZDJmYTY0MzM3MGZjMjRlYTAwZTMwMDlkMWM1NWNlMjlkMmYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue#L504-L517",
+          "version": "repo-lines-v1:sha256:ca903018fd34832b062bbfaff174e8b30ca0beb2e2db9f67e3318ca0ca9594b4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhhYjM0ZmUwNDU5YmE5NzZjZTY3YjAyMGM3ZDBiZGZlMzEyMjFjMmRhNzc1YWJlNTgwMjMwZTdkYTg3N2ViYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ4M2E5ZmU1OTJjMjhmMGYyY2Y1NmUzNjg3ZjVmMTZmMWFmN2U1OWRhZDc4NTAyZTdjNmUxZjE1Yjk0OTEyNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgzMGQ2OGNjM2VhY2E4MWM1ZGMwMDM5ZDIyMTY2NjY3YWRhOTg1ZDkyNWQ4NDkwOGU2M2Q3NjhiNDJjZDFiNmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_53e34944e47a453d919c82aaeac03e44",
+      "statement": "router.ts pre-warms both axes at bootstrap by firing unawaited hydrate() calls for the continue-reading and browsing-history stores right after the token and settings restore, so a cold deep link to /shelf or /continue does not render an empty first frame.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L620-L631",
+          "version": "repo-lines-v1:sha256:f7925414e7979e0992d89bd5a9aff046746de41426810a8676a1e706bf3d436d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRlZTkwMjZiN2ZlZTI5MTJiM2RmNDg4MWRhNDM3MzgwYjMxYmNmZTBjNDE3NWI0OWIxZGM2YzNhYWRiMjgwY2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1ZmZiY2I4YjgyNjdiOGMyNjdkM2I2MmI5NDE1YmQ3NmQ4NjA1NGVmNzViNTJlZmFiYTQ1MjU4NTEwZDRiM2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAyNmE3NjYzNmIzNWIyYmE5ZjE2NDVkZDJiNTE2ZmI0NGMxNzkwYjMzNzI3YjgwY2ZiN2IyYmE0NGQxNzEyZjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFiOWNhNzc3OTM1NWFhMmY2MWNhNTQzMzk5YzQ0YmRmNjQ5OWU4MTg4NWMwZDRmZjNhZGZhZjU5NDI5ODczODcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_32e518bb636c4862904af8e629813a69",
+      "statement": "Shelf.vue records the continue-reading segment's observation once, after both axes' hydrate promises settle, via recordSectionObserved('continueReading', empty) inside a try/catch: one merged-segment boolean rather than per-axis counts, no per-entry click counter, and no network egress.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md#L198-L213",
+          "version": "repo-lines-v1:sha256:50ddb7f463a1fc462bec9bca51aa75e0500a53a284e7f8413f5e7bcfabee4e7b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2ODMwZGE5YzI5Mjk4YWVmMTZiOWYwODkyYTdhNDM1Zjk3MWE0NmY0OTYwOWM0YzIyNjNlYWY5YTI1NzQzZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmNTk3MzkzNTFjZjc3N2JlYjRhYjgxNDBmN2NiYjE1NmU4MjE1MzMwMGRjMDRkZjU2YzExYTZmNGRhMTQ2ZGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE3NmZhNmY3OTAxMTRlZmMwOGFlODBhMTc0ODQzYTUxNmFiNWJjZWFmODQwYjU3OTA2YjFkODU4NDU1OWZhMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkY2NhMDkxNjg1NGRmNTQ2MTY3NTU2ZDAyYzg4ODYzNWRlOWI4NWE2YTBlYTFmYzRkMzY3MmFiOWM0N2I4NTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue#L174-L185",
+          "version": "repo-lines-v1:sha256:aa263001369f295a77878b7aa7bfc290ab361e65510bb2b64f5e5ae368eed65c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjNmI1N2VlNThkYjE4MmU0MTYzN2FmZDc5ZWJmOTkwOGRhNzIzMjlhZTNmZjRlMDRhZmY5ZjdiZWI4MjEzMjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OWYwMGUzMGIwMjU2YzFlNzhlN2E3YjU0MjUwNWNhMDdmZTMxNTQ4YmQxMWNhYWE4MDEwMzMyOTJkOWUzOTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzNjJhNDA3MDE4YWZhNmI3OTc1MGEwZTEwYTA2NTZhMjJlOTdlMjM4MzUzZjQ4NTMyNmIwMTBhYjlkODIwNzMifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-05T06:49:09.686Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

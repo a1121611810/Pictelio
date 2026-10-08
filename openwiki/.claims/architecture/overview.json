@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:bacaf7b01265137c69238d6813cc52bc403dc4d774930ec37c79bc3ef23746bf",
+  "pageVersion": "sha256:901982ead5a5e78e1b471404a89095e39d6f8d0cdd5e0ceaca8a067643fca8da",
   "claims": [
     {
       "id": "claim_0c597c5fda3d4962ba46b74ba904b8ad",
@@ -62,7 +62,7 @@
         },
         {
           "resource": "repo://vite.config.ts",
-          "version": "repo-file-v1:sha256:ad5b4fe75be91855fd63eb4dde8a8bd470c30ba4fd9d1f458ae13fc13fa5dede"
+          "version": "repo-file-v1:sha256:11b3f5b4f95e39496d604b0e4fe270226fe8cb3b4f32007cee18370e560973a3"
         }
       ]
     },
@@ -86,7 +86,7 @@
         },
         {
           "resource": "repo://packages/app-lynx/src/router.ts",
-          "version": "repo-file-v1:sha256:890b45555a0c95dc96fa7b73de1380166e4651a1fc2a39348083343d02297f07"
+          "version": "repo-file-v1:sha256:3d7e38bf4853a529ccbc045ff9e9418ace23ac32f54a88b420bae4c45df588d6"
         }
       ]
     },
@@ -128,7 +128,7 @@
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/src/api/client.ts",
-          "version": "repo-file-v1:sha256:25b41af9f6baac7a3dc15f0bafaecaec361acd5ce3dd260bc5761b3840d4ded0"
+          "version": "repo-file-v1:sha256:d25225900ed002a74350a5fdd3d8245a10ddcc449fc9f7b40add8d7a81475682"
         }
       ]
     },
@@ -142,7 +142,7 @@
         },
         {
           "resource": "repo://packages/app-lynx/src/App.vue",
-          "version": "repo-file-v1:sha256:4887656a9f11942268a74d3393ea8e3d9830ce568b467e5dea1e27dca1719894"
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
         },
         {
           "resource": "repo://packages/app-lynx/src/styles/tokens.css",
@@ -156,7 +156,7 @@
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/src/api/client.ts",
-          "version": "repo-file-v1:sha256:25b41af9f6baac7a3dc15f0bafaecaec361acd5ce3dd260bc5761b3840d4ded0"
+          "version": "repo-file-v1:sha256:d25225900ed002a74350a5fdd3d8245a10ddcc449fc9f7b40add8d7a81475682"
         },
         {
           "resource": "repo://packages/app-lynx/src/i18n/index.ts",
@@ -170,17 +170,237 @@
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
-          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
         },
         {
           "resource": "repo://packages/android-host/package.json",
           "version": "repo-file-v1:sha256:c39d3352dcac943d9c9d881f069014b57a16eeb916e974e1aec20d5be9a306ec"
         }
       ]
+    },
+    {
+      "id": "claim_b9019b62a61a4b9eab3baee7ba5be459",
+      "statement": "App.vue's root <page> binds its class list to appearanceClasses(settings.themeColor, settings.resolvedDark) and its inline style carries only the bottom safe-area padding (paddingBottom: safeBottom) plus the reduced-motion --shimmer-motion gate; top inset is not compensated at the root but declared per route as meta.topInset and consumed by each page's own zero-content spacer through useTopInsetSpacer / utils/topInset.ts.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useTopInsetSpacer.ts",
+          "version": "repo-file-v1:sha256:1f900805c06ab999a158d5e2c1342400d11e5be85b5725825482e8b54d4ab925"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/topInset.ts",
+          "version": "repo-file-v1:sha256:59d5a9d693562e798d23399b17c864501831f588d499b231c2d3ddbe5093ac7f"
+        }
+      ]
+    },
+    {
+      "id": "claim_3bcf979217374858aa2cad1d1264caba",
+      "statement": "App.vue renders <RouterView> inside a route-transition container whose direction/stage is decided by the router's afterEach (composables/routeTransition.ts), wraps the view in <KeepAlive :include=\"['discover', 'updates', 'shelf', 'me', 'ranking', 'mypixiv']\"> while deliberately excluding detail pages, and mounts the global singletons once: GlobalFab, SearchSheet, the engine-fallback notice, the exit-hint snackbar and the tag-mute snackbar.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/routeTransition.ts",
+          "version": "repo-file-v1:sha256:804014bb229c6ceab0d6d2db8d29920b3a3034a21ccdc088e0085476d66a52c8"
+        }
+      ]
+    },
+    {
+      "id": "claim_770f51a101fb49618b9ad1076ccc6a25",
+      "statement": "App.vue's two onMounted hooks own the startup side effects: the delivery-probe lifecycle init, usage-metrics hydrate-then-recordLaunch and the notification unread-badge prefetch in the first, and engineFallback.check(), initRouter(), runStartupUpdateCheck() and initSafeArea() in the second; each step is individually guarded so a failure cannot block startup, and a watcher on the routeState object (not .path, which would miss the cold-start landing) records top-level tab reach.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/notificationStore.ts",
+          "version": "repo-file-v1:sha256:09afda094e7718cbfa918101a922ca8ea5824347fb0ef55108dcd87ad8d78916"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/usageMetrics.ts",
+          "version": "repo-file-v1:sha256:328464f6b4ee07e9d1128b710cd9949a6263e2079a41f476202be7be67ed991d"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLifecycle.ts",
+          "version": "repo-file-v1:sha256:e74f9008b4cb61fd3cba2b28aa5887ef95e9d3d832f9813d3894f2cd5a8fa37c"
+        }
+      ]
+    },
+    {
+      "id": "claim_241b98b837ea489d83f5d41c8f9ce52d",
+      "statement": "The single source of top-level navigation destinations is packages/app-lynx/src/components/navTabs.ts (NAV_TABS: discover /updates /shelf /me as a closed four-item set); illust and novel are in-page tabs of the discover page with their routes kept only for deep links, benchNav and back targets, and /advanced is a secondary page reached from Me rather than a FAB tab (ADR-0218).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0218-app-lynx-top-nav-user-question-dimension.md",
+          "version": "repo-file-v1:sha256:1407a16598ecd3ee273d8c1a314bbffd8927406b53973f118d531a721dc5fd33"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/navTabs.ts",
+          "version": "repo-file-v1:sha256:f5f0bc31048240aeb7797ba14e5a5f4310f8e8e3cdef2c0470be0dbf2e6b4108"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts",
+          "version": "repo-file-v1:sha256:3d7e38bf4853a529ccbc045ff9e9418ace23ac32f54a88b420bae4c45df588d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_230cc0cba0004890ad9ea344e0ccaf56",
+      "statement": "After single-engine consolidation only the default-engine half of ADR-0164 survives structurally (build.gradle declares CLIENT_KINDS = {\"lynx\"} with CLIENT_KINDS[0] as the single source of the Java default engine), while the bidirectional fallback machinery (EngineRouting / EnginePrefs / EngineRoute, failure memory, auto-fallback switch, reason codes, double-failure page) was deleted; LynxActivity now funnels every runtime failure (init throw, bundle load failure, fatal render error, 10s load timeout) into a single error page with no automatic jump and no failure memory.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0164-default-engine-lynx-bidirectional-fallback.md",
+          "version": "repo-file-v1:sha256:581978a5805181b771c109f579246717dafe5ec1d64a8028ac18247c9ef47aa3"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle",
+          "version": "repo-file-v1:sha256:2b59f391489119eb4febca3eeba7e7c7aec16fa3554629c06cbd22097dcb12e5"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
+        }
+      ]
+    },
+    {
+      "id": "claim_6b51476272e84429b9b3b8bb477f8cbe",
+      "statement": "app-lynx still ships the consumers of the retired engine-decision protocol and they are inert in a single-engine build: stores/engineFallbackStore.ts consumes the one-shot key pictelio_engine_fallback_notice at App mount although no native writer for that key exists in packages/android-host, and utils/engineState.ts (parser for the pictelio_engine_state snapshot with 10 reason codes plus an unknown fallback) together with the engineFallback.reason.* copy has no production consumer since the client-switch UI was removed.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/i18n/locales/zh-CN/pages.ts",
+          "version": "repo-file-v1:sha256:bba8da19ebbe3cb1c2573f34b00254e2a1a6efd8ea48e437aafe04de728e67e1"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/engineFallbackStore.ts",
+          "version": "repo-file-v1:sha256:cbc20fe3dbb68b702bc027b3e4ec447bf01f819e7481981bd77b118489d2c849"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/engineFallbackNotice.ts",
+          "version": "repo-file-v1:sha256:f24dcd09c4368dc39607ee38aac55fed930d0526f42d20f5f16a64feb49671d1"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/engineState.ts",
+          "version": "repo-file-v1:sha256:4136192777acfd8fff38e15b61a9ddd0ceae601cab8cfa8076a5c629829cc099"
+        }
+      ]
+    },
+    {
+      "id": "claim_c2b1737a363e4e32b24f7ec13271d084",
+      "statement": "Update checking is automatic-only with no manual entry: App.vue triggers updateStore.runStartupUpdateCheck(), which waits 500ms, calls @pictelio/update-check's checkForUpdate with __APP_VERSION__ and an environment-adapted FetchLike (native PictelioApp.httpGet, otherwise requestFetch), and only then clears history and replaces to /update when hasUpdate, latestVersion and latestReleaseUrl all hold; the .env switch PICTELIO_DISABLE_UPDATE_CHECK is honored in dev builds only.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts",
+          "version": "repo-file-v1:sha256:a73b7b9fc034bdee13b7c805cb8882b2f7852eee2f0dec5e053bbe17f03648d7"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/updateStore.ts",
+          "version": "repo-file-v1:sha256:fb1fb411e16fce3082ddf1cc6f1f888034cbd3c1469ec5ba30f7da362fc7fe3a"
+        },
+        {
+          "resource": "repo://packages/update-check/src/index.ts",
+          "version": "repo-file-v1:sha256:2d6520be8bbeebcc633635356f00b444854a2fe8564cf6c3c91a370051bf04b6"
+        }
+      ]
+    },
+    {
+      "id": "claim_6ecb044876ab478db1f9394654137712",
+      "statement": "@pictelio/update-check is APK-update-only: its OTA dual-coordinate web-bundle API (isBelowMin / WebBundleMeta / parseWebBundle) was removed together with the OTA publishing-channel retirement (ADR-0202) and the deletion of its only consumer packages/app/src/** (ADR-0203).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0202-ota-web-bundle-channel-retirement.md",
+          "version": "repo-file-v1:sha256:63cf90a27a02e032d1143bd51635698fabf43b2ae7f746a13fd70ded25aebacb"
+        },
+        {
+          "resource": "repo://packages/update-check/src/index.ts",
+          "version": "repo-file-v1:sha256:2d6520be8bbeebcc633635356f00b444854a2fe8564cf6c3c91a370051bf04b6"
+        }
+      ]
+    },
+    {
+      "id": "claim_68c72553b2564072b8a286bdf6c3e4fe",
+      "statement": "Notification taps are a second navigation ingress deliberately outside the __BENCH_NAV__ gate: the host broadcasts the notification target up to four times to survive bundle-render races, JS pulls any click that landed before subscription and dedupes by clickId, and the router navigates with push rather than replace so the session mirror stack stays consistent with the real history queue for back handling.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts",
+          "version": "repo-file-v1:sha256:3d7e38bf4853a529ccbc045ff9e9418ace23ac32f54a88b420bae4c45df588d6"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/deliveryProbeLanding.ts",
+          "version": "repo-file-v1:sha256:521a0bc3fe2ba0a3fb67ddaaf98e565626cba7015f3f87f2192e5398158d23a1"
+        }
+      ]
+    },
+    {
+      "id": "claim_a9476699e532497cb509d623927b6417",
+      "statement": "The workspace root pins its toolchain through devEngines (node >=22.22.2, pnpm 11.9.0) and pnpm-workspace.yaml carries the supply-chain policy for the whole monorepo: a 24h minimumReleaseAge cooldown with an explicit @lynx-js exemption list, trustPolicy no-downgrade, blockExoticSubdeps, time-based dependency resolution and a shell emulator for cross-platform scripts.",
+      "evidence": [
+        {
+          "resource": "repo://package.json",
+          "version": "repo-file-v1:sha256:b3dc7864cab8bf082ba0049cd0ef27c6b9e596bc6bffda4d3c467eb2790e5ee9"
+        },
+        {
+          "resource": "repo://pnpm-workspace.yaml",
+          "version": "repo-file-v1:sha256:1b990a860b23ced37defc27f294b5798e14bd80e6dcc6a23e95c10fe6911bdb5"
+        }
+      ]
+    },
+    {
+      "id": "claim_2ba3af9a24d24bcb92bf41432863379b",
+      "statement": "packages/android-host owns the JS-to-Java event and storage contract that the client binds to: the pictelioInsets, pictelioDarkMode, pictelioBack and pictelioAppForeground / pictelioAppBackground global events, the notification-tap intent extras, and the CapacitorStorage SharedPreferences file (PictelioPrefsModule.PREFS_FILE) shared with app-lynx settingsStore; the constants are pinned by cross-boundary contract tests on both sides.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java",
+          "version": "repo-file-v1:sha256:d4c092dd29bcf1821fd70ef7c5262dddbc9dd451473c5c612f1d51e31d76352e"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/darkModeJavaContract.test.ts",
+          "version": "repo-file-v1:sha256:3eea8460e38c9d2f56c7116b98286df9542be3ddb747ebd9783ebff600569ae0"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/safeAreaJavaContract.test.ts",
+          "version": "repo-file-v1:sha256:60a83afa09ebd5de21debaebc1b1a4f135d5665feb0ecd550118101fc9655490"
+        }
+      ]
+    },
+    {
+      "id": "claim_6152d28cfe5040b9939d6ba9d395b5df",
+      "statement": "app-lynx's source is organized as ordered layers rather than a flat tree (api for transport and server state, stores for Pinia client state, pages plus components for the view, primitives for lifecycle-owning logic factories, composables for composition behavior, router/routerCore, services, utils, i18n, styles), and dependencies flow pages/components to primitives/composables to stores plus api/client down to native modules or fetch - with api/client deliberately not reverse-depending on Pinia.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue",
+          "version": "repo-file-v1:sha256:7b4dc8398bae1485f53ea1de53db483e1dad021ccc3348a77c249861aeca3169"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts",
+          "version": "repo-file-v1:sha256:d25225900ed002a74350a5fdd3d8245a10ddcc449fc9f7b40add8d7a81475682"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/Shelf.vue",
+          "version": "repo-file-v1:sha256:11ebac6269c472b44458a1c891acd1b51be18690e79dfbf12783aca980021d0c"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-05T06:49:09.686Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

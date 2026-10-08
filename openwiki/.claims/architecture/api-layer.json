@@ -1,22 +1,26 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:1b71c908854dfe93392e4247fe315515c852e53760c25d7c2059d87f3b523d11",
+  "pageVersion": "sha256:bee5050daff2c24ea492b2c4d149e36818cb34f7dd1d8f73fe7f634b632bc738",
   "claims": [
     {
       "id": "claim_3eda17df10f64623ababa13ea503abe4",
-      "statement": "The app-lynx API client selects between two transport modes at request time via isNativeMode(), which probes NativeModules (bare global and globalThis) for real Pictelio* modules: native mode forwards through NativeModules.PictelioApi into Java, while web mode uses fetch through the /pixiv-api and /pixiv-oauth dev proxy paths.",
+      "statement": "The app-lynx API client selects a transport per request via isNativeMode(), which probes NativeModules through getNativeModules() using a bare-global-or-globalThis lookup and reports native mode only when a real Pictelio* module is present (PictelioApi / PictelioAuth / PictelioSecureStorage / PictelioApp): native mode forwards method, relative path and body to NativeModules.PictelioApi.request into Java PixivApiCore, while web mode uses fetch through the /pixiv-api and /pixiv-oauth dev proxy paths.",
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0053-lynx-nativemodule-contract.md#L26-L53",
           "version": "repo-lines-v1:sha256:faf6881c59ee54db15ee7f347d588eeed3414c17ce4bc951e5bc6621069db593:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhYjRjZTQwNTAwYjg2OWM4NmMzMWEzYjQ5MmQ5MGU5Y2MwY2Q5NDBmYTUzY2E5OTNmZDFhNjcyODNmMDlmZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0MjE1OTUxNzk3MTM2MGU5ZTZjZmNjNWJlYzkzNjdkMTMwNTAwYTc5ZTEzMDY4MTU4ZmM4M2U1NGMyNGZiNWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0MWQxY2I0YjFlMzIwMWQ0ZTNjZDIxY2M5MzEwOGUwOTZkZjNjODNhZjM3YTE1ODUwMDhiMGM3ZWFkOTg4MDEifQ"
         },
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L239-L260",
-          "version": "repo-lines-v1:sha256:c60bf02ac557caf85c4337136081add9e26ebaff332f7dddabde50d39db0ed68:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjOTM0NTQ4YmU0M2M5ZGFlNmIxNjc4YzIwYzYwMzY2OWE5N2JhNzQ1Nzk1YTgzMmFmZDgzZWQ1NWYyY2FlMTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAyNDcyZGUwYjU2NDU3NjhhZDVlNDNiZjM1YTg0YTVkNmZlNGJlODIzNTk1ZjAyYjU5MDY1MzA3YWU3MWM2YTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4YmE2NjYxMGJhYzk3YmJjMzM1OTNiMWMzNWRiZDIyY2Q2YzhiYjFkYzJkMjA4MjNjMzYwMjIxMTM1ZWMwNTUifQ"
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L234-L262",
+          "version": "repo-lines-v1:sha256:1548ea37cca85f50fb3f7f6a2557fba78b7b32b688fe5c7cd8fcecec034b13a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhMzA4OTdiNzk0OWYzODcwNTUxNWNjMjZmZjlhZjZjM2RmZmNhZTg0NmRiNGM4NWRhOTI5YzRiOThmZDgwNzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4YmE2NjYxMGJhYzk3YmJjMzM1OTNiMWMzNWRiZDIyY2Q2YzhiYjFkYzJkMjA4MjNjMzYwMjIxMTM1ZWMwNTUifQ"
         },
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L361-L441",
-          "version": "repo-lines-v1:sha256:d5dac0f4b0eb604a567b9c95f4fe7c27dd5d84aa51f58a1fbc369a04b0f3e13d:eyJzZWxlY3RlZExpbmVDb3VudCI6ODEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2NzgxYTI0NWMwNjc5YmQzNmIwNGMyNGY4NGJjNjBmNmU3MDg1NDhhMDVkOGY2NTQyYmEwNTNkYWZjMjQyNjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdiMzY3M2YzZTg3NTY5MTk0NGQ1ODc0OGQ0YzA4NmFmYzY1ODhjMWIwOGM5ODE5ZWMxZTYxYTI2M2MxZDgzN2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiZmMxYTdhY2ZlMjdkODI2OGUzOGM3M2JhZTRjYTgwZTBhNmMwZTAwYjdiNWYzNzcyMjQ3MTg4MmNiNTRhZmMifQ"
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L362-L399",
+          "version": "repo-lines-v1:sha256:a0a771d49d8644342c88777368da167c6ef399255a6d3737a8f17e6a362c5ffc:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyYzMwMDY4ZDk3YjMwNjk3MzNiZjUxMTE0MjE5MGE3Y2E5ODU0OWE0YjJhYWZiZDIyOTM5ZDJkNDg0YjQ0MWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc0MDRmZGUyY2M3NjJmNjI1YjM5YjlhNjc3NWUyMjc5NzVkYTA0MDIyMzkwOTg4N2I2YTQ3ODlhMzU4ZjcwNWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkNjNiMDAxNjFhNWViNDY3ODhjNzBmNWNiOGYxNTU3M2E1YTJiNjgxZDQ2OTI4ZTliYTU5NGY5YTllMTI3YzgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L464-L505",
+          "version": "repo-lines-v1:sha256:33632c11d977213d2638470e3736dd9a5395db5f685464581686d466e46db5c8:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0ZjlkOWE5MDY5N2QwNmMzY2UyNzNlZGFmNmFhZmJkMDIyMDMwYWIyOTdiZTk1YmUxZDdjODBlZTViMjVjZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMzJhYTljZmE0NjE3NzJlNzRiZTQwNzk5MmVjZGIwNGE1MjE2NzFkMzg4YjA2MzY0NzhkYjYwNTUwYjM5NjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkNjNiMDAxNjFhNWViNDY3ODhjNzBmNWNiOGYxNTU3M2E1YTJiNjgxZDQ2OTI4ZTliYTU5NGY5YTllMTI3YzgifQ"
         }
       ]
     },
@@ -65,7 +69,7 @@
           "version": "repo-lines-v1:sha256:6eed36511846ef75ad6af583a16f8d71a8751df7df2c87e839c75925305a9830:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkNzQ4ZGZlNzY0MjljOGQ2OTNmMDBlMzg5NDJmNWZkZGI5NGQ2ZGQ2YmI3YjlkYmFjMGZhNDMzNjAzZDQwNTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2MTY0Mjg2MTMyZTE1NjkzMGFkYjFmNjBlZTU5NjZlZWJlZmRlZjc4ZGZlZmU4YTZkMjMyZmZlNTZhMjdjNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         },
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L538-L557",
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L540-L559",
           "version": "repo-lines-v1:sha256:190018c3db6e82db7c885a937bba185b9627bd128037b1192e42d8f43a378fc4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwNjdkZmM0YjI1ZDg2ZjJmOGE4MzVkN2U4NWViZTFmMTg0ZTdjMzQ5MzNhOGE2ZjRjNDk5ZDRlZjRiZmNkMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBkNjhiY2FlN2YyZDJiZjQ2ZjRjZWViYmQ0MmQ2YjI5YTgzMmNkYjUyZDgyMGQ4NzQzZTgzZWZmM2U2ZGJiZGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiODYwMzBkZmJkMjkyODEyZjUyZDRhYWQ0ZGEwNWJjNGNhNzEzZTY5NmI0MjQyNzE5MzYxYWQzM2UxMjdhMjgifQ"
         },
         {
@@ -79,7 +83,7 @@
       "statement": "client.ts enforces a token barrier: authPermanentFailure short-circuits execute/executeRaw with a synchronous throw, and GET requests without a JS access_token await awaitAuthReady() (the authStore-registered restoreToken provider, capped at 10 seconds) before web mode throws UNAUTHORIZED; the gate also covers the native branch because the Java-heap token is produced asynchronously by the OAuth exchange, while POST requests are intentionally not gated.",
       "evidence": [
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L335-L358",
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L337-L360",
           "version": "repo-lines-v1:sha256:2aeefeafab6c784186f97c50af5dd49908973dcf5f6676a8504a017c491b39ce:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxMjhmZGM1MTYwZjI2ZTNhZGZjMzMwOWZjMzI5YTdkZTVmOWM0MTgzNTYzYWM5MzAyZGJjZWM3NWY2MjZkOGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyYjIwNzMxZWNmMTRhZjIzMDdkZGM3MTEwZDJhNWIwNGM1MzY5Y2QwNjRmNmY2ZjMyN2MyN2U4ODQzMzNiMWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzMmE0NjhmMTdkNzhlNDM4MWFkNjVlMzQ0NTEzNGU5MjNmNTJmOWI0OGMyMTUzYjQ0NDBlMmM1OGIwNjEyOWIifQ"
         },
         {
@@ -119,7 +123,7 @@
       "statement": "refresh_token persistence goes through utils/tokenStorage.ts as a dual-path wrapper (IndexedDB in the web-core worker, NativeModules.PictelioSecureStorage Keystore on native), with unquoteNativeString correcting Lynx's JSON-quoted callback strings; authStore.restoreToken dedups concurrent restores via _restoreInFlight, and every login/refresh plus any Java-side rotated token is written back through saveRefreshToken without blocking in-memory state on persistence failure.",
       "evidence": [
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L379-L383",
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L381-L385",
           "version": "repo-lines-v1:sha256:fea67b5483c7ee8f409a8ba4f2f4172ebdfe00f5d318d1b23c7a188a95ab087a:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmEzZTFkMTQ2YjMyNzNmY2JhNGY2MTA3ZThlYWVkM2E2ZjJjMjc2M2FhZDZiMTRlNDk2ZDEwZjA5NmM3OWE0OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGIyZDIwZGIwMjQ2NDFjY2QyZDE4NDdmYjBjMThjNzg4ZmVjOWUwZTgzNTkyMzRhZjY5ZGMxNzNhM2UzZjc4ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2I1NWU1NTY1ZmE4NzI5ZjVhYWMxYjhiY2ZiNGI0MjhhNGZkNTU3ZDdmYjAzNjZkNTdjZWQ5ZGU3ZjkzMTJmZSJ9"
         },
         {
@@ -145,7 +149,7 @@
           "version": "repo-lines-v1:sha256:eb237054e212c3a60f49af304fe76c827514f84532f6b3cb03b699a7cf53243b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MGUyNmFiOWFkM2ZkMDNmYmUxMGUxOWZmZjk1ZmI0OTIwZmViNDAwMjMyN2FkYjBmZmI0ZDY3NTFkNjQ0OGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3YTU3ZDIxMGU2NWU4NmE0YTczY2JhYjk2NjIxYzk1N2RlMTk1MTE4YzYwODM1NjAwYTMwMTk0MzgwOWI3ZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0MjE1OTUxNzk3MTM2MGU5ZTZjZmNjNWJlYzkzNjdkMTMwNTAwYTc5ZTEzMDY4MTU4ZmM4M2U1NGMyNGZiNWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5ZjYyZWRiZTgwNGM1ZDkzZjE5OTBhMTNlYjU3Zjk3NWIwZTZiNDc0NTllYmViYzhhYzExNzM1YmI2YTBiMGUifQ"
         },
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L574-L616",
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L576-L618",
           "version": "repo-lines-v1:sha256:09b3741d73a5a17b4bb3c657c62d5357b2e1732e20d1ffe6c06f5e7838021ef1:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyYTZmMDQ1N2U1OTM1YjhkMGMxYmI4NjkzNGEyZDIyNWUxNDVkZDU5YjJjYTVjZTNmNDE0YWJjZjM3MGQ1MjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyNGVlYjAxNGJjZjk1MjEwZDY0ZWU0OWY3ZjYxYjI1MmM2ZTJhNjAzNTgyMGIxN2M4MTQ2NDEyMjFiMmFjNjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc2YjRjOTQ4OGI4ZThiY2UyMTg2N2EyYTAyNDVkOWRkOTRiMTRlZTAzZmQ1NmQ5NGQ2N2ViNDc3Zjk3YWE3ZTEifQ"
         },
         {
@@ -187,14 +191,188 @@
       "statement": "rewriteUrl normalizes paths in both modes (stripping the Pixiv host from absolute next_url values in native mode, mapping Pixiv hosts to /pixiv-api and /pixiv-oauth proxy paths in web mode), and shouldAttachAuth plus isTrustedPixivHost restrict the bearer header to local proxy paths or exact trusted Pixiv hostnames, rejecting pseudo-suffix domains to prevent access_token leakage.",
       "evidence": [
         {
-          "resource": "repo://packages/app-lynx/src/api/client.ts#L262-L333",
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L264-L335",
           "version": "repo-lines-v1:sha256:e7e885d7c040d604bf8989710956b5fdf863110beb5c6f7084915598a846a034:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyYTYxZGIwYjFjMjhjZTU0MzMxNGEyMDlkODlmMmQ2MzdmYWZiZDc3OGQ2YjVmNzU5YTYwZWU3ZmRjZWZkNzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ5ZTNiOWRhNjJmYTgwMWM0NGY3OTc0YzZhOGI5YmJlYTE1YTU2NzU5Yzc2Y2YwYWZiNDlkMjY5NzFmMzBhMGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYyNTgyZGEwNWY1MTUzOTgzMWJjNDM4MDQ1N2IyYmM2MDBjYmNjYjE3ZThjMzg4NGVlNDgzMWI1YzZlNmUwYTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c39de1fd533c4414a448baddd199af78",
+      "statement": "The JS 401 path in execWithAuthRetry is retry-once rather than a refresh loop: concurrent UNAUTHORIZED failures in one burst share a single module-level refreshPromise created from onUnauthorizedHandler().finally(...), each catcher then replays the wrapped call exactly once so a second UNAUTHORIZED is surfaced to the caller instead of triggering another refresh, and the promise is cleared as soon as the handler settles so a later burst starts a fresh refresh — i.e. one Pixiv refresh-token exchange per burst, which matters because Pixiv rotates single-use refresh tokens.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/0004-401-concurrent-retry-promise-queue.md#L5-L13",
+          "version": "repo-lines-v1:sha256:f8335c12c6814db2cf91da92ffbcf86985fda663ed63e932ca0d920ca328f369:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGM0NmE0NWMyZGNkOTk3ZTUwM2U3OTlkZTA2OWI5YWNhNDk5NGY1OWM4ODhiMGE5YWJiNDc4ZWNiODM3MmMzZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGFjMDYxNjlmNTliMWQzNjZmZTgzMzFhMzNhNmIzYzgyNmEyNzg3ZWY0NWI3NmViYjcxNDE0NGY3YmQxNzlhNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzFjZDYxMWU5YTA5OWRjOWViYzAxM2I5MWQ3ZmNiOTRmYjAzYzE3NjUwNzhlMDMwYWQ0N2VjNjIzOTVhZjczYyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L540-L559",
+          "version": "repo-lines-v1:sha256:190018c3db6e82db7c885a937bba185b9627bd128037b1192e42d8f43a378fc4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwNjdkZmM0YjI1ZDg2ZjJmOGE4MzVkN2U4NWViZTFmMTg0ZTdjMzQ5MzNhOGE2ZjRjNDk5ZDRlZjRiZmNkMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBkNjhiY2FlN2YyZDJiZjQ2ZjRjZWViYmQ0MmQ2YjI5YTgzMmNkYjUyZDgyMGQ4NzQzZTgzZWZmM2U2ZGJiZGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiODYwMzBkZmJkMjkyODEyZjUyZDRhYWQ0ZGEwNWJjNGNhNzEzZTY5NmI0MjQyNzE5MzYxYWQzM2UxMjdhMjgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/authStore.ts#L185-L214",
+          "version": "repo-lines-v1:sha256:8fe7c76108fe0bfe0cdb9d82f39daeb7dae486e9fd841b73aa9e9331722315e3:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlMDQ1NzU1MTI0NDk2MDBiYTk1MDA0YjI5MTViNmJmMDY4NDkxNjM3NmM2OTA2MGZhNTk5ZDViN2Y3ODIwOTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc0ZDNjNjM4ZmYwNzhkYjE1YjZlZGRmOGFkNTJiODEwZjMzMDU1ODFmMDAxMThhYzdmZjBkMWQ0NzY2ZjZlMmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFmZWIwZmQ3ZDkxY2Y4YmNlYzQwZjcwNzdiYWExZjU3NjgwMTg3NThhZTFhNTU0NWQ5MmJjMGNiNzFhZTQxNDcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a7445c04848943f7b0608ae91fbc0e69",
+      "statement": "client.ts deduplicates GET requests by a GET:<path>:<JSON params> key in inflightGetRequests, so identical concurrent reads share one transport execution and therefore one 429 backoff sequence and one 401 single-flight refresh; calls carrying an AbortSignal never join the map (a shared promise would let one caller's abort cancel the others), requestRaw is excluded from dedup so a raw text body is never shared across callers, and the map is cleaned up through a two-callback then because a single finally would derive an unhandled rejection.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0199-app-lynx-rate-limit-backoff.md#L43-L47",
+          "version": "repo-lines-v1:sha256:515ec5fa3e264c31973c04321d252e40fe646250a61c06cdfb6fe884ca6be450:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGU4MTRmYmVhYWZhZTY3MzZiM2E2YWExZDc3NzViZGIzYzk5ZDllYzQ4NWU1MzFkZGNlMmFkYTNmZTMyNzU2YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE0ZDI2M2FlNmNjOTYxMzYxMTAwZTljNWJlYzUxMGYxNmZiNWI2ZWUwODcxM2JhYzdiMTYyNjM2YzY3ZWRhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzI3MDk1MGZiOTExNWNiOTY2MTI3NTk0ODQyZTcxZTVlNzQ5NTZiYjFkMDc5Y2Y0N2RhNDZjNjc0ZWQ3NjY1ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzVjMzk1ZmUxNTNhNGUxNjEyYWY4NzFlYWI1MmZhYWJhNjc4YzJkNDUwMGYzNzVkMDBlZmY2MGZlMGE1Y2MwMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L113-L118",
+          "version": "repo-lines-v1:sha256:27fcc38f23cb1d71eb96b71c6561de5d0608302c7dd1f0b73b67aec802ebfc24:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzk5N2Y5MjBlZWZkZDliMzM2YzA4ZjQ0MjZmNzczYmUwNGI5YTAwNGZkZDlhODM4Nzc3NmM2NDE1M2E2YmU5MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjE4ODU2NzMzNTQ0MzdiNGVkNmM0NDgyZGZiMDk4YzM3Mzc1MTg5YzNhMjJkNTA2Mjg4NTZlMzFkMzFjYzM5NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjUyNjFhNmNhYzE2ZDRkYThhNGFmZWI0YTA3M2VlNDEyZTY0NzAxOTM1NDJkN2Q2YjE3NDkwNzlmNTU3ZWNjNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L561-L600",
+          "version": "repo-lines-v1:sha256:0fa6bce34e5333efcccd4a9dffad7729f43b2843586bd997b6642d38895442dc:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4ZGNiNmI5YWM5ZTQ3YmU1OGRmMTE4ZmUxZDQxNWYxMWJhYzY4ZjhlNmYzMGQ4M2MzYTgxYzI2YjNkOGFiMTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwYzhhOTgzNGQyYTA0MTU4ODQyZDM3M2Y4YTVkMmMyZGEyZmIxYjAyMjQ1NGFhZTJkZjE4NTBlNDQ1NTdkY2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_56268a7dcf964724bd150d86393992bb",
+      "statement": "A native transport failure reaches JS as PictelioApi.request's cb(0, errMsg, \"\") and is classified as ApiErrorType.UNKNOWN rather than NETWORK, because the JS branch calls classifyError(status, null, parsed) — the error string never arrives as the error argument and NETWORK maps only from a web fetch TypeError; the explicit native NETWORK error is thrown when isNativeMode() is true but getNativeModules().PictelioApi is absent, with the message 原生 API 模块不可用.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java#L114-L127",
+          "version": "repo-lines-v1:sha256:5b422f96f837b1e5da7131833c256f0152a40403079bad87220742d900f19f30:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiOTZlMGU2ZjFhNWMwYzQwM2FkYjg5ZTUwNzVlMTljODdiZmI5NjQwYzY1NWY1NTRlYmFlMzNkN2M0MTYwYmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5NzM4ZDkwZTdmMDMzYjQ1ZjlmOGI2NzEwODcxNTE4MWJhMTkzZTJhMmFmMDE2ODM3MWQyYjEwNTBiMWQ5NGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRiZGNmZDA1NzkyZjdhZDExMDZjMTg3YzZhYTMzNTQ2YzJiZDNkZGZlZmQ2YzAwMjU5NThmZTRjYWM5ZTk2NDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L156-L170",
+          "version": "repo-lines-v1:sha256:7f006f278eae990116761057a1c091b1d3d5f6720db61edce2edf2c8c31b9060:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdjYWRkMmU0NDM3YTJjODRiNGI1MmJhMjVkMDgxMThmN2FmY2JjN2U0NDk2MTJkMjkwNzU3NGQzMmMyN2EwY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0MGM1ZDNkYzNhNzczMDc5M2M4OTI3OTQ4YjU1OTY2NDIwN2Y3OWJhODc3NzNjMjE1MDA0NDMxOTYyZmQ0ODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxNjJlYTQ4ODA1NzJiMGUyNDViMjZkYzM4ZWYxMzdmNjI5NDNkYWI0N2U2M2MyOGQ2Nzg3MDliZDk0OTBiNjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L372-L397",
+          "version": "repo-lines-v1:sha256:1291bec16a96e9eb0ed21405406223e37f53ae02c2246734e0d74e96ddb0ce54:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0ODkzNTdiODFmNjRiMzRkZGIyZDE1ZjFhYmJiNWE2YjEyNTg2NWViMjViOGU3YTRlZjY1ZGU3OTQyYzljMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MzU1MmFiNTcxNDk0YjM5OWIxODE5OTYyMmRiZTNiMzgyNmViNjFmY2QxZjc0Y2ZiMTJhYmNmODhlNGY3MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NDdlMjFkNTdjZTExYjcyZjAxZjU5ZTFhMDk1Y2EyZWU0OGRiYjhlMWI5NDBiMjllMjAyMTU5NzNhMzNkMDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljNzlmNjZkZTFhMGY2NmIwZWU2MzVhNDc5OTI2MTJhMzZkMjA2YWEyMzcxODY0M2E4ZTFjMDQxYzM5YTNkZTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_721c8b7e7033494997b9380940b0b0f0",
+      "statement": "Every per-entity endpoint module is a thin wrapper over apiClient rather than a second networking implementation: reads are apiClient.get(path, params, signal), writes are apiClient.post with a form-encoded object, and server-issued pagination is passed back verbatim as apiClient.get(next_url, undefined, signal) so rewriteUrl and shouldAttachAuth remain the single URL-normalization and bearer-attachment gates; search.ts is the only module adding its own next_url guard (assertPixivUrl accepts only a /pixiv-api path or an exact app-api.pixiv.net hostname, warns and throws otherwise, and is pinned at source level by search.template.test.ts), and the HTML novel body at /webview/v2/novel is the only endpoint using apiClient.requestRaw.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/comment.ts#L104-L128",
+          "version": "repo-lines-v1:sha256:7980d032f11e534a0d98ade81bc132d92056292a6ec5b31458067b207f376f03:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxYzdlZDFlMWI3MjcyYzU5ZTE1NjVjMDkzYTA5NzNiNDgzZGJmNzdkMzIxOTVmZjYwN2VmMGUzZmQ0ODFmYjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0MGM1ZDNkYzNhNzczMDc5M2M4OTI3OTQ4YjU1OTY2NDIwN2Y3OWJhODc3NzNjMjE1MDA0NDMxOTYyZmQ0ODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFmYzRhNTA5MTBhMGNkNDY4YmMzYzhmNzY5YWY2YWRlZWVjODgwZWIzNjQ3OGJhMjQ2M2YyZTljMDY3Nzg5Y2MifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/illust.ts#L67-L69",
+          "version": "repo-lines-v1:sha256:2d0fe2d8708ed74895c2f3273828e80a1694509075d1268251899cc5541a2938:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlYTBjYTNiYTY0ZmIxODgyZTEwYjIwZjMzODEzZWExZjllYmFjNmQyYWIyMTA1MDUyNGM1ZDFjZWU0MjYxNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzQwYzVkM2RjM2E3NzMwNzkzYzg5Mjc5NDhiNTU5NjY0MjA3Zjc5YmE4Nzc3M2MyMTUwMDQ0MzE5NjJmZDQ4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjJiOTkxOWEwNDBlZGZkYzQwZjliNWE2MDFkMGE4YWMzNzc5YTYxNTFiZjhmMjUxMGRiYWE3YjMxNjIxODYyOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/novel.ts#L188-L213",
+          "version": "repo-lines-v1:sha256:1ff39d35c3717fa8a8366488e0fba682d0776bfaaa615743588ef3b11a39c28e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM4ZGQ1MWM1ZTE1M2U0OWNmNGE3MmEzODA1YjM1ZmMzMmExNGU0ZmJiNzhhNjljNGUyZjI5MDUxMWE1MjBmZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzYTZjMGZhZDgwZGZlYjFlNTdlZGEyMjZlZGI2ZTFjYzU5YjBkYjdhZWU3NzljMjYyYzA2OWM2OTRmZTQ2NjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/ranking.ts#L15-L21",
+          "version": "repo-lines-v1:sha256:a12db8521f5066c0a426331fb8d9a93ddc888c30bada9a18aab9928325b4d8d1:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjRkODVjOGQyOGQwZWJlOWUxNzdhYWI4NTJhOThjZTE2ZTkzYTQ1ZmEwNzM1ZDc1ODg1ZmU4YTUxMzdiZmE4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjYxZGRiN2VlY2IwMGYzNmY2NTRkZDVlNWJhMzY3NWQ4MTJhOTJhNzA3OWUxMDgwZmQyMjNhMjg2MjY5ZWExMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/search.ts#L22-L78",
+          "version": "repo-lines-v1:sha256:7db33c839b9b1e3fc8cfc6abeeea05cc92fb745a49044c59bd6aa18045e75a2c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlMTVjYmM3MDliZWFhMmNhMTIwN2QxMjA0MjAzOTNlNTA0MTI3NjRhNDE2ZDIxNjcyY2E4MGQyYTQzZjY4YjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVkOWNjYzY3YzBiODE1OWQxODZlYTRlYzZmMjE4YzJiMzYxYzMyMjQ3ZGNhZjA2YmU2NjNiZTgxMmVhOTk0NTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcyMTMxMTE3ZDIyODlkNTBlY2YxMDk4MzIyZWMxOTcyZmFhY2ZiNDU0OGJhMzNkMWNhMTk4ZGFmNjhjM2E2NTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8ba8e3e253f04cdeb8cbf261dcbf3f76",
+      "statement": "notification.ts exposes exactly two GET endpoints: loadNotifications(nextUrl?) hits GET /v1/notification/list for the first page and then passes the server's next_url through verbatim, while loadNotificationChildren(id, nextUrl?) hits GET /v1/notification/view-more with notification_id required and the older_than cursor carried by next_url; both are plain apiClient.get wrappers returning PixivNotificationListResponse and required no Java change because PictelioApiModule.request forwards an arbitrary path without an endpoint whitelist.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/notification.test.ts#L63-L130",
+          "version": "repo-lines-v1:sha256:a5ca4504ccc19d38e082213b37180a5b5e2137e151bf729265e6176a15197af6:eyJzZWxlY3RlZExpbmVDb3VudCI6NjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmYTA3ZDU3MzhjNDc2ZWUxZWJmOTE3ZGNmNzUxYmM4NTNiNzgwMGQ5OWEwN2Y1NDhiM2U0YWU0ZWUzZjk2NDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc5M2NkMDNhMDBjZjUyMzc2MGYzNjViYjJlZjM0MjRkZjNkYThmZDM3MGU5YjQ2MzJiMWQ3N2IwZjg3MWZmYWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZjBiOWRjMmI1ZTFiOWFiZWNiZjJmMTAxNWE0NTIzY2IyYTc1MWVlZDgyNDQyYTBhNzA4ODBmZmNhZjliZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYwMTM4N2JhYjZkMjI4ZWNhMDA3YmU3N2Q0YjAxMjc4ODQ1NTQxMmM2NzA3Mzc0OTUyOWZlY2Q3OWNjYzUzYzUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/notification.ts#L1-L36",
+          "version": "repo-lines-v1:sha256:90ad9267901ecb0dc5195f017bb7d8b5b66892a470a0058e266fb59ae1ee488f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1MmZhMWQ2MjI4YThiMjg1MDY1OWIzZjAxNDkzMTJhZjAwYzcyZTIxZDQ2YTY2ZjM5NTQzNDY2YzE0Mjc3MzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/queryKeys.ts#L74-L80",
+          "version": "repo-lines-v1:sha256:46e676836968e66ec0689e7fa2d2b9bac214a9418809fd7ae268867e86e72f24:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmEzMDFmZWExYTFjODdhY2Q3YTZkOWMyNTY4MDUxNTU1MGJjYTc1MGFlMzJlZjM4NDVlNWJjNDRjYWUwNmJiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ1Y2QyZmI0ZjNkZjg4NDUxNTI1NWIzOTUyM2YyZjhiNTQ3MmJlZWE5ZjU2NmZmY2EyMDRkYjgwMjU2MTA0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2MyOGE4OWQyM2JkMDczZTc4ZGYzOGU5ODMyYzg4M2I2MDg4YTk4MDFkYzE1MjYwY2Q2ODhiYTVmYzY2Mzc4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM3NWJkOTJkNTRiZDY4MjkyMjRhMGI0Njc5NzNhNGRjZjUxOWUwYzczYjU4YWRiYWE3YmMyNWRjYTRlYmYzOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e346fdeaf532430dad00f4822c913754",
+      "statement": "The BYOK LLM translation channel (api/translate.ts plus api/nativeTranslate.ts, backed by the PictelioTranslate native module) is deliberately separate from the Pixiv gateway: it never calls apiClient or PixivApiCore and classifies its failures as TranslationErrorCode instead of ApiErrorType; on the native path the endpoint config and API key live in Keystore/Java (setApiKey, clearEndpoint, probeEndpoint), getEndpoint returns only a redacted mirror with a hasKey flag, and Java assembles the Authorization header for translateStream, the two documented exceptions being the one-shot configuration write that pushes the plaintext key across the bridge and the web-core dev preview where OpenAIResponsesProvider injects Bearer apiKey itself.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/nativeTranslate.ts#L1-L26",
+          "version": "repo-lines-v1:sha256:2e5bb9476797934ef1ce729234c494f13d72d2957135ad5a9a15deb5079d5281:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE5YzBkZTJkMzQyZmIwODYyYzc0NWI0Yjg5MGM5ZmRmMjEwZWFjYWU5ODM3ZWVmMjlmNTRkZjcyYzhkNTIyODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhZTlhYTU0M2YzN2ZmOTEwYWY3NzY5YjdlNWRmNGQ5MGQyYjA0ZWU2ZTAzM2RhMTJlNzg1N2UzNDMyOWI0ZDIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/nativeTranslate.ts#L101-L130",
+          "version": "repo-lines-v1:sha256:52b24e0e7bedee4a699fab69b98b27983e576ae840094031d30487a03335b5ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0OThmN2VjYTIyNGE3ZTU0ZTIwMDgyMGY4YTc5NDk4ZTAyOWJlM2JkMzBlZTRkM2U2MmI0Mjg1NzA5MjA1ZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkMGY5NjRjZTk1NTBkMzIyZjlkN2MyZGI2YTIwZGY4YTUzOGM2YjlmYjMzZTU0MzEzNDFjODQwMDQ4NzU0NjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2MjNkMTc0M2ZiNGM4ODc5OGFkNjJiNTA2NDYxMjc2YmRhOGIzMWIyNDk2NDZjYWE3ZjJhZjE2YzllZTM4YWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwZTQwNzNjMDRjNWJlNDIxZThjZDk1ZjI2MWIzNGM4M2I4MmM1NTEyNWNiOTBjMzAxNjUxOTkzYThhMDQ4NzIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/translate.ts#L14-L62",
+          "version": "repo-lines-v1:sha256:5175a6f897eefab56d9ab1632c6ed7b1f72b460e7273282db2f4f81becfd334f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhZmQzYjkzYjg3MjM4ZTUzYWJhOGNhN2FkMDNmYWRlOTZiYmU2ZDYzZjkxY2MxZTBiM2E0ODhkY2EwYTY2ZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY4ZDEzNDdkMjI4MWQ3YWJlN2VjZWFlOWNlYjlhNzU1ODIyZDE2Y2IyNjZlYjJkMzc4M2Y2NWY2MjAyMWMxZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5NGRlZGVjYzM2YWU3MzM0NjJlZGZhNjE4OGI0ZDljNTM0YmZiNjI3ZDhmOGQ5YjMxZmMwMGVlNzk0MTJkNTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/translate.ts#L640-L652",
+          "version": "repo-lines-v1:sha256:531157f172ba59533923eee210c15488da32d0553e626d863f64bb102c6fec21:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3MDBlZDBjYmU0OGEzMDg4ZGRjZTU3MjFkYWMxZWE2NGNjYWQ5ODgwNjdlYWViMjRkMGI0M2JjNjEzMGMwYmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MzU1MmFiNTcxNDk0YjM5OWIxODE5OTYyMmRiZTNiMzgyNmViNjFmY2QxZjc0Y2ZiMTJhYmNmODhlNGY3MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhiM2UxMzcxOTgzOTNhMDlhOGJhN2JmMzdlMGUyMTdiMGFlZjg2MzY4ZDI0ZTBhZjU4ZTQ3MmVjY2I2NzVjZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3N2EyZDU3NzQyNDc3ZmFmODhlZDIzZDRmM2IzMTMyNGEzZDllNzU0MzU0MDc2ZDZmMmIyY2I4N2U0Y2MxZTkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4a9490800e4d496c99ef5a4b31771904",
+      "statement": "Accept-Language is produced per transport: web mode snapshots i18n's locale.value into the request headers at construction time (so in-flight requests keep their language and a switch applies to the next request), while native mode never sends it from JS — PictelioApiModule reads the settings_language pref on its worker thread and resolves everything except \"en\" to zh-CN through the pure resolveAcceptLanguage, then passes it to PixivApiCore.executeRequest's new nullable overload, which keeps the Lynx bridge signature unchanged under OTA version skew (the retained 5-argument overload delegates with null, i.e. no header).",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0200-lynx-accept-language-header.md#L27-L33",
+          "version": "repo-lines-v1:sha256:2ba12c3e11912d1366a08edac3faf031e644fcdd0afcb285b6473918daf4871d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQwY2YyNTEwM2M0MDZhNzRlOTU2YTIxODgyM2ZmMDY5NTFmYmE0ZWRjMzE4OTQzYzNlZTRiNzNjNjQyNTliNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWViYzM5NWEyM2Q3ZWVkODgwYzI5ODJmZjQxNjUwNDc4MGYzMTFkMTIyMzllMjk1ODQ1ZjE4NzcyODhjY2VhMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODJiOGZiZjY5NzRjMTYyMDMyM2QzODIwYTExZGVlYzNhMTliZmNiODIzMjhiZDQ4YTgyNDIyNGEyOWUwYTFhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDcxNjAwZTliNWIxYWRhZTNiZmM2YTEyOWFkZTAwMTY4NTFiOWZkOTFhYmFlMTBlYWY3YjYzMmE5MmE1ODAxMyJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java#L96-L167",
+          "version": "repo-lines-v1:sha256:03d6831111c9ece8f20c5f685fe02e965689082654e48f45066e51da2295b4d7:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlMmE5M2IwMDQ3MTkxMDAxOTkxMTcyNzA5ODc0YTdlNDYzZDZlZjhjZmI1ZTg2OTQwNGNlMDM5NDI2MGFmZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyOWJhNzI0Y2I3MjRkMWM0YjJiN2RkNzY4OTcyZTE5NDhkNDVlNDQwZjAwZGUxMjI4NGYxNGNiZTk2NmM1MzYifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/PixivApiCore.java#L96-L131",
+          "version": "repo-lines-v1:sha256:260ac90d9533049d450cd2d76c77039b94db2f3ac21830f819fb4be10787a017:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxOGEyN2YwNGQxNmI4NzFjNTZhODIwYzdkYzU2NjI5YzI1YmUxN2ZkNThkMzk4M2M0MTUwYzJjNzFjNTM2ODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVlMmI5ZTIxZmRjODZmYzJjMmVlNDQ3MjE4NWQ2NzY0NjdiZGQxY2JmMmUyNGI0ZGM2NDRhYjFhYmIzMzI1NDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4ODA2YzAyYjlmMTI3ZjY4NWQzMTJiMjZiZjE4NGQwNzM2NzhjMTM5OTY0NzZlMjY3OTZhNzU2YWQwZDViZDUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/client.ts#L408-L416",
+          "version": "repo-lines-v1:sha256:d07a426b832451a3af2d9a1f237b591ed7990a68f428f517f1fc3ca5e03cf476:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDYxYTI4ZjE0OWI0OGVjODZhOTA1YWRlZWJlOTk5MjZlZGYyZDI1MjFkNzQwZTJiOTUzYzkzODJlNmExODQ1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdlNTc4OGQ1ZDlkNzNkMjRhODFkYmMwYTVhNzRiZmE4MmM5YzNiM2FmOTllNTJhZjc5NmU5MGI0NjhhOGEzZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGNjMDM5ODE4YjNiY2Q5Y2UxYjYwYzYwYzBiZDVmZDQzYzA4MThlY2FjZDU3YzIyM2FhMjNkMmQyNDY1ODhiMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmJkZWM0MGU4NGI2NjFmNzQ5ZWNlNzFkYzA1OTAyMDIyNjExMzNjODk5ZDU2NmNhZTNhMThjYzdkZWRhNTg1ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c9ed3abad61e4c3fa14296b86bb4f7d4",
+      "statement": "refresh_token persistence on the native path is implemented by SecureStorageCompat, which reproduces the @aparajita/capacitor-secure-storage layout exactly — AES/GCM/NoPadding with a per-key AndroidKeyStore alias capacitor-storage_<key>, the WSSecureStorageSharedPreferences file, and ciphertext Base64(ciphertext) + U+0010 + Base64(iv) — so already-stored tokens keep decrypting across client version migrations, with tokenStorage.ts selecting this path only when NativeModules.PictelioSecureStorage exists and falling back to IndexedDB in the web-core worker.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0050-lynx-login-persistence.md#L37-L50",
+          "version": "repo-lines-v1:sha256:f3657f443a039fe54e6c4858d975eb9f8a7cdd6baf5311697949f1966c6d0cc4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmMTM4MmNmYWE2OTY3YThiODcxNGE1N2I4NDRiZWRhNzI2ZTdmNGJlZmYzZjFiM2YwOGNmNjZkNTQwMTYyMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5NzYzNzI4M2Q3YTdjMWNhMzM2MmZlZDFlM2VhNDM3ZTExNGE0NzQ4ZThlMWU1NDA2YTA5YjliNmM4ZjBmY2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwNGIyZGEyMmE1ZGQzZGRlN2QzNjI2ZjA4ZGU5YTFlYmI3NjQ5NzRiNDM2OGMwZWFlYTRhNjY0MWY3ZTcwNWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwOTVkMDY2MDk5NjA5ZjA0NDA2MjM5NjQ3ZDllMWU5ZmM4ZDQ4NzI5ODA1ZThmNTUzNmRkNjIwMjc5NjE3MjIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java#L21-L54",
+          "version": "repo-lines-v1:sha256:f1f3d262dd75911e9a2130f4733dd68863ac27533ba2ea8010f8c52e0b023849:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzMDdkNTlmZTY2OGQzNTljOTUzNGE5MmExNzFjNDdkNzNmNTZiMDAyNThhMDdlMDViZjcxZDliN2M3ZTQxZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEwZjM2NjJkNjAyMzNmZmViYjVjMjllNDg5YTQ5OTg4ZjY0ZTVkYWM3MmIxYjc4YWNiOTk0Njk0NTQ2MzljOWEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/tokenStorage.ts#L1-L26",
+          "version": "repo-lines-v1:sha256:cf548d177030a5dc8382c10c0761d7b23d8ffeb5f7bc9f48a35e852b6fc90cf5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2OGE0NWMwM2FjY2ZhODgzYjY4MDIzZmZhNzMzMzhkZjZkYzFlMjhmZGZlY2NlODNjMDhiZjQwODZmNjdhNjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkY2I3OGIyNGM1OGViMTVmYmMyYTc4ODdkNzAyYjI1ZmFjYWEwMDNjNGZhNTQxZWMzMTg5ZTIxYzlmNDdhNjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_861b5289aee2432897e054afaa25ff8e",
+      "statement": "oauthTokenRequest is the single OAuth transport helper and is fail-closed: it rejects unless __DEV__ is true and the compile-time __CREDENTIALS__ contain non-empty clientId, clientSecret and hashSecret, because the vue-lynx plugin forces __DEV__ true under dev so the flag alone is not a guard — this prevents an outbound OAuth request from being built without injected credentials.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/api/auth.ts#L100-L107",
+          "version": "repo-lines-v1:sha256:bcf1a9e6768e76f02087d09f7557a7e2a161ec5bce7dc619f61bd3b04863e638:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUwZGYzMjNlZmI2Y2JiNzcxYzY3YjI4MzIyMjNiNWQ2YjEyYjNlYmI4MTk2YzFhZTc0NTAzOWRmOTU1NTJiYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2FkNjQyYjU2N2NjYTE3MzJjZTJmNDUxZDVmMDMyODMzODc1YWM1ODA2M2NiY2NkYzQ2MDgwMGZmYzgyOGRlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/auth.ts#L22-L58",
+          "version": "repo-lines-v1:sha256:a8df510ec4c241a868f67d2333b553c873b2269d660db298c48d9dcfb7e4b7a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjZDIyMjgyMGFlYjM2NjQxNzA5ZDJlYzJmYjk2MmUwZTRiYjk1MTk3N2VmZTczMWNmNTI4MDMxMjU4MWZhN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmYjkwZmRkNTQ3MGM4NGZlMDNlODQxYTIxZTY5MmUyYjE2N2M0Y2ZiMGQzNzgwZGQyY2M5YzdkZmJlM2Y3OTMifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-05T06:49:09.686Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }
