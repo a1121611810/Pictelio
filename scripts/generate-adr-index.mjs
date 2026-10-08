@@ -15,7 +15,9 @@ function walk(dir, base = "") {
 const files = walk(ADR_DIR).filter((f) => f.endsWith(".md") && !f.endsWith("README.md"));
 
 function titleOf(file) {
-  const first = readFileSync(join(ADR_DIR, file), "utf8").split("\n").find((l) => l.startsWith("# "));
+  const first = readFileSync(join(ADR_DIR, file), "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("# "));
   return first ? first.replace(/^#\s+/, "").trim() : file;
 }
 
@@ -32,10 +34,17 @@ function klassOf(file) {
   return "adr";
 }
 
-const entries = files.map((f) => ({ file: f, title: titleOf(f), num: numOf(f), klass: klassOf(f) }));
+const entries = files.map((f) => ({
+  file: f,
+  title: titleOf(f),
+  num: numOf(f),
+  klass: klassOf(f),
+}));
 
 // 被引统计：全文检索 ADR-NNNN 引用（排除自身）
-const all = Object.fromEntries(entries.map((e) => [e.file, readFileSync(join(ADR_DIR, e.file), "utf8")]));
+const all = Object.fromEntries(
+  entries.map((e) => [e.file, readFileSync(join(ADR_DIR, e.file), "utf8")]),
+);
 const cited = new Map();
 for (const e of entries) {
   if (e.klass !== "adr") continue;
@@ -47,9 +56,10 @@ for (const e of entries) {
   }
   if (n > 0) cited.set(label, n);
 }
-const topCited = [...cited.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+const topCited = [...cited.entries()].toSorted((a, b) => b[1] - a[1]).slice(0, 20);
 
-const byKlass = (k) => entries.filter((e) => e.klass === k).sort((a, b) => (a.num ?? 9999) - (b.num ?? 9999));
+const byKlass = (k) =>
+  entries.filter((e) => e.klass === k).toSorted((a, b) => (a.num ?? 9999) - (b.num ?? 9999));
 const adr = byKlass("adr");
 const glossary = byKlass("glossary");
 const legacy = byKlass("legacy");
@@ -57,7 +67,10 @@ const other = byKlass("other");
 
 const L = [];
 L.push("# ADR 索引", "");
-L.push("> 本文件由 \`scripts/generate-adr-index.mjs\` 确定性生成，**勿手改**；ADR 增删、改名后重跑该脚本。", "");
+L.push(
+  "> 本文件由 scripts/generate-adr-index.mjs 确定性生成，**勿手改**；ADR 增删、改名后重跑该脚本。",
+  "",
+);
 L.push("| 类别 | 数量 |");
 L.push("| --- | --- |");
 L.push("| 编号 ADR（ADR-NNNN） | " + adr.length + " |");
@@ -81,8 +94,12 @@ L.push("| --- | --- |");
 for (const [label, n] of topCited) L.push("| " + label + " | " + n + " |");
 L.push("", "## 消费规则", "");
 L.push("- 读 ADR 前先按本索引对号入座；精确语义以 ADR 正文与源码为准。");
-L.push("- 与源码冲突时按 [docs/agents/domain.md](../agents/domain.md)「标记 ADR 冲突」的句式浮出，不静默覆盖。");
+L.push(
+  "- 与源码冲突时按 [docs/agents/domain.md](../agents/domain.md)「标记 ADR 冲突」的句式浮出，不静默覆盖。",
+);
 L.push("- 新增 ADR 后重跑生成脚本；本索引的活性由 AGENTS.md「地图保鲜」自检条目兜底。");
 L.push("");
 writeFileSync(OUT, L.join("\n"));
-console.log("ADR index written: " + entries.length + " files, " + cited.size + " ADRs cited by others");
+console.log(
+  "ADR index written: " + entries.length + " files, " + cited.size + " ADRs cited by others",
+);

@@ -1,6 +1,6 @@
 # ADR 索引
 
-> 本文件由 `scripts/generate-adr-index.mjs` 确定性生成，**勿手改**；ADR 增删、改名后重跑该脚本。
+> 本文件由 scripts/generate-adr-index.mjs 确定性生成，**勿手改**；ADR 增删、改名后重跑该脚本。
 
 | 类别 | 数量 |
 | --- | --- |
