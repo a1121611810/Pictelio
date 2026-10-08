@@ -21,9 +21,11 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    # 防挂死：0.7.0 的 --print 仍是批量缓冲输出（openwiki#924 未修），长跑期间日志全白，
+    # 防挂死：0.7.x 的 --print 仍是批量缓冲输出（openwiki#924 未修），长跑期间日志全白，
     # 分不清"在跑"和"卡死"。用超时把挂死转成显式失败，而不是白烧 6 小时 runner。
-    timeout-minutes: 90
+    # 90 → 150：实测 13 个页面全量重写要 56 分钟（2026-10-08 实测，输出全部缓冲到
+    # 结束才刷出，中途日志全白），90 分钟只剩 1.6 倍余量，仓库继续增长随时会撞线。
+    timeout-minutes: 150
     steps:
       - name: Check required secret
         # 提前暴露缺失的 key，避免裸报错（DeepSeek 走 OpenAI 兼容端点，必须有 OPENAI_COMPATIBLE_API_KEY）
@@ -68,6 +70,9 @@ jobs:
 
       - name: Install OpenWiki
         # mermaid + jsdom are optional; they add high-fidelity validation of Mermaid diagrams. Remove if your wiki has none.
+        # 0.7.0 → 0.7.1（2026-10-06）。0.7.1 在本仓库两次"worker exited without
+        # submitting"（10-06 planning worker、10-08 quickstart worker）之后发布，
+        # 尚未验证是否含对应修复——升级本身是排查手段，不是已确认的修复。
         # 0.2.5 → 0.7.0（2026-10-02）。与本仓库直接相关的上游修复：
         #   #817 updates 模式兼容 openai-compatible 流式分片 · #861 规范化嵌套 text content
         #   数组让严格 vLLM 端点接受回放 tool output · #888 禁 agent 任意 shell ·
@@ -75,7 +80,7 @@ jobs:
         #   失败原因 · #840 状态文件原子写 · #933 code 模式不再建 CLAUDE.md ·
         #   #903 页面 worker 并行 · #905 MCP search/read/link
         # 0.5.2 起要求 Node ≥ 22.22.0（#863），本 workflow 用 setup-node "22" 满足。
-        run: npm install --global openwiki@0.7.0 mermaid@11.16.0 jsdom@29.1.1
+        run: npm install --global openwiki@0.7.1 mermaid@11.16.0 jsdom@29.1.1
 
       - name: Snapshot pre-run OpenWiki state
         # 必须在 run 之前记下上一次的 gitHead——run 会把它覆盖掉，之后就无从比较了
