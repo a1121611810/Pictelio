@@ -1,7 +1,7 @@
 {
   "name": "@pictelio/net-diagnostics",
   "version": "0.1.0",
-  "description": "Pictelio 网络自检共享纯逻辑库（检查项计划 / 判定 / 文案 / 报告），webview 与 lynx 共用",
+  "description": "Pictelio 网络自检共享纯逻辑库（检查项计划 / 判定 / 文案 / 报告），app-lynx 消费",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
