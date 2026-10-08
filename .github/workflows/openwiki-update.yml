@@ -10,8 +10,9 @@ on:
   schedule:
     # 8 点是 UTC，不是北京时间。原值 0 8 * * * = 北京 16:00，且 GitHub 定时任务是
     # best-effort，实测启动落在 12:37–16:23 UTC（北京 20:37–00:23）——刷新发生在
-    # 下班之后，白天读到的永远是上一轮。改成北京 09:00。注意 GitHub 仍会延迟数小时。
-    - cron: "0 1 * * *"
+    # 下班之后，白天读到的永远是上一轮。曾改成北京 09:00，现按需改为北京 18:10（UTC 10:10）。
+    # 注意 GitHub 仍会延迟数小时。
+    - cron: "10 10 * * *"
 
 permissions:
   contents: write
@@ -109,7 +110,7 @@ jobs:
           OPENWIKI_PROVIDER: openai-compatible
           OPENAI_COMPATIBLE_API_KEY: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
           OPENAI_COMPATIBLE_BASE_URL: https://api.deepseek.com/v1
-          OPENWIKI_MODEL_ID: deepseek-v4-pro
+          OPENWIKI_MODEL_ID: deepseek-flash
           # LangSmith tracing 仅配置了 key 才启用
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGCHAIN_PROJECT: openwiki
