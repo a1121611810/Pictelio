@@ -125,7 +125,7 @@ ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/dom
 
 - **PixivApiPlugin 网关** → ADR-0037 + `packages/app-lynx/src/api/`
 - **图片流水线三层缓存** → ADR-0090 + `packages/app-lynx/src/primitives/`（图片构建）
-- **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`
+- **Android 原生集成**（返回键、`/pixiv-img/` 图片代理（`PictelioImageService`）、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`（词汇层见 `packages/android-host/CONTEXT.md`）
 - **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳
 - **安全存储**（refresh_token 走 Keystore，首启迁移）→ `SecureStorageCompat`（android-host main/java）
 - **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `packages/app-lynx/src/primitives/` + 对应 ADR
