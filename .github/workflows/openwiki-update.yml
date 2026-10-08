@@ -128,6 +128,32 @@ jobs:
           LANGCHAIN_PROJECT: openwiki
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
+      - name: Snapshot post-run OpenWiki state
+        # 必须在 create-pull-request 之前快照。那一步会先 git stash push
+        # --include-untracked、提交完再 git checkout main 并留在 main，于是门禁读回的
+        # 是 stash 前的旧文件。后果是永久死锁：main 上的 .last-update.json 停在上一轮
+        # 的 interrupted → 门禁每次都判失败 → 永不自动合并 → 那份 interrupted 又被
+        # 人工合并进 main，下一轮继续锁死。2026-10-06/10-08 两次 run 实测踩中：
+        # PR 分支上 status=complete，main 上仍是 interrupted。
+        id: poststate
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          FILE=openwiki/.last-update.json
+          if [ ! -f "$FILE" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::$FILE 不存在——openwiki 本次 run 未产出状态文件"
+            exit 0
+          fi
+          STATUS=$(node -p "require('./$FILE').status" 2>/dev/null || echo "")
+          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
+          {
+            echo "exists=true"
+            echo "status=$STATUS"
+            echo "gitHead=$GIT_HEAD"
+          } >> "$GITHUB_OUTPUT"
+          echo "本次 run 状态: status=${STATUS:-<解析失败>} gitHead=${GIT_HEAD:-<无>}"
+
       - name: Remove transient OpenWiki run state
         # .run.json 是断点续跑用的临时状态（0.5.0 #720），不该进版本库：旧配置 add-paths
         # 直接写 openwiki 目录，会把它一起 commit 进去。
@@ -218,26 +244,27 @@ jobs:
 
       - name: Gate auto-merge on a complete run
         # 门禁 1：状态文件说"完成"才允许无人复核合并。
-        # 位置说明：必须排在 create-pull-request **之后**——中断的 run 也要先把已完成的页面
-        # 留成 PR 供人工判断（官方模板的取舍），只是不许自动合并。
-        # 0.7.0 在 run 开始时就把 status 写成 interrupted（崩溃守卫上膛），跑完才翻成
+        # 位置：仍排在 create-pull-request 之后——中断的 run 也要先把已完成的页面留成 PR
+        # 供人工判断（官方模板的取舍），只是不许自动合并。
+        # 但状态值必须从 poststate 快照取，不能在这里读文件：create-pull-request 会
+        # stash 工作区并切回 main，此处读到的永远是旧文件，构成永久死锁（详见 poststate）。
+        # 0.7.x 在 run 开始时就把 status 写成 interrupted（崩溃守卫上膛），跑完才翻成
         # complete —— 实测确认。langchain-ai/openwiki#921 记录过被中断的 run 仍可能以
         # exit 0 结束，所以退出码不是可信信号，状态文件才是。
+        # 经 env 传入而非直接插值进脚本：状态值来自被解析的 JSON，插值有脚本注入面。
+        env:
+          HAS_STATE: ${{ steps.poststate.outputs.exists }}
+          STATUS: ${{ steps.poststate.outputs.status }}
+          GIT_HEAD: ${{ steps.poststate.outputs.gitHead }}
         run: |
           set -euo pipefail
-          FILE=openwiki/.last-update.json
-          if [ ! -f "$FILE" ]; then
-            echo "::error::$FILE 不存在——本次 run 没有产出状态文件，禁止自动合并"
+          if [ "$HAS_STATE" != "true" ]; then
+            echo "::error::openwiki 本次 run 没有产出可解析的状态文件，禁止自动合并"
             exit 1
           fi
-          if ! STATUS=$(node -p "require('./$FILE').status" 2>/dev/null); then
-            echo "::error::$FILE 损坏或无法解析，禁止自动合并"
-            exit 1
-          fi
-          GIT_HEAD=$(node -p "require('./$FILE').gitHead ?? ''" 2>/dev/null || echo "")
           echo "openwiki status=$STATUS gitHead=${GIT_HEAD:-<none>} checkout=$(git rev-parse HEAD)"
           if [ "$STATUS" != "complete" ]; then
-            echo "::error::openwiki 本次 run 未完成（status=${STATUS}），禁止自动合并。上方 PR 已保留本次跑完的页面，请人工判断"
+            echo "::error::openwiki 本次 run 未完成（status=$STATUS），禁止自动合并。上方 PR 已保留本次跑完的页面，请人工判断"
             exit 1
           fi
 
