@@ -57,8 +57,8 @@ The root `package.json` is the full command list. Bare `dev`, `build`, `check`, 
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) — the rules that govern changes here. Read this first.
-- [openwiki](openwiki/quickstart.md) — architecture, domain, integrations, and testing. Regenerated on a schedule.
-- [docs/adr](docs/adr/) — 199 decision records. Look for one before you change behavior.
+- [docs/adr](docs/adr/) — decision records. Look for one before you change behavior.
+- [CONTEXT-MAP.md](CONTEXT-MAP.md) — the map from package to domain doc.
 - [docs/privacy-policy.md](docs/privacy-policy.md) — what the app stores and what it sends.
 
 ---

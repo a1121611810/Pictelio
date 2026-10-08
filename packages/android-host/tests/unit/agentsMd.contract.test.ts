@@ -8,8 +8,10 @@
 // - Fluent 曲线/时长白名单：Microsoft Fluent 2 官方 motion 规范（cubic-bezier 标准曲线 + duration 档位）
 //   + #599 保留底线（Fluent 禁令表逐字保留、措辞不降级）
 // - 硬约束锚点句：#599 保留底线点名清单（含 R3 三处「规范藏描述」：即时导航硬约束 / 工作流强制规范 / Notes CDN 禁令）
-// - 三张路由表表头：#598 审计 R4（首跳路由层，不可指针化）
-// - OPENWIKI 标记对：openwiki@0.2.5 code-mode.js 块级替换机制实证（#597 preflight 评论）
+// - 两张路由表表头：#598 审计 R4（首跳路由层，不可指针化）
+// 【墓碑，openwiki 退役】原「OPENWIKI 标记对存活」用例与第三张表头断言
+//   （`| 场景 | 首选文档 | 说明 |`，OpenWiki 查询规范）随 openwiki 生成链路一并删除——
+//   spec: docs/specs/openwiki-retirement.md T1/T2；保留断言只会钉住一个已退役的目录。
 // - 陈腐清零断言（"15 格"/"ADR-0096"）：#598 审计 E1/E2 实证
 // - 单引擎措辞锚点与清零判据（ADR-0201 + glossary-single-engine-facade.md）：
 //   真实入口类 = LynxActivity.java，MainActivity / registerPlugin() 已随 #610 删除
@@ -145,11 +147,10 @@ describe("AGENTS.md 契约（硬约束锚点，#599 点名清单）", () => {
   });
 });
 
-describe("AGENTS.md 契约（首跳路由三表，#598 R4）", () => {
-  it("工具触发协议 / 代码智能速查 / OpenWiki 查询三张表头存活", () => {
+describe("AGENTS.md 契约（首跳路由两表，#598 R4）", () => {
+  it("工具触发协议 / 代码智能速查两张表头存活", () => {
     expect(agentsMd).toContain("| 任务涉及 | 第一步必须 | 依据 |");
     expect(agentsMd).toContain("### 工具选择速查");
-    expect(agentsMd).toContain("| 场景 | 首选文档 | 说明 |");
   });
 });
 
@@ -164,11 +165,6 @@ describe("AGENTS.md 契约（首跳路由三表，#598 R4）", () => {
 // 此处不重复设防——重复设防只会让两份断言在改文档时一起红、互相掩盖。
 
 describe("AGENTS.md 契约（CI 维护块与陈腐清零）", () => {
-  it("OPENWIKI 标记对存活（CI 块级管理，openwiki@0.2.5 code-mode.js）", () => {
-    expect(agentsMd).toContain("<!-- OPENWIKI:START -->");
-    expect(agentsMd).toContain("<!-- OPENWIKI:END -->");
-  });
-
   it("已实证陈腐表述清零（E1 ADR 计数 / E2 引擎矩阵格数）", () => {
     expect(agentsMd).not.toContain("ADR-0096");
     expect(agentsMd).not.toContain("15 格");

@@ -9,6 +9,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 - **入口**: `packages/app-lynx/src/index.ts` → `App.vue` → `src/router.ts`（vue-router）
 - **设计系统**: `pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）。**Fluent Design 2 章节为历史存档**：它服务的是已删除的 WebView 客户端
 - **Pixiv API**: `packages/app-lynx/src/api/` 经原生模块 `PictelioApiModule` 走 `PixivApiCore`，401 自动刷新 + 防死循环
+- **Monorepo 结构**: 包清单与各领域入口见 `CONTEXT-MAP.md`；代码事实走 CodeGraph。本文档不维护目录树（目录枚举必然陈腐）
 
 ## 工具触发协议（任务开始第一步，违反视为架构违规）
 
@@ -16,15 +17,15 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 | 任务涉及 | 第一步必须 | 依据 |
 |----------|-----------|------|
-| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | `openwiki_search` 取 section → `openwiki_read` 读该节（工具不可用时直接读 `openwiki/` 对应页面） | 「OpenWiki 查询规范」决策链 |
+| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 先认层：理由 → `docs/adr/` 对号入座的 ADR；路线 → `CONTEXT-MAP.md` | 「四层词」 |
 | 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（pi 原生工具 `codegraph_explore` 或 bash `codegraph` CLI） | 「代码智能规范」速查表 |
 | 第三方库/框架文档 | Context7（`mcp__context7__*`） | 「文档查询规范」决策链 |
 | 浏览器标准 API | MDN（`mcp__mdn__*`） | 「文档查询规范」决策链 |
-| 理解一个功能（why + where 都涉及） | **先 OpenWiki 后 CodeGraph** | 「OpenWiki 查询规范」协作规则 |
+| 理解一个功能（why + where 都涉及） | **先 ADR / 地图，后 CodeGraph** | 「四层词」协作规则 |
 
 ### 允许的降级（仅限以下场景，未命中则必须触发）
 
-CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· 已知路径的完整文件读取 ·
+CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路径的完整文件读取 ·
 非代码文本搜索（日志/配置/依赖版本/文档）· 简单文件列举 · 小范围精准定位（已知符号名 + 单文件）·
 中文语义搜索失败（降级找入口再切回）· 环境缺少上述 MCP 工具时改用能力等价的可用工具
 （grep/read、web 搜索）——**不视为违规**。
@@ -33,7 +34,6 @@ CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· �
 
 - **自检证据化**：任务完成前记录"路由判断 + 所用工具"（见「任务完成前自检」）。
 - **当场沉淀**：发现偏差（该用没用 / 用错工具 / 顺序反了），当场记一条 feedback memory（含场景 + 正确做法），下轮会话自动召回。
-- **用户反馈兜底**：发现模型没用对时随时告知，由 agent 沉淀成 memory 或修订本文档。
 - **定期回顾**：每次改动本文档相关章节时，回顾已沉淀的失败案例，把高频失败固化为规则。
 
 ## 代码智能规范（Code Intelligence）
@@ -87,26 +87,18 @@ CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）· �
 未经 Context7 尝试就用 `web_fetch` 查库文档；对同一问题重复调 `resolve-library-id` 超 2 次；
 单个 `query-docs` 调里塞多个独立概念。
 
-## OpenWiki 查询规范（OpenWiki Query）
+## 四层词（先认层，再选工具）
 
-OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代码结构）互补。**路由规则见上方
-「工具触发协议」速查表**（架构/领域/集成/测试 → 先 OpenWiki；符号/调用链/影响 → CodeGraph；
-理解功能 → 先 OpenWiki 后 CodeGraph），本节只给文件索引。
+每个问题先归入一层；每层有唯一事实源，层间冲突时先信更底层并浮出矛盾。
 
-OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体流程，CodeGraph 无法替代。
+| 层 | 回答什么 | 事实源 | 保鲜 |
+|---|---------|--------|------|
+| **事实** | 代码在哪、怎么调用、改了炸多大 | 源码 + CodeGraph（`.codegraph/` 本地索引） | 索引随代码走 |
+| **理由** | 为什么这样设计、这条约束哪来的 | `docs/adr/` 对号入座的 ADR | ADR 评审流程 |
+| **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `CONTEXT-MAP.md` → 各包 `CONTEXT.md` | 缺口如实标注（无 `CONTEXT.md` 即标「未创建」） |
+| **保鲜** | 上面三层是否仍为真 | 确定性检查（脚本 / 人工复核），不走模型重写 | —— |
 
-### 优先级决策链
-
-| 场景 | 首选文档 | 说明 |
-|------|---------|------|
-| 快速了解项目全貌 | `openwiki/quickstart.md` | 入口点，再根据链接深入具体页面 |
-| 架构概览（启动流程、路由、CSS、工具链） | `openwiki/architecture/overview.md` | 了解设计意图和整体结构 |
-| API 层设计（OAuth、双模式、401 重试） | `openwiki/architecture/api-layer.md` | 设计决策与数据流 |
-| 图片流水线（缓存、代理、CDN） | `openwiki/architecture/image-pipeline.md` | 三层缓存架构 |
-| Feed 与浏览（推荐、虚拟滚动、R18 过滤） | `openwiki/domain/feed-and-browsing.md` | 业务逻辑与数据流 |
-| 小说阅读器（虚拟布局、搜索、系列导航） | `openwiki/domain/novel-reader.md` | 核心交互流程 |
-| Android 原生集成（Lynx 原生模块、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
-| 测试策略（单元测试、E2E 测试） | `openwiki/testing/overview.md` | 测试分层与工具链 |
+ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/domain.md)「标记 ADR 冲突」。
 
 ## 命令
 
@@ -123,33 +115,21 @@ OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体�
 
 **宿主包动作一律显式命名**，不占用裸名。CI 门禁 = `check:all` + `lint:all` + `test:all`（见「门禁边界」）。
 
-## Monorepo 结构
-
-monorepo 布局与逐目录职责见 `openwiki/architecture/overview.md` §Monorepo Layout、`openwiki/quickstart.md` §Key Source Files。本文档不维护目录树，结构信息走 openwiki + CodeGraph（防回潮见「OpenWiki 维护规则」）。
-
 ## 架构
 
-`packages/app-lynx/src/` 分层（逐文件清单 → `openwiki/architecture/overview.md` §Component Architecture）：
-
-- `api/` — Pixiv API 层（OAuth、作品/小说/搜索/用户/评论；经原生模块出网）
-- `stores/` — Pinia 状态（Feed、收藏、设置、主题、更新、翻译等）
-- `pages/` / `components/` — 页面与可复用 UI；路由定义在独立的 `src/router.ts`
-- `primitives/` — 无 UI 逻辑原语（虚拟滚动、分页、图片构建、翻译器等）
-- `composables/` — 组合式逻辑；`utils/` 工具；`services/` 服务
-
-原生侧在 `@pictelio/android-host/android/app/src/`：`lynx/java/` 放 Lynx 原生模块（`LynxActivity`、各 `Pictelio*Module`），`main/java/` 放跨端共享核心（`PixivApiCore`、`SecureStorageCompat`、各编码器）。**「宿主包」不是客户端**——它只负责把客户端产物装进 APK 并发出去。
+`packages/app-lynx/src/` 分层与各目录职责见 `packages/app-lynx/CONTEXT.md`（领域词汇层）。**「宿主包」不是客户端**——`android-host` 只负责把客户端产物装进 APK 发出去；Lynx 原生模块在 `app/src/lynx/java/`，跨端共享核心在 `app/src/main/java/`。
 
 ## 关键设计决策
 
-细节一律**双锚指针**（openwiki + ADR；openwiki 可能滞后，精确语义以 ADR/源码为准绳）：
+细节一律**锚到 ADR 与源码**（精确语义以 ADR/源码为准绳）：
 
-- **PixivApiPlugin 网关** → `openwiki/architecture/api-layer.md` + ADR-0037
-- **图片流水线三层缓存** → `openwiki/architecture/image-pipeline.md` + ADR-0090
-- **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、Java 原生模块）→ `openwiki/integrations/android-native.md`
-- **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳 → 同上页 §Engine Availability Fallback
-- **安全存储**（refresh_token 走 Keystore，首启迁移）→ 同上页
-- **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `openwiki/domain/feed-and-browsing.md`
-- **更新检查**（GitHub API + `/github-api` 代理）→ `openwiki/architecture/overview.md`
+- **PixivApiPlugin 网关** → ADR-0037 + `packages/app-lynx/src/api/`
+- **图片流水线三层缓存** → ADR-0090 + `packages/app-lynx/src/primitives/`（图片构建）
+- **Android 原生集成**（返回键、`shouldInterceptRequest` 图片代理、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`
+- **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳
+- **安全存储**（refresh_token 走 Keystore，首启迁移）→ `SecureStorageCompat`（android-host main/java）
+- **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `packages/app-lynx/src/primitives/` + 对应 ADR
+- **更新检查**（GitHub API + `/github-api` 代理）→ `packages/app-lynx/src/stores/updateStore.ts` + `@pictelio/update-check`
 
 ## 即时导航硬约束
 
@@ -188,11 +168,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## Fluent Design 规范（历史存档，非现行约束）
 
-原为 Fluent Design 2 规范，服务已随 [ADR-0203](./docs/adr/ADR-0203-webview-client-source-removal.md) 删除的
-WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判定见
-[`glossary-fluent-design-chapter-archive.md`](docs/adr/glossary-fluent-design-chapter-archive.md)。
-**与下方 MD3 节冲突时以 MD3 节为准**；Fluent 纪律中在 MD3 下仍成立的两条已并入 MD3 节
-（禁硬编码令牌值、禁写 `:focus` / `:focus-visible`）。
+服务已随 [ADR-0203](./docs/adr/ADR-0203-webview-client-source-removal.md) 删除的 WebView 客户端，**对 app-lynx 无约束力**（原文与逐条适用性判定见 [`glossary-fluent-design-chapter-archive.md`](docs/adr/glossary-fluent-design-chapter-archive.md)）；与 MD3 节冲突时以 MD3 节为准，仍成立的两条纪律（禁硬编码令牌值、禁 `:focus` 变体）已并入 MD3 节。
 
 ## 约定
 
@@ -254,7 +230,7 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 
 - **框架**：Vitest 5.0.1（`vp test`）
 - **位置**：客户端 `packages/app-lynx/{src,tests}/**`；宿主 `packages/android-host/tests/{unit,android-e2e}/**`；编写约定详版 = `docs/testing/conventions.md`（本节为摘要）
-- **E2E 编排**：android-e2e 10 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`
+- **E2E 编排**：android-e2e 12 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
 
 ### 门禁边界（#539 拍板，2026-09-15）
@@ -274,8 +250,7 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 
 ### 门禁冻结线（防「给回归创造就业」）
 
-原文已移入 [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) §门禁冻结线。
-本仓多处（ADR、specs、脚本注释）引用「AGENTS.md 门禁冻结线 #N」，**均指该节**。
+实体全部在 [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) §门禁冻结线；本仓各处引用的「AGENTS.md 门禁冻结线 #N」**均指该节**。
 
 ## 部署
 
@@ -285,13 +260,13 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 
 ## 任务完成前自检
 
-- **工具路由**：本次工具选择是否按「工具触发协议」执行？（代码结构/调用链/影响面 → CodeGraph；架构/领域/集成/测试 → OpenWiki；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
+- **工具路由**：本次工具选择是否按「工具触发协议」执行？（事实 → CodeGraph；理由 → ADR；路线 → CONTEXT-MAP；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
 - **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）
 - **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
 - **闭环规格**：凡产生了代码改动，强制闭环一律以
   [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) 为准 —— **含**「工作流强制规范」的
   三条例外路径（纯 Bug 修复 / 纯重构 / ≤20 行局部改动）；`/review-fix-loop` 可显式调用
-- **生成物归属**：`openwiki/` 由 CI 定时重生成（见「OpenWiki 维护规则」），提交前不手改
+- **地图保鲜**：改动 `packages/*` 结构或 `docs/adr/` 后，检查 `CONTEXT-MAP.md` 与 `docs/adr/README.md` 是否仍为真（缺口如实标注，不静默跳过）
 - **提交信息**：`type(scope): description`，type 取值见「Notes」
 
 ## Notes
@@ -300,36 +275,6 @@ WebView 客户端，**对 app-lynx 无约束力**。原文与逐条适用性判�
 - 图片 CDN 走 `/pixiv-img/` 代理路径访问 `i.pximg.net`，非直连；**不要**在 HTML/CSS/JS 中硬编码 Pixiv CDN URL（`i.pximg.net`、`app-api.pixiv.net`）
 - `packages/app/` 整包已随 ADR-0203 删除（WebView 客户端的源码、构建配置、依赖与专属测试）。Android 侧桥接实为 `@pictelio/android-host/android/app/src/lynx/java/` 原生模块；`capacitor-storage_` / `CapacitorStorage` 是**存量用户数据格式**，一字不改（ADR-0050）
 - **Conventional Commits**：commit-msg hook 经 commitlint 强制；type ∈ feat / fix / docs / style / refactor / perf / test / build / ci / chore / revert
-
-<!-- OPENWIKI:START -->
-
-## OpenWiki
-
-This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
-
-- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty. Stop once the question is grounded.
-- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed workspace to use and retry with its ID.
-- Use `openwiki_list_workspaces` or `openwiki_list_wikis` when workspace membership itself needs to be discovered.
-- If the retrieval tools are unavailable, read `openwiki/quickstart.md` and follow its links to the relevant pages.
-- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
-- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
-
-The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
-
-<!-- OPENWIKI:END -->
-
-## OpenWiki 维护规则
-
-### 强制约束（违反视为违规）
-
-- **架构概览 / 领域概念 / 集成方式 / 测试指南类问题，必须先读 `openwiki/` 对应页面再深入代码**；**禁止**未查阅即用 CodeGraph / Read 从零摸索。违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
-
-### 更新维护
-- **禁止** AI Agent 本地执行 `pnpm openwiki:update`（含修改 `src/`/`packages/` 后）。openwiki/ 是生成文档，由 GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每日自动重生成并提交 PR，无需也不应本地触发。
-- **禁止手动编辑** `openwiki/` 目录下的任何生成文件。如需更新 OpenWiki 内容，只改源码/`CONTEXT.md`，交给 CI 定时重生成。
-- **AGENTS.md 不维护逐文件清单**（目录枚举必然陈腐：ADR 计数、引擎矩阵格数均曾失真）——结构信息走 openwiki + CodeGraph。
-- 兜底机制：openwiki 更新失败/未及时同步不影响本地开发或 commit，无需提示或干预，CI 定时任务会收敛。
-- **CLAUDE.md 已废弃删除**：CI 定时任务的 openwiki 更新可能重建该文件，**请勿提交**（CI 已自动清理）。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph
