@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:bd63a17a8847eddc3b65d8dcb194a698ab4772236a901514862ccb67fed92180",
+  "pageVersion": "sha256:2429d6e60c66ca7814a2b073daa8ba0b124bad7b4cea43515c4586bdb83d7598",
   "claims": [
     {
       "id": "claim_7f62f90ec5854c3e9c954db9d9761a1c",
@@ -72,27 +72,31 @@
         },
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
-          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
         }
       ]
     },
     {
       "id": "claim_fba47a9f449b4deab37ad526581120d7",
-      "statement": "LynxRuntimeInitializer is the idempotent runtime init point (InitGate latches only on success) shared by PictelioAppLynx.onCreate and LynxActivity.onCreate; it registers LynxHttpService, LynxLogService, and PictelioImageService, calls LynxEnv.init, globally registers 11 LynxModules, and exposes isAvailable as a CLIENT_KINDS + init-no-throw + native-library-loaded probe.",
+      "statement": "LynxRuntimeInitializer is the idempotent runtime init point (InitGate latches only on success, so a failed init stays retryable) shared by PictelioAppLynx.onCreate and LynxActivity.onCreate; in order it registers LynxHttpService, LynxLogService and PictelioImageService as services, calls LynxEnv.init, globally registers 12 LynxModules (PictelioSecureStorage, PictelioApp, PictelioAuth, PictelioApi, PictelioPrefs, PictelioGallery, PictelioDownloader, PictelioShare, NetDiag, PictelioWebDav, PictelioClipboard, PictelioNotification), enables LynxDebug for debug builds, and exposes isAvailable as a CLIENT_KINDS + init-no-throw + native-library-loaded probe.",
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java",
-          "version": "repo-file-v1:sha256:f2a395f2ba2f5bfad6cec217e87d8f32248f17af3245aea9e62f8827f37c27c3"
+          "version": "repo-file-v1:sha256:26151fcfb3a86d3258a15410bffcc8ba70ab39c54e04686e282f1c8eb458c895"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppLynx.java",
+          "version": "repo-file-v1:sha256:4d87e36efccca184277dfdd40bad6f50bda85d679443e4b5e49f87c6b8c759f2"
         }
       ]
     },
     {
       "id": "claim_002e6dae834246e2ad533e9dc582258b",
-      "statement": "LynxActivity is the sole launcher Activity (plain AppCompatActivity, no Capacitor), installs SplashScreen before super.onCreate, holds the splash via bundleLoaded, registers PictelioTranslate and PictelioTranslateCache per-view (the 11 others are global), serves main.lynx.bundle through PictelioTemplateProvider, and forwards lifecycle events to the LynxView.",
+      "statement": "LynxActivity is the sole launcher Activity (plain AppCompatActivity, no Capacitor), installs SplashScreen before super.onCreate and holds the splash via bundleLoaded, serves main.lynx.bundle through PictelioTemplateProvider with XElement behaviors, registers an 8-module per-view set on the LynxViewBuilder (PictelioSecureStorage, PictelioApp, PictelioAuth, PictelioApi, PictelioTranslate, PictelioTranslateCache, PictelioPrefs, NetDiag — only the two translation modules are per-view-only, the rest duplicate the global registration where the global LynxEnv registration wins), and forwards lifecycle events to the LynxView.",
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
-          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
         }
       ]
     },
@@ -146,7 +150,7 @@
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/src/main/AndroidManifest.xml",
-          "version": "repo-file-v1:sha256:a290ccf52d4c019ad8d21444528d6f53b9ae94fa6a3d8834dc61a49b4fa5a112"
+          "version": "repo-file-v1:sha256:8a75c8aeb70bf50e15db4a2c015bdeef85c4fd20963dd990454058fe9744bf47"
         },
         {
           "resource": "repo://packages/android-host/android/app/src/main/res/xml/data_extraction_rules.xml",
@@ -236,11 +240,19 @@
     },
     {
       "id": "claim_3f6e5bad61704847b542c86e98f90777",
-      "statement": "LynxActivity owns the native system-UI contract: EdgeToEdge base, content size = LynxView bounds minus visible system-bar insets, a pull-first pictelioInsets event plus getSafeAreaInsets, a fullscreen toggle keyed on settings_fullscreen_mode (only \"true\" is truthy), and a three-state settings_dark_mode (light/dark/system) driving status-bar icon appearance, splash theme (API 31+), and the pictelioDarkMode event.",
+      "statement": "LynxActivity owns the native system-UI contract: EdgeToEdge base, content size = LynxView bounds minus visible system-bar insets (physical px, converted to logical px on the JS side), a pull-first pictelioInsets event plus getSafeAreaInsets, a fullscreen toggle keyed on settings_fullscreen_mode (only \"true\" is truthy) whose hide/show also writes back the statusBarHidden latch so status-bar appearance is re-issued on exit-fullscreen, and a three-state settings_dark_mode (light/dark/system) driving status-bar icon appearance and the API 31+ splash theme — while the pictelioDarkMode event itself reports the system uiMode.",
       "evidence": [
         {
+          "resource": "repo://docs/specs/lynx-systembars.md",
+          "version": "repo-file-v1:sha256:ea42aab899eda490a398c8785319ca75f9159a50a0b40e9d0c70ce36fc5cee5f"
+        },
+        {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
-          "version": "repo-file-v1:sha256:464558efe6385462dbe0ba3c988b206f7bd9f0518778e840e4a761ad339c92b0"
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java",
+          "version": "repo-file-v1:sha256:34350bec64e3771e1e392bf9e1b8c936e2f46fee85c1176e97761febf8fab7ce"
         }
       ]
     },
@@ -256,7 +268,7 @@
     },
     {
       "id": "claim_18461ea66cd54bd89fda74db60f07c9f",
-      "statement": "PictelioTranslateModule streams OpenAI Responses API translation over SSE with the API key held in Keystore (setApiKey/getEndpoint/clearEndpoint/translateStream/probeEndpoint/abortStream), and PictelioTranslateCacheModule is a filesystem LRU cache (default 10MB/200 entries) under cacheDir/pictelio_translate_cache with a manifest.json index and atomic temp+rename writes.",
+      "statement": "PictelioTranslateModule exposes seven @LynxMethods over the OpenAI Responses API (setApiKey / getEndpoint / clearEndpoint / translateStream / translatePoll / probeEndpoint / abortStream) with the API key stored through SecureStorageCompat and never returned to JS, delivering SSE frames primarily by publishing seq-stamped frames on the pictelioTranslateFrame global event with translatePoll as a pull fallback; PictelioTranslateCacheModule is a filesystem LRU cache (default 10 MB / 200 entries) under cacheDir/pictelio_translate_cache with a manifest.json index and atomic temp+rename writes.",
       "evidence": [
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateCacheModule.java",
@@ -264,13 +276,95 @@
         },
         {
           "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java",
-          "version": "repo-file-v1:sha256:2eed6bd37c2b6c2ad147ce46fc8aa887c7ba1704035bf8d1c585bd2c2e225876"
+          "version": "repo-file-v1:sha256:34deb103f0b09e92e830310fca5052c0a46f5c1d1a6ffd9584b8aba0b5983b24"
+        }
+      ]
+    },
+    {
+      "id": "claim_1d03ed562e1947999351a64530dc6512",
+      "statement": "PictelioNotificationModule is the delivery-probe bridge registered globally as PictelioNotification with exactly two @LynxMethods — areNotificationsEnabled (reflects the real system switch and degrades to \"not granted\" with a warning instead of throwing) and postSummary (creates the pictelio_delivery_probe channel via createNotificationChannel, then posts one aggregated notification under a fixed notification id so rounds overwrite instead of stack). It never requests POST_NOTIFICATIONS and never writes counters, and assembles the wording host-side from a locale string while stating only the count; the manifest declares android.permission.POST_NOTIFICATIONS so a runtime grant can succeed.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioNotificationModule.java",
+          "version": "repo-file-v1:sha256:852580c156fb0da9ffd59bff56e74b5be3b4b341bf5988aa774b33e4ace1ed09"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/AndroidManifest.xml",
+          "version": "repo-file-v1:sha256:8a75c8aeb70bf50e15db4a2c015bdeef85c4fd20963dd990454058fe9744bf47"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioNotificationModuleTest.java",
+          "version": "repo-file-v1:sha256:e597afefd7c772995ccd7c24fdde4776608fcf1e337bbb24fc19062ddf4eab1d"
+        }
+      ]
+    },
+    {
+      "id": "claim_9379a7bdbc834825a7c521c4d2d1d087",
+      "statement": "Notification taps are routed through NotificationTapActivity, a NoDisplay trampoline declared exported=false with excludeFromRecents/noHistory and targeted by PendingIntent.getActivity: it is the one place that runs at tap time inside the app process and is exempt from the Android 10+ background-Activity-launch restriction, and it copies the \"notifications\" target plus the per-delivery clickId onto a LynxActivity intent. LynxActivity.dispatchNotificationTarget then persists the pending clickId with commit() and broadcasts pictelioNotificationTarget four times at fixed 1.5 / 3 / 4.5 / 6 s delays, deduped JS-side by clickId; warm taps require onNewIntent to call setIntent(intent), without which the click extras are dropped silently.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java",
+          "version": "repo-file-v1:sha256:ce66b6452eee8e7ad06b74cc25c08028692aa1c2268082cb2c749d60541ef539"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/NotificationTapActivity.java",
+          "version": "repo-file-v1:sha256:1bf23bcb9b946a9aecc799c561a9878aaf1755930119369e68fd1ffd560df927"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/main/AndroidManifest.xml",
+          "version": "repo-file-v1:sha256:8a75c8aeb70bf50e15db4a2c015bdeef85c4fd20963dd990454058fe9744bf47"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/NotificationTapActivityTest.java",
+          "version": "repo-file-v1:sha256:f81fe0af6145161747a0cae2f86094159d6f84de58224eeeb69244f3cbb5f502"
+        }
+      ]
+    },
+    {
+      "id": "claim_b34df703fdaa43d9a29675f07f30abcf",
+      "statement": "LynxActivity sends the pictelioAppForeground global event in onResume and pictelioAppBackground in onPause via sendGlobalEvent, with no debounce; these are the only JS-visible foreground/background channel, because LynxView.onEnterForeground() does not become a JS event and Lynx exposes no window-focus event.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L59-L70",
+          "version": "repo-lines-v1:sha256:dde5acf2a909b79b66ddb39bd60b83239d6bc0e2d98eeba657f6ddc574fb8bd0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1MWY4MjNiYzUxYWUxNjg5ZThmZGFkZTQxZjkzZjU2YjVlY2VkNWY0Zjg3M2Y1NWJlMzNlNmIyY2ExODk0YjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY4NDE4OTg5MzU2MjRmZDU5OWZlNWQ3ODE3MGYzYzhhMzcxOTE3NDgyM2EyMjlmODY0OTA0Yzg1YzE3ZGQ2ZDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ0YzY4OWNmNmQ1NTM4ZGNjY2Q4NWFiMTQzYmFiMWM5NTMwZTkzZGI0MWIyM2UzOTY3NGM0ZjE5ODg5Mjg4ZmMifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L1085-L1126",
+          "version": "repo-lines-v1:sha256:575b9a88e3f54d222b379178e65cb4074c516f3a2f1b0c4782c10ad03707b369:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkYzJiMzExYWJlODc1NzJlOGE3Y2MwZDk5NmE2NTg0NDA3NmU1MjMyZDIxYjdhODU0NzVmOWI0MDU1Yjc0OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJlNjNjZGQ4MWJkOTQ3MmNhMWZkMjYyZDBkZDMxMmE0NWNhYjQwMjBhMDY5MTFjNjBhYjkyMDFmMGExNWY5OTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwN2Y1NDA0MzVkNmU3NmEzNWJhYTMwMzVmMTc4MjU3OWVhZjE1YjE1ODBhNzdhNTg0NzcwODUyOTljMjU0NWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_daff6de53dbc467bacae93a553407b5c",
+      "statement": "The translation frame delivery path snapshots the seq-stamped frame buffers and pushes them through the global event bus without draining them, so frames survive a window in which no JS listener exists and translatePoll's terminal handshake performs the cleanup; abortStream records the streamId in a USER_ABORTED set before cancelling the OkHttp call, because Call.isCanceled() cannot distinguish a user abort from a client-side timeout and conflating them left the JS promise permanently unsettled with the UI stuck mid-translation.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java#L700-L780",
+          "version": "repo-lines-v1:sha256:8e6179fbae1e3813af06680d5aaa74d3996b02754762a3a601c0346271e8c045:eyJzZWxlY3RlZExpbmVDb3VudCI6ODEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJiNTFjMGI4MmMyMjUwYjg0NmI0N2YzODI4YTBlMzlmYzUyNTI5ZjU0MmU4MDg4M2M5NDNkMjJmM2UwOTg1OWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYwYmIzODY1NTBjMDQ2MDUyZTQ4ODc2ZDFmODUyZTY3M2YxNzYzYWJhODJjZjI2YTA1YjVjNzg5ZWM3NWY1YjYifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java#L851-L876",
+          "version": "repo-lines-v1:sha256:3bfca246ebb3a25090425fa5fa36573c825e9ee18859681af8fd99f2eaa95db6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5Y2JiYzY1NDY5ZGIxY2EyODQyZWZkOTdkZjdlZTJjZTZjYzE1NzE0ODJkMDFhMThiNzkwYTEwYzdjNTEwZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyY2MwZDQ0ZGRlMzkxMDE4YTQ1OWMwNmIwOTBlZWVjOGRmNTA0MTg4Mjk3MzIwMmQwYTc2NWZjOTM1NjRjYTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzZmY2NTJkZmYxM2U1MzU1OTc2YWZjYTQwYWFjYWU2OGVhMzBkZjJhNWIzZTU0MmY1MzhlYWQxNzFhNDMzMjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8fcbe72955654cbca46d616ce555160e",
+      "statement": "Preference values returned by PictelioPrefsModule cross the Lynx bridge JSON-quoted, so JS must apply its unquoteNativeString helper before JSON.parse (the on-device XML layer's &quot; escaping is a separate layer); a key that does not exist is returned as an empty string rather than null.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0220-notification-delivery-channel-probe.md#L105-L111",
+          "version": "repo-lines-v1:sha256:b76db7a44101e8b0ae5732d88c1003de9879aec22744f939947a30f1d782e7e3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGEwODEzYTA1MjBmY2Y2YThkNDE2ZTgzYjBmMjgxNzZiZmNhYWExZWNlMzk0MGNiZGVmZTE5MmEzMTQxOWM2ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTU3Yjk4NWYxNDc3OWM0NmFiMzYwOTA0YzM0ODdiYWQyZDY0NmM4NDRhNzRhODZlMjZkMzQ2NWRjYjljNjA3MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWQ3YzRmMDBhOGQzMjExMzBlMTBlYmM0OWJkOWU4MGM1NzE3MjJlNWRjYjk1NTg4NTA1NTgwOTM3M2U5Mzk0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTNiM2U1M2Y1ODI1MDBjM2E4MmFkZWEzNGYzNzI5OWExOTg1NTg4NjhiNWU5OTUwNzE4ZWJlZmEwMzI0ZDliMCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java",
+          "version": "repo-file-v1:sha256:d4c092dd29bcf1821fd70ef7c5262dddbc9dd451473c5c612f1d51e31d76352e"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-05T06:49:09.686Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

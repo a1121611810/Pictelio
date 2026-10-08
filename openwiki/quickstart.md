@@ -29,9 +29,6 @@ sources:
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
 generated: { by: "openwiki/0.7.0", at: "2026-10-05T06:49:09.686Z" }
-verified:
-  - by: openwiki/0.7.0
-    at: 2026-10-05T06:49:09.686Z
 ---
 
 # Pictelio — OpenWiki Quickstart

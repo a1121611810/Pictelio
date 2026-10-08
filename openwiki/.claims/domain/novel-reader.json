@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:ff506992d984170dde54e53b656f2c60769095b9455ff425e095304640a8eb4a",
+  "pageVersion": "sha256:478843a05296229270b666a9e0338470dfec52868c6c9ad34d351b12f705d442",
   "claims": [
     {
       "id": "claim_440001d18f634ed78882ef797b653a19",
@@ -8,7 +8,7 @@
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0203-webview-client-source-removal.md",
-          "version": "repo-file-v1:sha256:1efbed49a183d03538a50a7a9dff2c52e4a7dc2c076592db2a0064569040fe61"
+          "version": "repo-file-v1:sha256:5a6f8cee8369f5f82a7305c5032dae3f3d0c29a49367a1cbb527fc963759fe03"
         }
       ]
     },
@@ -42,15 +42,19 @@
     },
     {
       "id": "claim_e760b4a5ffc24d2ab05eac24d4682c9f",
-      "statement": "NovelIntro.vue is a cover-scrim decision surface whose restricted/AI masking reuses the body predicates (R18 before AI) with handler-guarded greying, and whose main CTA switches between start-reading and continue-reading labels while always navigating to /novel/:id.",
+      "statement": "NovelIntro.vue is a cover-scrim decision surface whose restricted/AI masking reuses the body predicates (R18 first, then AI mask) with the same `masked` flag driving handler guards and `:disabled` on every Row-1 control, and whose main CTA switches between start-reading and continue-reading labels through the pure decideIntroReadAction(continueReadingStore.has(novelId)) — defaulting to start-reading while the store's hydrate has not settled — while both branches navigate to the same /novel/:id route.",
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md",
-          "version": "repo-file-v1:sha256:743eb3059295c4f6dc8fd4e2b64e97a179993a9f015c266e0d9d3e12f016035a"
+          "version": "repo-file-v1:sha256:501a19f8539925ae555b9ee4e9990dd5658ffb8722619c9be65412cbad2a5436"
         },
         {
           "resource": "repo://packages/app-lynx/src/pages/NovelIntro.vue",
           "version": "repo-file-v1:sha256:656352b922147fb9afb3f7a7a303b70bb0d444025ee8f33c814ea5b74a26b08c"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/novelNavigationTarget.ts",
+          "version": "repo-file-v1:sha256:a2c38cb9e4d82d74cf364b0561a65028e3839fa026ebbd2090f5cbf4ad4af1fd"
         }
       ]
     },
@@ -118,15 +122,23 @@
     },
     {
       "id": "claim_a032f199c56b446599f0947e40ff4e99",
-      "statement": "NovelDetail.vue records a session-last continue-reading position on entry and evaluates completion via decideNovelCompletion at bottom, after chapter-coordinate backfill, and after a re-pulled viewport size (ADR-0219).",
+      "statement": "NovelDetail.vue records a session-last continue-reading position on entry with zero threshold (chapter coordinates back-filled afterwards for the 「第N话」 label), and evaluates completion via decideNovelCompletion — behind a content-taller-than-viewport precondition — at bottom, after coordinates land, and after a re-pulled viewport size; a completion is a soft delete (completedAt, which also sweeps the earlier chapters of the same series) and a detail-load failure marks the entry unavailable instead of removing it.",
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md",
-          "version": "repo-file-v1:sha256:743eb3059295c4f6dc8fd4e2b64e97a179993a9f015c266e0d9d3e12f016035a"
+          "version": "repo-file-v1:sha256:501a19f8539925ae555b9ee4e9990dd5658ffb8722619c9be65412cbad2a5436"
         },
         {
           "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
           "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/novelContentFitsViewport.ts",
+          "version": "repo-file-v1:sha256:70b81087b02db18f24dbda0c199b6b70ec335713d16e5fc324a184fe2f46305b"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/continueReadingStore.ts",
+          "version": "repo-file-v1:sha256:98ef784badf0992a6e6ee4cb6b0558cf9113a554d03e5efadfe0cee55f9ebc7a"
         }
       ]
     },
@@ -164,15 +176,23 @@
     },
     {
       "id": "claim_61ba9c3d6eec45acb3737b57239ba42f",
-      "statement": "The LLM API key is stored in Android Keystore via the Java PictelioTranslateModule and never enters the JS heap; JS only receives the LlmEndpointPublic mirror, and stream delivery uses the pictelioTranslateFrame global event bus with streamId/seq dedup rather than per-chunk callbacks.",
+      "statement": "The LLM API key is stored in Android Keystore via the Java PictelioTranslateModule and never enters the JS heap — JS only receives the LlmEndpointPublic mirror, while non-secret baseURL/model/language metadata is persisted in the JS-readable prefs KV and overlaid on that mirror — and native stream delivery uses the pictelioTranslateFrame global event bus (the per-chunk Callback channel is deliberately not used for delivery) with translatePoll retained as a fallback channel carrying the same stamped frames.",
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0170-lynx-translate-nativemodule-bridge.md",
-          "version": "repo-file-v1:sha256:6c8dae651365302c0a15b06cdf07ba24a0b5b5813d451927124214d4f7257065"
+          "version": "repo-file-v1:sha256:1af92a49a88fadceec68657ef8982f8ec184da556106dceab3f5bfa7314a6b6e"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java",
+          "version": "repo-file-v1:sha256:34deb103f0b09e92e830310fca5052c0a46f5c1d1a6ffd9584b8aba0b5983b24"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/nativeTranslate.ts",
+          "version": "repo-file-v1:sha256:36892327df47787572720a4e1cadf1a3345f6cd5f0b04e00e9932d916963337d"
         },
         {
           "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
-          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
         }
       ]
     },
@@ -196,7 +216,7 @@
       "evidence": [
         {
           "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
-          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
         }
       ]
     },
@@ -224,15 +244,23 @@
     },
     {
       "id": "claim_e379a89fb89940ecbe30c3bd21640f30",
-      "statement": "Translation authorization is independent of content display: isTranslationRestricted aborts R18/R18G requests before any content leaves the device, while endpoint compatibility (dummy key) and credential verification (real key) are separate persisted states.",
+      "statement": "Translation authorization is independent of content display: isTranslationRestricted aborts R18/R18G requests with a dedicated code before any content leaves the device, while endpoint compatibility (dummy key) and credential verification (real key) are separate persisted states; the body page's translate-entry visibility is a separate display decision (translationEnabled reusing the show-R18 predicates), and blocked requests surface in the UI as aborted rather than failed.",
       "evidence": [
         {
           "resource": "repo://docs/adr/ADR-0173-llm-endpoint-probe-and-verification.md",
-          "version": "repo-file-v1:sha256:d65ffce07c5bd4c32c9f54ec8aea01d985ab515207f8e213c8e87a0d01108d5f"
+          "version": "repo-file-v1:sha256:429e619bb2798aec2c9b61377bdfcdfa634eb07fc1be7002d1af86b3bf596ee2"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/NovelDetail.vue",
+          "version": "repo-file-v1:sha256:2b9a7ddda6493fe9363efa8ca33ecbcd7211627f4b49a0009f63a8b690349ba4"
         },
         {
           "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
-          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts",
+          "version": "repo-file-v1:sha256:e552888923a7fc1735cc3af52e912ef02a1de79825159d96ee42cf9243335113"
         }
       ]
     },
@@ -246,7 +274,7 @@
         },
         {
           "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
-          "version": "repo-file-v1:sha256:cf08a0551188661088c6ed76152a5b0b4a09f81f7c5b4a31320fa6ef2313c896"
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
         }
       ]
     },
@@ -299,10 +327,134 @@
           "version": "repo-file-v1:sha256:ef7f4dc78deedf433d31712452f75a8fc7f9f1de96c9297315e2dab2edbe983b"
         }
       ]
+    },
+    {
+      "id": "claim_c2ef5ed19c9e4ad08f4e6b03fb0ad95a",
+      "statement": "streamId is the shared JS-to-Java key of a translation stream: JS generates it and reuses it as the payload's _abortToken so Java echoes it on every emitted frame, frames carry streamId and a per-stream monotonic seq stamped once on entry into the per-stream buffer, the JS adapter drops frames whose streamId is not the stream's own and dedupes by seq, Java keys its delivery state (STREAM_FRAMES / STREAM_TERMINAL / STREAM_TERMINAL_MSG / STREAM_SEQ) by streamId and prunes other streams when a new one starts, and abort is streamId-direct because the provider registers abortStream(streamId) synchronously instead of waiting for translateStream's promise to settle, with Java marking the id in USER_ABORTED so a user abort is not reported as a failure.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0176-app-lynx-translation-per-stream-keying.md",
+          "version": "repo-file-v1:sha256:96367f876eef1a39bd472d1c57de1386b00db90282c76cbe1a8aa28ecdc2aa37"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java",
+          "version": "repo-file-v1:sha256:34deb103f0b09e92e830310fca5052c0a46f5c1d1a6ffd9584b8aba0b5983b24"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/nativeTranslate.ts",
+          "version": "repo-file-v1:sha256:36892327df47787572720a4e1cadf1a3345f6cd5f0b04e00e9932d916963337d"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/unit/api/translateFrameChannel.test.ts",
+          "version": "repo-file-v1:sha256:74e3bd47487ee8930df6d1efa9cc8ed859d6158395abfca43410c5c472aadb65"
+        }
+      ]
+    },
+    {
+      "id": "claim_fd67b341ce8f4acbbb305847a529aed9",
+      "statement": "Java's frame attribution is per-stream but its SSE parse state is not: PictelioTranslateModule is a single registered instance whose instance-level sseParser is reassigned and whose single frameQueue is cleared at each stream start, so two overlapping streams can still share parse state even though ADR-0176 decides that the parse state be bucketed per stream alongside the already per-stream delivery maps.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0176-app-lynx-translation-per-stream-keying.md",
+          "version": "repo-file-v1:sha256:96367f876eef1a39bd472d1c57de1386b00db90282c76cbe1a8aa28ecdc2aa37"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java#L117-L157",
+          "version": "repo-lines-v1:sha256:5eda56929322fcd7554765615acdbbbf7506d30a09961f603982a8e61ee880d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzODZmNjhhMTZmOWFjM2RmNDQzMmRkYWNkYzZiYmIxMjkxZDZmZDhiYjJjOGUwNTc4NGY2YmU1NTBmZTVmYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OWQ1ZjY0M2E2YjQ1NDI1Y2UwOTkyNmRiNzc4MzNjNWU4NDhmZDY4MGU2Yjg2NzE4ZDYxMmZmZGFiMTJjZDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkNGUyNWVmYjQ4MWQxYzBjNjA2ZDkwMjM0NTZjZjc0M2Q1MTc5NGFhMDUyYWE1ZTM5ZjJkZDZjZWRiNDI4YTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4MzllNGVkZWRmNTgzN2ZjZGMzMzQ4NWQ3MDNkNWUxOTA0OTMyZWRhYjg2ZmQ3Mzk1ODE4NTNhY2U4ZTQ0OTUifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java#L425-L450",
+          "version": "repo-lines-v1:sha256:af8ab0a6ec25aceb08d73fb5ed5f63a881b3b470b804ab0b2ad95e41eb6cf677:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZTY2ZjhjNGJkNDlmMGRkMzEwNDY3OWE0OTBlYjdlNGUzNTk2ZmVmNzQzNThkYmI4NzlhZjZiNzM4NGUzZjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3MTY1M2Q1ZGFhYWUwNGM2MGViYWYwYTJiNGY4Njc4OWVlZjllZTBhYThlMDUwMjhlZjdhODExMTdiMDEwNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkMzQ3Zjk2YWVlM2YxODU4YjJkNzgxMTgzZmM4OTU5OWNlNmMwNjk0MzRkMDkyODcwNWQ3NjE5ZTFmNGY1N2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3MDE0MTljZDBiMjQ1NjQxNTJhNDI4MzM0NGY0ZjAwY2ZmMDRhMjEwNjNkMTk4ZTgzOTBkZDMwMGRlMDc2ZmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_909766e37ee44b449dc4b588e5d441f4",
+      "statement": "The endpoint probe must send the Responses API-accepted scalar input (\"ping\"): a bare string array is rejected with 422 by providers such as DeepSeek, and that defect stayed invisible for a dummy key because authentication precedes routing, so a 401/403 verdict proves only that the address accepts and authenticates requests — never that /responses exists; the compatibility chip therefore states only the verified provider/Responses fact and the runtime request path stays unchanged.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0173-llm-endpoint-probe-and-verification.md",
+          "version": "repo-file-v1:sha256:429e619bb2798aec2c9b61377bdfcdfa634eb07fc1be7002d1af86b3bf596ee2"
+        },
+        {
+          "resource": "repo://docs/specs/llm-endpoint-probe-payload-and-verdict-honesty.md",
+          "version": "repo-file-v1:sha256:996486dcae82a83dd89e6a297b96c6702eccf6b45b7faefee8abb15a59c150fe"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioTranslateModule.java",
+          "version": "repo-file-v1:sha256:34deb103f0b09e92e830310fca5052c0a46f5c1d1a6ffd9584b8aba0b5983b24"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioTranslateProbeTest.java",
+          "version": "repo-file-v1:sha256:f04a40812f98ab64f282b54ab43d0366d5d4d120658b0dddd64414fb5a6e8e2c"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/i18n/locales/zh-CN/novelTranslate.ts",
+          "version": "repo-file-v1:sha256:487a25998ae4f051ed52e3b3b54b57a8880c96ff68af5935dbd2a67722b12633"
+        }
+      ]
+    },
+    {
+      "id": "claim_19a8f0f52e4f44ef8999d8323c7f1c65",
+      "statement": "Automatic whole-batch fallback is limited to retryable errors, which are exactly server / network / incomplete; the native adapter classifies HTTP status and message into that same subset instead of hardcoding retryable=true, so 429, 401/403, 402, 400, model_not_found, content_filter and endpoint_not_responses never trigger an automatic second request.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0178-app-lynx-translation-retry-and-partial-ui.md",
+          "version": "repo-file-v1:sha256:a1c9ae859912e7293953f4549b995a506a58be63db43bffa62907d7a617348cb"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/api/nativeTranslate.ts",
+          "version": "repo-file-v1:sha256:36892327df47787572720a4e1cadf1a3345f6cd5f0b04e00e9932d916963337d"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
+        }
+      ]
+    },
+    {
+      "id": "claim_47e91ee2eb1045feb1b263c11abb6111",
+      "statement": "The R18/R18G translation authorizations are account-scoped settings keys (settings_translate_r18_${uid} / settings_translate_r18g_${uid}) kept separate from the show_r18_* display keys, with the first enable of each passing an inline risk confirmation in the settings form; isTranslationRestricted(xRestrict) maps xRestrict 1/2 to the corresponding switch and the store refuses the request before it leaves the device.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0173-llm-endpoint-probe-and-verification.md",
+          "version": "repo-file-v1:sha256:429e619bb2798aec2c9b61377bdfcdfa634eb07fc1be7002d1af86b3bf596ee2"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/SettingsEndpoint.vue",
+          "version": "repo-file-v1:sha256:7e50d16a236b2fbece5f1eadb5a814c5a58d088ed7871542ef65e119b858ceaa"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/novelTranslateStore.ts",
+          "version": "repo-file-v1:sha256:f1feb78cdc6392edcfd69504fdd5639edba8b02556686cafb3108890d3432210"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/stores/settingsStore.ts",
+          "version": "repo-file-v1:sha256:e552888923a7fc1735cc3af52e912ef02a1de79825159d96ee42cf9243335113"
+        }
+      ]
+    },
+    {
+      "id": "claim_225aff6d6845484ea0904820669cf6ea",
+      "statement": "openNovel(id, opts) is the single novel-navigation seam: it emits /novel/:id/intro or /novel/:id from the pure decideNovelTarget({ novelIntroFirst, resume }) predicate, where the new resume: true intent overrides the novel_intro_first switch and is used only by the continue-reading list — implemented as a parameter on the existing seam rather than a second navigation shortcut.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0219-lynx-continue-reading.md",
+          "version": "repo-file-v1:sha256:501a19f8539925ae555b9ee4e9990dd5658ffb8722619c9be65412cbad2a5436"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/novelNavigationTarget.ts",
+          "version": "repo-file-v1:sha256:a2c38cb9e4d82d74cf364b0561a65028e3839fa026ebbd2090f5cbf4ad4af1fd"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/novelNavigation.ts",
+          "version": "repo-file-v1:sha256:a609b97216d1901d4eed8c81b0f5175a7673e05a3c49ad6dcc1c59004e3996ad"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

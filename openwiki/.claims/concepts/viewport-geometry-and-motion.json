@@ -1,0 +1,574 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:fc412e5e4f63e1e4a67a544001f9e300a270eb609b40c5e4b1ed2e6bb6261f68",
+  "claims": [
+    {
+      "id": "claim_157c9ad5f90d4333b38bc4ae938dedd6",
+      "statement": "app-lynx derives bottom-anchored overlay geometry from the native LynxView content-area size rather than from SystemInfo's full-screen physical size: LynxActivity records the content area via OnLayoutChangeListener and PictelioAppModule.getViewportSize(cb(w,h)) returns it (sentinel -1,-1 before layout), and screenHeightVw resolves in strict priority content area > SystemInfo > web-core fallback 216.4, because SystemInfo includes the navigation-bar inset and pushed the radial FAB out of the content area.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0131-app-lynx-viewport-size-contract.md",
+          "version": "repo-file-v1:sha256:5ef1b877a4710f5483177c1d5b5cb9f43859c7adb6fb2561ba32eae982fdc604"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java#L75-L86",
+          "version": "repo-lines-v1:sha256:b1899c7afd3374c5a17dac39e00e9d4eb0b2a5d2f1eb3a66879e665a8b6803b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkNGJmODNlZDUxYTc0NDRkMjVjOTdlNzQ2MGJlMjVjMjcxNTVhM2JhZTk1NmI5MGFhZTJiYzdjYzc1NTJkZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjYTI4OWUwZGYxNTc1YTEyOGQ1OGVhYjRlYjM2ZDllZTFhN2NjYWUzZjgxNTZjNjFhY2JkNWI2ZDk3MGQ5YzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlMmI5ZTIxZmRjODZmYzJjMmVlNDQ3MjE4NWQ2NzY0NjdiZGQxY2JmMmUyNGI0ZGM2NDRhYjFhYmIzMzI1NDcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/viewportGeometry.ts#L26-L50",
+          "version": "repo-lines-v1:sha256:5d72213309ca8d5c7608c07ed88becd9c798e15aad357510157a16521f9c89e2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgwZDg3MmI3OGZjY2YxMzkzMTYwNzQzNzJkNDFjZjIxNjJjNGIwMzJlMDQ4YTY0ZjA5M2I1MWRhYmMwNjBmN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/viewportSizeBridge.ts#L21-L38",
+          "version": "repo-lines-v1:sha256:6921f0d711fdb481b8d1d8397ac8b00e91d473285bcb3add8ca7a9b3972a7f6d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgwZDg3MmI3OGZjY2YxMzkzMTYwNzQzNzJkNDFjZjIxNjJjNGIwMzJlMDQ4YTY0ZjA5M2I1MWRhYmMwNjBmN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_917042bd3e774164987118102c62f55a",
+      "statement": "utils/safeArea.ts is the only physical-pixel to logical-pixel conversion point (dividing native insets by SystemInfo.pixelRatio once), all downstream consumers receive logical px and must not multiply or divide by density again, and insets arrive through a subscribe-then-pull channel (a pictelioInsets GlobalEventEmitter listener plus a getSafeAreaInsets pull for the initial value) because the first insets dispatch precedes JS subscription.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/utils/safeArea.ts#L70-L109",
+          "version": "repo-lines-v1:sha256:275e7c8d1c23a7cf3f57aa3fae3ed0347882e778d2e147ef79b2a040ec0a517b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzNTM4MDZlMWE1NzE3OTczNzYyOTk1M2U0OWNlOTVlZmZiMDRiY2JkMjkxNjJkNDNkNDgwOTk2YzJlMTFlOTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5ZmRmZDc2YTVmODQ4N2FkYjgwZmJjZDRlOTRiZmIwMTA4MWY0NjM0MTMyZmJmMTgyOWM4ZjdkZTVkZGNmYzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFhZjBiM2ExMzgwNjk0MDRkZWJhMzQ3YzhjYWNmMzM1MGZhZmQ5N2U1NWRmNGQ1YTliZDdiZWZiNmI1M2U4ZjMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/safeArea.ts#L8-L50",
+          "version": "repo-lines-v1:sha256:a5437090479a6c587e49866e5965ead2e3ce3ba57bbd8b05ffb06403c4e3f7f3:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1NzVmZjExZDEyYTMyY2YwYjUyMmZiMjEwZTQ4ZTQ2MGY5OWQ3YjUwZDBkNmY3ZDc3YjkwOTAyZDg2NzkyZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjNjVmNTAwYzdkNjAwYzE5ZmYzOGQyMzQxZmMxNjViNjU0YTZjN2QwNGIxMDdkMDc3MzZhNmQ2ZGU4YzNkOWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM4OTYxOTQ2N2U0NjZkMDA0NGI3Y2RhNTk2MjYyZWJmNjBhODVhMmE3MzdmOWMxNmVmMDIyYmNjNGEwNzhmNmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a07eadb5f6714f8cad63e24763b587d4",
+      "statement": "Top-inset ownership is a closed two-value route declaration: TopInsetMode = 'self' | 'bleed' with TOP_INSET_MODES as the vocabulary, meta.topInset is a required RouteMeta field, the third mode 'root' was deleted because it degraded into 'no yielding at all' (byte-identical to 'bleed' while looking unlike it), and resolveTopInsetOwnership normalises unknown modes to 'self' with a one-time warning so the failure direction is never 'bleed everything'.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0214-top-inset-per-page-ownership.md",
+          "version": "repo-file-v1:sha256:bda45e08385e6f31be0913025a021eb7f8d62d96e1aa01cc9a3b21dc2d95674d"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/router.ts#L39-L57",
+          "version": "repo-lines-v1:sha256:d69a2f2ae40bb2994f6edb2072d67a05f1f7663c754b7759e542808aab3dd866:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwYTEzMDliM2M2ODQyYzQwMzljYzlmMGQ5OTkxNzM4MjZiZTM3NjcyY2IzYTBkOTUzYmYyZGFkOWQwYjJmOGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjMmVhYWJmYWQ3ZTBiMDkwMGM5MmI5ZWY4YTFmNGRhODhmYTlhM2IxN2FiZDcxYTg1NGY0YTFhNmE2MGRiZmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwMDkzMTQ2NWQ1MGU1ZDVjMGFmY2MyYTdmOWVkN2E5ZDRjYjZjODE1YzExOGQxMGJmNjM0ZTY3ZGM5YWJkZTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/topInset.ts#L36-L86",
+          "version": "repo-lines-v1:sha256:05781f9d27b8c2c96aff5c4920e22100565ad9cf46c80592e17031ac75563b05:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2Zjg4NWQ3NzE5MDMxYzQzNmI3NzZjNTJhZjM3YmJlYjZiNjJhYTIyZGJkM2UwYmI2Y2EzODgzMGM3ODhjODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e7ea282a72964fcf96405e7ad008f018",
+      "statement": "Top inset is owned per page rather than by the root container: useTopInsetSpacer() reads the current route's meta.topInset and safeTop and returns the spacer height as a ComputedRef in logical px, App.vue's rootStyle now carries only paddingBottom: safeBottom, and a cross-language contract gate asserts that a route's ownership declaration and its spacer implementation exist together.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0216-four-root-pages-header-removal-and-fab-allowance-removal.md",
+          "version": "repo-file-v1:sha256:5f49b66494fce1ca8bcf3471a1313c4eeaed3512702310535133ca78badfcb7b"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue#L180-L186",
+          "version": "repo-lines-v1:sha256:ccbe59eb2796d77c35893b6a752a66cbd8696adde916d97c4cf80011e3dd6419:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTk1ZjY5YjM1ZDBkZDkxYWFkZGY1ZTAxZDRmMTExMWI2N2EwMTVlZDJmZTQ5MTg3ZTdmNGRjYmM0NGRlMzQ4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWMyZDdiMGU2ZmM0ZjBjMjliOGRmODMyYjMzZjU2MmZmYTAzODUzNDg4NjM1YTM0M2FlM2EyNDY0NzE3NGEyMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDI0YzE3OTcxNzY5MzE0OTQ1ZDAyYzVlMjlhNzJjNzk4Yzg3NDZlZjRhZjdmOGEwM2JhZDc4ODIwNmM4ZTdhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWY5ZDAwZWFmNmFjMGQ1NTgzNmU0MjA3MDY5YjAzZDI4N2E4YmNjZmMwZjNhOTk0MTJmYzdhNDRlY2JjYTUwMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useTopInsetSpacer.ts#L24-L34",
+          "version": "repo-lines-v1:sha256:3f74051e5ccc92dfa1bd9bc6a1a335dbab031afa1249f0acae666bbfae680782:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIwODg1NDdhZDA1MzJlNDVmYTA1YjA2MTYzNTc4NzE1MDhiNTUzYmRhMmMwMGU1OWE5ODJmNWQ0MTNlMjliNzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/safeAreaJavaContract.test.ts",
+          "version": "repo-file-v1:sha256:60a83afa09ebd5de21debaebc1b1a4f135d5665feb0ecd550118101fc9655490"
+        }
+      ]
+    },
+    {
+      "id": "claim_b8799e73f85f42839c2c2a192c013ba1",
+      "statement": "Every inset yield in this codebase is delivered by a zero-content element with an explicit inline height, never by parent-container padding, because Lynx's UA default is border-box (padding eats content height) while the web-core preview does not replicate that default, so the same utility string means different things in the two renderers.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L62-L68",
+          "version": "repo-lines-v1:sha256:0d842d592762b5eede5f6fbfc9026803d2bd16ff033f34282123f755db663cd2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmViMTkzZjBhZGY2MjdmNTI1ZWNjOGExMTUyZGNjZGE1ZmU2ODdlOWQ5ZTg0NDg3MzY4ZGU5ODY1MGMxNTI0MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTM1MGEzOWVkMWM0YmQ5YTFkYzU0ODcyMWU4OWRmODBkYWUxM2Y2MTJlMzYwNzU2NjdmODg5ZWNjY2RlOTYxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTBmMmU1MDkwODU0ZWE2MTJiNjVmOGE2N2NjZWRjYTVkMTI1NDJkOWUxZTc3MzM3MWVhYWQ5NDYzN2QzOGQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTNiYWExMTk1Zjg3ODhlZTQyZjMyZWFiZTVhYTc0MDRhOTk2MjkxMDhmYzM4NGQwZjc4YjE1NDNmOWI4NzM2MCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/PageTopBar.vue#L48-L56",
+          "version": "repo-lines-v1:sha256:c698e0676f4961fe0a2471c28a7fdb9e6a1bc663e59661601aa01851e623de41:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZThhMWYxYWI3NzQ3MWNlZmI0MGFlMmRlOTAwZTMzZjllMDZmYzZlNjBmY2EyNjY4NzI3M2EwOTMwMmE1NDlhYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjRjODU3YTgwOWE4MDQwZGIzODQyMWY5ZGY4MDkwMjNhMzk0MmE5MjNmNDcyZWJlMmZlOGYzN2M3YzJiMGM0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjRlN2E2NmU1NGQ2NTBiZDA3MmE4YWQ0OTRiODA1NWU3MjJiYzEyZGFiMmFjNGQwMmJkMTc5MGJhMzhiZTg0NCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/topInset.ts#L22-L32",
+          "version": "repo-lines-v1:sha256:b450939122c4511da3e7bbf6be394a29b29a43f2ad78926a3ca41b39bcd729ae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2ZWY5YWE2ODdmYjdmMmIxZjRiZjE5ODVmNmYxM2U5MDUyYTFmNDc0YjUzMWFhZGFhMDQyMGJjNDQxMzEzNzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwMWVhZDkzNmEyMjgxZDUzZGNjMDY0YjdlMmEyYWIwZDUzYjkyZWYzZWY3YjM0YjY2ODY3MzAwNzg5NWM4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFmZjBmMTNmNTZjYTg0NWYzNmYwNmNkMzJlMzU2YzRjMDQzNTE1Zjk3Yjc4OTA1ODkzZGZmMDg2YmZiZTlmNjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2Zjg4NWQ3NzE5MDMxYzQzNmI3NzZjNTJhZjM3YmJlYjZiNjJhYTIyZGJkM2UwYmI2Y2EzODgzMGM3ODhjODgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cd5f54790db94cbab56c8f8f633c6af4",
+      "statement": "The bottom of the screen carries two different kinds of yielding that must not be conflated: the platform-known bottom safe area (safeBottom) is consumed once by the root container's paddingBottom and additionally by each of the six bottom sheets for its own panel, while the app-drawn GlobalFab occlusion allowance is paid for at the end of the scroll content per scroll container; the two are orthogonal and do not stack, and no 'bottomInsetMode'-style mode flag may be invented for the allowance because only the top has a genuine product choice.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/glossary-bottom-occlusion-allowance.md#L10-L62",
+          "version": "repo-lines-v1:sha256:6faa3b3f93c2de324ec7bf9b56b796614649a6c7e6170f2ed78ce17c2e7c6f6c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhNTQ0YTg3OGY0NGQ4Mzg0NzZmYzVjNzVjYmM4NzMyMGUwY2ZlNTRjNmZlZDc5YmNmNWZiN2UwNTdlOWJmMzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3YjE2NGY3NTNmNzRjOTY2Njg1NGM2MTRiZjE4ZDM2NmM1NzQwM2QyMGIwNDYyMWViNWUzYWYwNTM0NTFiYjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/App.vue#L182-L186",
+          "version": "repo-lines-v1:sha256:cece80ba0071b80d82fe5542564e063b784267dcc9edbc867b14620594387153:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjAwZjQ0YjdjNzAyNTgzNjNlNTk4MTM5NmJiMDlmY2MzM2VmNmUwY2E3YWViOGRhMTk0NDMxOGJmNDc0OWFiYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWMyZDdiMGU2ZmM0ZjBjMjliOGRmODMyYjMzZjU2MmZmYTAzODUzNDg4NjM1YTM0M2FlM2EyNDY0NzE3NGEyMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjVkMmY0MzA0ODliNzRmMjVlMjE0ZTBhYTdlYWMyZTBkMGIzN2I4NDMwODM4YjYwNTUwMWJmNGZlNWJmODg5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWY5ZDAwZWFmNmFjMGQ1NTgzNmU0MjA3MDY5YjAzZDI4N2E4YmNjZmMwZjNhOTk0MTJmYzdhNDRlY2JjYTUwMyJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L73-L79",
+          "version": "repo-lines-v1:sha256:1829199a21640bf5e6d93826143c8c84467f206e50acc25fcc8d061f42bf11d1:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDU2ZDhhZmNmNWVjYjBlZTI4ZTNkZjA4Y2RmYmRkNWIxZjdiMzA0MjNjN2E0MTEzNmFkM2QwM2JmZjQ0NGNmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjRjNjZkNjYzOTMwNmIwMzVjN2M1YTJkYzgzOTkwMzdmODNlNjhjMTI4OWIwYWZhZTU0NWIxYTQ2MTZhNGE1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmI5NmI3NzFkZTBhMjA4YmUxMDBjNGNlZTdkY2UzY2ViYTRjNDU3NzcxYzMyOGFhODM3MTJmMjIyMzE5NWQyOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjRlN2E2NmU1NGQ2NTBiZDA3MmE4YWQ0OTRiODA1NWU3MjJiYzEyZGFiMmFjNGQwMmJkMTc5MGJhMzhiZTg0NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_44fb6d35cee64224b82f22887f205191",
+      "statement": "The bottom occlusion allowance height comes from fabAllowanceHeightVw(mode) in utils/fabGeometry.ts with a required, defaultless mode: 'menu' (the four top-level tab pages, FAB bottom edge 4.267vw) yields 19.2vw while 'search' and 'hidden' yield 58.668vw, and the degradation is written as mode === 'menu' ? low : high inside the function so that non-menu routes always take the conservative tier — the failure directions are asymmetric, since a too-small allowance occludes the last item while a too-large one only adds an invisible blank block.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L10-L46",
+          "version": "repo-lines-v1:sha256:52cecdc6a04773a46d3299f91f50361c26e64d3df0024b7f94749c86fd251305:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwMWVhZDkzNmEyMjgxZDUzZGNjMDY0YjdlMmEyYWIwZDUzYjkyZWYzZWY3YjM0YjY2ODY3MzAwNzg5NWM4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFhNzQ0YzM4Y2IxYmM4YjE2ZmUwZThjZGU4YmJlMjQzYzM3NDdhZmVjYzI0MTk5ZmU5M2Q1NTY4YTUwNTEyZTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjZDA0OTJkZDM5ZGY0YmNmODRkNWNjMGQzMGIyMjdlZjIwNWVkMjZkMDM3ODNkMTc2ZTlkMjc2OTk3MzNlMzIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/fabGeometry.ts#L61-L103",
+          "version": "repo-lines-v1:sha256:83dcb900f5b394ac0da52228b3b95e6cb5521a1fcdce3ef3a05033432b9be8f7:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ZWQ1NDA5NzhjOGYzYzQyNmY3MThkNmRkY2E5MjZhYzdmZWU5ZGFjYzZhZDY0Y2QxNDU4NjJjMTBlNTdiNDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0ZDY1MzllNTNhNmNmYTlkNGQyYWM4YjIyMGQ3ZjA0ZDc3YWI2MTlhNzcyNTU0NjYzMGI1MWM0ZTIyYjljZTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJhOWUyMjhhOTBiYzQwM2EyNjgyYTM3ZTkwZWQ2ZTIyZDA0YzFmN2E1NGIxMmJkNDhmNzJmMDIzMzQ4MThiY2IifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/fabGeometry.test.ts",
+          "version": "repo-file-v1:sha256:d5e1f96d50c18a1d6e800572ab9816c08c3053c82fe647aa229bf6aa44ccb1f4"
+        }
+      ]
+    },
+    {
+      "id": "claim_f3d14421971049869d7298658514ed26",
+      "statement": "FabAllowanceSpacer reads globalFab.view.routeMode (a pure route-derived tier) rather than view.mode, because mode folds in modal mutual exclusion (hasOpenModal leads to 'hidden') and following it would make the allowance height jump and reflow the whole content whenever an overlay opens.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0217-bottom-occlusion-allowance-scoped-to-scroll-content.md#L220-L240",
+          "version": "repo-lines-v1:sha256:470d374131643698e22d98b0a703955c7ffd91a07ea941f7943e28a3fe2d1cc7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlYzcwY2QzNmZkNTVlNmY0MzJmZjllNzQ0YmQ0MjlhMTNjYzNjYmQzMmM5YWU5NDQ0NzkwNWM4YTY1MmM2OGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ1NDRhZDFjYzJlNThmNDBjZDZmY2NkM2M2M2Y2ZGQxOTEzOWE4NzRkODQ3MGM0Y2NkOTZhZGM2NDcxY2UxNzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5MDQ4MmQxY2FiNDgxZTE5NWVkMDcxMDk2NmI3MDU4NmI2NDU2ZmNjODlkZTBiMmYwM2Q3ZjdlNzBlY2E2MDgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L12-L18",
+          "version": "repo-lines-v1:sha256:3c487917a5e90027d7cf5423841bc56ff1786d8e576a0643f2986505a0347264:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjIzY2I0YzEzZDY3NzU5ZDU0Zjc2NzFkNDQwMzQ5NzJkMDkwM2EzOWQwOGFmYWU3M2JiOTgxZWI5YWIwZGNmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzhmMDUwMmQ4YmU1MGFhYTZhNTU5NDc4ZmM4NjA3Njk4ZjI4M2Y5MGJkZjYwMDIwNGIyYzI2ODViMTY1M2YyNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2U3ZTc2YjcyMzVhZGMzNjMxMTFiOTRjYWFmMDU5NDBlZWExMDVlNGMzYjU1YTRmMDMxNDRkZWFiMDYzMjkxMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjlkYjBmOTNkMGVmMWE2MmJhZjk5NTYwYzI4NzU2OWUzODg3ZjdlYTg0MzE0MmI4YWQxY2IzMWUxZTFjYWVlYSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/primitives/createGlobalFab.ts#L200-L215",
+          "version": "repo-lines-v1:sha256:31e5f39d435b073e767d3e88005e1b0bc857f773ab47c4fb4f83aee2ee85a774:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MzMzNThkM2U5NWE0ZGViZTNmMzM0MmI1MDZmNTZlMmFmZjY2NGY0MjNkY2I2NTYzY2FiZmRmOTJjMzgyMWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU1MGU2YzM0OTdlMTQyNDkwYTEyODQ0NDUyNjYzZTY2ZjM2ZWY4MjRhMmQyMWYxYzgzNTIzMmQyM2JjOGM0YWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlkNjI5OGIwZGNiMzA4NGI4ZDUxMmVkNThhZDc3MDU1NjQ4Nzk1YjViNzRlZmQxYmE5MTUzNDgyMWNmNjE5YmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_067d42c6a47f477ba0f265896d84ec52",
+      "statement": "Waterfall <list> node semantics are insert = silently dropped, remove = leaves a gap, replace = misaligns, so the only structural operation app-lynx performs on such a list is appending at the end (verified by a device spike); consequently the occlusion allowance must be a new trailing full-span list-item or the last child of a scroll-view, must not be folded into the existing three-state footer list-item (whose v-if is false in the most common state), and must not be conditional or keyed unstably.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0217-bottom-occlusion-allowance-scoped-to-scroll-content.md#L85-L123",
+          "version": "repo-lines-v1:sha256:dd75f66446a382bdd6b61f32e53fbe244a47b127c655db7a2efa1406ed40ef75:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzYzU1NmI1MjYzYjE0ODc4M2U2ZTg2NmUwOTc1MGZmZTZhMDczNDU0NDU2OWNkZDYwOGE0Y2I2MzFmNjRiNjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiNzAyNmUwYTE1ZWE5OWIwYTdlNTEwZjA5N2RhM2JiMGIxYmIxZDBiOWE5NzdlOTQxYzFjODVlMTcyYTU5MTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzNmY1ZDdiNjE2NmVhMWQ5ODI3OGZjNzc1MmVkZGRjYzA2NDZhYzZhMjU4ZmEyZGY0YzY3NWUwMGNjYjY0MmIifQ"
+        },
+        {
+          "resource": "repo://docs/specs/bottom-occlusion-allowance.md#L93-L129",
+          "version": "repo-lines-v1:sha256:375d043d728bc1fa493942e7d774f504e7b6e89fd168d0790f109414e8200379:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViOWZkNDczYmQ2ZjI4ZTlkOGFkZjE0MGE1NTQwN2QwZTI4YjkyZjdlMjkyOWU3ZGFmZDkxZTE5ODdiNWM5MmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2ZWI0OGRmYjY2YTA0MTZjNWE2OTI2NGJlMTUxMTBlZTFlY2Y5ZDg3NDk4ZjFjM2U2N2U2ZDFiNDYzOGI1NGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdiMDI5NjlmYzdhYzllZmQzZjNmMWZkNTdiYWY1OWM1M2UzYTlkYmExNGJhMzMxNTNmODUzMzA4NzY3M2E4ZWIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L72-L79",
+          "version": "repo-lines-v1:sha256:f0a619d8f4698683618832b8f7b1ba0ce1e0693ad2976679c095b463a71f402c:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTAxZWFkOTM2YTIyODFkNTNkY2MwNjRiN2UyYTJhYjBkNTNiOTJlZjNlZjdiMzRiNjY4NjczMDA3ODk1Yzg2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjRjNjZkNjYzOTMwNmIwMzVjN2M1YTJkYzgzOTkwMzdmODNlNjhjMTI4OWIwYWZhZTU0NWIxYTQ2MTZhNGE1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTNiYWExMTk1Zjg3ODhlZTQyZjMyZWFiZTVhYTc0MDRhOTk2MjkxMDhmYzM4NGQwZjc4YjE1NDNmOWI4NzM2MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjRlN2E2NmU1NGQ2NTBiZDA3MmE4YWQ0OTRiODA1NWU3MjJiYzEyZGFiMmFjNGQwMmJkMTc5MGJhMzhiZTg0NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7190ffd87b28462781dcaf4f7aaf35d1",
+      "statement": "The occlusion allowance must read its height from utils/fabGeometry.ts and never from a Tailwind spacing tier or a literal: tiers are compile-time constants while the FAB geometry is a JS constant, so they are not the same source (measured — changing spacing.18 to 30vw left the allowance frozen), and the follow-through only holds because GlobalFab.vue and FabAllowanceSpacer.vue import the same JS constants.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/bottom-occlusion-allowance.md#L108-L116",
+          "version": "repo-lines-v1:sha256:bd34abb370890491d1e1aa916dd42635e0f9b75298bf80495025588bd27664fb:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZjM2M2Y2I0NjM2ZmJlMTI4ODM3NDRkMWMzOTMwYjdhYTliYjAxOGI2ZmZmMjc5Y2YwNDRkNWM0ZjRiM2VjYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmU3YTQ1YTQwYjhhNGJjNzI1MzRjNTJkOWVkNWUwM2UzNmFjNTJlZTlmN2FlZmIxZjMyNmY1NTA0YWNlZmNmMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNkMmIwYTVjODQwOGMyM2VlNWExOTE1ZjA4ZDgwM2EzZTBmYmNmNDEyOGNiYWZhOWZjZmY1M2U4NmM4M2I5OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzBkOTJmZGM1MWEwMGM3YmU5MWM4ZmVjYzM3MGUzODFmYmQ5MWUyNmM4YTMyZTJmZWM0MWRhZTNlNDlkMjFjOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/FabAllowanceSpacer.vue#L66-L71",
+          "version": "repo-lines-v1:sha256:225d01c634d281f0a65f4181883508963cf1ea0d4d9cc52c3d007538ccc70114:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGQ1YmU1MDQxZTc4N2I3ZTU3ODY3ZWExZTYwZjA1NmQ0MjllOTJjYzViZDViNmQxYjg3YmM2MzAzZjU0Yzg1ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWIxOTgwNmZiMTlmYTg0MDdhMDMyM2RlODY4ODM2MzVmNmMwNTYwMmZmY2MzNWRiOWZmNTZlZjdiY2I3NmU4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzA5ZDM2ZmYwZGIxNzA0NDBjODUyMjk4YjA0N2UyMmFkNmRmODlkZGNmODY3OTNhNWE1NzJjMGE3ZDEzNDMzYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWMyZDc2OTQzMjRhMzI5YmM3MTM5YmM4OWUzZDI1OWE2Y2JhMjJiMGFmNWVhYzE1OGVmYTcwNTE1ZjNhMGNhOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/fabGeometry.ts#L1-L31",
+          "version": "repo-lines-v1:sha256:ba4ea8ab9e52ffd02e33ad071f89d5df11a1c5f520a611335d118a21871a0ee0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJlZWU2M2U1N2U0ZTczOGVhN2QzMjdiNGZiMjhmNjIxYTgwODRkYjJjYmEzMTFhM2E1ZGM4MWZkNTIwMjVlZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3YTZmN2UyODZlNzljMTc5ZDYzYjBmZTZhOTBjZGNjNDdjZjYxNGM4MGEzOWRjYTM4NmZhODZkZTkwMzQ4NDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2MGUxNTNmNTdiOTEwYTI4YzhmMmYzNzU1NTI1MWQ0NWYxODI3MDMyODUxNWM2Njg3ZmEzNTZmYWZkZTcxOWQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e930e0d670d046eebce06fe11455a01d",
+      "statement": "Occlusion-allowance coverage is policed by a gate that reverse-looks-up pages from router.ts (rather than a hand-maintained page array) and names the specific unwired page and its fix, with the current coverage being 17 pages; a DownloadManager hand-written h-[30vw] was 310px short and now uses FabAllowanceSpacer.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0217-bottom-occlusion-allowance-scoped-to-scroll-content.md#L130-L155",
+          "version": "repo-lines-v1:sha256:d4342dd28c7d8d5bdf4bb8968ce824e268bef5cd03a9941c959d4bc2d97d6e62:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1MGM5NzAzZGZhOGNmMGRkMGU2Y2VmMmRlNTFjYmUzYmVhN2E1MTE5N2MwZTQwZmMzZmEzODcxNzg5MjU3MjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhNTI2ZjZjY2FmYjEzYzhhZTA1YjVkMmYyNTMyMzE3NWY3NDYyZTYyYjAxZWY1ZmMzMzc5Y2VmM2Y0Mzg5NWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5MTFkODNhNDA3ZDE2MTM0ZTU2YzY4MTMwZDUwZTIwMzEwMTRlNTMwYzJiNTI3Y2M4MWU3Mzc3NDk5MzkxYTYifQ"
+        },
+        {
+          "resource": "repo://docs/adr/glossary-bottom-occlusion-allowance.md#L35-L39",
+          "version": "repo-lines-v1:sha256:575a0e09b9b315a0b28c8b9989cf7f69be34837c77b3e2d7292ca25ec32a759a:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM0ZjU5MjBlYjhlNjU3NTc0Yzk0MmZiNjg4NTVkMzJjYTUxMjY0YjU1MjEyMDAwMzEwZjNjZjBlYzViMjM0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzA3Yjg1MDJjYTI1M2FiNTU2N2RkYjM1ZTQzZjRhYmMxNzk4MDNiYjJjNzgyNDc0ZGM0NWFiNDM5ZjE0Yjc2YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTRiYzU2NjkwMDRiNzcyOWQ4NzY5YmNmNTgyMTc4YjAyZGUzZmE0NGU2YTJiNjUxNDQ4Y2NhNTYxMDM4ZjNlNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjE2YTliM2I5OTk4ZjlkOTlmM2Y1ODEyMTdiYzNiODYyMjQ0ZDc2NDk1ZjY1MGM0MmE0NTEyZjRhMWYxNjUxOSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/bottomOcclusionAllowance.test.ts#L574-L653",
+          "version": "repo-lines-v1:sha256:fca335f0f6e747f0b779a15760e54344601c363ca5077fbd5e8df2673dec32fb:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxYTJhY2I3YjIwNTg2NGRlN2ZjYjc4Njc2MWY5MWUzYTUzNGMwYWQyMTEwMTJlYzkwNGRhZDE5ZDM1ZWJhMzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZiYjFiN2FiYTljOTNjMTZhNTI3YTcyOWFmMzZmMzdjMjc3YTk2Yzg5ZjBiZWMzMzgxZWQ3YTg1ZGViNzQ4ZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzNTlkMmJmZWU2YzdlYTFhNWYzZWUwMzY3ZmE0NjgxYTZhNGJmM2IyODVmODIzODk4ZTk0ODZkMjMzM2Q2OGIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8d74e463b9da4ef889cf2998c7cbffa9",
+      "statement": "utils/fabGeometry.ts is the single source of truth for GlobalFab geometry: FAB_SIZE_VW = 14.933vw (56dp) and FAB_EDGE_VW = 4.267vw (16dp, one name used twice as both right edge and bottom edge, so vertical clearance depends on the bottom edge only), and FAB_BOTTOM_SEARCH_VW = 43.734vw is derived by lifting the search FAB above the paginated menu's 42.667vw panel top so the menu's first pill cannot be covered and tap-swallowed.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/components/GlobalFab.vue#L35-L55",
+          "version": "repo-lines-v1:sha256:08929787437b50f2b336856bc10761f4522c758cda4e5b5f7dc720485198e7de:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExMDgyYmRkNTJkNWQ1MjM0ZjM4MWNmNDNhNjJmYzNiYjhiNWY0MzYzZDdjNjBiNjcwZTJkNjVlZjg0OGI1ZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjNGZlNmQwMGZjZmZmNzZhYTMxM2JmNGI1MmZlM2Y3NGUzZmUzNTRkYTkzOWQ3MjkzYzIzNGVjYWVhZDA3MDAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyMjY5MWNmZjI1Yzc0NTdmNTUxMTAwZTkyYzZjNzFiZWVlYTRlYzgzNmEzN2FjMzYyNGY3OWU3N2U3NDJhOTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiNGM0NWJiMmE2MmFkZjFhYzNjZWNhNWZhOTg1ZGM4YWI0OWUwNzg2ZjUwNjM4YzA1MTk5Zjk0OGIxMDA3ZjIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/components/GlobalFab.vue#L84-L88",
+          "version": "repo-lines-v1:sha256:19531bd764730c8be94d3676e07ab869ff9b0ef73021d0693cb987427149fbd2:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTdkZWUyNzFiOWY5OTM1NTk0ODAwNDhkNWZkMjU4N2Y3NmM2YTdkOTNiM2I2NWE0NGI5M2Q0ZDI2Yzc4NjUzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzgwY2IyMGNkMWE1OTJjYzdlMTYzY2YyNjJhMGYxNTUxYWUyM2Q5NDZkYjFkZTkyNzZhNzU0MmU5MjQwNTYxYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzQwYzVkM2RjM2E3NzMwNzkzYzg5Mjc5NDhiNTU5NjY0MjA3Zjc5YmE4Nzc3M2MyMTUwMDQ0MzE5NjJmZDQ4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGU3MDk2M2Y0M2ViNjk5YTJjNjBjZmM3YzcxNDdhZjQwNDlmNjliYmY3N2M3YjQwODRmZTExM2Q1YjRhNjUwNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/fabGeometry.ts#L27-L63",
+          "version": "repo-lines-v1:sha256:e5366f34f0e8fdf5a39ac288bbacb235c4f6b2adbd1979160f3055107e320bd0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1ODE3OGY4MjFjMjgxOWUzNDczODBiNmIyZTUxZDYwZDEwYjU4NTZkOGU4NmUxOTczZTE4NTY2ODk1MDJjOGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmODdhZmM0YTNhM2I0MTc2NmNiMjZiM2I4MTg3MjBkYjliMDM3MGNkOWIwYjAyYTJiODgxZDNmMzYxYTdkODMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3ZmMwZWU0Mzg2Nzk0YWVkYzIxNWVkODgxYTM4NTA4NzBkNzE5NjA0OWE3NWI1NjZlNzZjN2I4OGMyYzI0YTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YWViN2Y3MTU2MDQ5NTNiZDFlNjM1NjU3MGRjOWVlYTE2M2NhN2MzZTJiZDEzMmVjZTU4MzdhNjg0N2RkNmUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e610bca1e7a4bb587a844b041c058c9",
+      "statement": "The GlobalFab horizontal occlusion band [FAB_BAND_LEFT_VW, FAB_BAND_RIGHT_VW] = [80.8, 95.733]vw is derived from the same two constants and is independent of route tier (both tiers project identically; routeMode only changes the FAB's vertical position), and its width is the FAB body alone because the edge gap is not part of the projection; because native LynxView does not recognise pointer-events and hit-testing takes the topmost element, anything inside the band is deterministically stolen by the FAB, which is why ADR-0221 moves in-row actions to the row start as a 40dp round icon button rather than adding horizontal allowance or collapsing the FAB on scroll.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0221-row-action-leaves-trailing-band.md#L11-L71",
+          "version": "repo-lines-v1:sha256:ffbe3fed77e8bbaba0934da99ad55b7c1db0ee782307abb774705db2b8cdc569:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1ZWVkOTBmOTY0NThkZDU2NTNmZWVjOWE1ZmMzNjM3OWQ3N2JiMjBjMjhhY2UxMWE1MDg4ZDE1YmEyZmE1ZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1ZDcwMjM2MzQ2ZTdiYWMxMmMwOWI4NjIwMzBiNTllZGQ5ZWEwN2RkY2I0NjdkY2Q1OGU5NmJiNjE4OGZhYWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+        },
+        {
+          "resource": "repo://docs/specs/row-action-leaves-trailing-band.md#L10-L41",
+          "version": "repo-lines-v1:sha256:12bd0592739093942da37e8550126e68db38de7b2551dda02a3e67f44b352f85:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwYmExOTg3YzhhMTg0OWY1N2FjYjlkYTUxMTE5MjI4ZDQ2MjkxZjIxMDg5OGM3ZDYxZmYzNDVhMGRkM2ZjNWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0YjU1NWVkNDIyZTM5MTMzYjBmNDgzNDQyZWE2Mjc1YWQyN2UyNDVhY2I0OGVmZGE1YmE3OTU3NzdiNDk1OGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/fabGeometry.ts#L105-L156",
+          "version": "repo-lines-v1:sha256:6de4c34933a452c44951f6db5a90eb3df936bee507300cdc43a9951c127d8dae:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzMDNhYzhjMDE2NTZlMWExMDIzMzRkY2NkZDUxYWMyNDM5NDA2MWQwMGIxOTUxNDU1ZTYzOGYwMWFlY2UyNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhZTE0YTk5ODdiMjA1NmViNzFiYzkwODk1ODU3MjE1Y2UyMWQ1ODQ1MGQ1Y2ViYjE1NTNkOTQ2NDJkZThhMmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUxYWRiZGJmYjM0MDUxNzU0MGYwNzcyMzQ0NTFmZDZmZTg5OTBjYTI1ZTg5NTQ3YmYxYTIxYmJlMmU4M2Y2MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/fabOcclusionBand.test.ts#L111-L186",
+          "version": "repo-lines-v1:sha256:b768bce16598e92d974db57650b1058e43ab886a5fc8cb0c1f9eaf2cadb2051b:eyJzZWxlY3RlZExpbmVDb3VudCI6NzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5NTI4ODgwYTZjMTZmYzFkYjk0ZjlhMzk5ZDI5ZDJlN2E4OGVkODk5MjQxNzFjNGU2MDYxNzg1NWVlODVhNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyNjlhMTFjNTY1MzY0NDhmMjVkOTllNDk4YjlmM2MwOTMzMWU0MzRjZmFmYTQ1Mjc5YzVjZGVhYmU4MjA1YjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI1ZTk4MjgyNmZjODUyZDI1YTk1Y2RkZjlkYmQ5MGNjODdjMzhiNzIzMzAyMTVjZTkzYWQ0M2FlNWY1ZjU2ODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkMzY5ZjE1ZDc5OWJkYmQwZjc1Yjg5NzlhNjVkZDllMTY5NTlhZTEwNjU4NTYwMzkwMWM5NzY5ZTU0OWE0YTcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f280c96ab19d4cf1ac9336c72affa009",
+      "statement": "Immersive viewing is the conjunction of in-app chrome hidden (frontend) and the system bars hidden (native plus the insets pipeline, which drives safeTop/safeBottom to zero): useImmersiveChrome holds chromeHidden as a page-local ref plus a module-level single ownership token storing the current owner's release action (a new owner forces the previous owner's idempotent release first), chromeSuppressed is derived from that token rather than kept as a second boolean, toggling is manual only with no auto-hide timer, and openOverlay exits immersive before opening a comment, page-picker or bookmark overlay.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0213-immersive-media-view.md#L75-L81",
+          "version": "repo-lines-v1:sha256:6625e26cdb42a687f1555c01149755692e193c5b02605403cb4f46bdf20fd09d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2M3MWNkYzgxNTRmNmZkZTYzNWNiNzczYzRlMGY3YWJiMDJhZWM2ZWVjZGZlYzI2YTY0YmYxNzdlYjhmYmJkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODk1YWEyMzNkMWRhNzAwNGFkZGQyMGE5OTgxYTI2ODc1NDRhY2M1ZjI2NjA5ZWU4MDdlOWEyNzAwNzc5ZjI5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzU2MmU0NDhkMjc5YTBlYWY5ZjUxYmRmOThhMzY1ZWQ3YjAzNjM1N2QwNjg1NWFhYTIwNjNhMGZjZDBjMTE0MiJ9"
+        },
+        {
+          "resource": "repo://docs/specs/md3-immersive-mode.md#L119-L167",
+          "version": "repo-lines-v1:sha256:a5216c3636d927afeee86fa5cbcdbf8a061193eb800f49aa4f628eb3c608991b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyZDNmMDU4OTZlZDMwY2NjYWJjNzFlYzdiZGQyZGU5ODFlOWYyMWJkNzcyMTQyZDVkYmJmOTE0ZTVmNWFlNWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNmMmI5NzU0YTM0NjFhMGVjOTEzODE5OWNlNGZjZjQ2ZGFmNTZlYzVhZjUxYTA3MDFjYmY4MTk1ZDBkZGRiNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5MmY0MmE1NWFlMzFlNGZjNGEwYjZlMDA4N2YzNTVhOWE1ZDdhNDhiN2UyMjFhMjI1MDdhYzE3ZjM0ZDc0OTMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useImmersiveChrome.ts#L62-L132",
+          "version": "repo-lines-v1:sha256:5838fc6ca25ab3d1463f4b4bf658247b0ae07147e26c741a67cecafd17d08543:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhY2M3ODkwY2JmNzY0ZjQyZWM4ZDQwMmRlNDUyNzdkMjJiOTI1MjQzM2RkZTNmODMyOTc1MGEzMDkxY2RkNDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMzUyNTg5YzM0ZDNjNjA2ODU5MzFiNmVjYzRkNTA5OTFhN2M1NmM4ZmJhMjg5NDExNDY1NzY5MDI3MmNhYzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNThmYzM1YTk1ZGFjZmM0NTkyZGEyNWFkZjk1NjNlMTIxMGQ3NTQzMjI1ZDI5NmIzMzM0YmMwYWE2MDVmYjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2YzUyYmM4Y2ZiNDQ0ZTgzNzllZGRlODVmYmU0YjhjYzFiODhjNWFkMDg3YmI1ZmQxODVkOTY1NmRkYzY1MzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_00b335bc8c424d28af3cc20ec500efc4",
+      "statement": "Immersive release is one idempotent exit in the host page with a fixed order — exit() (clears chrome and hands back ownership) then onImmersiveExit() (system bars fall back to the user's fullscreenMode setting, never a hard-coded false) — wired to both onBeforeUnmount and a back guard that returns false so the guard decides before the history stack pops and the previous page never renders a bar-less frame; the immersive path must never write the fullscreen persistence key.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0213-immersive-media-view.md#L182-L196",
+          "version": "repo-lines-v1:sha256:9b07fc67ca9fec7afc72f6d82e6005f1f31075e9f1dafcd1891c2178e24d647a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3NDM3MmZhZTkwYTMzYjE4NDVjYTVmMDAxN2FmMDMxODQyNTgyYWFhNTcyODcxOWZjNTI1NjE5ZjhmNmYwN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwNDU1OTc1NWNkY2VkYjVjZWJjZjQ3ZTMxZTlkMjA3MTY5OTM0MWM4ODFlOTc4YTFlMjk4YTU1NTNiZDc3ODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwMWQ4NWVmMDY3NDA3YzNlMWVjYjYwYzA3NGQ4NGRmYjg1MzZiNzk0MzhlZWQ4N2I1ZDY1OWMyODY1Y2ZmNzEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useImmersiveSystemBars.ts#L17-L64",
+          "version": "repo-lines-v1:sha256:278ea0a5117ee686eb8b8967d8ccbd21b836593963b3d3ad86ca9aaa22452245:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4ZDEyNDUxZWVjNDJhNDhhODU2NDNhM2E0MTE2MGRjYTFmNWNkMzkxNzBkN2Y5OGFkYzhiZjk4ZDhjYzZiOGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwYmU1Njc4NTdlYjg4MzQ1NTFjZDE0ZjEzZjJmNGEwYTYwZWM1ZmM1OTAxYjYzZmVlODk4ZTFkMzRmYjE0NjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ1YjFhNDVlNTVhYTMzMzU3OWM4ZDYyYzFmZmQwYzFmZWZkNjNhYTI1NjQ5YTk0OTJiMzE5YTU3M2MwMDcyNGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/pages/IllustDetail.vue#L139-L169",
+          "version": "repo-lines-v1:sha256:05d3a28b6807c1f51ff1fab8178009228895722d0a4ceccbdd7b7d4c1480ead5:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkOTdmYmQ3ZDIzZjM3OTcxOTAxNjMzODRjNmY3MzU4YTVjMWRiOTQ5YjNmOTk1YTE1MmRkMjAwZjE2MDk4M2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxMTdjOGZhZTY2ZTBkMjMzOTRjMTY4MDRmYWU4OWUyNDdlNDQwNjU5MjBmMWM1NzQwZGRkMTQ2NjhiYWRmYzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyYTEzY2U2MTRhYzE0MTIzN2Y2MDY5M2RlNWYxOTZjOGExODJiYzJjMWVlZTFjZWY0ODk5ZDVmMTI3YTA2YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBjM2MwNzI2OGFiYmQ4YmQxZjVlNTRmNGQ3NjY4NDQyY2I3Y2NiNTFhMDExYzRlZTUxOWZkMGFhMmQ3MjIzOGMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b961a182c97341efbb3640ff5abcafa5",
+      "statement": "Immersive mode swaps the page root class to a literal bg-black cinema backdrop (utils/immersiveBackdrop.ts) instead of an MD3 surface role, because the MD3 surface family is light and a portrait square artwork inevitably exposes page background below the image while stretching distorts and cropping discards the artwork.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/pages/IllustDetail.vue#L458-L458",
+          "version": "repo-lines-v1:sha256:cb58b1674cd520473f7f9637b80596c06052462c5f9abd30409833bda31d77ef:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2I1OGIxNjc0Y2Q1MjA0NzNmN2Y5NjM3YjgwNTk2YzA2MDUyNDYyYzVmOWFiZDMwNDA5ODMzYmRhMzFkNzdlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2I1OGIxNjc0Y2Q1MjA0NzNmN2Y5NjM3YjgwNTk2YzA2MDUyNDYyYzVmOWFiZDMwNDA5ODMzYmRhMzFkNzdlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODMxMjEwOWYzNzA1NTlkMmM0NjNhYTBjOTU3N2U2ZTM5ZWUxZTFkNjJkNmI1OWZkOTM0MzY4ZmI0MTI4ZGQ1YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODlhZDFiMDRlNWZiYTZiOWNiZDNiOGZhZmMxNzdjZWE5ZTU3YjM1YjE2MGM0ODRkMDY2NzFhNGI3ZmQzOGJiZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/utils/immersiveBackdrop.ts#L1-L31",
+          "version": "repo-lines-v1:sha256:d89bdcc90d6e2838749914f7d36f6861abafc0c6a32f54130e5111a1b5a9b0f0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3MmQyOTc4MWY1NzRlNGM4ZmFlYTRkNDVlN2M4NTVhNzUwZDE2NWJlOTljMjE0YzBkMGY4MTZiNmE2NDQzMjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5762829e5d294edc98379b40f20e6eb5",
+      "statement": "composables/motion.ts is the only source of motion durations and curves and adds no token: MOTION_DURATION maps fast/normal/medium/gentle/longer/loop to the existing --duration* tokens (150/200/250/300/350/1000ms) and MOTION_EASING maps standard/emphasized/accelerate/decelerate to the --motion-* tokens, with standard and emphasized officially equal in value; MOTION_DURATION_MS is a numeric mirror needed only where JS needs a number and is kept honest by a gate that parses tokens.css at run time and compares tier by tier.",
+      "evidence": [
+        {
+          "resource": "repo://docs/specs/md3-continuity.md#L210-L226",
+          "version": "repo-lines-v1:sha256:04de83f2f71dd20c56fe9a80ce09e2d9b682eb0f0db4843695309c5e20fdc7ba:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0M2UwYWRhZTA5OGM2M2ZlZGViMzQyMTUzZjRhZjlmNjY0ZGJjMmU3NjVhMDA3ZjczNjAzNDFlN2JkOWU1N2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5ZDUxYWQxZmIwNDFmNzQzZTA2Mzk1OGRiZDFjNTgyN2Q4YjAyNmQ1MGQwNWI2OGFhNzQ0MjdmOWU5NWUxNjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3ZTZhMzEyYjc4MjgwZGUxYWJhZmYzMWFmMWZjNzNkNTA2YzMxZGMxZmM1ODhiYTA2OWE5OTZlNjUxOWQ4NjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L33-L96",
+          "version": "repo-lines-v1:sha256:b205b7f8a1db3b70ea03b12ad7a203a93c56d2872512710274e8a58a2a1a8cf1:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiNGQ0YjMwZjY0MGIxODMxMWJmZTQ3OWU1YmFiYjZlM2E3NTY1NDY3MDk3Mzc1MWM1OTJkYWU4OGU5NTZmODYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiZDAzMGQ5OGYxYWNjYjI4YzM0NWZmY2YwNWM5ZTY2ZWI0MGVmZjMyNTNhNDZkMDMzYjE4ZTExNmFiNWUwMzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBkZjRhOTBmNjI1NTZlMGIxNGM4NDlhZmU4NzU3MjZmMjcxMDVhMmFjNDA1MDcwMmQ3N2FmYjE4OTBkOTMxNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc2MzhhZmRiYzAxM2EyMTBjZTkxOGQ2MzRmMTNkYmQ4NDQ5OWMzNzQ3ODQ1ODE0MTQxYTRlYjYyYmMzYjNkNTIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/motionContract.test.ts#L183-L256",
+          "version": "repo-lines-v1:sha256:afc567242fb0396344b9220e0998f2f4595ab0f7b4eb2cc46b009e6f8cde30c6:eyJzZWxlY3RlZExpbmVDb3VudCI6NzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4YmY5NDA4Zjg5NjIyMzRhNTk2MTA0OTExYzkwOTIxNGRmZGM1MDE1MTg4NTVkYTAxMTgyNWJlYTcwZTFhM2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyM2EzNDczMjI3MjJlMzVjMmNkMTdlN2E0MTQ3ZjQ2ODVhMzdmNDBlZWQwMTZlMjM2MjZiMDJiOTQxMzQ5MTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJjMjBkM2FlMmQzMTBjMmI5NTE3NWM2YjY0ZTgwZDkxNWU4OTk2YjA1NTkyNWIwOWUwMTI4ZDMxODQ5MDZlZmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4MGQ2YTVhZjllMTM2NzZjNDMwMzkyMGY0NjAzMWM2ZDc5ZTQyNTZmOTgzMmY0YTE2ZTM5MGNmNGU2OTAwMGMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7c63363cdac64a9cbdce0209cec1f362",
+      "statement": "Motion has two non-interchangeable carriers decided by the engine's actual transition coverage: state-layer colours go through literal classes because .transition-colors covers background-color, border-color and color, while opacity, width/height and transform must go through inline :style values, and box-shadow gets no press transition at all because neither verified carrier covers it — attaching transition-colors while expecting opacity to animate is a silent failure and the gate checks the carrier rather than the mere presence of a transition.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L162-L208",
+          "version": "repo-lines-v1:sha256:881775f13fe5c776c280f1ea9780abe0b76abae6b9dd20a74084def6adb40fb9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkZTNjMmFhMzNhNTFlMzA3YWE3MTMxOGJiMGM4OTJjZTBlNjBhMWM5MGE5ZmEyZGU0OGI0NmMyY2ZlYmE2ZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlMWExNGU1YmVjYzBhZDU0ZWJmMmUwYjZiYTZiYjFmNjBjZTA4MThlMTZkYzU0NzEyMTk3Y2Y4YWRkYmNjMjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY2Y2Y3MmMyZTg1NzFlODE2MTQyN2MwMmU2MjZiYzlhODE5NTA4ZDk2YzEzNzc3N2IwZTBjZTkxZjRkM2VmYTQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L98-L148",
+          "version": "repo-lines-v1:sha256:2ee56cdcd93c8a0c4d52b1c07793f2d7c46ef906321906ae1c90f9e0e20531c6:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiNTgwN2EwMDVkNDk4Y2NiY2NkNWIyZTlkNDRiNTJjYWQxMmUxMWJkMTY0NDM1ZThkZGE3NDhmZTY5ZTk0ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiNTgwN2EwMDVkNDk4Y2NiY2NkNWIyZTlkNDRiNTJjYWQxMmUxMWJkMTY0NDM1ZThkZGE3NDhmZTY5ZTk0ZWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExMTI5ZDIyNmVmMzE3NjY4NmE4MjJkNTllNDdjNzlkMjE1MTdmNzQ0NzA0NTNlYjJkMjgzOGMyYWU2ZWM2MzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiNGYyYTRhMGVkMDI3MDZkY2UyNGI0M2RmMmZkZDA2NzMzN2ZmMTdiNGM4ZmE0YjQ1MmE1MTM5YjRiN2IyOTgifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/pressStateLayerTransition.test.ts",
+          "version": "repo-file-v1:sha256:4c1b13db9f0f0d60f92e199e5ff03efd45b7b9864633dca09e44aca5d5047fc3"
+        }
+      ]
+    },
+    {
+      "id": "claim_f0dc7d92a860495d92f21f1ab271d644",
+      "statement": "Motion class names must appear as full literals inside motion.ts (Tailwind's content scan includes .ts), so the class form is a literal registry keyed by tier name and anything parameterised by data such as the stagger delay goes through an inline :style value; a run-time assembled class name yields zero rules in the artifact, zero motion at render and no build-time signal.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L140-L161",
+          "version": "repo-lines-v1:sha256:33d8a8bc83a0a6a31ea3b647e6c47ffce5673bac9fc5e4b574c039b56edbbc30:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhYzRlMjc5NmNmODY5OWU0Yjc3Y2YxYWZhNWRmYTNjMWU5OTRkZGVmMWJiZDJlYWJjYmI4ODQ1NGUyZDEyMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0MjE1OTUxNzk3MTM2MGU5ZTZjZmNjNWJlYzkzNjdkMTMwNTAwYTc5ZTEzMDY4MTU4ZmM4M2U1NGMyNGZiNWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg4Yjk0Mzc4MzYwYzM2NGFjNjhiMTg5MTdhZTRlZmVmMjFhNTFiNDZjZjk5NmMzODdhOTQxY2RhMDQwZmJiNjcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L106-L138",
+          "version": "repo-lines-v1:sha256:31c7a996440e5b1e62a9fe9a7709811d816c8a16157512741ea76cb6aef3e1f2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2MjA5ZjE2ZTM3Y2EwYmVlMDM5ZmNmZGQ0ZDkwYzQ5OGM1NDRiZDBhNTU4YzM2YTRmMmI5ODU2M2U5NTZjNWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1NTQ0Y2ZiOWMyNGZiMzAyZDcxMjZmM2YxNTg2Mzk3MjkwOTRmMDM1YWM2MTA5Njk4NDUwZmRlNDE1YmExZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIxYTM1ZDBlMGExMTM3MGE5YzgxNWFlZDVhMWZjNGY5MzkzZmQ5OWZjYmY4YTRjNTA2ZDg4NGVlZmQ3NzRjMjUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L6-L14",
+          "version": "repo-lines-v1:sha256:750bed017804c826b07665c6c48ca4b978bed85f9f51d70561ae51d39c079a29:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2UwNGZiMGU1Yjc5Mzg4ZDFiOGIzY2M2YjU1MWYwZDQ2NjcwZDkwMTRlYTc1NzFmZWExMGMzMjEyODhlZDY0NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTAxZWFkOTM2YTIyODFkNTNkY2MwNjRiN2UyYTJhYjBkNTNiOTJlZjNlZjdiMzRiNjY4NjczMDA3ODk1Yzg2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTM4YWNhNzkzOTlhNTQxNWYyZmYxZGZhZWRkYzcyZmY1M2M4OTFmNjQ2MjRiMzUwMjNmNjAwMDRkMzkwYjRlNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjYzMGI1ZDhjNTExNjI3MWMyZWYwYWFkZmVjODRiMzBiODJhNzYyYzY4ZTliMmE5N2EwMjc0ZTRhMDhiOGVkZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c846ba9e7d24ae39592124029baf82a",
+      "statement": "Tailwind transform-family utilities (transform/scale/translate/rotate) are dead class names on Lynx: they do produce CSS rules, but those rules reference nine --tw-* variables that are never defined (the preset emits no base/preflight layer), so the declaration is invalid at computed-value time and transform falls back to none — the operational criterion is whether every var() in the declaration resolves, and transform written inside a @keyframes body or as an inline value is fine; hover-class is in the same silent-failure family.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L317-L360",
+          "version": "repo-lines-v1:sha256:8cba88fdb5b9d5126323cb116edb231419960360b0390bc5fad93e879ac6b045:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2OGUwYWMxNDk4MzI2MzRlY2RiNzA4ZWZiY2NmMzY5MTk2MjdjYjczZjM5NDY4YjZhZDQxZDgxZDE4MjM5YjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2OTg2NjM1ZGQ3ZDc3NDUzMzkzMDIwMzY4ZGJlYjNmNTg4Mjg1NGNhMWMxNzA3NWVhOTdjZTAwYjJmNzlhY2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkYjBiYzNiYzEyN2RjZGY0Nzk3ZWViNjYyN2YxMDA0ZWJjOWU5MDBmZGFjZTg5MTJmMjBiODE2NDU5NTg4MzcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L15-L21",
+          "version": "repo-lines-v1:sha256:4f251acc4ce6749454edbbb24571448c8b6f3e34dc53b80d9b8873b666ab6708:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGJhOTRlZTc0NTQ3MmRhNjk0MTVmOWMzYTgyZDdhMmY2M2MwZTY0OGU5MjVjMTg5NTc1Y2U1NmQ2ODEyOTI2OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTAxZWFkOTM2YTIyODFkNTNkY2MwNjRiN2UyYTJhYjBkNTNiOTJlZjNlZjdiMzRiNjY4NjczMDA3ODk1Yzg2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTZlZjU2ZTI1OTJlMDRjMWJiOTI4OTRmNWM1MTE4MmVhM2NkNzliNTllM2E5N2U1NjBkMjhmOGZhZmNjNWVhNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWRkODI4NDdhZGZhMWZkN2I3YWRiNmI3OTVmYjc4MzVmYjM1OWEwMjg4NzdhNjQ2M2IyNTFmMWQ2ZmI3OWQ3ZiJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/motionContract.test.ts#L328-L399",
+          "version": "repo-lines-v1:sha256:9b343d56c8fe8a125b3e9f8132508274b9bbff6a6bec6027ffeefe1927cd3a61:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjNDNmOWZiNDNlNTFlNGQ4NDU2M2QyMjAyMTJlM2ZmMzIzYTA3ODE0MGUxZmMwZmNiMmRkMTFjMWU4MWRmNTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlMmNlM2ZkYzMyNTAzNjNhYmFlNzQwMGZlMTUzZWM4NTNiMmIwYTVhZTFlMDEyOTc2MTJiMGI3Y2JiNDMyN2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI4MGFhMDRiMDRiN2Y3ODM5NzA0YTZlNDRhNGZhOGEyMTBlMzFlZGJmN2FmY2I1YjhkNzM5NjA5YTI4OGVlYTIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_df159adb60e24eb5b4bc17f12b66f463",
+      "statement": "Because Lynx has no transitionend, exit animation uses an explicit two-phase protocol whose holdMs timer is sourced from the same duration tier as the animation and must zero out in lockstep under R1, otherwise closing a sheet leaves a window where the animation has stopped but the scrim is still present and not responding to scrolling.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L209-L235",
+          "version": "repo-lines-v1:sha256:d1bb1327339b516e03f93a630bb6e4cf48d61f76ff3c0dd25de796c6ac40df67:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2ZjZmMzkzMjk1NWU3MDY1MDg2YzE4MWIyZTczZTM1ODY1MGUyOWRhMGI2MmI2ZGZiNDE1ZDQ5ZTgyMDc1NjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBiNjA1MDU3N2U2OGY2ZDk0MDY3ZWU3YzJkOWQ3ZjAyN2Y5NTEwNWM0YmM4ODIyNmQzYTBkNzg3OWI5MmQ2YmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkYWYwYWRkYTVjMmExM2NjYTFjMzAwMDJhNjlmYjk4MGQ3MjFiZWU0MTdhNWYwMDIyMWExYjY5YzE0OWZiNmMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L169-L175",
+          "version": "repo-lines-v1:sha256:ab5dde338ca335e0e08fc6cd87a714248cc1cd9c4b4428a074cff96b641093f1:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTA0NjMxNDAwN2U2YTU3ZTg2YmZmNGZiYjA1NDk5MTgyYjgwYzAyODUzNjBiZGYzNGUzODA0YWM0NDkyNWMxZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmM4NGE2NTlhNTFkZDBiNTIxZDIwYjc0MGE1MmQ5Mjk3YjRiMmRiNGRlMjNhMWE4MDNmNjUxMzg1Y2ExMzVlNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGZjMWUzYjhlN2QxMmVlMmJjZTdiODQ3ZjZiNTQzMDhmZTAxYzRkMzA5M2NiNDg0MDk3ZTU5NjRkZDA1ZDc3MSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L267-L283",
+          "version": "repo-lines-v1:sha256:ad6d6e7cdcc850174b2fc1a9b2141220873d699859ca45a1354c8cb1943650c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0ZTU5NTU4MzE3MTZmZmRhZjUyMTkyNjRiYTVmOTYxODU5OTcwMTk5NjBmMTEyOGEyZTk0NGU4NmFmNmI2N2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3MjAxYzNlNTQ2Yjk5N2M0NzI2YjFlYTk0ODgwMDM2MGMzYzI2YjdkM2M3ODk3MzBlZDQzODEzYmZlNTE3NTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ5NjU5MTM0OWZiOTE3NWYwM2M1MjM4YzlhYzg1ODcwOTUyZDA2ZDlmYWNmNmExYzk5NDBlNjEzODk2ZjMwMzMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useSheetDismiss.ts",
+          "version": "repo-file-v1:sha256:486213002d2b703f194a101ba3357f91359d73907b30cdc5c6b5af8cea1bdd4e"
+        }
+      ]
+    },
+    {
+      "id": "claim_511d84f225df462b901b66a52a972915",
+      "statement": "List-item entrance is funnelled through the single outlet listItemStyle(index) and its keyframe body carries a hard visibility contract (LIST_ITEM_VISIBILITY_CONTRACT = 'from-visible'): the from state must be visible (no opacity: 0, no near-invisible 0.001, no visibility: hidden or display: none), because the animation shorthand's trailing slot fill-mode: both fills the element with the from state before the animation starts and after it ends while the engine does not start entrance animations on cold-mounted static sibling nodes — so an invisible from state leaves the element occupying space but permanently invisible with every static signal green; changing both to none alone was verified on device not to fix it, and the accepted cost is that entrance loses its fade and keeps only translate/scale.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L554-L639",
+          "version": "repo-lines-v1:sha256:e3c28c381b27a5bc9f14437de4adc8b9b59b22354aca349d30f4ed6292826c3a:eyJzZWxlY3RlZExpbmVDb3VudCI6ODYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0MWUyNjY1YjlkODA2NWM5NGVlOTQ5NDQ2NTRjMDA0NDI1MTU1N2FkZjVlMjcwY2Y2MjAxNTQzODVhZWQyZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0ODI4MzY2ZmM4NDJlMzEwZDFjZTc1MzQ3YTExODQ3OGU4MzUwYTJjMjc5OTRiYWRiNDNiY2UzZTg1M2U3MDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNmNmM3N2ExOTEzZWExNzVmZTRiMzE4MDE4N2Q1NjFmMDFiYTAxMjBmZDk0ZTg0YzFhNDcxM2FkMjM1ZjM4YmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1YzE5MDI5OWMzMTE5YTE3MGFlZmQ4MDA3ZmE1ZGQxZWQ5OTY2ODFjNWMyMDg5NjUwMzUwZDI0MTdmOTRmOWQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/entranceVisibility.test.ts#L87-L131",
+          "version": "repo-lines-v1:sha256:69e52ca197d81c48752602a4c5afdb90843fdee4166016634723f11ac8466da0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkyYTg4NWNjYTU4ZWM5MzhhOTFmNWQ0ZDFjMWJkY2QyNWRkZDBjNmIwMTllNzE2YjVkZDc1NWVlMWFkNjVmYWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxZmVlYTk1NTkyMmM5ZmNjYjQ3NTRkNDcwMTY3MzYyYWM3NWM2MDJkNzMzMjU5MTc0ODZjZmQ1NDdjMDYwODUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlMmNlM2ZkYzMyNTAzNjNhYmFlNzQwMGZlMTUzZWM4NTNiMmIwYTVhZTFlMDEyOTc2MTJiMGI3Y2JiNDMyN2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxYjIwODJhZGQ5YTI5ZTA2MmU2MGQ0NmRiYTFlMWY3YzUzYTBlMDUwYjg4MTE4YzExMDIxOGJjY2UwNTUyZDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L365-L418",
+          "version": "repo-lines-v1:sha256:46955255d51121940aafd9b26246c8aeeac7e8a3c09c1ba5b0336b21b68132e2:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1OTc2NWQ5MDRkZGE5MGFmNjk0NmY0NzViZTk0OWExZTlhMTlkZTIxMjY2ZTk0NzYzZmRhMzM2OGMyMjk1NTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwYmU4NWQ2MDk1YTc0MWNkMzYxMmM3OWRjOTZhNWYyNTM3YWIzY2M3NTAxNDdkYTc4ZWE0NmVlZmFhOTEzYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlkZTZhMjEzMzA4M2M5YWNhMGRhOTRmOGQ4NTdlY2FlMjA3M2YwMGY3OTU2ODIwMzIwNzBmNmYwZDU5NzUxYzMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/listItemStaggerContract.test.ts#L171-L248",
+          "version": "repo-lines-v1:sha256:2b890da9c2f08812f32fb6ecae67392c86ef8eb80cb0bfe1db97a24025725a25:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlZjJmMjBjYWRkNmIzMGNlMmE2NGQ3MmFiNmJlNDE5YmRjYWU4YmI0MDdhNDgyYmI1Y2JkMjY4ZTZlZWM2YWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg2NDAzYTE1ZTFlY2Y3Y2U0YjJlNWNkM2E4NzlhMDdjYWM0OGQ1NWMzNmE5YzEzNDM3NTQ4YTdmNGM5MDEyNzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlOGQxY2RlMWE2ZWNhMmY5OGRjYTg3MGZlMzk2Mjk5ODk2YzQ2MzIxYWZjNzdkZTgyNGY4NzVmOTRmMmExOTkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f7fc9fa2af7e4db29f6f6f13043a768a",
+      "statement": "useReducedMotion.ts is the single reduced-motion fact source (components may not build their own matchMedia) and it implements three named rules: R1 sets the whole transition declaration to none by not attaching the classes at all, R2 sets the whole animation declaration to none including infinite cyclic animations, and R3 does not generate the motion at all (no animation node, no geometry change, stagger delay always zero) because vestibular response scales with displacement; degradation is explicit, warning when matchMedia or addEventListener is missing rather than silently pretending the preference was honoured. useMotion() binds these rules to the four presets through computed values so a runtime preference toggle is not served a stale snapshot.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/composables/motion.ts#L444-L496",
+          "version": "repo-lines-v1:sha256:0a314376bb8d25ab3aa057e7e3c4d7dcc627f54aa4b16b047bad0470168d0b72:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNmYmZhZWU4NTI5ZjdkNjdlNzdhNjdhZTk1ZTBhNjhiNTY1NzEyNzk1ODM0MWRlMDcwZjdkMjgwN2I4NmU0MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0MWNlMzI4YmY1NGRkMjQ0ZDhiODk5NmYzMGZjOTM2YWYxYWM2YjQ0OGY0MzQ2NDAwNGIwNWIzOTU2ZjFiZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useReducedMotion.ts#L7-L36",
+          "version": "repo-lines-v1:sha256:5e45e23382540dedec0aa7103624636bdea54aeb1a8618a97e5642dc400c2b9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4Y2Y0YmFiODIxNTVkNGRkNjlkMzEzYjdlMDRkYzkzOGNjOWRiYTA0MTFlZjA0ZmQ1YzVlMzNmN2ZiMjQwNTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwZjQ2NGE5MjZlZmE0YmY3YWU0ZTUwZDkwMmE4NDYyNTYyMzgwZGUyOTYzY2VlMjE3NmE4YmY3Y2YzMzg2ZjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVkZTc5MTkyZGY3YWEzZmVlOTAwZjE4NTEzNGRmODYxZGZkOTI0NmU4YmRkNTg0MGIzNjlkYzI4Yzk4YjA4YmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkZGViM2ZmN2ViZGZkNmNjM2JjN2YxMDhmNDAxOTNjYzQ4YTA4ZDM4Njc1MTIzMzc5YmI0MTA1NTVlMTZmOTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useReducedMotion.ts#L97-L144",
+          "version": "repo-lines-v1:sha256:66b90055c86da9dc6eee19b4f2278db0a9eac04215413a1df62b20d63b0ee57a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjNGRkZDY1ODYyYmMwMTBjZmRlNDcwNDAwNGE3OWIxNzQyYmZmMjkyNzJlYjQ1MmE1NTU4YjFiZjNiNWNkNGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1ZDBjNmRkMzNjMWMxYjkxZmNkN2I1ZDMxZjEwYmMyMGVlMWFiOWE3NDY5YjVmZjYwMDZmNmIyZWZmMTFkZmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkYTU2MWQ2MThhNTFhNzE3ODcxNjExMjIzZmUzMDk0ZTJiYjU1Y2U2MzU5OGUwM2ViN2Y3YmM2ZGNkNjliZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f903b7d0455d489189c8f475e118f028",
+      "statement": "The immersive chrome toggle deliberately does not consume useReducedMotion because it is a v-if structural switch with no transition classes — a stronger R1 form than conditionally attaching them — and reading the preference there would create an interface that always returns an empty string.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useImmersiveChrome.ts#L30-L36",
+          "version": "repo-lines-v1:sha256:f13c229008aa712d7e1baa52ebb7b285937d0b350b8d78c23a75b217e3711dee:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzNmYzAwMGU1YjNmN2RjZjQ0MjM2MTBlZjNhYjM5NzFmOTJhYWZmNmQyMDMyYTVlZDA2Njg0NTA3MWFjOWNkYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTAxZWFkOTM2YTIyODFkNTNkY2MwNjRiN2UyYTJhYjBkNTNiOTJlZjNlZjdiMzRiNjY4NjczMDA3ODk1Yzg2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjEwNDkxMTVhMmQ0NWUwMmIwYzE2MGRjNDRjNzU2M2YzYjlhNTkxMDcwMDUzOTU4MjIwYjEyYzljZmNkOGJmYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjcwZjJiNDMzZmE0MmQ3ZjIzMmNlMWQ5OTJiMDVmZTliZjM5YzQ3Y2M0MTA2NWMzZmE1YTVkNTM4YTdlNmQ0ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_905e33c3ca0140d79655c1ff2f6304e0",
+      "statement": "Route transitions are built at the navigation site because Lynx has no router transition support: decideRouteDirection is a pure function returning 'none' when replace is true (login/logout/first route/deep link/tab switch) and otherwise the declared direction defaulting to 'forward'; the direction is written by router.ts's afterEach, which runs before Vue's render flush is queued, so the new page's first frame already carries the animation; two keyframe-name variants per direction exist because the same animation-name does not replay on the same element; the tier is gentle (300ms) with decelerate and ROUTE_TRANSITION_HOLD_MS mirrors that same tier; idle and reduced states bind a shared empty object so no declaration is mounted and no transform residue remains.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L284-L315",
+          "version": "repo-lines-v1:sha256:573072bd71917e45ff47b07c88c372b3485eb47e776fe55a1964b7735b95800d:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkZTRkMzY0YWIzMTRkZDAxOGEyNmU1MzU5MmJjY2E1NTM5MWVmZWU1NjY0MDU0YWVmMmNiN2VkZDgwMzlkYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiMzJmMTJhOThlNTllMDkyYTJkMmE1MjI4MTE5OWMwNzJkODJlNmI4OWI5MzZlNWRiZjFmMDRhNDYyMTQ1NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg4NzcyZWI1OWZkMmZlMzNlNTcxMmQxODcyNjUzOGI5NzQzMDM2MmU5ZWExZTQwN2ViYjVkNTRhMjIyZTdiZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVmMjE0Mzc2NjU0ZDc1MTRkOWVkMjBmYWFmMzliMTc4MTQxZDlkZGM0ODJhN2IzYjRiMTE3Y2QwMzYyZmY1MTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/routeTransition.ts#L171-L238",
+          "version": "repo-lines-v1:sha256:fdc0562fe9c1c02814dc7a775953d85cfca3ceee64ee700ef4bfc28a0ab1495c:eyJzZWxlY3RlZExpbmVDb3VudCI6NjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE4ODU0NDRmMDdlZGJlYmJmYWZkYzQ4MzhlNzU4MTEzMWU4MzUzNDJlOTc1MTRhYzRiZjE5NWEwNGVhY2RkOTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/routeTransition.ts#L42-L122",
+          "version": "repo-lines-v1:sha256:09dfc4bf10c871f975dfa708f6b3011460f294c906321ed77dd41e82bcb50b27:eyJzZWxlY3RlZExpbmVDb3VudCI6ODEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiNGNmYjExY2JlZjNiMWIxMDJhOTc5YWUwM2NlNGM2ZTY4ZDZmYzg4MGVjZjYyOTg4ZTJhZjg2NWZlZGIwODAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyYTk5NmVmZjk0MWFlYTc2YjMwY2Y5ZjdjZjk1ODQ0MjMxMWE3NWY0ZGQwODJmOGQxMDc2NDk0NzBhYTAxNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzMWZiZTk0NzdiNzJmNmI0ZjllZTQzZWNiNjViM2MxNjc0NGJjY2YxNTQ3YzI4OGRhYmVkZmQ5MGQ3MDUyZGQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/routeTransitionGate.test.ts#L1-L35",
+          "version": "repo-lines-v1:sha256:5ec0d17ae9c13bc8b88918951a882f3b16d3d22c492caecaff414209af19ecdb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxODY3MTcwMjU1Y2E5YzdkNTc4ODNjZmMyNTZhN2UxMTU5OTJiNjFhODI4NTMwMGRmYjgzMDllNjVjNDA5MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5N2VkYTk5YTA3Y2YwNjIzMDU1MTU2MWE1YmI5YzE2MGJmOTgyYmYyMTkxMjQwMzAwZTliYjg1M2M5ZDM1NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmZjM3MmMzODY2ZmEyODJiNGQ0Zjk4MDQ0MmQxODA4NDEyMDNkZDU2ODA4NDlkOGM1YjZhODlhMmQxMWM4MDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_14197875a2b947588c9f12f1070c422a",
+      "statement": "Route transition directions are deliberately asymmetric — forward slides in from the right with a light fade while back slides in from the left without fade — because symmetry would make the two keyframes the same animation played forwards and backwards, and back is a registered capability reduction: the old page never slides out (it is already gone when the animation starts, and there is no transitionend or cheap two-page coexistence), so only the re-entering page animates and the exposed side shows the root surface colour.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0211-ui-continuity-motion-contract.md#L296-L315",
+          "version": "repo-lines-v1:sha256:602d877cfbe28061670e8f27672f2ddb1b410c04a87b6c5a3570c58e45a165e9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1MTU1MmVhYmMyZDU5NTljMmQzZTIwYmJjZDRiZWJiYjIxNGNlYzQ2MTE2MTJjMTkwYzgyY2FmOWVlZTE0MDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiMzJmMTJhOThlNTllMDkyYTJkMmE1MjI4MTE5OWMwNzJkODJlNmI4OWI5MzZlNWRiZjFmMDRhNDYyMTQ1NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYWZhYmE3N2QxNmVkZDExYjAwYjhjNjhlMGEzNDUwYTkwMDMyZmRhZTAzM2Y0M2YzYmVmMGEwYzIyNWQyM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVmMjE0Mzc2NjU0ZDc1MTRkOWVkMjBmYWFmMzliMTc4MTQxZDlkZGM0ODJhN2IzYjRiMTE3Y2QwMzYyZmY1MTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/routeTransition.ts#L1-L15",
+          "version": "repo-lines-v1:sha256:bedaf2afa47d3b3f4104efa37cee989e283a469d88275e7ce43e3714cce623db:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3M2JhMzBjNTdmNzVmMTZiYjNjYzRmN2RkYzFjZjE2MzllYTVjZjJhZjYxZGJkYjI1N2ZmNWUwOTU5OGQzM2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwMWVhZDkzNmEyMjgxZDUzZGNjMDY0YjdlMmEyYWIwZDUzYjkyZWYzZWY3YjM0YjY2ODY3MzAwNzg5NWM4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEwNGQ4ZTQ5YWIwYzc4ZmRiNDk3OGNiNWI3ZWRjZDNlNTMzNDczYjQ2Nzg5NzBkMDEwNGMwMjQ3ZDkxNmNjMzYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/routeTransitionGate.test.ts#L1-L35",
+          "version": "repo-lines-v1:sha256:5ec0d17ae9c13bc8b88918951a882f3b16d3d22c492caecaff414209af19ecdb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxODY3MTcwMjU1Y2E5YzdkNTc4ODNjZmMyNTZhN2UxMTU5OTJiNjFhODI4NTMwMGRmYjgzMDllNjVjNDA5MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5N2VkYTk5YTA3Y2YwNjIzMDU1MTU2MWE1YmI5YzE2MGJmOTgyYmYyMTkxMjQwMzAwZTliYjg1M2M5ZDM1NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmZjM3MmMzODY2ZmEyODJiNGQ0Zjk4MDQ0MmQxODA4NDEyMDNkZDU2ODA4NDlkOGM1YjZhODlhMmQxMWM4MDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_206675db3086489a890a41b61b44ad5f",
+      "statement": "The hero (thumbnail to large image) transition interpolates the layout box rather than using transform: scale(), animating only the evidenced transform/width/height channels and never left/top, so the aspect-ratio difference is absorbed by re-cropping inside image mode=aspectFill instead of stretching already aspect-filled bitmap content; it needs two rAF beats because the start value must be laid out before the end value arrives and there is no getComputedStyle to force a reflow; degradation is a correctness requirement with ten named reasons each logged with a module prefix; and the availability of the return direction is derived by asking Vue's own lifecycle (onDeactivated firing means the instance was deactivated rather than destroyed) instead of hard-coding the KeepAlive include list.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/src/composables/heroTransition.ts#L1-L37",
+          "version": "repo-lines-v1:sha256:223c1a878cb99af306ed8c1388af56489f1ce2139c845be6b41e30dc7efd8ac5:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhZDQwMjE4OGMyMTU5NjAxZDJiM2YzYWE5YWZhMzE0YWFhZWVhODQ5NmQxY2FiZGI0NzU3MWE2NzFiYzkyMDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmNzdiOTBmYzBjNzM5ZGMyNzM3NDAxMzYzOTRhOGY4OTA2MWEzMmM5MDA3YWRkMjhkNTg2Mzg5NTgyZmVkOTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhhMjE4OTNhNTNmZDBmYzQ5YjcyN2JhZGM0NzZlMDMzMmU4NGI1MmI3MDdlNTU3NTVmOWI0ZjI3M2Q0MTMyNDUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/heroTransition.ts#L69-L103",
+          "version": "repo-lines-v1:sha256:22137e32c57611dd31415a492d221a9d7a9ab485111ff6aef2b27f29e2949b74:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiNTgwN2EwMDVkNDk4Y2NiY2NkNWIyZTlkNDRiNTJjYWQxMmUxMWJkMTY0NDM1ZThkZGE3NDhmZTY5ZTk0ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZjEzZWJiZDg0ODYxZGNjN2E4NTY4YWIxNTZmM2VjMmFlYWY5NjBkZjI2ZTY5YjUyYTI1ZGViMmJlYjdlNzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczOGZhNWYxNWU2MTZlMTdmNTE0ODIzM2M0MDgyY2JjMDZkZTNlZDlhZDY0MjczMDU1NzYyODE5NDE4MzM1YjkifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/heroTransitionOverlay.test.ts#L64-L230",
+          "version": "repo-lines-v1:sha256:d203f121ec9d9333da0ba2026ab299bd8ea7ead7589afab68928639a213ca7ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTY3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlNjA4ZjVhNTE4MWQ0Mjg1ZGM2MjBmYTIxNWJmMTMzNDU0MDNiMWM0MGZmMmM3ZTY0NThlOGQ3MTdjZTJmNWU4IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI4ZTkzZDBkYTIwYjYxOGU5MThjMDVjYzY3OGNmMTY0ZDY2NGI1ZjQzNjQwOWVkMGMwZjg2MWJjODI0NTYzMTVmIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJiNjFjZjk1MjFiOWIzZTk5OGExOTYwYzk2NGFjMDcyOTdiZDVhZTNhMjcwZjAxODIzZDI0MGFmODhhZDMyMzZhIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkM2Q3MThmYTUxYjYxNzU4ZDdlZGU4ZDA0NmYyZDA3Mjg1MmM2MzY1ZDZlNTZjZDBhMWY1YmJhMDk2MDRjM2MyIn0"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/heroTransitionWiring.test.ts#L113-L113",
+          "version": "repo-lines-v1:sha256:b35d30450244d8976d9e89a922e4e31539e1e98f88be28a5c9f197e7071cf342:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjM1ZDMwNDUwMjQ0ZDg5NzZkOWU4OWE5MjJlNGUzMTUzOWUxZTk4Zjg4YmUyOGE1YzlmMTk3ZTcwNzFjZjM0MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjM1ZDMwNDUwMjQ0ZDg5NzZkOWU4OWE5MjJlNGUzMTUzOWUxZTk4Zjg4YmUyOGE1YzlmMTk3ZTcwNzFjZjM0MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTIyY2YzMWI0NjVhOWJkY2RkOTg1YmZiNWIwODMwOWFmYzhkYTJlNTQ1ZmE3NGRhNTJiMmUwZTViNDMxMjI1ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjE1MzhkNjIxYTFjZjQ2MGFjMTk1YjJiMjQ3YjBmODA4Yzg5N2VjM2ZkMDFmNGYxNWI1NjZlN2JjMTA2MDFiNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fc4d59b22c864ce4836fd81895d179c0",
+      "statement": "Device verification for this area uses two isomorphic-but-distinct scripts that read the same platform facts: scripts/verify-top-inset.mjs measures top-inset amplitude in physical px on self routes and scripts/verify-statusbar-contrast.mjs measures status-bar text contrast on bleed routes (geometry green and illegible text can hold at the same time); both emit three non-equivalent verdicts with exit codes 0 PASS / 1 FAIL / 2 REJECT where REJECT means the criterion cannot answer on this sample and is never a pass, the contrast verdict is taken on the worse of the darkest and lightest sampled base colours, the amplitude script refuses non-applicable pages by route declaration first then by two flat-surface measures then by a non-positive implied inset (order is the cost), and registered blind spots are exported as data that the gate asserts field-by-field and that the script's REJECT message actually consumes.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0214-top-inset-per-page-ownership.md#L117-L200",
+          "version": "repo-lines-v1:sha256:4feec6ebb55dcebbc78bdd3ddc522b6d5b084c9d26e316c95333048a53cdcbe8:eyJzZWxlY3RlZExpbmVDb3VudCI6ODQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmYWJlZmZhMmU0YzkyYWY0OTBjNzQ4MWRiMTI3YWQ2MmI1MDk3NjEyNzk5N2Y5ZjNhODRhYzlmOGU5YTZkYmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0OWM5ZDg4YjlkY2JkYWZmNzEyNGIwYzg1OTFmNDQ0ZmI0MDk2NWY0ZGQ5ZGM5ODBlZDQ2OTM4NDMwMmE4N2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM2NTEzNGQzMGIxOWI5YzVkZmIzNzJjNjFhY2ZhMTRjZTFhYzZjMDVlOTUzNjBlZjI3NjAxMWFhMzgzMTdiMTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZiMjI3MTNlOTMxNWMwZDMyZGI1MTJhM2I5ZGNiMWY4MjcwZTMzNDY5NjMzMWIwYmNhNzc4MzQwYWM5ZDhmOTQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/topInsetVerdict.mjs#L9-L122",
+          "version": "repo-lines-v1:sha256:0af2d311214ace1eaad9b4bad190e4709fdc10a38f85e88ba338b0c92ac83643:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlYWYyMmNmMDczMjU5MmMyNDcxNDFjYmU2MWVmYTExMDEyNjEyZjVhMzEyMmI5YWY5YmJhZjUyZjU3MjRkMTk0IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI0MTJjYTM0NWNjZjc1YmY5YzA4MDZiY2U2OTViZThkZTgwOGI3OTk4NDI1MWE3YTU0ZDIwMmNmNjEwMWRkNDUxIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJkODk5OGM1YzlkNDg3OGNkZDY3NmI2MDVkMmQyOWY3ZjBjMmE2ZWRkMTBjMGRiMjk5M2MwNGQzMDExNWQwN2UyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIxMzI4NjY0Y2I2ZDQwYzc4ZGU3YTJiYTUyMTJiMDc5NWUyZDU1ZGRkZjA5MTdmNzY2ZmEzNmQ5MGQ1YTBkZDdiIn0"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-statusbar-contrast.mjs#L1-L53",
+          "version": "repo-lines-v1:sha256:0dc9fb88ee78290e22ce7e45adc272e9d69a3e3cfb41721429a38acbfa533d09:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUyYmE0MTgxMGYxZTEwZjEzODlhMTMxZDM4ODFlN2IwZDkzYzgyM2Y0NDlhYzQ2M2FhZDAyODhhYTAyMGM5NWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2MTE0MTUxOTRjNmRkOGJkOWNlODE3YjRmNDkyMTFlMjBkODc3MTVjZWZhYTkzMWU2MDBhYzMxMGM0YWYwYTYifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-top-inset.mjs#L1-L57",
+          "version": "repo-lines-v1:sha256:0a8f6321481f4ed0035f81ba596a8025932791100127280932b14c6e87501884:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxOWQyYTAwOGU3ZGRmNjE1MWUxY2RiOTg3ZDY1NmU2NzBkNjM3MjM4OWU4ZmQ5MWU1MmUyOWVjYWJkNTMyYWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRiNTZmNjZjOTZjMDdlNjRmY2ZiZGYyODliMWE4N2Q0ZGJmNzkwYWFhNjlhNWE1MTZhNmE1ZDIwNDUyZGNhNzQifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/statusBarContrast.test.ts#L1-L50",
+          "version": "repo-lines-v1:sha256:ea1fbc124930b14a8d6fe7099807eb7873dff219eed93d6eb351eee80c4cb90f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjOWM1ZjJiNjdjMmRmYWY0NjUwYWQ4MjM4MGJmZDZjNzY5MGE4Yzg2NmQxMTMyMWY0NzhmOTM4NjRmOTBiZDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxZjVlZWE0MWExN2QwNzNlMTkyYmRiNjg5MGViMzhlMDI2YTlhMGVkODBiYjRiMzQ4NThlNWZjOTU3MDVhMWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkM2EwYTI3MGQ1Zjk4MTQ0NTcyYzhmZmIyYTM0Y2Q4MzhhMjJkM2M0MDYxNGM1MmY4NjQ0NjI1ZjAwZTlmMWEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/topInsetVerdict.test.ts",
+          "version": "repo-file-v1:sha256:1ee93b24543536eefe132e293a1f69a65da8166479009748c1912a43d864be71"
+        }
+      ]
+    },
+    {
+      "id": "claim_5ff022262bb9463caf42c8b5d5524982",
+      "statement": "The cross-process metric seam is treated as its own object under test: the parse from the Python metrics output into the JS verdict (parseMetricsOutput) was once entirely uncovered, and a field-order mistake silently bypassed two gate layers while the whole suite stayed green, so it is now pinned by tests/metricsParse.test.ts including a value-domain invariant that ratios fall in [0,1], which is more robust to reordering than field-by-field assertions; new gates in this area are also required to prove they can turn red by injecting the defect.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/glossary-top-inset-and-verification.md#L29-L45",
+          "version": "repo-lines-v1:sha256:a623ac273c7550d85757d8da94d49d769d75a9667034460c78fd6b892bff131d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyZWFiZjljNjgzYzZjMzA3NTczODUxNDQwMTI2ZTE3OTkxM2NlZGVjZDNhYmQ2YjM2MzY3ZGViNGY2ODU3MDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM5N2RmNGU2ZTBlZmRhNzRkNjZmOWJiNDAyYzM5NmM2NTFjMGMxMGIzODE4ZTEyZDZkZDk2YmRmNGQ2N2Q2NDAifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/topInsetVerdict.mjs#L124-L158",
+          "version": "repo-lines-v1:sha256:7d0c0d6deb99f0efd004aea8885e208da689c5324b408c64ca6d28e892c06eb7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0ZWM1YzgxMzUxNTMyODc0ZmU4NzQzMGU5NTcxMWE0N2ZiMWNmYjk3YmE1YjBhZDg3NjQzODg3MjU5YjhlODUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlODhkNjc2NDIzYTQ0NzBmMDFjY2I0MGRiN2U2ODVjOGY2Y2UwNjNjODRhYWM4YjFhYjAxMGRlOTBiMWM0N2QifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/metricsParse.test.ts#L59-L59",
+          "version": "repo-lines-v1:sha256:c5f6116d2aa646544ab39e816f548fc6bde662ffd2c42741bc0257d7f3a1f185:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmNjExNmQyYWE2NDY1NDRhYjM5ZTgxNmY1NDhmYzZiZGU2NjJmZmQyYzQyNzQxYmMwMjU3ZDdmM2ExZjE4NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzVmNjExNmQyYWE2NDY1NDRhYjM5ZTgxNmY1NDhmYzZiZGU2NjJmZmQyYzQyNzQxYmMwMjU3ZDdmM2ExZjE4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmI1ODBlOTY0ZjgzYTQ3M2Y0M2Q0NDM4NDYyOTQ5ZDY4YjU2MDBmZGE3ODdmMTYzNzQ1ZDAwZGU4OWNiZjM2YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGFkZDBmYmY0NWY0ZjA3ZTkxOTk3MTgwYmU0NmQyOTE3Yzk2NzliYThiOWNmY2U4OTMxNWRlNjljZTFhZWVjYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b6ad4caa9b1e42aea721b8eb912069aa",
+      "statement": "Accessibility of the immersive toggle rests on a dynamic accessibility-label bound to the chrome state (enter/exit immersive, plus image n of N in the multi-image branch) that was verified on device by reading the a11y tree in both states; accessibility-traits swallows content-desc on the same element and is a net regression, while clickable=false on a <view> carrying @tap is a red herring that does not block TalkBack activation.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0213-immersive-media-view.md#L116-L161",
+          "version": "repo-lines-v1:sha256:bea4a4d300b56076007a2c285cba77911407ab5867db76c6d650c0daea3efd51:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMjU5ZTI3MmUwYmMzYzIzYzNjNTlhYmE1YmZkMGEzNmRhOGY0ZTg2MjYzYjJiNWZjOGE3M2MxYTE1NzA3MzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMzczYzI0OTljZGQ0NTc1ZjA5NjU3NDg0ZTZjYTUyNGMxMTg5YjhhODdlYjgwMWQ5MGI3YzM5OWU4ODAwMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIyMzM3ZmIxYWMwMGVmNWM1YzdjZWFjODE4YjgzYzM1NDQ4MTg4MjVlYmZiOGUyNDg3ZGNhMTI2NmVkMmEyYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjYmZhMGIyMWVkZWQ3YmEzMGQ1ZTQ1NzYwYzNkNGM4YzJmZWNiZjYxNTQyYjUwYjI4YmY3NDI2MzgwN2E2ODcifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useImmersiveChrome.ts#L134-L147",
+          "version": "repo-lines-v1:sha256:1fc2b2af133b090defae7ac868156fbb11f74a132e033927ca9039a638df506a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIzMDVhNGJlZjk0Y2ZjOGViYjFjOTc2ZTI1YzE4Njg5NjllODVlZThlNDk2ZTg4ZGM1MTU4MmU1MDY1ZWQ2YWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3MzM3MTE2NTU5MWVkMTNlNTlhYjU1MjNiNDhhYzQyZGI0NWIxMjEzN2Q4YTFjNThkYjI4ZjZhNmJhNjQ1NzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5NGQzMGIzMGMwMWZjMjNiYTJlOTFlOTZlNmFjZmNmZjA3ODY5NDNkZTUyMzQ4YTBiZDYzZTIxMzlmN2VjNjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/src/composables/useImmersiveChrome.ts#L37-L51",
+          "version": "repo-lines-v1:sha256:b9dc9fbad80d8dd8a6e37a2324b565b83cfbdc287302cd5047c64900c6d2e81c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1MDU0ZTkyMzQ0MjJhYTk0OWQ2MTAwNDkyMmIzYjA4NjFlMjM3Njc2YjVmNDFhYWUzYjQ3YWE1NGY2MDBjNjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNjUwNGUyZDAyMTA4YTA5ZTBmZDYxNDNmY2M5N2Q3MmZjYzc0OTcyYjRmYjI1N2U2YzM0NzllN2M0ZGIwN2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUxOGVlYWU3ZWY3NzU0NGNlMzdkZDkxZDExNTIzOTNhMDZlNjNjNTA4YTk5NDc1ODkzNjQyOTZlYTA4ZmJhMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxMGRmYWIzMWUzNzJiNzRiMmRlNmY4Y2QzMWUzMjJmMmM3NzNkNWFkZDA3MDc4MjgxYzc5Mjk0MWJkMmM5YmMifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.0",
+    "at": "2026-10-08T00:43:21.663Z"
+  }
+}

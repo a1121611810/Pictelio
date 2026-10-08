@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:59cd4179760c530ecf38ea60e2c5e0ca83fb3e3b7a55faab02e6c481653d9491",
+  "pageVersion": "sha256:1cb002684d138646ef3c0678319bd541c7ca27a4c1a38460dfe1c11544460c96",
   "claims": [
     {
       "id": "claim_2f832bf06be7470fb14b62a9e764499c",
@@ -176,11 +176,23 @@
     },
     {
       "id": "claim_fcc41171860e4f759f779ab5966babee",
-      "statement": "The website landing page is built in `packages/website/`; `scripts/deploy.mjs` only copies `packages/website/dist/` into `_site/` for local preview, while the real GitHub Pages site is served from the `origin/gh-pages` branch.",
+      "statement": "The website landing page (`pictelio-website`) has two distinct operations: `scripts/deploy.mjs` (root `pnpm deploy`) only copies `packages/website/dist/` into an untracked `_site/` directory for local preview (and ignores the `--dry-run` flag that `pnpm deploy:dry` passes), while publishing is done by `.github/workflows/deploy.yml`, which builds Astro, copies `packages/website/version.json` into `dist/`, and deploys the artifact to GitHub Pages with `actions/configure-pages` + `upload-pages-artifact` + `deploy-pages` on pushes to `main` touching `packages/website/**` or the workflow (plus `workflow_dispatch`) — serving `https://a1121611810.github.io/Pictelio` via Astro `site`/`base` with no `gh-pages` branch push, so the gh-pages instructions in `docs/release-checklist.md` are stale.",
       "evidence": [
+        {
+          "resource": "repo://.github/workflows/deploy.yml#L1-L58",
+          "version": "repo-lines-v1:sha256:43070f8ae7bc37792bdeead67ebffb53b8e66bded90ab7d6bae8dcac5bda6c9d:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzMGFkZjU0YmQ4ZTMyOWYzNzMyNDgxZDkzYmYxY2NlYWRlNWNhYjY3MDU1NTc0YTZlYjllZTk4ZDhlYzU4YTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2NWIyOWJkNjc1YjI5YWI2MzQ4MTEzNzQxNTIwOTgzNzdiMmIzYTUwNmUzYWIxYTg1OWIzM2RmNzJhODJkZTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://docs/release-checklist.md#L204-L212",
+          "version": "repo-lines-v1:sha256:def7e0ad90c615644bb81eca1e443631ba034c39ee22016a2bcca49a32fbf7bd:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTc5OGU3ZDg0Mjc3MmFkNWMyN2RlM2U4NWJiMTE3OTJhZWExM2E3ODEzZjhmZTA0ZmM5MTA4MDdiYzdjMDQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODY2MWQ5ZmVmNTQ2NGJlM2NhODQ3NDQwOGQ1OWQ5MTNjNGU5ZTEwMThkYzBhNmU4MWU1NTY0YmMwNTIxMDAwZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTlmZDA4NzIwMmU2Zjk5NDQyZTllYmE1YzE4YjQ3MGE5MDQ2NTM4MDdhMzlkNDY0MjA3OGM2MTBlN2ViYjRkMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM2NzRhOWIxZTY2YWJiNzhmYjA0Mzg4MDU0NGQ0Y2JlYjU0Nzk4MWRhMDYzMjI0ODY5Y2FjMGM0ZDFmY2VmMyJ9"
+        },
         {
           "resource": "repo://package.json#L52-L53",
           "version": "repo-lines-v1:sha256:5188029e9133a1ffd2f4833695480e2bdc29945f138d4d872ec1b103275a7366:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODk4YWVhOTI4Y2ZmOWQ4NmRjM2ZiOTZkMjNjY2U0MWUxNjNjYzQwNTg0ZWQ2NGZhZDBjNzkzNDBhZjVkYjAxYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGU2MTg4MTBhYjNkYzE5ZTdjOGZjMGJhNDk1YmQzNGQzZmIyYWVhOTUxOGU0ZjU5YWU0MGJiYjE0ZTNhMDVjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjJkYjMxMzliNjllZGE3MzcxMWJjZjY4NTNiMWZmZTc5NTdlZThhOWNmYjY5Zjc5ZDM0NDIxY2NjYTZiZDVhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzhmN2EwZjg1YTk1MmViZTc2ZDI2NmQ1NTcwY2RlYTkwMzFhMDgwYjkzZTJkMzBhNjI2ZDQ3MzIwODAyMzZkZSJ9"
+        },
+        {
+          "resource": "repo://packages/website/astro.config.mjs#L1-L8",
+          "version": "repo-lines-v1:sha256:c797728ed1dd0bbd152c26b5d6454dfb08d5f6a755d37ed6dbdd0c7215664c18:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWUwZTUxNGU0YjhkZjZmZjAxYWFkOWY0ZjA0ZjA2YWEyYmQ3YjAwZmZhNjM1NzQwMzg4OTgyOTE1YjU1ODEyZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjZmNWI0MGIxNTg0NTdkMTc4NjRmMjE3OTA3ODZkZDVhMmVjZGI2NGI2NmE2NTFmNzg4ZDRlMjVjZDMzMDNkMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
         },
         {
           "resource": "repo://scripts/deploy.mjs#L1-L56",
@@ -201,10 +213,362 @@
           "version": "repo-lines-v1:sha256:537e669454ba05fefaa75b3782d18ee1d4c8d9b0d58b4bdc373c67760a8b02b3:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM0ODU4NTQwNjk4ODhiMDk1NDcwZmNiNmI1YzdmOTY4YTJlYmEyOGU1YTYyNWFjNmMwM2FiMmE1NmVmYzFiYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMyZDdiMDc0OTg0YjhkOWYzM2U0ZDVhMjhlZDk1ZTUwMzI4ZjkyNzEzMWQ4Yjg0YjcxNTk0Mjk1YTIxOTc1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmIxZmNmY2NlZTAyMTdlZGIxMzYzYzI2MGU5OGJjMDhkMTU3MWZlODkwMzQzOTFiYzIxYjUwMDIzMDZhN2QwNSJ9"
         }
       ]
+    },
+    {
+      "id": "claim_8095e3389093451e99e04131072344c3",
+      "statement": "The release toolchain requires Node `>=22.22.2` (repo pins `24.18.0`) and pnpm `11.9.0` enforced by root `package.json` `devEngines` plus `engine-strict=true` in `.npmrc`, Java 21 for the Gradle build, Android SDK minSdk 28 / compileSdk 36 / buildTools 36.1.0, and an authenticated `gh` CLI, which the release flow uses for Release create/edit as well as for the default uploader's token.",
+      "evidence": [
+        {
+          "resource": "repo://.node-version",
+          "version": "repo-file-v1:sha256:55075b5ec4e8b31936cbbc282b8829116d1fd48f2f2f1856dee592a6650700ce"
+        },
+        {
+          "resource": "repo://.npmrc",
+          "version": "repo-file-v1:sha256:e654e6d36187ba09ce2fd88df4584dcfe33ae07f19936b8c52d4f9478e0c18fc"
+        },
+        {
+          "resource": "repo://package.json#L61-L78",
+          "version": "repo-lines-v1:sha256:d28a56424d44260618b9f62499d25e84546094a80960ec220eae5424a20b1c9d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkYzRkZTdlZDM1YTIzMzY0NTM5ODY0ZGFkYjkzOGI4NzIzMzM3OTE3OWQ2MjkyYjlmZjVmNjE5YTZjMTMxNjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZDNiZGMyNjk4ZGE3ZjQ0OTg3OTY5ZWZmODU3Y2Q0Y2EyZGQzZTI3MmUyN2VhM2YzZDhlNjdhOTk1ZDg3ZGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVmMjNkNTVhYzAxMTM5YWYyOTdiYWNjOTIxNmQ3ODRkMjY5NGUyMDhhMTMxMjUzMDAwNWQyMmZjOGYxYTAxYjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle#L11-L15",
+          "version": "repo-lines-v1:sha256:50bb055dc49fccc31dabfa1e93449f5d542046efb5652e48c94e607f58eaae8b:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTczMzgxM2U0MDEyZDcyZGVmZDFhMjAyYTMwNTdhZGMyMjYyNzhkNTBjODk2ODY2NDEzYzlkZWE0ZWE0NDA4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTllMTdhODRlMjNiMDRiYmMxNWM5ZjZjNDQ3YWM4YzUzMWExZjhmYTU2YTU4MmNlY2MyMjgxZmRiMGRhYTU4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTg5OWNiNmVhODA5NTRmZDlhYzJkZTBmODkxZTE0ODI3ZjcxZGEzNmI2NmQyMTJhZjA0OWNiOTEwNmMyMjYwYSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/variables.gradle#L1-L4",
+          "version": "repo-lines-v1:sha256:537e669454ba05fefaa75b3782d18ee1d4c8d9b0d58b4bdc373c67760a8b02b3:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM0ODU4NTQwNjk4ODhiMDk1NDcwZmNiNmI1YzdmOTY4YTJlYmEyOGU1YTYyNWFjNmMwM2FiMmE1NmVmYzFiYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMyZDdiMDc0OTg0YjhkOWYzM2U0ZDVhMjhlZDk1ZTUwMzI4ZjkyNzEzMWQ4Yjg0YjcxNTk0Mjk1YTIxOTc1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmIxZmNmY2NlZTAyMTdlZGIxMzYzYzI2MGU5OGJjMDhkMTU3MWZlODkwMzQzOTFiYzIxYjUwMDIzMDZhN2QwNSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/upload-release-assets.mjs#L29-L44",
+          "version": "repo-lines-v1:sha256:f6aa5098aba8bc46f487e7c2ffb9d846e73c629966ccee374dbc962a47313324:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3NzkxNGQ3YTdmMDA4ZGU3NjBiNzQ2MGRjZGI0NDZhOGU1YmQ1ZDA1MmNhNjJlZjI3YjBkNGRhMTgzZWFkMWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUxNTg2NDFkMWFmMThmNWI2ZmU0NGNhNGQ0NTlmZTRmYmE2YTkyOTBjMTNhZGZiNWM2OWNmNjEyMWM5MTk4NDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmMWQ4MDIzMDEyYjYxOGVmNDYzYzcxYThiYWRkOGE5ZGVhYmM4YzUwNTU5MmMwMDRiNzE3YWUzMzhiYzM4NDkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c6c70481eb334a02858d110332f81887",
+      "statement": "Developer-side Pixiv/API traffic is expected to reach a local HTTP proxy resolved as `https_proxy` → `HTTPS_PROXY` → `http_proxy` → `HTTP_PROXY` → hard fallback `http://127.0.0.1:7897`; the rspeedy dev server binds `127.0.0.1` only and routes its `/pixiv-img`, `/pixiv-api`, and `/pixiv-oauth` proxies through that agent, while the emulator E2E path instead sets the device's global HTTP proxy to the host proxy via `ANDROID_E2E_HTTP_PROXY` (for example `10.0.2.2:7897`) and clears it on teardown.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md#L46-L51",
+          "version": "repo-lines-v1:sha256:f0b4f78cf7b9b9cf976d1d384119cd0881e2bcd04484e7c26151e830e3e04736:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTAxMGRkY2Y0YTM5NWY2ZTY1MmZlN2NmNWE3NTE0NzM4NDg0MmJiNzE0YzljMzRkMjU0MzNlOWM5MmI5NTNkZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk0YWMzZmJhZGE1ZWE2ODFjMTNkYmQ3ZjhlZDg1OTYzMzk5MWE0NjA0OTExYzgwYmY2YWVhZDJkMzMyNWI3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmQ4NDBlYzQ1NjgxOWFmOTZhODlkNTU5YTA1MjBkMTU1YTdlMzE3NjQzOGZhNjZmNjgxYTc2MjUwODZjNDYyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWMxNDc5Y2Q0OTg2Mjk4ZjIxMGFhNTg0ZmU0ODdlMGY2ODRlNDVmZGUzYzM0MGM1ODM4MWNjMGI2YjI2NzgwOCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md#L67-L77",
+          "version": "repo-lines-v1:sha256:66879b40501416dfb35397b5b85e1b7c869b170437ea3306072310451c5419f1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2ZmNkNGE2MzQyZDJlODBlYzQzZDM1NmRiMzZiMGFhYmNiZTdhOGIwYmNjMjNlMGEyZTU4NGIyMzMwMDhjOGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUzYTg1NTJhZGYyZmZjZjJmMmViNmUwMGFhNDI3ZjZkZWExYjUyOTA4NDMxZTI5MjMxY2VhNzU2MDFjMzZiOWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3YTQzZjM3MWYxODE4Zjc0MDI0MTlmNWNlZWMzMjQ5ZTVmZjNiNWU2YWU3MDQwODk0NmVlYThmOTdhNGExOTUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts#L133-L171",
+          "version": "repo-lines-v1:sha256:70a5b1e151aeed473ed2b24291b80f65d632ef1aab6bb95d3583b32aed68182c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwZTY2YWZlMzEwMjMxZDJlNjA5MWE1ZDg5YTYzZTc0OTg1ZmM3YzAyMzY0YTg5OWI0Y2FjZjdmNTI3Mjk2NTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNWNkMmZiNGYzZGY4ODQ1MTUyNTViMzk1MjNmMmY4YjU0NzJiZWVhOWY1NjZmZmNhMjA0ZGI4MDI1NjEwNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1NGM3Nzk2NWFmYjNjOTQxMTNhYjU3MDA4ZDY4MTgzMDI5ZjZmMmY5NjdiMjYyOGE0YzFkMzQwYmViMDEwZDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMyMGFiZjNlYjgxNGVjYmViYWIyZWExN2VhZWE4YTI1ODNmNDZjYzBlMTdjYzczY2I1M2JhNGY4NDI0NzUzODUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts#L41-L47",
+          "version": "repo-lines-v1:sha256:23c349424a2368f7b7760b9a7e6205f7339d827afb087f7643bff32f9069ea6c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTVjNmQ3ZjU4NWMzNzA0NDQ1NmUyYTMzZjc1NDEzNWI3NmUyYjZiNTUxZTM0ZTI4ZTBhZDE5ZDdjZTNhOTcyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODZiODUxYmZhOTZhZjE3ZGIyZWU4NzZiMWU5OWU5ZmNhNDgyNTI4NTEwYTdmZGVkOGU3NjUzNzU3ZGE0MGJiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGEzMTZjODU5NjZmMjMxOTY5NzZiYjJhMDMxYjAxM2JmNjI2MDMyMzY3MzVmMzAxOTc0ZGU4ZDc5N2QwNmQzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTMzZDMyOTg2ZDcwNzE5YjhiNWFiZWVjNjFlMjRmMTJiMTQ1NTNlMGNhYTdhYmVkZTA3ZjE5ZjFlYjQyMDgyNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d7bad88233974125aef0575f6abce17e",
+      "statement": "No Pixiv, OAuth, or signing credential enters CI: `.github/workflows/ci.yml` runs only type check/lint, `pnpm test:all`, and `sync:credentials` plus `./gradlew testDebugUnitTest --no-daemon` with no secrets, the refresh token and AI keys live in the gitignored `packages/app-lynx/.env`, and the keystore/key passwords exist only in the releasing shell's environment.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml#L16-L110",
+          "version": "repo-lines-v1:sha256:3ea62711a7327dbe94e004b13096d5d282c75e4efa8d29e0e8afd2588acf3c79:eyJzZWxlY3RlZExpbmVDb3VudCI6OTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5ZDgwMTU0ZWQ0MmZjNWM3NzliMTMzMTU3OGI1OGI4OWM4MDFlYWNlNzRmMjRjZDQ4ZWI0YTIzNTc5NDBhOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlNjA2OWE3M2Q1YTIyNWQzMTlmZjIyMmI4MjI4MjVmZTA4ZmFlODIyN2IyNmMwY2U2MzUwNGU2NjA0ZWNmMDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM1MzA5OGEyNjYwZGFkN2I3YzgxYjg1MmYyYzk2YWExMjIxNzMzNWVlZTgyZDI4NDFmZTI1YWUwZWI0NTZlZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://.gitignore#L47-L49",
+          "version": "repo-lines-v1:sha256:a4d1c3518e4cb3130519f6e7c7f30bc0ce426721ccd8ba6b7b8798d7772dd7af:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjkzMjViZDJmZTUwZjIwNWJlNDAzMTE0Yjk0YzdkZGRkYTQ1ZjJkOTdhOGYyYjBhYTY5ZWNhZGIxOTc4YTRmNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTU1YzlhZTNlNWQ0NmE0NmM0ZTQ4OTAyMDA4OTVlNjdkN2E5ZWYxYjFkMTk5NWY0NjNkMmI4NmQ5ZTZmOWI2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTAwMjU4YzEyZDNiNjE4NzhmMzBlNDI1YzBjZWNiYTY1ZDhjZDYzYmM5MzQ1ZDk4ZDAxNzI3N2YwOGE4YmUyNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQzYWZjODFjNmQ0NGZjMjc5ODViY2E5MGNmMzYxZGJhOGIzM2Q0NzgwYWRkNWJkNTZiYzE4MGFkOThiZjZmMyJ9"
+        },
+        {
+          "resource": "repo://docs/release-signing.md#L97-L135",
+          "version": "repo-lines-v1:sha256:8acc6565cda044feec4ea462b8f89874d81f5c27aab5c13bb20e916cbba11984:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdjNGE5OTNmNTk3Yjk2NWZjYWZmZDVjOTU4NDQ4YmJhNjAzN2Y1NGQyNmQwNjQxNTNjYTFiMWE5MjM2MzQ0NGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2NGE1ZTc0N2JlYzkyYjlhMTZmNjBlNTExNGFkMzc0OTc5ZDM2OWY1NGE4Nzc2MmM5OGQ2NTU1OWJiMjkzNmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5622d82efb614288a26a806547b09c66",
+      "statement": "`probeProxyRouting` mirrors Go `httpproxy` semantics for https uploads (HTTPS_PROXY then ALL_PROXY, with NO_PROXY forcing direct), and because a NO_PROXY domain entry matches the domain plus all of its subdomains the documented direct-fallback value is exactly `NO_PROXY=api.github.com,uploads.github.com` — writing `github.com` would also bypass the proxy for `uploads.github.com`; since the default Node uploader ignores proxy env vars, HTTPS_PROXY only changes behavior in `PICTELIO_UPLOADER=gh` mode.",
+      "evidence": [
+        {
+          "resource": "repo://docs/release-checklist.md#L197-L202",
+          "version": "repo-lines-v1:sha256:8299e6e2962d0aa3062175adadb2a63cd622f7ed4b9b217f1990d0b4bfb38283:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzgzNTE1NDZiNzNhYzNmYmYxN2RjMzJjZGNiMmViNjJmZThkZjllODUxMTMzNWM3M2RmNzY0ZDQyOWU5YzIzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTI0ZDVmZjBiZWEyMjYzZmQwZmE1MTc3ZjY4MmY0N2JlYjAyMmIzNmUwNmZkMTYxY2QyM2ZhYjA5ZmQ0MmYzNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJiYjE1MmI0NWRjZGY5NDNlOWM4MzA5MjZiYjlmMDQ5M2RmNTFmZjNhYTQ4ZjAyMzIwYTY0ODUwODcxNjA0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDE2MDg4NTk3NmYxNjY2NzczNTNiMjdiMGE0ZTZhZjVlM2NlMWQxMTIxZjJiYjg3OGViMTdkYzQ4OTI0ZGFlMCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/proxy-probe.mjs#L1-L10",
+          "version": "repo-lines-v1:sha256:8534525f7a34e4ac9afa539aec95b1761b0ea4859011689af6d408ea743b9f4d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZjYzUxMWIxNTZjZDNkM2Q0N2YzZTc1YmRkZWZkNGY2YTM0NmQwNTMzMzUzYTllZGFiZGRlMTRkYzIxNDIzZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiNTEwZDViMTNlOWVkYjg0MDlkNTYzNWRlYjVmMTFjOGQ1OTZhMGZkMzIyNThkZDVmNDZmMzUyMTM5ZjE2YTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMwM2JlZWU5ZWExOTVjMTFkNTNlMDY4N2VhNGMxZmNlOGRlN2FiODgyZTk1ZjhmNTYzMzYwMjU5MWQ0ZjhhZmUifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/proxy-probe.mjs#L76-L107",
+          "version": "repo-lines-v1:sha256:36b16320ffea35f29a5ba17946b03a37975a0618ab26ad00083ff2d142a3a758:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2OTUzNGRkZTdiZTRkMWQ2MWM5YjlkMGQ2YmE3YjM3YjA1MTUxNDQ1NzFhYjBmOWI4ZWRjZTJjNzMwYTYwNTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM3OTI5ZTkxZTBmOTljM2U4MjVkZTY5YjQzNWZiNjQ4NGQxYjBhMWRmMmY0NjU2MWFiZjFhMjlmMDQxODhiODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmY2JhYzRlNDExMjdhN2Q3ZGFiNTRlMDBjOWUxZWVlYzViYTc5MWQ4MDcwMzJmMDhhNmQyMzhlZTAwMGY0ZDcifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/upload-release-assets.mjs#L6-L11",
+          "version": "repo-lines-v1:sha256:a333b948d38d0bd80dcd704eb59b5fe6445f157fe249213758460bda068b213b:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzEwMDgzMzlhZTFlOTVjMjI5MjhiZjU2YTA2ZGMxZThlMWJkNTU2NTEzZWVkM2NhOTA2MGVhMzNlNWMwOTExMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTk4YmEwZTk3YTcwM2QxNjI2ODYzM2Q5ODcyMTVhNjY4NDI5NmVhOTliMDI1ZDAzZWU3ZWUyZGRhYzhlMDZhMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTBiNWNjNzU0ODI1MWYwYzFiYTg3MDg2YjU0YWQ5MTI0NDMyMDk0YTAyMTcxODhmMWJhNDRhYmQwOWRmOGQzMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTZiNjZhZTdmY2FiOTUzNzAyMWUwNjYzNWE1YzEyNDUwNjIwZjVlNjcyNTEzMzBjZDI4MjdmM2Y2YzJkMjAzNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cdf96cdc5a5e4429b93ad84070c7b6d3",
+      "statement": "`pnpm dev:android-host` (`scripts/dev-android.mjs`) is the debug install path: it syncs version and credentials, builds the Lynx bundle with `NODE_ENV=production`, syncs the bundle into Android assets, runs `./gradlew assembleDebug`, and installs `android/app/build/outputs/apk/debug/app-debug.apk` with `adb install -r`; there is no dev-server or hot-reload variant because the APK loads `main.lynx.bundle` directly from assets, so 'dev' only denotes the debug build type.",
+      "evidence": [
+        {
+          "resource": "repo://package.json#L13-L13",
+          "version": "repo-lines-v1:sha256:565486649d8e63d2e310bc88525293c454ef9feba657c27ef1cd2b19f9f9d508:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTY1NDg2NjQ5ZDhlNjNkMmUzMTBiYzg4NTI1MjkzYzQ1NGVmOWZlYmE2NTdjMjdlZjFjZDJiMTlmOWY5ZDUwOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTY1NDg2NjQ5ZDhlNjNkMmUzMTBiYzg4NTI1MjkzYzQ1NGVmOWZlYmE2NTdjMjdlZjFjZDJiMTlmOWY5ZDUwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmI0NWIzYWE0ZTE0NTdlMjg0MzhlODdjMDRmZjVjYjE1MWRkZTIzY2FmMWRiMDY3MjE2MTZkMzY0M2NhYjdjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDM1MGU4ZDdiZjU0ODMxMWE5ZjhmODhiOTQ5NTUyYjVkOTE4NGI0OWY4ZmQ1MTQ0MDY3NTAxZDFkMjdhN2QyMyJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/dev-android.mjs#L1-L64",
+          "version": "repo-lines-v1:sha256:808612b8ef48aec882a905c5df4ebfbf0d7ac278d4302d5bfdeb5912153587e7:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4ZTA2MzA0MGZlMTg4NmVjMDA3ZGEzMzdhNmE3MDYwODk1ODVkYjZjMGYzNGMzODk5ODYyYzVlYzA2N2Y4ZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_51f86ed057e54ec9a2970c426ab09d78",
+      "statement": "The signed release APK is produced at `android/app/build/outputs/apk/release/pictelio-{versionName}-release.apk` by a per-build-type `renameReleaseApk` task declared with `outputs.upToDateWhen { false }` (so a stale `pictelio-*.apk` cannot be published), and `sync-android-assets.mjs` copies `dist/main.lynx.bundle` plus mirrors `dist/static/**` (hash-named icon fonts) into the host assets with byte-size verification, clearing the destination first — a missing `main.lynx.bundle` is the historical white-screen failure mode.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle#L99-L135",
+          "version": "repo-lines-v1:sha256:6bdf35b243d0d192bbd4d2f5f44b198645e12e53350a7a0169ccdf2405301a52:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYjY5MGE4Zjk3ZGJlNDYxYzliMGI4NGQ0ZjJlZDI4NjhjZWU5ZTJjZWRhZjhlNjlkOTJjZjliZmMzNjRjYTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzNjZkNWQ5MTIzMzVhMjQwMTVjZDdhM2U1ZWViZmU2MDRlMmExMDFjMDhlZWZiYzllNmNlZTJiMmFkNDgxYzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkyYWYxMTcyZjRlODUxNTE2MmZkMjhjN2M0YmI1MzZhOThmYTBkYzUyMTAzYWZjZDM2ODg5YzE1NzA4ZjE2ZWYifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/release-utils.mjs#L45-L53",
+          "version": "repo-lines-v1:sha256:19027ec930e6410689724f7421c541b998b617a9f3cdd8fdb6630b0a0df05b5d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzRiMzBmMGZiZjRkYTk1YTc2N2EyYzE2ZDNhNmY0YmY4MWMyZWM2Zjg0ZmZiMjc4YTJhOWRiOGZlZmU4MWE1NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTZkOTM1YTQyNzAwZjBhMTFlZWQ2NzZjNDI3NzYzZGM0MjcwYjE4YTQ3MjhmZTU0MmY3ZjkxNjkwNDllNmRhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDVlNTFiNGU2ZjJjNWFkYzVhNzRiN2ZiNzg0MjBlYWY4MGRjODAzZjlkNjNkNDc5NDIxNmVhZTVmNDVjMmZhNSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/sync-android-assets.mjs#L24-L71",
+          "version": "repo-lines-v1:sha256:bb81aba2058b2265e93f29315a2c1e9facb23751b80580fe5fa99bb35ed19f8e:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhlN2NhMjhmMWJhYjQ0MTdjODYzNmY0MzhhOWU1NWQyNDdiMWExNTlkOTU3YmNiNzBlMjIzMjRmODg1MzI4OGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3NTlmYTUxNzg3MzY3YTA0MGE1ODBmNTZiMmRkYWRmMWM5NTQ0MTFhOTY3OTA0NWYxMDg5Mjc3MDE2NDI1OWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0OWI2YzAyNGEwYzI1NDM2Yjg5OTIzZGRiY2FkOTRmZDE4MGM4ODM1NWYxNjg2MWM4YjU4Y2QwYjM3ZTRkYzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2a7b0e7dbfc4c58ac05420aac5b678c",
+      "statement": "The signing keystore must never be committed: `packages/android-host/android/app/pictelio-release.keystore` (alias `pictelio`) is ignored by both `packages/android-host/android/.gitignore` (`*.keystore`, `*.jks`, `app/release/`) and the root `.gitignore`, and passwords come only from the `PICTELIO_KEYSTORE_PASSWORD`/`PICTELIO_KEY_PASSWORD` environment variables; `docs/release-signing.md` remains the keytool/procedure reference but its build command, `app-release.apk` name, and paths still describe the removed WebView/Capacitor chain.",
+      "evidence": [
+        {
+          "resource": "repo://.gitignore#L31-L43",
+          "version": "repo-lines-v1:sha256:ea5af6f387eaf118678bc0edb87649ea25c4075d60cde3553fa7de55aa586177:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4NGQwYTlmMGQ1ZGFkN2Y2YzdmOGZiNDMxYjRjNzc2ODgwNTcxNTg4NmE1YzU0NDQ4MzA2Njk0ZDE0NTNiNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyMjk0ZTkzNDRjZmZhOGExNGY5M2I2ODA5N2UwZWNlMmYwNzY1MGFhN2ZmYjI1MTU3MDE4ZTRiZTAzYTQ2MzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI4MGRkOGM0YjBiMDgwNWMyNjcwNmEzYjExY2E1OGVkZTk2YmQ3ZDFmOGI2NTViMDYzY2I4MjhkNDUzNDgyMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwMDI1OGMxMmQzYjYxODc4ZjMwZTQyNWMwY2VjYmE2NWQ4Y2Q2M2JjOTM0NWQ5OGQwMTcyNzdmMDhhOGJlMjYifQ"
+        },
+        {
+          "resource": "repo://AGENTS.md#L204-L204",
+          "version": "repo-lines-v1:sha256:0a17e0a093d7984fd9a034b28e5d836c9f4d5be6b6f1718ea3c27ec2a937fdfb:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGExN2UwYTA5M2Q3OTg0ZmQ5YTAzNGIyOGU1ZDgzNmM5ZjRkNWJlNmI2ZjE3MThlYTNjMjdlYzJhOTM3ZmRmYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGExN2UwYTA5M2Q3OTg0ZmQ5YTAzNGIyOGU1ZDgzNmM5ZjRkNWJlNmI2ZjE3MThlYTNjMjdlYzJhOTM3ZmRmYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTI3OTBkMmM0MWJiYWIyOGVjYjNkMTgyMWQ3YmJlMDhlMTA4MDcxNTQwZDIyNzAxYzRjOGNjYzFiYmRkZGM4NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGNjY2U5NzgxOWIwMWNjYTVmMjBkMmViYTNkMjg3N2YwZTJlZDMzY2NiZDZkYzFlYzkxZDUwN2NjMmVkN2YyYSJ9"
+        },
+        {
+          "resource": "repo://docs/release-signing.md#L138-L167",
+          "version": "repo-lines-v1:sha256:8101b60e6981895125418b01b50c96bea6d72bf884b71d57f3bb03f2a9c41322:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwNjY1Y2UxZWY0NGUzY2EzYjkwYWI3NjI2MzA1OGJlMDM5ZGEyMDA1ZmVjOTk1YTU0ODkwZTlkNzQ0NjNjYTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3YzA2YzU2MWQ1YzMyNzM0MzY4NTI2OGE0NmIzMzkxZjM5OThlZWU4OTBkMmJlNTFmMGQyMWNjNGE1M2FlNmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/.gitignore#L55-L62",
+          "version": "repo-lines-v1:sha256:303b6eccd59e685a478d70362421aa1ab23bc462f54c9d9e2d4fb0cb76a2d037:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI2MjUxNzU1OGUwODZkN2ZjMTEwYzZjMTJiYTNjZmI1Y2Q4ODBhY2QyMzgwM2Y0M2NkMjU4MDliNmRhNTNlNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM5YmQzNTU5ZTYwNjUxOWIxYWRkZWNhYjRkMzA2ZTYwYmFiNTcyNWNjY2NkOWYzYjhhMTI2NGQzMWZjNzgzMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjhiMjI5NzNmNjExYjNiM2QwNDBkZTdhNTI1YWY0NzY5MjIzZmM0MWNkMGE3YTQ5YWE1ZWExZTg2ZjBjZmI1ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDg0YmQxNmMzMzFjOGFhZmQ4MzkyYjEwZWY0MjVmOGQ0ZmQzMTM4ZWI1OGIzZDRiYWMxN2ZlNDgwY2RiNTI3OCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4e379dd89ab54beba8ece09cf513d7ac",
+      "statement": "The optional AI changelog summarization step (`-i` and `-c` only, not `-o`) reads `PICTELIO_AI_BASE_URL` / `PICTELIO_AI_API_KEY` / `PICTELIO_AI_MODEL` / `PICTELIO_AI_PROTOCOL` from `packages/app-lynx/.env` (explicitly not the host package); any missing key means 'not configured' and the step is skipped with a warning, the protocol is explicit (`chat` → `/chat/completions`, `responses` → `/responses`), the default per-call timeout is 240 s, only transient failures (network, 429, 5xx, non-JSON, empty output) retry once while 4xx and timeouts fail immediately, and the step runs before the step-1 signing check.",
+      "evidence": [
+        {
+          "resource": "repo://docs/release-checklist.md#L167-L185",
+          "version": "repo-lines-v1:sha256:b888d11066d96755fcc6e461e4080e920a536e989b597fc85295287a29516192:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5OTcyNmMxMzg3M2U1YjkxYTViMWU4NGJhYmU2OTdjZmY3NjAwNDI1YzM0ZWM2NTFhOGE0OTUzODBhMjhhNWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3Njk0ODU1ZWZjODVjMTNhNTA0NmZiOWVlZWQzYjlhYWZlZTFjNzg5ZmVhNDZjZjVlMTgyNzFjMTE5YzI4MzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1Y2I1ODc0NDc1YTQ5NDU1Yzc2NzdlNzUzMjczZWE2Y2YxNTJkNzM4OTM5ZWFiYmQ4MzAwMzMwNzZjNjllNDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2OTEzZWVlZTcxZjUwZDNjMmJhZTJkNjE3MTQxMzA5YzFhYzMwZDU5MjVmYTBkM2U1NzZiOWE2MzQwMTM5ZjAifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/release-notes-ai.mjs#L19-L52",
+          "version": "repo-lines-v1:sha256:f30bf57ef8ec2ba651ea7e6f5b51e408a0ef496897b5bf9c0c5aff14f769891b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZjIyY2YwNzMyNTkyYzI0NzE0MWNiZTYxZWZhMTEwMTI2MTJmNWEzMTIyYjlhZjliYmFmNTJmNTcyNGQxOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyZDY3YmMxYmFlMTFiNWZhODRhMThkN2Y2YTcyZWY5YWU5YWQ3MjkxZTFmMzgwNWI1NmI5MDdjZjgwZjJlOWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzMmNmMjZiZDIxMmIzYWM3MmZhZDQ4M2E4NzBmNzRmNjUyNWI4ZTcwMzBiMDQ1YmJkOTE3NTFlOWMwMGYwMzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5ZjRjYWIwYzAzYTBkZTA2MmJkMGUzYTUyOWJiMTNmYWUzYmJhZmNkOGE1MGRjYTE1M2Q1ZTZhZDNkNzJjY2EifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/lib/release-notes-ai.mjs#L41-L44",
+          "version": "repo-lines-v1:sha256:dad45fb6b445979761fd877be1c5574d013c80a815ab493a6a0bec67b600b131:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjkzOGU1N2VkMzk5ZDI0MjUxYjk0NmJlOTBkMDRiYzM4NDM0YzU4M2M2Zjg4ZWFiODVlOTg1ZWY4ZWU1ODJjNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWExZDFhNjMzOTAyMjljNzk4MzQ3ZTgzYTA0MDU0NDFjOTQwMDAzNTI4NGFkMTY4YzFiZjZjZGYxZDcwYTM3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQyZDAyN2I5MjRmMjkxODA3MjMzOTQ2YzQ0ZDM0M2QwYjg4NzcxZThjZGEwNGFiNjIwOGM5NjI5ZGIzOGI1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDMwOGQyMjBkOTBiY2NmMDY0ZDQxNWU2YzY2MmQ1NDUyYjAwMWQyNDk5Yzc2MmQ1MTVhY2RhZjc5MThmYzhmZiJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/release.mjs#L349-L380",
+          "version": "repo-lines-v1:sha256:1ecec95d77f7e66c23870be825846dab405bcacf30594d4d450c2d9a26fadb29:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlYzQ1MWU0ZmIzN2UyNWVlMTM1OGZmMjIzYTEwM2VhOTQ1OTM0MDg2OWRjZWUwYjU4ODkzZTdjZGE1MTQ0NzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNTgwZTk2NGY4M2E0NzNmNDNkNDQzODQ2Mjk0OWQ2OGI1NjAwZmRhNzg3ZjE2Mzc0NWQwMGRlODljYmYzNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1ZDBlOTc1MmYxYjE2MjFiNjIzMGQ1OGViYzBhZWViMTI0MjU5YzBjZTI0YTJlODdjMjJmMWUzNjEwNDM4ZDkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fb4873c6a4d44ca4afd3bcf98c93c6bb",
+      "statement": "Release step 4 rejects any `git status --porcelain` entry outside the three release files, so the untracked `_site/` directory left behind by the local preview `pnpm deploy` blocks an interactive release until it is deleted.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/scripts/release.mjs#L806-L819",
+          "version": "repo-lines-v1:sha256:1e57e509a0861253725a2d48148de16be87d0ddbbd4731a5469c4b192d0b3431:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2NjY4NGVhZmM2MmQ1ZDQzNmRhNTM0YzAzYTgwNTQ1ODU0YzQ5NTA2MGY0YjZkMzhlNTdhNThiMWQzZWU0OWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExMDQ1ZjI3NGM4YWNhNjQ4OTFhMWIyNGM4MjRhMDNkMzZiMzhkYzRhMTgwNjVlYjcwZDMwZmExNjY1YmMzZDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwNDMwYjIwYjkzNDc0OTQ3Y2ZhNGI1ODY5OTNjZjU3NTY2ZDg0NjZkMGM1YmJmN2EyZGVhMWJhYjAwMDRiODkifQ"
+        },
+        {
+          "resource": "repo://scripts/deploy.mjs#L20-L21",
+          "version": "repo-lines-v1:sha256:82c6e4cec6e511e92792ca95b824e2f74c2338d9d69fc77ff065f45fbd0842b8:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2Q5ZTIwZGY1MjYyMjI3MzI4NDlhMmEyNWU4ZGUzZWExNzhlNDEzY2JmMTMxMzE2NGNjYTZjZThjZTJlOTM4NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzNkMmY2YTdhMWU4YTRlY2IwNDAwYzdiYjU1ODE1ZTAzMTA1ODZhMzhhN2ExNjM5NGRiZjhhYjE1ZDZmNmI0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDkzMDI4M2Q1YmZkYjFlYjA3NDM2MGIzYjEwMDhjYmFmYzc2MmQxNWFhMmNiNWI3NTRkNmQ4OWNlZDc3YjI5ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzE0NDgzMmYwNjI2Y2RjOWFhZjIxNmI2NjJiY2IxYjg4N2UwZTVhMTkwMjNhN2ZlZjU5OWE4YjdlYjk4Yjc3MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7ac41e5abd7c4306a11dcb91a2c156b3",
+      "statement": "`transition-matrix.spec.ts` is the only android-e2e spec carrying the `@release-gate` marker: it is the ADR-0163 pre-release manual gate (3 Lynx rows after single-engine consolidation) that runs outside per-PR CI through `pnpm test:android-host:e2e`, and because the suite skips as a whole when the pinned AVD does not match, the operator must confirm from the suite-level skipped count or `--reporter=verbose` suite names that the gate actually executed.",
+      "evidence": [
+        {
+          "resource": "repo://docs/release-checklist.md#L222-L230",
+          "version": "repo-lines-v1:sha256:4cb63ce2c109de7e302b51ce0ec81ab0fb6d92ee52b2a4ded50ae98b7d1a6905:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNjNWE4ZTg0YzBiMjgzNzdhZWZkNzFjOTc1NzAxYjMwMWIxNTMxZjkxZDgwNjRmZDFlZDVhNjA2YjA1OWI4ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2FkZGEyOGE5YjVjNzA3MjlkYTQ5ZTQ5MWYzNGJlNGJhMjcyYzE0OTA4NjY0OTc5MGE4ZjI4OGNhMzIxOWZlZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzFjMjBmMWQxZjIwZjBiZWRlMDIxNmY5ODYzYjQ0YWVjZjVlNzAyMmQ0MzA5OTk4N2ZlODQwODg4MWM5MGY1OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTllMWM0YTc3ZjQ2MDYxZjRhY2UzMTY0ZjUwNWYxZmVjYmZlZTAwZWQ0OTA3MjIwOTk2MTgzYTRkZGY2MTYxMCJ9"
+        },
+        {
+          "resource": "repo://docs/specs/qa-defense-lines.md#L42-L45",
+          "version": "repo-lines-v1:sha256:d3fb33e0b128d4214341c68a681a3197d046c82d3d484f4efb597631959bf648:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM3ODM4MWEyMjEyNmVlOGQzODU2ZTU0N2I0MzgyYzU2ZDcxZTg3YmEyYmMxMTUyYjczM2VjMDU3YjIwM2QxMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JhNjU0YTI1N2M3NTNlNDA1ZGU4NjVjZjQzNjFlNDRhYmU1NGZiMWY3MTI4ZDIyZmY1MmYzMDU2OGM4NWQzNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTY0YWRhZmFkMjIxMGRkZWVhNzNkMjhkNzQwMmE0MmUxOTZmNzgxOTRhNDM2NjA5NzM1OTQ0MDc1N2YwMDU0MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDQwZWEyMGE3MTY4YjliMDhmYWJiOGU4ZjAxM2EyNDgxZTc5MjdmODZmODA0YjEyYjczYmY2NmQ4ODdlODU1YSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts#L1-L10",
+          "version": "repo-lines-v1:sha256:cee81690cb4209f3ad96c30e5e5a2202cb85e73308d76ede853a32eff507dc8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRjZDBkMmE3MjMxZTI2OTRjODhjZGQ1NWNlZTE1OGRmMjUxOTg0YTc5ZjQ0YTUyNTgwYTI3YmUwOWQ5NmIyN2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyM2NiNGMxM2Q2Nzc1OWQ1NGY3NjcxZDQ0MDM0OTcyZDA5MDNhMzlkMDhhZmFlNzNiYjk4MWViOWFiMGRjZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3YzEzMjg3MWRiNzg3M2FhOGI0ZmExOTNkMTNmZjg1OGI5NjA2YzRmYmI4OWY2MjI1ODc0YzJlMjMxYTYxNTkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9ba47de188694fd185a28224bd89e605",
+      "statement": "Because GitHub Releases is the only distribution channel, the ADR-0163 staged-rollout replacement is publishing the tag as a pre-release for at least 3 days and then promoting it (`gh release edit <tag> --prerelease=false`); the release script's `gh release create` call does not pass `--prerelease`, so the marker is set as a separate operational step.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0163-qa-defense-lines.md#L43-L45",
+          "version": "repo-lines-v1:sha256:ca31aa20fb866f38247242ad4c58e031f950e8789dc2975c3d6d00958793d06b:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDZhMDY2ZmJlZWRhYTNkOWM0MDM3YjE3MjliYmRjYjdkYjY2NDQyNGRlYjFjYjczNTllM2YyNzk1MGQ1MzVmYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjllNmQ1MWUyNzQ0NDJkYzU2ZDYzOGU2NWQ3N2ZmZDQ1OTRhMmY4NjFiZTQyMDA3MzUzYTNmMjc1OWUyZTIzZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzY5MTg1MzExMGFiMzI0NzRmN2M0M2ExOTFjYWRhNDYyNmZlNWI4YzZlNzQwZmJiMDg4Yzk3NTYwOGM1ZDY3MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTM0ODM1MWE1YzU4NmVjOGNjOTUxZDI3NmU1NmJjODc5NTU1MWU1MGRiNTY2NjE4YWM2NjM3OWMzZmMxNDE2MiJ9"
+        },
+        {
+          "resource": "repo://docs/release-checklist.md#L219-L219",
+          "version": "repo-lines-v1:sha256:ad6208062e2edd4367c4c4ba44b56ecaa076ea21d8cd8de0878e3802a84dd83e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWQ2MjA4MDYyZTJlZGQ0MzY3YzRjNGJhNDRiNTZlY2FhMDc2ZWEyMWQ4Y2Q4ZGUwODc4ZTM4MDJhODRkZDgzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWQ2MjA4MDYyZTJlZGQ0MzY3YzRjNGJhNDRiNTZlY2FhMDc2ZWEyMWQ4Y2Q4ZGUwODc4ZTM4MDJhODRkZDgzZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDk3NmU4NWIxNzBhYzJmYTdlMGJjMjZkZTA3NDU4NDg0NzZjYzU1NDk3NDk3Zjk0NjA2Yjc1M2M0ZWIyMzk5NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTY5YzhjZDY3NTQ3ZjYyNDI2Y2ViYzQ4NTJmMzNiYzEzYTY2Y2I2OWZlZjc1OWE3NTJkZmNkNTIwYTNhMGRlOSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/scripts/release.mjs#L869-L901",
+          "version": "repo-lines-v1:sha256:cc0e7d663469903bdcaaf9ed033e88fbc3304248c2e29dc2745882b57fe2759c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhN2ZhNTkzMTViZTQ2MDkzNTdhY2U2NTViODA4YmM3OGQ2NDRiNjc4YTllMDYxODBlMGYyNjNhNmJkOGM3NDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliNjJmNjBkODU5MGE1NzljZjQ2ZjhkNjczNzhjNGM1NzJiOTYyY2VjY2RiOTBjN2E1ZjdiNDJiOTYwNzgyYTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjZGM2NDQyMjU1MmQwZTE4NmE3MDg5M2IwOTg3MmUwMzlhNjMxZjJhOGZjYmVjODRlOTE3ZTMyYWU3ODEwNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2ZGFmZGRkZWQ5Zjc0MDI1M2Q2NmY4MWJlZDMwNjBhNGFkZjMyMjVlNmYyMjdlMDFlZThhYWM5YjZiMjEwMzIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3c9b25bc85524cc7be3291a416e3262a",
+      "statement": "`BENCH_NAV=1` is a compile-time macro (`__BENCH_NAV__`) that enables the benchNav deep-link hooks used by device verification and E2E, and it must be injected across the whole build chain (`BENCH_NAV=1 pnpm build:android-host`) because the chain rebuilds the Lynx bundle — injecting only `build:app-lynx` is overwritten; the shipping chain does not inject it, and the native forwarding additionally requires `BuildConfig.DEBUG`, so the channel is absent from a release APK.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L93-L107",
+          "version": "repo-lines-v1:sha256:c16c2e3eee782104e8f90964276955206e6785d71adaac06f8650894d9da6d24:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2YzQzMDRjZmFiYjg4OWU4NjFkZWQzMjYxMTZmMDZiZWVhOTI5MjNmZjkzODQyMzEwY2ZlNzVmMmNkNzhkMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MmE4MWUxOTFiMjYxMDNhOGFiZDVjN2FhZmMyZjAyNmNiMzBjZmEyZTI3OGY4MTU2ZmVhOTQ0NGQ5NWY4NzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0NmI2MzVmYjZjODY4YTY1NmY0YmZjZWNhOTFhOTUyNGMzNWI5ZjQ2N2RiZTdjZDU5Y2NhMzIxZmEwMmQyZDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiN2ZkYjJhYWNhODgxZWEwMzI1MWJkNjQ2ODk0ZWU2NGMxZjgwYjI3NGY1M2IyNzUxZWY2ZjhhZmRkMDA2NTgifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/README.md#L78-L89",
+          "version": "repo-lines-v1:sha256:59bb07d77080ffbfe9f241728dbee344bcc4fcc234f44de7b2c6cff7276505f3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4YThjMDg0ODUyNGQ5ZjdlYzA5ZGUxMzAzMzg1YjQ4NmM5N2U0MTM3N2FjMjJhNGYyZTgzNDMyNjBlODg3NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkY2FlMDBiY2I3NWVjMjRmMTQ5NTQ3YTFiYjBmMjI2ZDFjY2NkYjFlM2ZhNzEzNWZkZWVlOGZkNjJmMjdmODciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM4MDJhYjAxOGI1YmFjMjQyMDVkNDI1ZDI1NTE1MzZiNmY0OThkZmQ3YThkNWUwNmJmMzU4MGY5YzEwNmRjY2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlZTg2YjUxZmE1ZmMyMDhhZDIxYjZhZDZmOWQ3YzY3OTZjZDYwZGIyMjljMjE5NjI1YzM0NGE3ZWJkNmUxZWQifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-translation.sh#L24-L45",
+          "version": "repo-lines-v1:sha256:917223baf87183820000039e5195b836010f786d8ff4850d5b8e3441ff51f6e9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyMDk5MDVhYmIxOTUwY2VjMmMzMjEyMzJiZWQzMDcyNWVmNzkzNWI1MzlmMzQ4OTlmZGFhY2I2OGEwODBlN2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhN2ExODRjMTNmZjkwOGNmODRjNDg4NDRjNTQwMzkxZmJkNzcwNTNmMDYyYmJiYmM4NzY0NGU5ZTkxMGJmMWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI3MTFmMTEyNWM2MWE4NjQyYmNjNDQ3M2VjNGM5ZDMzMDk3ZjM4NWZmYjBmNjY4ZDA2MmI2OWZkYmNmNzQyY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwZWIwZDdhMWI0ODg2ZDJhMGUxNmZhOGU3NWIzNjkwYTQ5MGQ5OTJlYWZhOWRlNDc5MmFjYTcwMWVkZjhjNDMifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts#L114-L117",
+          "version": "repo-lines-v1:sha256:4a937a43a4e3c357b043ec1bd5215e735128ebdb226607c4f01a017bcf28eb8a:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM5YjIxY2U4MGExMWEzOTU2MTIwZWJjYmYwNjM5YjY5Yjk1MjBiNWExMzhmNDlhMTFlNWRhYTMzNzc5YzNhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWVhMTM5OWQyMjJjYmJmZDczYmJmOWY1NTBmMWRiMjY2ZGI2OGFlYjFmMGEyZjFjOWJmM2M4MGViNjA2ODcyNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWU3N2Y3OWQ3M2IyMjUwM2I3ZGIzNmRiNzA1MWFkYTA4MDg3MmFmMzg3NzUxYmRhNjE4MTI5NGViYWI0NDljMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODk5MmU5MGFkM2Y2YWIxMjVkN2UyYTNiZjEzNGUxM2JlNWI5NDY4YTM2ZTJjM2Y1NjAzYTk4MzNmMTBiYmZjMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_27f229295e1b4c13858924c9e1af86a4",
+      "statement": "`PICTELIO_HOME_BLEED` is a build-time rspeedy macro (default on; only the exact value `0` rolls back to the old 64dp top bar) whose polarity has a single source of truth in `packages/app-lynx/homeBleedHeaderFlag.ts`; because it is inlined into the bundle a shipped APK cannot be toggled, so the release operator must check `env | grep PICTELIO_HOME_BLEED` before building and verify the artifact rather than trusting BUILD SUCCESSFUL.",
+      "evidence": [
+        {
+          "resource": "repo://docs/release-checklist.md#L88-L140",
+          "version": "repo-lines-v1:sha256:6365016bfdd2ea571d6d4e9649a0872a735bb4ac01252663b3e6eea306c707dd:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxMGZiOTMxYWU1ZGI5NDRlZGNlYjkzYjllNzI1MDI0NzAzMDM2ZTI3NDNhMTAxMTNlOTY5ZWRjMDZlMmJiY2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5YTRiNTU1YzNiZjUyOGIwY2JiNzhkMmFjMmYxYzIzOGZhMjJlMTNjODhjN2ZkNGRkN2YzMDBjOTNhNDAzOTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiNGY2Y2RiNzBlY2QxODA4NGI1MjIzNTMyY2Q3NjY0YWVhNmM1MTIwYmE0MTAyMjBmMzdiMGUwOGViYWM5YjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiOWE2NjNiZDA1M2U3YTBmYmNkYWEzM2JiMWNhNzhjZjYyMTQ4MDk1NDZiOWZhZTA5ZGRkYTFkZGNmM2ZiZGUifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/homeBleedHeaderFlag.ts#L17-L28",
+          "version": "repo-lines-v1:sha256:782fd8c6eecbcd3348f3f1cd72776c6b0f3b8a2f988d556020129c0f60980790:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NTczMzJiOWVlNGExNWVlMzdiNDIxZTFlMmQ0YzVmNTBkY2Y5MDYwNTBjODNlYWNmY2I5YjM2ZjU2YjljMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkODY5MGU2OWM0NDIwYmViZjAxYzE0NDEzZWZlNTM2YzVkOTk2OTNlNzc0NjYzYWM5NzVkZjM4NmM4ZGVjMzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2ZjM2MTYxZTZhZmMzODc2ZTgwZWEzMmYzODE2ZWZmNzMwYjkwZDI4ZDc5ZTkwYTllNTExOGZiM2NjNmFmNzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3NTA4Y2U5MjZmMDczZDliYjU4ZjU4MGQxZGJlN2UyZWRlY2Y2ZmQzMzcxN2I4NDg2MTVkYjBiMmIxNWNmZDIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/lynx.config.ts#L118-L130",
+          "version": "repo-lines-v1:sha256:bf0c72d74ce88e8fae455416afe7bdaa06252a9b2811ecd52f6e3bdf571cbb2f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2YTFjZTJjODY2NjRiMjAxN2RlNjE1YjI4ZWYxM2I4YTk5NDljMjgxOTA3ZjgxODAzZTU4ZWFjZTQ4ODVkMGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3ZTkzYTBkNmMzNzE1NGM2OGExMjJiYjkyM2I1NGY2NmVlNWNiODM0NDliOWViNGIyZDQxMjg4MGJiY2NjMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzNjNjYWNlYTg3ODI0Y2RhNjcwZjA0YmIzODZkM2I1MWIxMDJjZWI1ZmI2NDIyYzIzZWFiMjBhNGIzNGMwNTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1MWM2NTI5N2Y2ODExOTc5MmU4NDA4MGQ1YzFkYWUxNWFkMWFlMDdkODk4OTU0MTFjYjc0ZjkzNjhmMDk4ZmUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1d5d3d7e80ab40f582753cc938388f42",
+      "statement": "Release builds contain no debug channels: the `pictelio_dev_*` intent extras (auto-login refresh token, force-R18, LLM endpoint seeding) and the native benchNav forwarding are gated behind `BuildConfig.DEBUG` and removed by R8 in release, and Lynx debug mode is enabled with `enableLynxDebug(BuildConfig.DEBUG)`, which is false in release.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L518-L520",
+          "version": "repo-lines-v1:sha256:7a07bf52dc6c27cd98ba92a2388a748b484b961e51f28a72d7da789d6eb96f00:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTNjNTgwN2UwODhiZWEwMmNiYTc4NWIxMWQ1YzI1ZDE2NzIyYzgwYjM4OGJmYTgxOTU4NTM1Mzk1Y2FlMGQ1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjllZGJhOGJlODFkOWYxYWJmYjllMjJhZWU1YWRmODJlYTI2MWZhMjcxOTFkMDljOWMyMzQyNzc2OTg2MjgxMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTYxYmRhZmQ4MmZmYjFmOGIyMjQ1M2YwOGNiYjE2MjJhMGE3ODgzNGQxZGJkOWRhMGZhMmQ3N2Y4YWFkMjZjZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTdlMGRmMGY0MjQxZTdhYmQzMDczYTI5OWVmZWZkMDU1NjU3MDZmN2FmOTNlZGFmMDA5ZDk3NGUyN2Y4MzE2YiJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java#L715-L736",
+          "version": "repo-lines-v1:sha256:2a15a0b9937b21cc2f9bbb48b243cf1c947a96e54d0966a95cb371ea8d583e38:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkMWFlNmNmNmYzYjQ2MjBiMDUwZGUwYTgzYjIxNjVlYjUyY2JlMDkyNDM5MTliNzgzNjM0YzhiZWIyNzJiOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkyOTM2YjQ1OGIyNjE1NDU2NzVlMDllNDIyZTY5ZmEyYjA1MWNhZWIyN2Y5NzliMDM4ZjZjOWIzMGIyYThhNDAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2OTdkZWFkMGI1YjRlMGM2ZDhjMTRiMGM5NjNkZmMyOGMyZjVkZTI1NjU4Y2VhMGI0Zjk4MmUxOGVmOTdhNmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwYmY0OGM2ZjI5OWY0NjRhOTA3ZTA1ODYxNjI5YjgzNzI5ZGFhNjU5OTcyZjBjNmJhNTYxNmY4OWM3Mzc3OWIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java#L86-L86",
+          "version": "repo-lines-v1:sha256:b7c94de8b9a12b22ea26952b1fe06927d4e6432ddeba10177256db79a956e119:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjOTRkZThiOWExMmIyMmVhMjY5NTJiMWZlMDY5MjdkNGU2NDMyZGRlYmExMDE3NzI1NmRiNzlhOTU2ZTExOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdjOTRkZThiOWExMmIyMmVhMjY5NTJiMWZlMDY5MjdkNGU2NDMyZGRlYmExMDE3NzI1NmRiNzlhOTU2ZTExOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWQ3MGQxZTFhNGRmYWMzZTcyNTdjMzgyZTBjOTYzNzA4YzRhZGZjNjhkZjZmY2Y0MDY0NmJiYjZjZTFjOTA0YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWUyYjllMjFmZGM4NmZjMmMyZWU0NDcyMTg1ZDY3NjQ2N2JkZDFjYmYyZTI0YjRkYzY0NGFiMWFiYjMzMjU0NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_eee3ef673c0445dead99a8e0c858390a",
+      "statement": "Several pre-release gates recorded in `docs/release-checklist.md` are currently unenforced and must not be recorded as passed: the dual-engine QA transition checklist (R1–R4), the engine-degradation evidence matrix (both unexecutable after single-engine consolidation without a WebView engine to switch to), the night-mode walkthrough acceptance record (`docs/research/lynx-night-mode-walkthrough-acceptance.md`) which does not exist yet so its gate stays closed, and the former 'debug backdoor key must not be present in the APK' assertion which is permanently zero and therefore no longer detects anything — replacements are pending redefinition tracked in #805.",
+      "evidence": [
+        {
+          "resource": "repo://docs/agents/qa-transition-checklist.md#L1-L20",
+          "version": "repo-lines-v1:sha256:042c040d5890c35fe34399432039f912a775bfe12b081724cebef3a8c7b67fd9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5MjU1YmZlMmI5N2I1OTQ1ODM5N2NjNjQyNzc3NjNmOTc0NGVjZmJlNzU2OTJlZmM0NzAzYmU1M2QwMWYzZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5NTFkNmY0Zjk0ZmJkYzA2NmQ3OWU0YzJkYmNjNjdjZGFiOGE3ZjIwZWNjZmM3ODA3ODUxNDJlMmY0ZDg3NWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2YWVkYjIyMmY3Y2I3MDExNTE5MmM1MWY1ZjAwODAwOGE4YTllYzliYWViYmMzOTU3NWRlNzQwNDQwNTRlNjQifQ"
+        },
+        {
+          "resource": "repo://docs/release-checklist.md#L214-L231",
+          "version": "repo-lines-v1:sha256:bf6fe4154c9e15854f3b0b5d3409a79c9a482983f8f1ebec3583fa173c03f49c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5NzRlM2YzNGIzMDRhYTMxNzkyZDhiZGE5ODljMWMxN2UxYzAwNDRjYmQxYjA4MTRmOWIzYWQwYmRmNDEwNTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE5ZTFjNGE3N2Y0NjA2MWY0YWNlMzE2NGY1MDVmMWZlY2JmZWUwMGVkNDkwNzIyMDk5NjE4M2E0ZGRmNjE2MTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJmOWJiNDMyYjM4MDljOWYyZjViMzM0YzM0OWMyMzlhYjU5MjU1ZjA4NDc2MDU5YjZlZDZjOTViMzQ3NWEwMWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff046c7586884969b490c08a106825f4",
+      "statement": "Release-adjacent verification outside CI includes device-side scripts that drive a real installed APK (`tests/android-e2e/tools/verify-translation.sh` builds with `BENCH_NAV=1`, refuses to test an APK older than the packaged sources, and asserts the translation request actually fired), `packages/app-lynx/scripts/verify-top-inset.mjs` which measures rendered top-inset magnitude against the platform status-bar inset with its verdict logic in `topInsetVerdict.mjs`, and `.github/workflows/sysbars-acceptance.yml`, a manual `workflow_dispatch` assertion gate that runs the system-bar acceptance matrix on an API 35/36 emulator on a GitHub runner.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/sysbars-acceptance.yml#L1-L13",
+          "version": "repo-lines-v1:sha256:dcf0a27cd7750a6a0f73cf7a317b7dc3ba93f7697d9337b8a76b0f22d724351d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlY2NjYjU2ZDFkMGY5NTNiYzBmMzlhMThiNDA3ZGZlYmM4MTYyNzFiNWE0YWQzMjIwMDcxNjMwYjI2ZjllYjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmMWQ3MGQ3MmJhZDIzMWQ0M2M1NzVhY2VmNjk0NjU4MGU0MzljODc5Nzk0ZWQyZWExZjRhNDAzNDAyNDUxNzIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-translation.sh#L1-L60",
+          "version": "repo-lines-v1:sha256:24233537541d42566602a27bbc6a882e10a8e3b562e6e64ce8fa97e3fdf432a6:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MWY2ZjRkNGFkODMxZDZiNTQzMWFiM2U3NmZjMTFjOTQ2NTU1YmJlNzgxNWRiMDA4NTE1Nzc4YTM1NTIyNzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxOGZkMmE2OGYwMzA1ZGMxMDI1ZTBiMTVkMzMyOTVmOTEyMmU4ZTdkMzJkMjJiNjgzZThlZWQxMDFiZTE2NzIifQ"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/verify-top-inset.mjs#L22-L40",
+          "version": "repo-lines-v1:sha256:4bc77b12c4c11893aa969f7f8a4ca63d1384b84321c79326c7c9e46d7e7a62dc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwMWVhZDkzNmEyMjgxZDUzZGNjMDY0YjdlMmEyYWIwZDUzYjkyZWYzZWY3YjM0YjY2ODY3MzAwNzg5NWM4NjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkwMTViOGJkY2Y2NjZiYWI2NTA2MTM1MDYxM2MzYzk5MmZmOTJhNjdlYmUyNmFlMjFlOWU1MDUyNDEwMTVkMTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhkNWRhM2I2YjM3OTMzNmZkMTQzZmQ2ODA5MDlhODQwMzE3NWYzZTFkNzIwOTMzZjI0YjI4MTQ4M2E5YTlhNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjMjE4OTM3NDY0MjU4OGJhODRmYTViYmRkZjkxNWM2ZjAwZmEzMjllNjM0YzIwZTUxMTNmYWQ4NjMxZTRmNjEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d531f0149d9a4b5db05469e327bf0dca",
+      "statement": "Some verification scripts cannot run against the single-engine build as written: `packages/app-lynx/scripts/lynx-device-check.sh` and `lynx-flow-check.sh` still launch `io.pictelio.app/.MainActivity` and seed the removed `pictelio_client_kind` preference, and `tests/android-e2e/tools/verify-abort.sh` still pins flavor-era artifacts (`assembleLynxDebug`, `apk/lynx/debug/app-lynx-debug.apk`), whereas the launcher is `LynxActivity` and the only variants are the `debug` and `release` build types.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/android/app/build.gradle#L31-L33",
+          "version": "repo-lines-v1:sha256:2f0b4fa137bae7004c68060969459173238e43cc000e300e0bc858120638bb98:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzMwNDhmMjc5MDljMzNlZDNmYjY3MWRjODE2ZGJlMjNkNjU2MzQwZGU5NDk1N2QwNzY1ODI2NzYwNWI2MzBjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzM2OTZkODdkNmQ0ZTM0NjZjYTU2YTliNjY2N2FkNzc2NGMwNDRmMDY3NmJjNjczZDM0MjE4MjZlNjRiM2ZhOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjc1OTcwYmJlMmY3Mzk2NDVmZjU1MmVjNDY5OTRkM2JhNjhjZWEzMmUyNjU1ZjQ5MmQ5N2RkMWFmZTk0MWNlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTMzYWUxZTFhYjRmMGI0ODU1NjRkNzU2MjQxOWMzNmQ5MGE0MGYxMGI0OTE3MDViNTQ3NWQxZDJjNDUzODVjNyJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/android-e2e/tools/verify-abort.sh#L53-L61",
+          "version": "repo-lines-v1:sha256:c603cf1920140f7b4195b586c755b91d1d3cc7adf09736f987e6a37901929674:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmEwOWZlYTdiZGFhOTYzYmRlOWZlMDgyN2M4MDVhZjU0NGU2M2MxMWNkODYxMDgyNTNhYzVmNjE3ZjdhM2UwMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmEzZTMwMDRmYTAzMTFhMWU0NDk3NjQxODFmNDVlNmM2MjU2NTYyMDdmMWQ1ZmQ4ZDNmMTZjYjU1OGIwY2ZhMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTJiYjI0NDg5YmFlOWYxZjgzZjRlNjUxZDIzODMyOTAzYjhmNWZhMzBhYjczMTk3N2E1M2NjY2NjODZkNjNjMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODMyNTRiYTU1ZDRhOTM4N2UyZTViNzA1MmYyZDNiNDM4MTUzNTNhYTE4NWZmOTY0MmY0MTM0ZWNiNmRkODIxOCJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/lynx-device-check.sh#L33-L38",
+          "version": "repo-lines-v1:sha256:75ac0fce8a71da3093375d815839fc70c2ccf7b93cb3e8e4491250002d9c7235:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWFjYzA5OTUxMjY3MzBhNzM4NDVhYjQ2ZDE0NjQ4Mzk1Y2E2YTlmZmJjZDEzNDliYzIyNDU0MTNiNjRjOTgyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGJkYWY0ZWIwMmIzMDg2ZmRiODM5NDE3ZDkxYTgxMjBmODA4ZTQ2ZWYwYTdmNTFiOTc4YTc2MWRjNDg1OWE0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjM4NWZhM2EzZGE1YmQ2ZjUzNTNmZjc0YmQ3ZDE4Njc5N2NkMTNjYzhiZTEzNmZlNGUyMTA3ZTUzN2VmNWE0OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjVjOTRiYjY3NjRjN2IzNGIyMGI3OWUxN2JhMzI5MTdjMGI2ZTZlMDRjYjcyNWM4YTY2NDkxMTIwZDg1Mjk3MSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/scripts/lynx-flow-check.sh#L41-L51",
+          "version": "repo-lines-v1:sha256:36012964fb25252aad42bd7c0913773d4cbed92507df6df0f6f38b3a04dc609c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMjZiYzI0YmQ2ODExMzEyZTc3OWIwY2RmZTU4MmViMzJlMjMzYTFhZjNhMzQyNzVhOGM3OGVlNjI2MjRhODIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRjZjk2NzEwYzIzMDViNmZlZWE5NGFhMzc4ZDkwNTIxM2QxYmJkNDZiNzM0ZTM4M2FjZDM3OTkzODEzYjYxNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5NDFhYjkxMjQyZDBhYWNhODYxZjIxODcwZWI4YzQxNDEwYzdjOGIxODY2ZDZjYmRiYTQ3M2RlNDc1ZWU0YTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIyZjgyMjEzMjRhNmUwYzVlODQwNzU2MDIzOWZmYzdjNWQ1NWE1ZjhiOWJlMDJiOTA4ZWM4MjAzZWFjMGZiZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_37b7de7c631945dc8d83f0fab292ec49",
+      "statement": "Release-script invariants are unit-tested under `packages/android-host/tests/unit/scripts/` and run by `pnpm test:android-host` (which feeds `pnpm test:all` in CI): the step table vs real pnpm scripts/Gradle tasks/APK path, branch and divergence preflight topologies, a subprocess test that retired flags are rejected before the TTY guard, uploader and clobber/error classification, proxy routing, the `planOverwrite`/`executeOverwrite` seams, `version.json` shape, AI summarization protocol, changelog truncation, git-ref helpers, and upload-panel formatting.",
+      "evidence": [
+        {
+          "resource": "repo://package.json#L33-L33",
+          "version": "repo-lines-v1:sha256:f689646aa289690d3f0e1bbeffd4b0286d5feddcd1d53c1cecb21dfe84e39e09:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjY4OTY0NmFhMjg5NjkwZDNmMGUxYmJlZmZkNGIwMjg2ZDVmZWRkY2QxZDUzYzFjZWNiMjFkZmU4NGUzOWUwOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjY4OTY0NmFhMjg5NjkwZDNmMGUxYmJlZmZkNGIwMjg2ZDVmZWRkY2QxZDUzYzFjZWNiMjFkZmU4NGUzOWUwOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjEwZmEwZDk0M2JlOTc1OTViYzNkMmEzOGQzMGRiNWZlODBmYjIyODJlZGMyNzY3MjNhMzlhOWRkNmFlYmEzYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODk0ODJkNmY1ZGM1ODUzNzRmMDY5MWFjOTVhMTFjNzZjYjcxYTI0Y2RjYTRkNzllMTFiOTQ3ZTYzMzZmZWEzZCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/package.json#L15-L16",
+          "version": "repo-lines-v1:sha256:e569fc547c3f3ee96165d7dca1fddbd85543e299b4bad354e3783cfa8e028bf0:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjQxZmMyNDllZmE3MWIwZTdhOTdmN2Y0ZWI4Yjg5NDk0YTU5Y2IzZjg3ZDcxYmU2YWFkNjNhYTNiYTVlM2QzYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNlY2VlYWY2YjY0NTNkODJmMDExY2UxODU1ZDMyMWM4YzQ2NTk1ODcyNjIzMjc3NTU3Yzg5MDE4NzMwZTg2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjlkNzlkOWQ2NDg1Y2QzNTdkZjBiMWQ0NjZiNGNmMDExMThlNDI0MzY1MTE5Yzg2MGY1NjRmZGE1ZGY4ZjRiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDYxMWQwYTc2ZjFjZGY4YWEyZDhmYzg5NTk1ZWZhZDNiMTg5Nzg3MWVkMWYxYjRkOTczYzllZDJjNWEyNzNiNCJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/release-build-steps.test.ts#L1-L12",
+          "version": "repo-lines-v1:sha256:d3c2431990b32993ed428fcdb8a77f5f6b2738862876016e206ba016a127b7d5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1OGFiYzA5MDJjMTIyZTQ5MjkxN2IzODYxYWQ2MmQxMWVkYTQ2MGRhNzUzMDM5NzI5MWNiNTVjZDQ3YTdhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliNzI0ZjRmZDJkMjkxMzlmNTQxMzk3YzQxNzExZDJjM2Q5YWU1YjkyYjA4NzhlMjNlMTFjM2I2MWQ3ZjY2MjkifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/release-retired-flags.test.ts#L1-L10",
+          "version": "repo-lines-v1:sha256:ac66b0cc58842036964e542ac95b2bdfcb0ec1b5cbe9eaa2fbfb1ddc6b650155:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxODIzODU3MjkxZjdmMDg4OWMwZjJmZmRmMzgyZWRmZGQ0NDYxYzEzYWZmZGNkMmQzZmY0OTNjMDFhMDA1MDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkwYmZjMjJmNWUzNDU4NzEwZTA5MDIzNThjZGI1MWYwMTI0ZmQxMWRhZGEzNjZhN2FjMTgzYzM4MDBiNDM3NGUifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.0",
-    "at": "2026-10-04T18:40:18.128Z"
+    "at": "2026-10-08T00:43:21.663Z"
   }
 }

@@ -1,0 +1,4 @@
+# Files
+
+- [MD3 Design System & Token Contract](md3-design-system.md) - The design contract every app-lynx UI change must obey — the single token source styles/tokens.css plus the material-web v0.192 numeric baseline, how each token family is wired into Tailwind and how new code must consume it, the state-layer/shape/type-scale/icon rules, the M3 component set with its migration gates, and the closed list of intentional MD3 deviations.
+- [Viewport Geometry, Insets & Motion Contract](viewport-geometry-and-motion.md) - The space-and-motion contract for app-lynx — unit systems and the native content-area viewport, per-route top-inset ownership with zero-content spacers, the two-tier bottom occlusion allowance driven by fabGeometry, the GlobalFab occlusion band and immersive chrome mode, and the UI continuity motion rules (durations, easings, route and hero transitions, reduced-motion gate) with the device verification scripts that police them.
