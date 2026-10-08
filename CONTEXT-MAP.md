@@ -5,7 +5,7 @@ Pictelio 是多包 monorepo，各包的领域上下文相互分离。本文件�
 | Context | 包 | CONTEXT.md | 领域 |
 | -------- | ------------------- | --------------------------------- | ---------------------------------------- |
 | `app-lynx` | `packages/app-lynx` | **已创建**（活跃维护） | Lynx 客户端 —— 唯一运行时形态（列表浏览、受限内容、分页、小说导航、领域词汇） |
-| `android-host` | `packages/android-host` | **未创建** | 构建宿主：Gradle 链、Lynx 原生模块、发布脚本、E2E 与 JVM 单测（不是客户端） |
+| `android-host` | `packages/android-host` | **已创建**（活跃维护） | 构建宿主：Gradle 链、Lynx 原生模块、发布脚本、E2E 与 JVM 单测（不是客户端） |
 | `ugoira` | `packages/ugoira` | **未创建** | 动图（Ugoira）zip 帧处理纯函数（fflate 解压 / Range 切片） |
 | `update-check` | `packages/update-check` | **未创建** | 更新检查纯逻辑（版本比较 / version.json 拉取 / 超时兜底） |
 | `novel-export` | `packages/novel-export` | **未创建** | 小说导出纯逻辑（提取 / 块解析 / payload / 格式表） |
