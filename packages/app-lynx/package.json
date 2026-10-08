@@ -1,6 +1,6 @@
 {
   "name": "pictelio-app-lynx",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "private": true,
   "description": "Pictelio Lynx client - vue-lynx (login / recommended / illust detail / novel + AI translation / global search / comment / bookmark / follow / user home)",
   "type": "module",
