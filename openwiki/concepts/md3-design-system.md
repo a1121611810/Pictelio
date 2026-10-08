@@ -77,14 +77,13 @@ sources:
     resource: repo://packages/app-lynx/tests/stateLayerOnPrimary.test.ts
   - id: openwiki-source-b6c2a7edfbe69bc8fbd5ad23
     resource: repo://packages/app-lynx/tests/typographyFontWeight.test.ts
-generated: { by: "openwiki/0.7.0", at: "2026-10-08T00:43:21.663Z" }
+generated: { by: "openwiki/0.7.1", at: "2026-10-08T01:48:11.384Z" }
 ---
 
 # MD3 Design System & Token Contract
 
 `packages/app-lynx` is a **Material Design 3** client, and this page is the contract that any UI change must satisfy: where each design value lives, how new code is required to consume it, and which gate turns red when a change bypasses it. The baseline is [ADR-0205](../../docs/adr/ADR-0205-md3-baseline-and-scope.md), whose companion ADRs own the detail: [ADR-0206](../../docs/adr/ADR-0206-typography-type-scale.md) (type scale), [ADR-0207](../../docs/adr/ADR-0207-shape-and-state-layer-guardrails.md) (shape + state layer), [ADR-0208](../../docs/adr/ADR-0208-material-symbols-icons.md) (icons), [ADR-0209](../../docs/adr/ADR-0209-md3-filled-text-field-alignment.md) (filled text field), [ADR-0212](../../docs/adr/ADR-0212-tonal-elevation-surface-over-shadow.md) (tonal elevation). The per-tier term register is [glossary-md3-alignment.md](../../docs/adr/glossary-md3-alignment.md); consult it before quoting a value.
 
-<!-- openwiki: broken internal link [../../AGENTS.md#L207] heading anchor "L207" does not exist in "../../AGENTS.md". Fix the href or restore the target, then delete this comment. -->
 The Fluent Design chapter inherited from the deleted WebView client is **historical archive** and has no force here — the single current statement of app-lynx design constraints is the `### app-lynx 的 MD3 约定` section of [AGENTS.md](../../AGENTS.md#L207), and `packages/app-lynx/tests/agentsMdMd3Baseline.test.ts` fails if a second current-constraint statement reappears or if the deviation list drifts off the ADR.
 
 Gate paths below are relative to `packages/app-lynx/` unless they start with `src/`. They all run under the app-lynx Vitest suite (`pnpm test:all` on CI, per [Testing Strategy](../testing/overview.md)).
@@ -96,7 +95,6 @@ Two scope boundaries apply to this page:
 
 ## The Numeric Baseline: material-web v0.192
 
-<!-- openwiki: broken internal link [../../AGENTS.md#L212] heading anchor "L212" does not exist in "../../AGENTS.md". Fix the href or restore the target, then delete this comment. -->
 MD3 numbers are **not** taken from memory, from `m3.material.io`, or from a secondary summary. The single authority is the generated token source in the upstream [material-web](https://github.com/material-components/material-web) repository, path `tokens/versions/v0_192/_md-sys-{shape,motion,state,typescale}.scss`. `m3.material.io` is JS-rendered, so its prose cannot be fetched and verified — it is illustrative only. **When values conflict, the upstream token file wins** (ADR-0205 decision 1; restated in [AGENTS.md](../../AGENTS.md#L212)).
 
 Two disciplines follow from this and they are checked by humans, not by CI:

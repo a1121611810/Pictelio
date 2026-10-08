@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:8ed6fa9c22eec5ff83273c94e0f94084ecaaa8eff583a4a13f01c127c50dad70",
+  "claims": [
+    {
+      "id": "claim_629c063bf44c43c6a85b3edf3a72e9ea",
+      "statement": "The repository mandates a four-stage pipeline for requirement-implementation work — Grill 澄清 → to-spec → to-tickets → implement — forbids skipping a stage or starting implementation before the preceding stage is finished, and requires an agent to detect which stage it is in and to surface a stage conflict (rather than silently obey a follow-up instruction that crosses stages).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L163-L187",
+          "version": "repo-lines-v1:sha256:80151268f86e88d23714bfa59adcd2de9062c451e6b081ada6cba14d8101e2d6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIzZTAwNThiYzJjNzhmYWVlMTgxNjNkYmNkY2VlMmIxODE3YTU4NTMwZjRiMjMyOWU1NjgwYThkZTBjZTU2OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExMjE4OTE5OGM2ZmQ2MTMxYTU4MGI2MTU5ZWY5YmMyNWMxZDU3NzZmY2RkZmY1Yjk3NDg4YmM4ZTAwNzk4OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ2OTg2N2EyYzkxOTI0MzBlOGQwYTNjNWIwMmJmNTIwYzQxODhhNWNlMDgyZWFlZTFlZjU4NGNiYTZlZDNmODAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRhNTFlZDQxNDBkMmQxYWY1MmJlNDkwZDQxMWM1OGM1YmJmMzc0NjEwMDQxM2VhZTI5NTk5ZDc0MDdiMjI5ODUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4f40cd1ceef4445e894e260290b3c265",
+      "statement": "AGENTS.md keeps only a high-priority pointer for the review-fix loop's rules, exit conditions and gate freeze line; the normative text lives in workflows/review-fix-loop.md, which declares itself the fact source for the loop.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L176-L182",
+          "version": "repo-lines-v1:sha256:2e2fa9fa836ab97b1d645bb9473d352831073591ca798cd88952eada2ab7d5cb:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc2MzM4MjI0YjAzMGMxOGViMWRjZThjYWE5ZTQwOTEwMWI0ZTEwYTEyYjVkYzYzZDEzNjhkZTk5ZDhiNTNlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTc3Yjc1NWM3YjExMmM0MGJkMTlmMTUxNTQ2NTU0NWYwNjBiOTg4NGU1ODJkNmNlYTk3MjI0NGJlZGI5ZDM0YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWFkZDJiMWE1ZDYyNWE2NDMxMTkzODdhMGJlNWU0ZDA4MzBlYzhkYTA3Y2MyNmZkOTc2MjQ1ZDllNGE2OTdjZiJ9"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L6-L12",
+          "version": "repo-lines-v1:sha256:c0c121511b7d4e1ea7bb4016f94a96e683c9522aae475754b90d5165ab40f948:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY0MmEwOTQ5MjJjNTgwYjIyZDUyZjU0NGI3YjY5OTc1OGM2ZDY0YTBlNDg0OTVjMjcyODRmODJmNDAwNDdiMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFmZDllZmQ0Yjc4N2MzYWNkOTFkYWI0NGFiYTdhZjdmZWI3MzM4NTcxNjE1YzVkMTg4MmVlNDgwYmE0Mzg4NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2M5MGJlOGZmODM2YzcyMzAzYjVkZWM4NzBhZTgzYmQ0NzM4Zjg2NjZhZDJlN2M1YTViZjNlODI3ZmVkMTU0OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGZmZGUzOTJhNmIzZGU5OGM4OTEwYTA3NTIzMmY4NjQ5NjExMGExN2ZjY2U5NTMzNTlmMzg3NmQ4YmExZGNmMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_161d4783d2e1453f8aa2c084540b78ef",
+      "statement": "The pipeline's allowed exceptions are a pure bug fix with exact reproduction steps and expected behavior (which may go straight to /diagnosing-bugs), a pure refactor that changes no external behavior, and a local change of at most 20 lines that does not affect abstraction boundaries; every code change, including all three exception paths, still has to run the review-fix loop.",
+      "evidence": [
+        {
+          "resource": "repo://.agents/skills/review-fix-loop/SKILL.md#L6-L26",
+          "version": "repo-lines-v1:sha256:fd5bac6c4e267e1a8b0a8395666849b756b7b5bca3b008b85c6bef92df4f5b8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNmZiZmFmM2JmYmVkNGQ5OTc3NzJlZmE4NDRiYjlhMTFlNDA2YTE3MjljYWUyMmQ3NWIwNzE2MmQ4YmRhMDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjZWYyNDc5OWE5ZWFhZGYyYzdjNTYxOWM2MmQ2ZDMwMGMyMGE4ZmRmZDBjMTM1NTZhMjc3Zjg5ZTkyYzc4ZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjOWZlMDAwZTVjMjgyMTcwZmEyNmRlMWRmZjMxMTZkMjc5ZTk4NDY3MTY0ZmI5NzY0NjQ2MzI4OThiZTM0ZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0ZGRmMTYzNjdlZjhhNjZhMGFkZTdlMTE4OGE4YWEwYjliYWZmNjAyZmRhMmRmM2JmNGE1ZTY4NjRlNDU3ZTMifQ"
+        },
+        {
+          "resource": "repo://AGENTS.md#L183-L184",
+          "version": "repo-lines-v1:sha256:1df6a59f85e5af078ff9a3376100b02ad13e731aed2dc3b3e81c162dc6475ee3:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjg0NmFlZWRlMzI5ZGU5ODU3NjljYTg2ZGVlMTczYzhhYTllNWNmOTg4OTE4YjUwZmU4MjM1N2E3MTdkYjUzNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Y5YjhhM2JjNGNkOWJkNDZkOTZhNjJjMjc4YmMyN2M4MTVjYTkwYTdkZDRiYjMyYzllOGY2NjQ1ZDUyMTBiNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWM3NDI5MDYzMzRmZWI5ODBkZTY3Zjk4NTI2MjBmZjEyYzE3YjU1ZjlmY2FiMzFmZDQ1ZTRkOTYwMDMzYTE4OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjg4OWM1OWVjOTg1ODQ3NWRkOWNmZTBkYjNhNmNmMTgyZmQ1MzIxOTEwNDUyOGUyMjA4OTQzYWViMzAwZGJhMyJ9"
+        },
+        {
+          "resource": "repo://AGENTS.md#L291-L293",
+          "version": "repo-lines-v1:sha256:95ea9c152039876e6ea8d8cb2db8a713a900d50697d865460626bd86d273ed02:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5YzNmZTg5YzM2N2RiZTlkMGQwMGMwNDNlNmZkZTY3NTE5YWRlYWE5OGE5MDg2MjcwMjU5NGQ0YmUyMWY4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGFjNDQ0NGRhM2JhNWMyZDU4MmMxMmUzMzczZmMzMjUxMmU2NjFkMmU1ODJjMzM0NTdiODRjYjgyMmIxY2RhMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdkZWU1MjA4YTE1NmUwNGNlZWRjMmZiNDBiY2FmMzlhMGRhMzVjOGU5NjQyOWY2NGUyMjMyYzc0Zjc0ODlkNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWFiNDQ4Nzk2OTc5MTJhYTMzMTY2MDE2NzUyOWZlYmMwZDU1YTViOTg4NDk5ZjNhOTgzYmQxODk5MzlmMTY2YSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_754b4d8ffa7a4bafaceb14feba5022f8",
+      "statement": "Each pipeline stage has a required artifact: Grill yields the requirements boundary, acceptance conditions and exclusions; to-spec yields a structured spec; to-tickets yields tickets that are individually executable, each declaring its prerequisites, with an unfinished blocker barring the start of work — and the ticket artifacts live under docs/specs as <feature>-tickets.md with a dependency/deliverable/acceptance/status table.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L172-L176",
+          "version": "repo-lines-v1:sha256:5ca7239ad728242ead6a0e0b8cdeb461d575df1568da0401a59762745bce34e5:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzUwYWUzZTI1MjhlNDAzMmZiODdlYWU1YTM5ZmMzODBiZmM3YjA3MGE1NmFkZDZkN2EwNDQzZjdjZDgzYzVmNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc2MzM4MjI0YjAzMGMxOGViMWRjZThjYWE5ZTQwOTEwMWI0ZTEwYTEyYjVkYzYzZDEzNjhkZTk5ZDhiNTNlYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzUzZWEzOGM5MjdmOTQwOTA2MDI5YTE1NDVjODlmMTQ4YmVkM2ZmY2JiZGU5NDQ4OGIzZDZjMmFkNzU5ZTJmNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Y4NzQ5NjVhMGY0MDQ1Y2M2MzExOGI2NGQ1ZDY1NjcyNmQ2NzIxNDg3ODI2M2MwMTQ5MWYzM2YxYWRiZjhjZCJ9"
+        },
+        {
+          "resource": "repo://docs/specs/engine-availability-fallback-tickets.md#L2-L5",
+          "version": "repo-lines-v1:sha256:532cfefa67ec741c675bdc14e9045bc0b7775c7634a25f823c0fe20fcf3395f9:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTdkZjk2OTFhNmQzNTBiYzI1YmNmMDg4MmUwNWM0MjgyNTNkOTQwYTMyNWNjOTU1ODMxZDk2ZmJlYjQ2MmE0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjEsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTg0ZTQ4ZDJhMGUxOTY2YWE0MWQ5N2I4YjE5MzhiNjRiYTc1MzE3MjU4YWUwOWM0MzUyNDE4YWZkMjAyOGI3MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2VkOGE4ZmMyMTliMDMxYTNhNjQ2NGRmNTk4ODJkYTRkZTZiYTI3MmIxNDY3Y2JjODljNTBlOTVmYzVlMzFjMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4204894c7da748939d052a7a39e2229e",
+      "statement": "Only two skills are repo-local: .agents/skills/code-review/ (the version the loop must use, declaring it shadows the global same-named skill) and .agents/skills/review-fix-loop/, which deliberately carries no rules and instructs the reader to read workflows/review-fix-loop.md first.",
+      "evidence": [
+        {
+          "resource": "repo://.agents/skills/code-review/SKILL.md#L3-L4",
+          "version": "repo-lines-v1:sha256:17d97492d3be249e0769e8bd604deb4e510ef52795a3c5404286da5f537bac41:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjM2NzE1ZGFkZDAwOTlmZGIxZjAwOTk0ZmYxOTgzN2MxYWE3NjUxODM1OWNlNTljYjVhMGRhMWUxMjU5MTg1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjUyZDcxMTEwM2Q1MGE0Mzc4MzBjNmZiY2QwNGZiNGJhYjQ5YTBmODJmNmQyNmQxYzc5MWM2ZTg0ODhkZDA5MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2ZjOGZjZjIwYTFmNTQxNTE2YTM0M2QwMzM0YWY3YmRmMWNlMjBhN2E3ZjJhYzk0MzUyM2I5NDkzNzhkODRhZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmIwMjMwNzM5ZDNhMWViNDI1ZmY1ZTA5MmQyNGVkNzVjODgwOWJlOGUzYWVjZTZmNWJjYzhlNWJiYjgyM2RhZiJ9"
+        },
+        {
+          "resource": "repo://.agents/skills/review-fix-loop/SKILL.md#L6-L26",
+          "version": "repo-lines-v1:sha256:fd5bac6c4e267e1a8b0a8395666849b756b7b5bca3b008b85c6bef92df4f5b8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNmZiZmFmM2JmYmVkNGQ5OTc3NzJlZmE4NDRiYjlhMTFlNDA2YTE3MjljYWUyMmQ3NWIwNzE2MmQ4YmRhMDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjZWYyNDc5OWE5ZWFhZGYyYzdjNTYxOWM2MmQ2ZDMwMGMyMGE4ZmRmZDBjMTM1NTZhMjc3Zjg5ZTkyYzc4ZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjOWZlMDAwZTVjMjgyMTcwZmEyNmRlMWRmZjMxMTZkMjc5ZTk4NDY3MTY0ZmI5NzY0NjQ2MzI4OThiZTM0ZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0ZGRmMTYzNjdlZjhhNjZhMGFkZTdlMTE4OGE4YWEwYjliYWZmNjAyZmRhMmRmM2JmNGE1ZTY4NjRlNDU3ZTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ca8b6f601f774f04a482ba234347e66f",
+      "statement": "The review-fix loop is an event-triggered activity rather than a schedule: it starts when the implementer declares the work done, its deliverable is the file set touched by the current commit's diff, and it ends when the commit lands — push and deploy are explicitly a different activity, as are the four-stage pipeline and the discipline for writing gate files.",
+      "evidence": [
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L133-L137",
+          "version": "repo-lines-v1:sha256:5344dc7934d1303a0c0c0db52fa6b38c0f94df7a9fe599d4c9cc77ddfc256f7f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTJiZDQ0ZTE3NjcxNDE1YTJlMTBkZWIxODMzMjNmNzM2Nzg3OGMzOTgzODJmM2Y4ZDM1MGM1MzRkZDQyYjMyNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmNjNTFmYjA1NjcxZTJhODA4OTQzNTYyY2VlYjRlZTc4NDVmNTdmNTBmN2Q2M2FmYTQ4NzUwMTFlNWYxMzI3YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTJlM2VhNWZjZjdmMzU3NjBjYmU1YWE4YzU5ZmZjNzRiMjBlOGZhNDRkOTBjYTk3ZTczYjUxZjY2NmFhMWYwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQyNTQ2N2ExZmZkNzcxNGQ0ZGY4OTZhZjUxNzEwMTE5ODAwMTA3ODU1MGVhNGNhOTQ2ZGUzZGE0MGQyZjJmNiJ9"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L6-L11",
+          "version": "repo-lines-v1:sha256:c7c97f610c481f7ea9a15c0f0cd6ff07155d558564079c1e1796ce60e67f0d85:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY0MmEwOTQ5MjJjNTgwYjIyZDUyZjU0NGI3YjY5OTc1OGM2ZDY0YTBlNDg0OTVjMjcyODRmODJmNDAwNDdiMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2M5MGJlOGZmODM2YzcyMzAzYjVkZWM4NzBhZTgzYmQ0NzM4Zjg2NjZhZDJlN2M1YTViZjNlODI3ZmVkMTU0OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWJiYjExMzhmZDU4ZmNhOTRjYjc0NTdjMjExZWYxOTczNWM1MWNlYzYzMGY1ZmUyMjIwMjA0MGExZDM5YjM4MyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fbcce5abcf9d41f8a621ac49086fd445",
+      "statement": "Each loop round pins a fixed baseline point and runs the repo-local /code-review, blocking findings are fixed with /tdd and the round repeats, and a round passes when the deliverable yields zero findings.",
+      "evidence": [
+        {
+          "resource": "repo://.agents/skills/code-review/SKILL.md#L20-L26",
+          "version": "repo-lines-v1:sha256:455c2edfa5521e3effde57bd5311e2597e8ada29cd2abd01d77137bf2d00b611:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGQ0YTRlMzdiMGZkNDUwNzU0MDA1Zjk5NjI2OTgwN2U0ODZkNTZmZGMwMWNhNjQyN2Q0NjE2YWUwNDk2ZWU0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQ1YTFkMGUyMmYxOGRjZmM5Y2E3ZTQ2NTZmOTYxYjkzZjcwZGM5ZjU5ODk1NmM1YzBhYzhmMjU2OGEzMzI4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmI0ZWQ0NWUyMTZiYzg3YTdhYjBhYThhODhjODI3MWRiZmI5MGY3MDkyOTEzYzNkMGVjY2I4MDFkYWE0MTEwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmU3YThlMWU4YmRhMjM2OWE3MzUwNDk3OWE1NTM3ODNjYzhhMTg0MzhkMzI0MGExYzc5NDM1NDBjYmRkZTZjYSJ9"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L21-L40",
+          "version": "repo-lines-v1:sha256:0be7778362001a4d6a5439fdd7c43547dd99aea8c0f8eb8215ac1d9dfd09b60c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzYzkxODBmZTAzODQxN2YwZGQ4ZDYyZWI5YjI2NWVlMWE3NTBjMGFiZGNlODY1Yjk3OGU5ZGU1YWUwYjVkOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1ZDMyNzQ4OWU1YWVlZWY1NjcyZTU4ODc3MTIwODZjYjkwNzY0NGZjYWIwMDMyYWNkOTAzMjkwNmFiZmJkNGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjllNTRjMmMwMDJjNmIxMmQxNmNlYTUxNmJmZTZmZWRkMjA4MTk4MTE3NTQwZTAxNTU0ODBlNTMwMDI1NDE2NGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFmNzQxODU3MDZiMTg2MThlMjBhNWVhZGQzMWYwYzBjNjAzNzMxZjYwY2E1NDI3MTRmNWQ4ODE1OGI2YWFmMDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8bf9aeee507a4ab09f9608f54c9de6fa",
+      "statement": "Convergence and stopping are deliberately separated in the review-fix loop: \"until no problems remain\" has no decidable definition in this repo and \"N consecutive rounds with no new findings\" is explicitly rejected as a success criterion, because the agent is both the author of the tests and the author of the fixes; the stop triggers are idle spin, a due external anchor that did not pass, and a human call.",
+      "evidence": [
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L42-L70",
+          "version": "repo-lines-v1:sha256:baed5b0cf3928c72fe92c1c340c8422c6dde971ac5306296caaabb09830fa462:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiYTQwNjEwNjUyMDQ1OWYyYzMwNDdmNjgwNjIwZjM3YTNhNzFlMDAyNzI5M2VkY2NlMDVmZWE3MjZlYThjNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZiZDA5ODVmMGFhNjcyNzBjNGQ4MDA0NWQyMTRjMWZmMDUxMmJlMGIxY2E0ZTg5Nzk4YWEyNGUwZTIxNzdmZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk5ZTQ0MzUyNjQ1M2VlMDk4ZmE0NjIwMTQ2MTcxOGM4Mzk0YjhhZTJkOTkxMjQwZWIxMGU1NzM2MmYzZjZmYWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a51404b7daa6402d83fe50fe4472bd51",
+      "statement": "External anchors (real device, real data, user-visible behavior) are triggered by the nature of the change — Android native changes, cross-platform contracts, real data shapes — with a periodic fallback count, rather than by a fixed number of rounds.",
+      "evidence": [
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L71-L80",
+          "version": "repo-lines-v1:sha256:000d55b3428cbaa5eeb03bfc2e136c4265914da435ec64de6c1febcf1cc8f225:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxZjVjNmY2ZmU2MDM2OTQ1NWIwYzI2YWQ1NTJkODAyNjMzNjNiNzYwODcxNzMwMTAxMzY0YmFkYjQ1YzI5NTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3ZDJhZGVkNzEzOTM1ZDM3M2E5NjM5N2FkZDQ0MDIzYTc4ODU0YTJlMzJiOGY5NmIyODM3Nzg1ZTVhMGE0YzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0ZWQ2Y2M5NzcyNTI1NDAyYzBlOGY2YmFlMWZjOTA5YzMxNjk3ZGRmYzJkZTVlOGQ3OTkxZTk5NTFlYzcxOWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxYTBhNTM1NTA0MGU2N2NmMDRkMmY0NjA4MzM4NjVmNWE2MzVhMmU3ZTBiY2ZiNTViNTYyODk4MDFiNjEyMWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f2ef489c2368436b8237fc60063556cc",
+      "statement": "The loop interrupts the human at exactly three checkpoints (anchor verification, idle-spin judgment, pre-commit), and the checkpoint brief has five mandatory items and carries no diff.",
+      "evidence": [
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L82-L102",
+          "version": "repo-lines-v1:sha256:37f78ec26d0eb926199274944082df521fdf256442e12a59a78991b979e1cccb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkNDVhZmMyMzEyNzg1MTQ2MzIwOTgzODk1YjNhNjUzNGZkYmUxOTkyOWY5NmMxZThmZDMxYTAyYzM1ODFjODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2NDIwYzdlM2QwMDI5MTQ5N2M0NWY2MGE0ZTVjNTEyNTljMjU3ZDU0ZGQwODBlMjZjYTAxODZhMTgwMTc1MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY0MmI5ZWFiZTRkOGNmZTQ2ODA1Mjg2ODM0MmE1NzFjNTA2Zjk1ODE2NWMwNzU3NjRkMmM2YWJjYTgxOTNiYjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzODI3NDY3ZmRjZjNhNzBjOGIzNjU0NDFlZjQyOTc5YmQ3YTYxYjdmNzEwNDQ4YzdkYjhiODA2MWIyZGM2ZDcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_acadb5bdc01f4e29aed21d5d4a341647",
+      "statement": "Gate discipline (criteria for a gate's discriminative power, the bans on negative evidence, the requirement to register each gate's known failure surface) and the gate freeze line live in workflows/review-fix-loop.md; AGENTS.md keeps only a redirect and declares that every repo-wide citation of \"AGENTS.md 门禁冻结线 #N\" in ADRs, specs and script comments resolves to that spec section, while newer citations name the spec path directly.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L275-L278",
+          "version": "repo-lines-v1:sha256:c47d4053c1bfdfbd541b76f78eac163604bf869003dfea9253db28b231aff158:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjBhMWMzYTZjNGQ0NjIzODUwNjYxODUyNzhhNTBiZmU4Yjk4NTg0NDhjZWJmYTJiNzE3MmRjYjMzNmJiZThhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzFhNDI2NWY0NzFhYTUwODJhNDA1NjFjZjhmNWEyMmU0YmUwMGQyYTU2MWY5NjhkMjkwYzNjYmNiZDBlOTg4YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMwMTAzNGI2YjM1MDIyMDU3OGFiYTI3ZmY5MzM3N2EyZGQ1OGUzMDFjOTEwYTE5MWMxZjkyY2E2MzhmMDBkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDRmZjM3ZGU5ZmE5MWU0NTJiMTVmMDE4ZmQ3MWQyNWFiOWM1M2RjY2Y4Y2UzODBmM2Q2NzkzMzNjNjIzMmU0NSJ9"
+        },
+        {
+          "resource": "repo://packages/app-lynx/tests/fabOcclusionBand.test.ts#L1-L13",
+          "version": "repo-lines-v1:sha256:ceb5ed6b3058ae1bfff320dab67fae541d7f2f286bb3ccbccc4a73591bc2292a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0OWRhZmY2NTE2NDUzOTRmZmU5NmIyZjc5NTE3NGQ3NWY3OTc4MTVjY2ZiNDg4ZmRkOTg5ZGEzZDhmYWQ5OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUyNGRiYjBiNjAzY2QxZWFmZTlkZWY0M2U4MjU3NjQ2MzVkZGE3Y2E5ZDQ1ODI3ZjM4ZDg0MDY0ZTM0ZWZlZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzNjE0NTA0OWMzODY5MDgxYWRjY2IxOTllY2U0ODc2Y2MzY2RhNmFjNTdlNGE5NDk0OTI2YWI3MjYyMGRkMjAifQ"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L107-L131",
+          "version": "repo-lines-v1:sha256:5bef92e74180fbefde37e636dc42c4c34d4e0aa38221c53e061603764e4f2b16:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzOGRkNTIyY2U5Y2ZhOWRiZGI1ZWJmYmFiMmUzNmJlOGMxZDc3N2YwOThjMWNhNjA2MWVmOTNhMzkxMDBiZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkZDJlOTVjMTA1MDRhMTJjZmFiMmJlNDVkMjFmN2YwMGQzOWVlNWJhNTE3YmJiYjMwNzA3N2E3OGIxMzQ5Y2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhMmM4MDA3NGIwMzFmNGY0MTA2ODU5MGJjMWI5Mzg2MzdiYTAxMTcyZjJlNzVhNDYzNmVmOGY3M2M4NzJiNzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhM2M0OTQxZGU3NGI4OGMyMmYyNTg2YTAxMDExZjBjZmZjNTZhYWE1MDMyN2JhYmQ1YzI2Mjg2NTM5NzAwY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5700d05ddefc4a3b9ea9f5a08d61bee3",
+      "statement": "The code-review skill has explicit preconditions: it needs a resolvable fixed point and a spec source (issue reference in the commit message, then an explicit path, then a matching spec file, then asking the user), and when no spec exists the Spec axis is skipped with an explicit \"no spec available\" note instead of silently.",
+      "evidence": [
+        {
+          "resource": "repo://.agents/skills/code-review/SKILL.md#L20-L26",
+          "version": "repo-lines-v1:sha256:455c2edfa5521e3effde57bd5311e2597e8ada29cd2abd01d77137bf2d00b611:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGQ0YTRlMzdiMGZkNDUwNzU0MDA1Zjk5NjI2OTgwN2U0ODZkNTZmZGMwMWNhNjQyN2Q0NjE2YWUwNDk2ZWU0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQ1YTFkMGUyMmYxOGRjZmM5Y2E3ZTQ2NTZmOTYxYjkzZjcwZGM5ZjU5ODk1NmM1YzBhYzhmMjU2OGEzMzI4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmI0ZWQ0NWUyMTZiYzg3YTdhYjBhYThhODhjODI3MWRiZmI5MGY3MDkyOTEzYzNkMGVjY2I4MDFkYWE0MTEwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmU3YThlMWU4YmRhMjM2OWE3MzUwNDk3OWE1NTM3ODNjYzhhMTg0MzhkMzI0MGExYzc5NDM1NDBjYmRkZTZjYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_62df4e18ae6d45ddb0c468ed9cb6e995",
+      "statement": "The Standards axis of the review discovers its standards sources (AGENTS.md, CONTEXT.md, docs/adr/, README and similar, used when present), so the absence of docs/development/ and CONTRIBUTING.md in this repository is explicitly not a defect.",
+      "evidence": [
+        {
+          "resource": "repo://.agents/skills/code-review/SKILL.md#L24-L25",
+          "version": "repo-lines-v1:sha256:7ca7a8c456c24c5e769c2205af844775dd4959334a56ca7424ac4c6512c8080d:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTM3ZDEzMTBkYTc4MTc4MGQ0NmYzNjk3YWY1MDFiNGU4MzA3MTlkOTgzOGJkZjVjNzY2M2EyYjI2YWIwZTc5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGIxZmYwZThmZTk2MjQyMzRmMjE4NGE2NjlhYzQ0YTJiMTEwMDhhOGE5NGMyOTYxMjFlOGM5Njk3NTc0MGUwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGEwNmMxNDJlN2UxNDQ1MTM4NDE2MjUzMGUyZmRmYTdiZjU2OGYzMjU1MGU1NzQxOTk1M2MzNjk4Y2U4ZDA1MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTcxZmFiNjM5ZTNmNWU2ZTFmNDlkZTE0ZTBiNTk1ZDM0ODljYWMyZjNjZWI3YjFiMTkwMWUyOWJjMDNlMjJhYiJ9"
+        },
+        {
+          "resource": "repo://workflows/review-fix-loop.md#L40-L40",
+          "version": "repo-lines-v1:sha256:f5d327489e5aeeef5672e5887712086cb907644fcab0032acd9032906abfbd4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjVkMzI3NDg5ZTVhZWVlZjU2NzJlNTg4NzcxMjA4NmNiOTA3NjQ0ZmNhYjAwMzJhY2Q5MDMyOTA2YWJmYmQ0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjVkMzI3NDg5ZTVhZWVlZjU2NzJlNTg4NzcxMjA4NmNiOTA3NjQ0ZmNhYjAwMzJhY2Q5MDMyOTA2YWJmYmQ0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjExY2NkMGM1NmY3Mzk5YTEwMGU4NGJhNmIzNmQxYTAzNzk3NTRhNWJjZWVhOTA3YjhlY2UyYjMyYjJhMDRiMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWY3NDE4NTcwNmIxODYxOGUyMGE1ZWFkZDMxZjBjMGM2MDM3MzFmNjBjYTU0MjcxNGY1ZDg4MTU4YjZhYWYwMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_3e1726fac8594c43935201007ccb62a1",
+      "statement": "Commit-message compliance is enforced at commit time by the commit-msg hook through commitlint with @commitlint/config-conventional: header at most 72 characters, lower-case scope, non-empty subject, and a fixed 11-value type enum.",
+      "evidence": [
+        {
+          "resource": "repo://.commitlintrc.json#L2-L14",
+          "version": "repo-lines-v1:sha256:5694af0b89a11f0d41cc4671373c0a52c08c01144247b5cc116b5de7cbef9e1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlMjJmY2Q3M2I2OTgxNjRlODExNGY4YTY1M2ExODEyOTNlZDk2M2QwMWY5MzkxMjRmZGY1NDI1YjQ4YTc1MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjoxLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2ZmIwOGZkYTFhY2I5NTdiNjExNmJkMzc4MTFhMWZlNDFhMDE2MTFjMDYzMWVkYmY3ODZkNjg4OWEyN2E1NWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://.husky/commit-msg#L2-L3",
+          "version": "repo-lines-v1:sha256:eba31c3892b439b9e3603e8d08d8d2c63b561e6aebf7544ab6bf4bb54b8e3f9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDBkMjgwZmNlNGMwMWM4ZDUyNTRiMTdlZDEyNmFiZDk3YWQ5MjRhMzQ0ZGRhN2NkOWRjZjljNDExOTU2YTkwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWEzMDhmODE0YWZiM2ViOGRhMjcxNDVjOTQ3NjI0ZGRiZjJkOWNmNjgwZTVjYzUxYjk3MTI2N2UxZmU0YzM2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjEsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTgwNzZkM2QyOGQyMWUwMjAxMmIyMGVhZjdkYmY3NTQwOWE2Mjc3MTM0NDM5MDI1ZjI4MmUzNjhlMzMwNWFiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5e6c7d7179f34a33b693a93d9b9daf62",
+      "statement": "The pre-commit hook is an empty shell that runs no checks and only documents that OpenWiki generation left the commit critical path for the GitHub Actions schedule.",
+      "evidence": [
+        {
+          "resource": "repo://.husky/pre-commit#L2-L4",
+          "version": "repo-lines-v1:sha256:7abf583de0c280758df5acffce69fc48c37ba68155a229d6cf8dbd74e3897657:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGZkYjk5NjEwNzY1NmE1MjQzYWMyYTY3YmI1MjMxYzEzMjZmMzBlNDRjNzU5ZDM1YzNkMmRhNTAyOTA1N2M5YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWZlN2RhMjE0ZWI5NTczMjY1MjhjYjE0NjFjMjhlN2I2N2NjNDAxYjQxMmMzNjIzNjIyZWFkZGEwOWY0ZTU0NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjEsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTgwNzZkM2QyOGQyMWUwMjAxMmIyMGVhZjdkYmY3NTQwOWE2Mjc3MTM0NDM5MDI1ZjI4MmUzNjhlMzMwNWFiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a3a3f1a283194003b3610c7690150b1f",
+      "statement": "The pre-push hook is a thin shell that forwards the pre-push stdin protocol to scripts/check-push-refs.mjs, which performs a precise fetch retry when a pushed remote_sha is missing (warning and failing open if the fetch fails), fails closed with human-readable rebase/overwrite guidance on a true divergence, uses merge-base against origin/main for a new branch, and skips refs whose local sha is all zeros.",
+      "evidence": [
+        {
+          "resource": "repo://.husky/pre-push#L2-L8",
+          "version": "repo-lines-v1:sha256:b3d4cd1d57929c6771d11df4e3418150c667f60ef24d1bb0c8000403800cc799:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzhjMTE3ZTAyOGM5ZDczYWViOTA3NGJhNzk1N2M2YjEyOWNjMTU5ZDNiMWFhZGQwNWZmODQyNTQ3NWE1MWJhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGZmY2NiNzAzYmQ1ZWQyYjhjMWYxMWYxYTYyNDEwZWNhZjZkZDM5Y2E2YTI3NzU1MTY3Mzg4ZTVhOGI3OGY2NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjEsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTgwNzZkM2QyOGQyMWUwMjAxMmIyMGVhZjdkYmY3NTQwOWE2Mjc3MTM0NDM5MDI1ZjI4MmUzNjhlMzMwNWFiZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzZhYjU5NDBlN2RlNmE2MzFhMjU3MTNjNWQ4ZmZlZjA3ZDRiNTFlMTY3NTkwMGQwMzg0YzhjY2M1Nzk0ODUzOSJ9"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs#L128-L179",
+          "version": "repo-lines-v1:sha256:5ee98e787cde2effc1666c7775aec39b451f76c41b8467fd35496d368e137e15:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhNTg2ZDMwNGYwZmY2MzE5YjkwZGY5ZGM1OWI2Y2MzNGJjOTMyMzEyMjNmNDE3Y2ZjMGVhZmZhNzRlZjYzNjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdjMDg1MGZmOWM1ZGFjNjQwZTY4NTRhNGRiZTVjZTJhYjA1Y2JhMmY5YjUzMDllZmZkOTVlNzRkYTVhZjc2NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwYjM5NWNjN2UwNDI3ZjVkYWYzMTY5ZjUxNTUzZDExOTE1MzkyYzg3NDgxODA0YWZmYWM4NTNmYTFhYTFmZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwMmYxOTI5Y2MyMTI1M2UwY2Y3MTlkYmNmNDU3ZWNmYjVjMDhiN2U4NTUwZjI2MmJkNjA2ZDJjYWFhYTM2NTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_94739dbce1334bac95ae4b9d1a3f1892",
+      "statement": "The pre-push orchestrator runs the oxfmt gate over exactly the pushed files (the union across refs, filtered to paths still present) before any domain check, and its exit-code contract is layered: exit 0 passes, exit 1 blocks, exit 2 combined with oxfmt's \"Expected at least one target file\" stderr marker is a skip with a single log line, and any other exit 2 or spawn failure blocks so a tool-chain error is never silently treated as \"no targets\".",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0195-pre-push-fmt-gate.md#L32-L48",
+          "version": "repo-lines-v1:sha256:7c3d43872faee25c55217e67e3786dfb32b5317c4606ebc75f55fbca3e6cd4aa:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1YWIyN2Y3ZTA4ZDNiODk5NDEzNGUzOGM2NzEzZmYwYjFhZjc3YzgzN2I4M2ZkYzE2MTRmOTEyNDZiYTlmMGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3ZGUzOTY3ZWVjNzkzZGRlNjE1MmMzMWI0MzExYzY0NmIwMmFiNjdhYzM2OGZiYmMxMmJkN2U4NjY0YjZmYTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5ZmJmNzM3ZGRkNzAxY2E0MTg1ZTQ4YmIzMjZhNGZhODdkOGU5YWU2ZjM4MzhkNTg0ODBiNTRlNTI5ZDNlMmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlkNzZjMzk5OTY5MzViODhjYmE4MTZhMTNjNzIxZWNiZTgxNzVmMTYxYTI2NjdmYTcxYWM1YzIxOWI4MzNmZjUifQ"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs#L180-L204",
+          "version": "repo-lines-v1:sha256:3e5e094506434755532e249f55cae894da6e15b1bcfe0dd32c0f2c4bbc91cec5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3ZTU3ODhkNWQ5ZDczZDI0YTgxZGJjMGE1YTc0YmZhODJjOWMzYjNhZjk5ZTUyYWY3OTZlOTBiNDY4YThhM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxZjA3NWRmMDJmNzhjNTEyNmY0NTM3YmFkOTQzNjhjNDIxMDA4MWNiMWI0YTdkNmJhMzBmZDRmMjlkZTY2MjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBjMjNmMTFkYWQwYjBhMTA3NGY4MjZjOTQzNWY1YWQ0NGM3ZjRjNzU2ZjA0MTJkYjkyMjRmNTVjYTkwNzFmMDgifQ"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs#L62-L89",
+          "version": "repo-lines-v1:sha256:cec665b2470e3b0c87aa0cf8ed285a8db14d020adc4fba644b817a970ce6d507:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwMmMzYTJhODhmYmFjNDJkZjdhMTU2MTAyOTgzZmFjZDA2MTJjYmM0MWVhNWM5ZTU2MTljOWMzNTMxOGNiY2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkMGYyZDNhM2FhZGEyNzU4NjQ1NzhkMGE0MzkxNTYzOGQ1NDNmZWNhMmM5NDg1OGRiOTQxMjExZTg2Y2VmMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIxMmE4OGIwYzFlNGY3MWEwYmZmZDY2M2VmMjFkZTA5Yjg1NGJlYjlmN2RkOGIxZDBkODJlMDBlYzBkZDdkZGQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_47071a9a95cb42809df0cd07a29f5d6a",
+      "statement": "After the format gate the pre-push runner dispatches two directory domains in order — packages/app-lynx/(src|tests) to the app-lynx anchor/unit script and .agents/ to the repo-level skill check — and touching the retired packages/app/(src|tests/agent-browser) path schedules nothing, which the orchestrator's tests pin as a negative guard; the shell hook's comment still lists that retired third domain.",
+      "evidence": [
+        {
+          "resource": "repo://.husky/pre-push#L4-L7",
+          "version": "repo-lines-v1:sha256:a507a8895e827f6849df819b5ab553c9350a0a4f37ad55fbfce8451b74c8a281:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmEwMWU5YTBiY2M2YmUyMTgyMmZkYjgwNGExZTVlNDY0M2U0MGJmZDExMmZkNTAzOWIyOGE3YzE0NDk4ZWIxOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjliYWU2YTM0OGZkZjQzYjZhMDViZWZhYzRkODQ4NGZlZmRmMDdlYmVkZTM3YjhmM2MyNDk0M2E0OGE0ZTEzNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjA5OWYzZGM5NzI1NWE1NGRjNDgyMTc0ZTlkMTMzZDhjNmQwOWQyMDdiZGEyMWFmMmY5MGY4YTdjMTA3OTZjYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTFlNjkzNzRhYzhjN2RiMjczZTRmYjU5NWNlYTA0MWIxYmY4ZWZkZDI0NzlhNDUxZDE2NDk2MzMyNWUxOWIzMSJ9"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/check-push-refs.test.ts#L130-L142",
+          "version": "repo-lines-v1:sha256:39bf1ac011e0b5c40e9af743dac5802bbe88891a5fd154bdf988de24e677eead:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzN2NlMmRhNTkzYWYzNTdiNDg1ZTM0ZTQwN2E3MzM2MjUxZDRiMjE0OTUzYmMwNDIzYmU2YTViNjJlZWNhZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0ZGU3ODM2MjJhZmUzNTAzMWI4NjliNGY4MjdkODgyYjQ3YzBjNzEzOWQzYzY4YjFkZWY1YmVjY2Q1NTJhZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZTBjOGU1Njg5YjFlOTU2OGUwZjcyMGMzYmI5MDhjYjA1MjkxZDMzMTQyMGZkZGQ0M2U5OTY5ZWU3ZmFjODEifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/scripts/check-push-refs.test.ts#L34-L41",
+          "version": "repo-lines-v1:sha256:b41dea912b7150c4f66ba1e019f9fd4ad1226913e8a43ae09003c2637a50d3b3:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGEwM2RhM2MzMjRkMjFjYTFjZTFlNTJkY2NlY2M0YjBiNjUxZDIxZWQxMGJkOTM5YzI2OTI5M2FiMDRkZDgzMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTAyMDhjZGRkYzgxZWUyZWNlYzZhZGNhYTAyYjU1OGY1ZWZiMGFmMzUxYWYxMmNiYjdhM2QzNmY1ZWM1MTllZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGVjOWY3N2Y0M2E2ZWI0ZDZmMGMwMzNmZDFjNDNiNmYxOGM3MDcxZjA4YzAzMTdlY2U0MGUwN2IzYzc5ZDI3OCJ9"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs#L206-L219",
+          "version": "repo-lines-v1:sha256:70696679b6b801152f0b2e0018ffb8f71b63f6bacd754d27b6b29b74d8745647:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiOWE3MGI3ZGUzY2Y2ZWRiMTVhOGZjYzNlMzBkY2Q5YmE5NzlkNWM4ZWM4NWNmMjNkYTllZGVlYjNkZDUwYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3ZDg2MzJlNTRlOTI5OGFiYjk1ODcyN2UyZDUxNDA4YWJhZjEzNjYwMzUzNzkxMDE0MGFiZjY1YjMwYWI2MTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjNWJhNGMyMmI0ZjFlYzAwNWYyMGYyYjhjYmYyNWFlZDc1OTUzODNlOTljZTRiN2ZlNjRmMTlhMGJiNjMwZjUifQ"
+        },
+        {
+          "resource": "repo://scripts/check-push-refs.mjs#L27-L52",
+          "version": "repo-lines-v1:sha256:f2469d687e973ebc10a9796ff01d313d38576fdee0125607a7c210d6fbcf5e60:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0Zjg0OTNkMmYwZGVkNWU2MDZiNjkwMDI3ODM4NDMwMzZlNDY3Y2QxZDM5ZGYyMmVmM2UyMTUxNzVkNTRlOTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwMmQyYzBkNmRjNWU3NGQ5MmZhMTRiOTFkYmVhMjY0MDkwYmViMzVmZGI5MTg4ZDliMzQxMTgxZGNlOWY0Y2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjNTc5Yzg3NWUwNGE5ZmI3ZGZkYTc0MjE4ZWUwNzc4OThjM2NmNGJjNzhkNzU3NTViZGY0MjNhYmE5ODJhMDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NzFmYThiNWNlZWY1N2FjM2ZjNjdjMzQ5MTcyMjViNDliNDcyODQ4NjcxNjhiNjZmMzZhYTUwNjkzM2I5M2YifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_244e64ecedc2446f9e616e3c696288c3",
+      "statement": "CI is a three-job workflow triggered by pushes to main and pull requests to main, with read-only permissions and per-ref cancel-in-progress: `check` runs pnpm check:all then pnpm lint:all, `test` runs pnpm test:all, and `android-unit-test` installs JDK 21, runs the host sync:credentials script, then ./gradlew testDebugUnitTest --no-daemon from packages/android-host/android; the first two jobs set RUN_CONCURRENCY=9.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/ci.yml#L16-L70",
+          "version": "repo-lines-v1:sha256:bd5e5d415e95dd1d80789df540c6f2413e4b327f3d032ab09291266941adbe35:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5ZDgwMTU0ZWQ0MmZjNWM3NzliMTMzMTU3OGI1OGI4OWM4MDFlYWNlNzRmMjRjZDQ4ZWI0YTIzNTc5NDBhOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0YWU4YjY0NDE4ZjZiY2RkZDE5OGRkY2UyNjM2ZjBiMTk2ZmEzZTZhNjdkYzliODk1N2MwMzQwMjY2NjI4MjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM1MzA5OGEyNjYwZGFkN2I3YzgxYjg1MmYyYzk2YWExMjIxNzMzNWVlZTgyZDI4NDFmZTI1YWUwZWI0NTZlZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0NzUwMDZmMDU1MTkzZTk1MzMxNmMwNjI5NmQwNzc0NjhhZmEzMTljMzQ2YjUwOWNmMWQ2NDc1ZTJmOTZiZTEifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/ci.yml#L72-L110",
+          "version": "repo-lines-v1:sha256:7fedf19a56079c2661ec2ba07bd9794ffb724b8024b0dc283ef41ea7ce39d21c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4MWFiODM1MTA3YjE2MTNhYTc5MmJkZTMwZjRjZmYyZGI1MjRlZDdiNzA3NWUzMjllYmQyMjg5MmU0NmFhMTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlNjA2OWE3M2Q1YTIyNWQzMTlmZjIyMmI4MjI4MjVmZTA4ZmFlODIyN2IyNmMwY2U2MzUwNGU2NjA0ZWNmMDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiMTcyNDA3ZDFjN2RkNDA4ZDM1NjdkNmMwODU1ZjFlYTE0N2MzMmFkNjgwYzU0NTRlY2Q1ZWY1NjQyYzI5YjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f7ac472a83994a349940d7a60e0d67ed",
+      "statement": "Emulator E2E is a deliberate CI exclusion: android-e2e is a manual tier (pnpm test:android-host:e2e) that pins only chains a real device alone can falsify, with transition-matrix.spec.ts acting as the @release-gate run before release, while gate duty inside CI is carried by unit and cross-platform contract tests.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L253-L264",
+          "version": "repo-lines-v1:sha256:b4aadb72ca4e8a831ded6c0a6cdaa01701633bbe77e1feb10f96651a8a6e7c53:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljYzZiNTkxYTA4MDUxODA1OGYxOTViN2RkYzJmZjQxMDU1N2FlNDYyYjk5YWYzN2Q5NDUzMTJhZmEwYTZmZjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjZmFkOWY4OGFhODIxZjI3ZjM4MmViNGUwMGY2ZGVkYmY4MjI1MzRmNjg2MTdjZmJjMTAyZTM4OTAwMGI3OTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRiM2U0NzgzZjk1ZTI5MTY1ODg3OTJjZjQzZTFmOTRmZGNiODc5ZmNhOWFkZWUwODljMGJkZWM3NmE1N2VhMTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk0NzQzZjc0OGQ2ODEzZWZiYTFiNDUyMzNhZTFhNmQ3MmU2MzFiZmQwZDE0OGM3MmU5YWZkNmFkNzI2Yjc0ZjQifQ"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0084-e2e-testing-localization.md#L19-L24",
+          "version": "repo-lines-v1:sha256:25c59935570073b806d0aa2f7bc66a898cb34c97acf8107bcacedebe3dc47fce:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc4NjFhNDI0NGZlNjg2ZmIwMjUyMTEwYWQyMDVhOGQ0Yzg2ZGZjZWU4MjgwYjcwNjcyMThkOTk4YzEyOThhMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM4ODg4YmM5M2JmY2NiMGNlOGZiYWVjNDAyNzFiNDZlMzhkYzZkZTk2ZDMyMjJmNDI4ZGQzOGE3YzVjMTg3NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTE3MmY2ZDMxZjFhZmVlM2Y3NWU2NDcwMGFiOTQxZTVhNmI1ZmEzNzkwYWRiODNlNDE1ZjNiNjA1ZDdlNTE0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjZiYWQ3NjE3OTNjMWI2NjcyYTMxMzdkZmMwZDk2Y2ViMDAxMjU1N2UyMDg1ODZhMjc0NWVhZTVmNDE5ZjM0NCJ9"
+        },
+        {
+          "resource": "repo://docs/testing/conventions.md#L27-L32",
+          "version": "repo-lines-v1:sha256:83841eb8fa3d31867a2f11800759c84dfc9c1a0a420b50adefa43d13f6af0fe3:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWIwMzEwZWU1MWQ4NDBlMGU0OTQ5YWE1ZDZlZDA4ZmFkNjkxOWJmMGIyMTIyY2JmZWNmZGQxMDcyODgzZjdhZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmJjODhjZGJmNzUzMmMwMThkNGI1Yzc0ZDlhNDc4OWJjOTY3NWU5ZTg0MzkxZWY1ZDRiNDlmNWY3NDQ1MGUxOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWUxNjZhZmZlYjgyZjNiYzJlOTU0NTcxZDNmMTU3NzZhOTIwOWE4Njk2NTliYTNjMWYxNDdiMGJhYzIyZjcxOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTNhMzliMmJhYzA3ZDA5MDE0OTU5OTVjNWIxMDMyM2FiMjFmNWI5ZTNmYjk5MGY1MDU4YTViOWE0ZWIzN2EzNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0cff652ffee7492a8c9f7113fa81ca57",
+      "statement": "Mutation testing is a deliberate CI exclusion as well: pnpm test:mutation runs StrykerJS with the Vitest runner over only the two in-process pure packages @pictelio/ugoira and @pictelio/update-check, and the mutation score is a local weak-assertion sensitivity signal that must never be used as correctness evidence.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/ADR-0101-stryker-mutation-trial.md#L18-L25",
+          "version": "repo-lines-v1:sha256:590f91c3e0b3a3f5b2fb76e8e752af5967846a308106d3d6ba087e8ce355303d:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc4NjFhNDI0NGZlNjg2ZmIwMjUyMTEwYWQyMDVhOGQ0Yzg2ZGZjZWU4MjgwYjcwNjcyMThkOTk4YzEyOThhMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDczYjc0ZWRkNzhmMDljZGFhZjQzYTQwN2I5M2FiYTg5ODQ2YzQyZmNjNTcxODA5MzJkZjAzNzFiZTZiMWFkYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJlMzE1M2U0MmNlMTU1ZDUxMDZlNGQ0YTg1ZTkxMmFhMjMyZjI2NzNmZWUzMDMwMjQyMGJmOGM3ODUyODk5ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzUyYmZlODk4MTFjOWJkNDYwNjFkM2I2MzVjMTAxNmEwZWFmY2M2Yjk0ODNhNmQ1NzU1NTExZmQyYWY1MWJkYyJ9"
+        },
+        {
+          "resource": "repo://package.json#L40-L40",
+          "version": "repo-lines-v1:sha256:5b1e90e47de7cf5582e284671640d4341c92b67ae4b286145f396b916d151794:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWIxZTkwZTQ3ZGU3Y2Y1NTgyZTI4NDY3MTY0MGQ0MzQxYzkyYjY3YWU0YjI4NjE0NWYzOTZiOTE2ZDE1MTc5NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWIxZTkwZTQ3ZGU3Y2Y1NTgyZTI4NDY3MTY0MGQ0MzQxYzkyYjY3YWU0YjI4NjE0NWYzOTZiOTE2ZDE1MTc5NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDc2YWMyNDFiZjllODNkOTFiNTI0YzA4ZTYxNDUzYzU5OGI1MmFjOWRmMDllN2Q5YTQ4NmUwNjU2OGJjOGI3YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjVhMmEyZWRkMzhmMThjNjVkYzNjMzNlNzA2MDIzMjUyYmExNGUxODI1M2IxNDJiODRlNDU1MGQ1MzYzNzQ3ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_203db7a5781d4d779f7cf7bc78cdbd73",
+      "statement": "Task-cache scoping is deliberately asymmetric: check:all runs with --cache while test:all must not be cached, because a cache hit on the test gate would mean the tests never actually ran (a fake green).",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L260-L264",
+          "version": "repo-lines-v1:sha256:6c70427282a0398152d48c4eed2d7ec02436ae644efc83f656da23ea310b10d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGU0YzBiMmQ5MWQ3OWZjY2UxZGEyMjNjZmM5MTIxNmZkNmFhNWY5MjJlMjNjMGJlYTgyMjkzNDcxMjQzZWE2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2NmYWQ5Zjg4YWE4MjFmMjdmMzgyZWI0ZTAwZjZkZWRiZjgyMjUzNGY2ODYxN2NmYmMxMDJlMzg5MDAwYjc5MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjQ0YzBjZmNjMWM3NDI4NjdjZTliN2EwZDM0ZTE0MzFmMGZiZDMyOTFhYjNjMzBjN2E2NzIxODQ0NWJmYmJmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTQ3NDNmNzQ4ZDY4MTNlZmJhMWI0NTIzM2FlMWE2ZDcyZTYzMWJmZDBkMTQ4YzcyZTlhZmQ2YWQ3MjZiNzRmNCJ9"
+        },
+        {
+          "resource": "repo://package.json#L26-L26",
+          "version": "repo-lines-v1:sha256:608fa5d6ffd539fe1c25f484ff667fc4fd29787bd5499bfabf49fd0659b3c056:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA4ZmE1ZDZmZmQ1MzlmZTFjMjVmNDg0ZmY2NjdmYzRmZDI5Nzg3YmQ1NDk5YmZhYmY0OWZkMDY1OWIzYzA1NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjA4ZmE1ZDZmZmQ1MzlmZTFjMjVmNDg0ZmY2NjdmYzRmZDI5Nzg3YmQ1NDk5YmZhYmY0OWZkMDY1OWIzYzA1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmYxNmY2MWFmMDFiNTJjMzdkMTA4ODY0ZGViMDk3NzUxMzY2YmQ5YWQ1MjE1ZmUwY2I1OGM2NmMxZDg2ZTJiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGEzZDUxY2EwMmEzNGY2OTljYTFlZTFlYmQ0ZWMxZmI2NzA3YzZlNWNlYTc4Njc2YTg2ZTY4OWIwMWFkOTdhNyJ9"
+        },
+        {
+          "resource": "repo://package.json#L41-L41",
+          "version": "repo-lines-v1:sha256:d62059c5ddce68b1e91219984a52db6a11599abc98721c30e498f10584261577:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyMDU5YzVkZGNlNjhiMWU5MTIxOTk4NGE1MmRiNmExMTU5OWFiYzk4NzIxYzMwZTQ5OGYxMDU4NDI2MTU3NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyMDU5YzVkZGNlNjhiMWU5MTIxOTk4NGE1MmRiNmExMTU5OWFiYzk4NzIxYzMwZTQ5OGYxMDU4NDI2MTU3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYThjMDdmNjY3MTY5NjE3Y2JiZGRhMDgzOTgyZjY1OTgwZjE2MTA4NmYxOWM0MTRhYThiODE4NGMyMjc3NDAwMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjc5MGUzN2M5YmE5MGNjMDgzMmY1ODYxZjZmZGNhM2JjM2ZmNzY5YTQzMDkwNGQ0ZjVlYzY0OGFkMzVjZmU3MCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_151c6e59cf8b411a9957829dcff0e0f4",
+      "statement": "T0-style mechanical guards back the test rules: passWithNoTests: false rejects empty or leaked test files (but can only detect \"nothing collected\", not \"one directory dropped\", which is why the android-host inclusion globs are listed separately and guarded by their own test), oxlint runs expect-expect: error for test files, and scripts/verify-agent-skills.mjs validates .agents/skills frontmatter, name/directory consistency and a required-marker list for the code-review skill.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/vitest.config.ts#L6-L22",
+          "version": "repo-lines-v1:sha256:9477c1ec69755ac6e812a8e032b3bb979df80eeba8e8ec434eab6d3294e461c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2NzMwZGFhZTMxM2NjOWQ0OTY5MDA0ODYxOGVjMDI2YzRmM2Q0Mzc0ZGVhNjY4ODhlMjhjM2I4ZDY5NmU3OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3ZGFmNGQyN2NiNjhiYTc0NTViZDI4MzdhNDUzOTM2NzFhNzMxMzk0NTUxZGRiNjBmYjE3OGM1OGQzM2Q2YWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU2N2M4ODc3YTc3NGVkMjc3Y2FkOTUyMTQwY2NiOWUxOTQxYWYyYWUxYjE0NzY2OTI0Yzk0NDUxZTU0MWM2ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4M2MwM2ZiZGY5YjM0NmFhNTUyNzg2YjVlZWJiM2FhZDRmYWM4M2FiOWU1YzZiNWQ1MTVhM2ViNTljZWVkNTIifQ"
+        },
+        {
+          "resource": "repo://scripts/verify-agent-skills.mjs#L16-L29",
+          "version": "repo-lines-v1:sha256:419f5965d8deb0d407dd6b70c37ff4fd6e5c14fb8b52ee96be8b2ffd20b57afa:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMGMyMmE1M2Y4ZTdkZmE2MjdhNjhjY2M1YzMyYWE2Y2ViYjRiMzBhMTc5YmFjZDczNWU4NzEyZDlmNDAxNzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhMWQxYTYzMzkwMjI5Yzc5ODM0N2U4M2EwNDA1NDQxYzk0MDAwMzUyODRhZDE2OGMxYmY2Y2RmMWQ3MGEzNzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQxODgwOTZhOWM0ODBiN2RiMWYwNDg0NWIzNTdmMDA2ZTViY2Y1OTYwY2Q0N2YyZDY2M2I5OWFlYjFmNjlhZmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5MjcwYWEzZTE0MTgwM2ZlNzM4ZTNmMzZiMDA1NjlmOWMxNTQ0YTE5NzU1YzMwOGE3NDI3NzZiYWU0MTA5NGYifQ"
+        },
+        {
+          "resource": "repo://vite.config.ts#L119-L138",
+          "version": "repo-lines-v1:sha256:12c04210ab7b7caafa18589b376ee301e1f559c40d8f85d88e74bcf8eca46e88:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyNjZmNWFjMjBkMGE3NTUxNWFjMDk4MzU2MjEzZDkxNDY4MDBlYWQyNjlkZmQ3ODE5NzZiNmRhMDY0ZjA1ZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0NzRiNWFiNzRjNzA2ZDIxNmRmZTkwODI0NDViYTBkYmRiNGJkYjM0YTM1ZDRhZDhhZDhhYjQzNWJmZTFmOTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxZTYyZjk2MGUyYzM2NWExMjA4OTM1Yzk5NjI0NTdiMDU1MDE3MGU0MTgxMjA0MTRjOTFhNTZmMDY0MTFmYWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9935ae45c00d47ed9accc8bbeda938e4",
+      "statement": "The AGENTS.md entry document is itself pinned by a contract test — a 30,720-byte hard gate, survival of the «## 工作流强制规范» section and its anchors («Grill 澄清 → to-spec → to-tickets → implement», «强制闭环», «自我监督规则»), the OPENWIKI marker pair, and reachability of every command in its command table against root package.json — so changing the workflow rules means changing that guard.",
+      "evidence": [
+        {
+          "resource": "repo://packages/android-host/tests/unit/agentsMd.contract.test.ts#L119-L134",
+          "version": "repo-lines-v1:sha256:6346555e6d8ac5b2591bbb05a3931548471d7442d5a3b0f3387fccddea332e8f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3OTg2MGEzMWI3MzQzN2FjNDVhMDQ4MWIyZGI5NTQ4ODY3OGVhZWE4ODZlZDRmNWIzZTMxM2NhYTBjZGI3NjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhM2U0NmY5NDI3NmI2ZjZmNGVkMWYwMmFmNzhiZWY2YTJlZTFjNDM5ZGQ1NTg0Yjk3Mzk0ODMxMzIxNGQyYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI3NzlkMTE4ZDZlM2NiZjQ1MDUzOTc0OGRlZTdhNDMwN2FjYmU2NDQ2Y2JhMjk3ZjI3NjBmYTVkMGJiYTFiYzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlNTU2ZGNhZjczYzg2Yjc2MzkwYTkwOTVlMDJmZjNmOWMxYmVmN2Y1MWNjNWUyYTAxYjg4MDU2YTY1ZDhhODMifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/agentsMd.contract.test.ts#L252-L299",
+          "version": "repo-lines-v1:sha256:1b0ddbde9c7da5a3f30f54369728668d31649039921083cf5411bc9226c21a72:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzODA5YzcxMjM3Y2M0YmYwMGE5MTAyNTdlMGY5ZjhjYWY3NmI4MTk4YTRmMWMzMmI1YTlhYzgxNGRjYjA1NGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhM2U0NmY5NDI3NmI2ZjZmNGVkMWYwMmFmNzhiZWY2YTJlZTFjNDM5ZGQ1NTg0Yjk3Mzk0ODMxMzIxNGQyYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhhMGU0MTZhNmZiYzNjNTBhNGU3MzM1YWY3MGUwZGZmMGE5YzM0NmQ4OWQ3ZTg1ZDBlZjEwMTk3YmI1M2M3Y2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzODVlN2EwMDc0YWM0YmIwMjIwMTIxNGM2NDg3MDViNWRlZThiOTdlZWExODMxMmI1NTUwMzhjZjc2ZTNjNDIifQ"
+        },
+        {
+          "resource": "repo://packages/android-host/tests/unit/agentsMd.contract.test.ts#L67-L84",
+          "version": "repo-lines-v1:sha256:c6f52ecb4ba9b6301e1a0c4523bf0a64f4a820fad43a99f120a32e92aac372bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkNzMyNTc5YzhmOTBkYzZjZGE1OTI1NDZhNWZiYjA5N2JkOGUyY2IzZWY4MGJjN2E2ZjIyNzUyZWQ2MWQ5Y2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkYmMwNmNiOGMwMDJlNWUyODUyMjMyZjU2M2FjYWI0M2JkMDAzMmY0NTliYWIwOGM3ZDhhNTRmMWUzNWIwY2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0YTJmMmFjYjY5NGM5ZjVhOWFhN2Q3MDA4NzgwMjNmZTlhYWIzMmJlMjE4ZGEwNjE4YTU4NGM5YzNhZjViNjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNiZmZiODg1ZjBhM2RjZmY0NzNhZjdjZjk3MDc2NjdhOWU0NTQzOTE2MWI5NGI3ZTU0OGQ2ZWIxN2MwMDQzNzEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e443387791dd4b13897f99219663eb46",
+      "statement": "OpenWiki regeneration is CI-owned: the scheduled workflow requires fetch-depth 0 (the gitHead diff needs the recorded commit), runs under a 150-minute timeout with an early preflight for the required secrets, removes the transient run-state file and the deprecated CLAUDE.md, opens a PAT-authored PR with add-paths limited to openwiki, AGENTS.md and the workflow file itself, gates auto-merge on the state file reporting status: complete, and separately fails on a silent no-op where gitHead advanced and sources changed but openwiki/ shows no content diff.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L142-L192",
+          "version": "repo-lines-v1:sha256:4d4e8aa6cd2c44b3188e2031729cc2b0927c8148500cafd3c12e2a0f36a7e253:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NTViYjdjMWRlN2UzZTA1MmVlYmI5MDkwOTYwZjk2YzAyZDI3ZTc5YzBlYTZhOTcyMzI5MWFlNGYyZmIxZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNTU5NzljZTczMDIwMzNlNmIyZmQ3ZDg4ZjUzN2EzYjhlMDkxZWEzMDVjODExZmZhMTI3NGJmNTc2NGVhNWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyYmVmNDU5ZjI4NDAyM2RmNzRhYjM2ZGU3MGNhMzgyMWEwYTM0ZGIxZTk2N2U1MDQxZTIxMzgxMjVmZDVjYWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkZWVlZWUzZTEyMGQ5ZDEwNGI3NmU1YzcxYTYyMjZlNDVjMDkzNWNiNWM2ZjI1MTIyZTUyNTdmYjFjMzgyNDIifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L20-L28",
+          "version": "repo-lines-v1:sha256:ee8bde2258e1b90d66c66fc80756852abd675b85d07e5928f9f3866f4920da8a:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWZkM2MwY2E3ODRlZjFmNWYyNzIzMTdkMjgxYjdhMjNjYTcyMTM4NWVhOWYxMDQxNjVjZWQyYjM0NGFlYzhmNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGNjNGJiNzlmNmViYzg1NTU5NzVmODdjMWJiZmFkYjQ0ODFmNzBiMDNjMWE3YjBjOWNjYjRlZTNkYWM3N2Q2MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTBjMzFhYWJlODY1YzMzYTkwZDAwZjgyMTE3Y2JiZDgyMjU1Y2E3MTI3YWQ3YjhiZmM0YzI3MTJlMTNiZmI3YyJ9"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L219-L262",
+          "version": "repo-lines-v1:sha256:413e87d69d17ed185bb234f2e8d7caf46c605bc92e5e63e9967f89bda21dc6ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxODNkOGE4OTA3ODMzZTkxYzYxYTczNmMzMmNlMzcxMjIwMjE4ZmYxZGFkYWVhZTI1N2UzMjVkNDQ5ZmU1NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NzE4ZjA2N2I1ZTVjMWYwOTkxYTZlNzQ3MjZmZTJhMjNkMjY0MzQ1ZTA4ZTRlYWQwNGZhZjczYzI3ZWQ0NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5YzE4ZTY0MWQ4NGM0NDczMzVkZDRjNTkzMjZiZjIwNTgzM2QxNDM3NjMyNjY2YWIwYjlkMjg4OTk2MWNkZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlOGNiNmI2ZGNmMWUzMWY5ZDY1MmUzOTc1YTg4MDBiNTBjMWU2MDAwYzc4MGRjNzIwOWM5MTIyZjA4Mjg1NTYifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L56-L64",
+          "version": "repo-lines-v1:sha256:fed7ea1f1ecaa18e005f7b63e84c28502d5e9f7ab5c9c354812dd8535a5a4750:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDVkNmNmN2Q0MjhjYTgxMTVmYzRiYWJiNjgwNzM5MDIzMzI3YTdhOWQ5MTYzZjcwNmEyNzY4N2RkNTE2ZjM5OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTMwOTc1YzdlMjBlYmE4ODU3ZWZkMzFlNjJiNjY1Zjc4N2U1MTY0MTk1MWE2NjA3ODlmYmE5MzNhNjM0NzIxNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDIzYWVjNTg1ZTcxOGJhOThhNjQxODc3NThkOGUzZDY0Mzg5OTk5YjU4NTdkMTNjNzgxNzM0MjBiMDQ0YjMxYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2VmMTZlM2M4YjU0ZTJiMjA0ODE5NmFiYjRjZDgwZDIyYTUwOGVjZDYwNzQ2MTI0YTJlYTJkY2MzNDE3OTlkMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b30c4bbf02a84d018e31ecd0e52bb732",
+      "statement": "Agents must not run pnpm openwiki:update locally and must not hand-edit anything under openwiki/ (the root script is retained only for explicit human use); wiki content is changed by editing source or CONTEXT.md and letting CI regenerate, a stale or failed wiki refresh must not block local work or commits, and CLAUDE.md — which an OpenWiki run may recreate — must never be committed.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/openwiki-update.yml#L131-L141",
+          "version": "repo-lines-v1:sha256:2cd3c185a6da154771ab539b6fab61f15762640895adc9d84124f9a99077f36f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3OWM4ODBmNjJkNDIyNTM4YmNhODRjYjU1ZWNlOGZlMTBlOTY1OGIwNjExMTVjM2ZhYmNkYzdiM2JlY2Y0NDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkwODY1YTk0ZTI4YTgyYjU1ZDFmZDE3NzAzYjE1YTJjZGQ0ZTcxZGFiMzQ0ZTcxMDgwYTEwZDIzODg2NzU4OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3NzkwMjY2MWI3Yzc3ZWU3MzVmNzVmMGE3MzMxNzY5NzdjOWIwMzc5ZjEzNTE3NGZmMTg2YmYxY2VmMGVmMDQifQ"
+        },
+        {
+          "resource": "repo://AGENTS.md#L321-L333",
+          "version": "repo-lines-v1:sha256:ce0e8100951c7372b2f09b48a93f92ac59e0652dbd92207e209458ca7e0d63d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzM2Q3Y2FjNzE1MzczNjVjMWYzMmJhZmRhMzhhM2VmODVmMDNkZGMzZDQ1ZjkxMjM4MWVjZjU2YjcxMzI5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5MzkxMmNkM2MzM2VkZmQyM2QzNzY0ZTE3YWIyOTc0N2IzNzkzNzQyMzZjNjRhNzZiMGE1ZmZlNDhhZDM4MGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2MTM1MGFjYmU2ZTI4MWIwOWY3YTMyYTY4ZTc0YWZhMWU4YmUzYjlkNmU1MDJiYTFlNmNhMWM1NTI4NDY4MWIifQ"
+        },
+        {
+          "resource": "repo://docs/adr/ADR-0099-local-openwiki-disable.md#L21-L27",
+          "version": "repo-lines-v1:sha256:5a881b684e1aaafe545f1fc198263bb09d4c139e228af5b60e474e0d28290380:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc4NjFhNDI0NGZlNjg2ZmIwMjUyMTEwYWQyMDVhOGQ0Yzg2ZGZjZWU4MjgwYjcwNjcyMThkOTk4YzEyOThhMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZkNzFlNzY1MTVhYzhhMjkwYTM0YjVlZjdhZjhiOTdjNTc1OTc3NDdkYzczZDRiNGU4YWExN2NlMWIwMmE2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmVmNWNjMmMwOWU0MTAwNjcwZDE0MTY3NDlkMTgxNGIzZDJkNzIyMWFiOGRlNTAzNTY5OGI0MDVmMDNlZGIzMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzUyYmZlODk4MTFjOWJkNDYwNjFkM2I2MzVjMTAxNmEwZWFmY2M2Yjk0ODNhNmQ1NzU1NTExZmQyYWY1MWJkYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0645a392e06e4780ad76623d2480a342",
+      "statement": "The generated wiki is optional just-in-time context, not startup reading: agents are told not to enumerate, preload or search wikis at task start, to retrieve only when unfamiliar architecture or dependency behavior matters, and to treat source code and tests as authoritative.",
+      "evidence": [
+        {
+          "resource": "repo://AGENTS.md#L304-L319",
+          "version": "repo-lines-v1:sha256:8926524de63a1266e7592d9f1256ec367b67e9fa0583f343808e3e51f19d4990:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMTgwZjljMTI2OTAzYmNjMzMxYWE5NTQ1NmU0OTQ0NGE3ZDRkMDExZThhMmE4M2Y1ZGM4NzAyMzkxODEyZDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5Zjc4NzE0ODkzYWE3Nzk0MmNlYTFjNGEyZTAyMzFkYmI3ZmEyYTQxYTcwYzgxNDYwYTNjNjc1NjJkYTNhYWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjODgxN2ZhZmJmOTYwZDkwOWViMjdjZDJhZTEwN2ZjNTZkMmUxYTM2MmZiNDQ2NGU1NTIzZGMyOWM3MzUxY2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJlNTk0N2EyMzU3NGE2ZmVlMDEwZTQ4MTlhNWYzYzhkMDA3ZDZiYjAwYTcwNDYwNWEzYmI3NDRkZjI4NzM5MTQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e27256e0fb7242bb9100e94aee7aaa07",
+      "statement": "Decision-record conventions: system-level decisions live in docs/adr/ numbered continuously (ADR-NNNN-<slug>.md, with the oldest files carrying a bare NNNN- prefix), context-level decisions belong in packages/<context>/docs/adr/, and glossary/fact sheets sit beside the ADRs as docs/adr/glossary-*.md; reading the ADRs covering an area before exploring it is a stated expectation, and a conflict with an existing ADR must be surfaced rather than silently overridden.",
+      "evidence": [
+        {
+          "resource": "repo://CONTEXT-MAP.md#L11-L14",
+          "version": "repo-lines-v1:sha256:e1db3cea350a7474f7991e16078b48808848dbe5867ad74412bf50c1d5a2402b:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTc1N2Q1ZWFkODUwOTViNDQyYTY5ZjE5YjczYWU3NzJhN2UyOGI5YWNlOGI3OTM4NGNhNzBlNDMyYzQxZDUyMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEwZjNlYWRjNjc0NjQ2NWVkMWQwZWRlOTY1YzFlMzU0NzRlNjczNGZjNTI0YjBjZDViNTY3ZTJjMWU4NGU0OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWUzYzJkMDIzNzQ4YTE1ZGU4YjI2MWRiMTk2YTY3NTlmZjI0ZTlkZTgzMzllOWY3MGYyZTg5YWJhNzJjYjMwYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjQ2NjczM2JmZTYzNTQ2ODhiNmRkM2UwY2EzYjE3MWYwZTY5ODdjMWM1NzA3ZjNmOGIxYWM3Y2EyOGQxMzMzZSJ9"
+        },
+        {
+          "resource": "repo://README.md#L57-L62",
+          "version": "repo-lines-v1:sha256:a2d0e54e829123844266d1337d2b7462ffc67c1d399399a1630af1f2ea61b311:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYyYWEzMjQ0NzE5YTcxMTZkMjAwMTdlZGI1Yjk5YzhiY2QxMzM5N2EzZjkxYWIwOWNjNWExZDIyYjU1MzdkMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ4NDRiZDY3NTUwZWMwODZhODEyMWYwYjcyYmM4MDdkMTRjMmU0ZDNhMTlmMDU2YzVjYWJjZDVlN2MzMzc4YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTBiZTlkNGNlZDExMzdkOTZkM2NiYWZmOWQwNDgxZDI1ZjgwOGYzNjM4ZGYxMjVjMzIwMzkzYWMxOWNkY2E3MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDAxZjJlYzE3NTkzYzEwNTRlYjQ2MzY3ZDg0NTNlZjI0YTE3M2NlOTZiNzExN2Q5MWY5YTY4ZDQ0ZmVmOGIwMSJ9"
+        },
+        {
+          "resource": "repo://docs/agents/domain.md#L6-L38",
+          "version": "repo-lines-v1:sha256:4405e218877c5254b184d2ba1b08c126dbb112c7df8786f343ade996d258c756:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNiYzJiYjVlNDZhNTY2NDFiM2Y1MzViMWVjNjdlODZmZDZlNGRiY2VkODU1YjcyZmJhY2I4MjZhYTQwN2E4OWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM4ZTk3YmY3NGI3ZDU0YTkyZmE5ZWMzNmNmMzkxZWVkODJkZjE3Mjc2MmFkZDY3NmFmMGY2OGZkOTRkZmE0NmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b18dea927625439d964ecdb7a47ac92e",
+      "statement": "Some ADR claims are machine-checked rather than trusted: the ADR-0212 consistency test recomputes a Tailwind elevation count from the .vue sources and requires every machine-readable measured marker in the ADR to equal the recomputed value, so an ADR asserting a completed migration the code does not show turns red.",
+      "evidence": [
+        {
+          "resource": "repo://packages/app-lynx/tests/adrClaimConsistency.test.ts#L1-L48",
+          "version": "repo-lines-v1:sha256:0d334a180829391d534adb6c884273bfbd661e915b835ea1108866a00a82dfda:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhOTRjNThlYThhOGE2ZTgwNzU4ZjExMTE0ZjYxMGJlNDkwYmZmNGUzMDc2ZjIwZDk0YzJjZGE0YjBmNGVjNjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliMWIzNmFmMWFlNTdiNDhmMmJhOGY4MDFjZjUxMzcyZjVmYjRjOGI5OWQ3MWIyM2E5MmRjODJjYzFiNTc3MzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_41dd6a75dc2442d6b2b3893ee3c88860",
+      "statement": "Website deployment is a separate, path-filtered workflow (triggered by pushes to main touching packages/website/** or by manual dispatch) that builds Astro and publishes to GitHub Pages; it is not part of the change-verification gate.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/deploy.yml#L1-L18",
+          "version": "repo-lines-v1:sha256:a1fed1eb8f60222733f619d75fac79c96772896e694aa57f627e84e72e561bfe:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzMGFkZjU0YmQ4ZTMyOWYzNzMyNDgxZDkzYmYxY2NlYWRlNWNhYjY3MDU1NTc0YTZlYjllZTk4ZDhlYzU4YTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0YTAxZjI4YjZiMDRkNDVjYWQwZmU2Yjg2MmQxYTgwMmQ3YzFiYzVlNzdlYjg4NTgwMGI4ZDkxY2Y3ZjQ0ODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkwMDE0YmEzYjgyODg4YWEwOGM1MzYyYTA1Y2JiM2E2YTBiMDVlYmRkZDlkY2VjY2RlMGNlZmMzZWM5ODVmMWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1d220db087b44749ad5817f12810daf0",
+      "statement": "The only emulator job in GitHub Actions is the workflow_dispatch-only system-bars acceptance matrix, which takes an API level input, enables KVM, builds the lynx bundle and debug APK, and runs assertive adb/dumpsys checks — so no push or pull request can trigger an emulator run, and a local network block to dl.google.com has a documented escape hatch.",
+      "evidence": [
+        {
+          "resource": "repo://.github/workflows/sysbars-acceptance.yml#L1-L21",
+          "version": "repo-lines-v1:sha256:5fd81f86bb0ff9ff0836d319ddbc1770aecf463de30c2960c1e9bdcf712d6468:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlY2NjYjU2ZDFkMGY5NTNiYzBmMzlhMThiNDA3ZGZlYmM4MTYyNzFiNWE0YWQzMjIwMDcxNjMwYjI2ZjllYjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4MjQyYTYwNzUzNmFlY2UyOGI4OWNhNjVjMTc3ZDlkYWUxNjIxY2NiYjkyMzFjZGM2NDM0ODA1NWUyOGRjNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1NjI3ZjgwNzE3NmYzZDMxMjdlMTM2MmQzY2Y2ODUyOTdkNWQ0NTc1MDEwNGJkN2U1Zjc2NTEwNWZiNjY1MmQifQ"
+        },
+        {
+          "resource": "repo://.github/workflows/sysbars-acceptance.yml#L108-L190",
+          "version": "repo-lines-v1:sha256:887378aaf96e53e967d8677dffc33db61742e42238d972d9153d8141aaf2760b:eyJzZWxlY3RlZExpbmVDb3VudCI6ODMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjMGIzOGI0NTVkMjAxMGZhNmU3MTZmNjgzYjA3ODRjNWVmM2I1NDU1NTE4NjAyNjc5ZWY3MWE2OTBjODhjY2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZTI0OGYzYjEwN2RmMDI4YjAwNTA0YjQ5YzVjNDI3YjJkMGRkNWU2ZDBlOTY5YmY4NTQ2YmQxNWNmNDQ1OTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyNTQyZTFjOGNhZmZhMjM2MGNmMzc2ODAxODcxMDVkZjFiZTM4OGNiYTcyNDRjMDk5OGE4MzI3ODNjNTE1OTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNiZjg3NGJlZTc5NWNlMThjODZmNzNiZmI5ZDNjZjMzMGY0MTczMTJlMGFkNTBjZDc4OGE0YTAwZGUwMGMwOWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cbcd24dcec3e4f27aa6f486512048d68",
+      "statement": "The WebView-era pre-release QA transition matrix is retired and currently treated as unguarded: docs/agents/qa-transition-checklist.md is marked non-executable after single-engine consolidation and must not be ticked as passed, the release checklist states that item cannot be treated as passed until issue #805 redefines it, and an emulator run's skipped count must be verified so a vanished @release-gate cannot pass silently.",
+      "evidence": [
+        {
+          "resource": "repo://docs/agents/qa-transition-checklist.md#L2-L16",
+          "version": "repo-lines-v1:sha256:1f91a99396a0f4af150237a7c23031a9b2007a87c60bb97cf432d4ee47df6cd7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyNGJkMDc5ZTJkZDI0YmJlMTI5YTY5NjhlMWMyOWFjODVhNTNkMzA5MDNkZmI4YjQ4MTA4ZGNmNWM5NWNkZGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjoxLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5MjU1YmZlMmI5N2I1OTQ1ODM5N2NjNjQyNzc3NjNmOTc0NGVjZmJlNzU2OTJlZmM0NzAzYmU1M2QwMWYzZjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlMjEwYjY5Mjg1ZWUyMGUxOTIxYzEwNDBiZGMwNTljZjlmNjk3MDNiOGM5NTk1Y2RjYWI4NmJhNzZmOWYzNDQifQ"
+        },
+        {
+          "resource": "repo://docs/release-checklist.md#L218-L222",
+          "version": "repo-lines-v1:sha256:0b6aaab92d62be7dcbb8d42aba479cb9fb680150cf2c3001a4dc8a08b487e3df:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODljNzMzN2NhNzY0YjY3ZjViODBmZDEzNzUzMWUyN2M2ZDU2MTRkMDM0M2I0YzMxOWQxMTYxMDIxZGU4Y2RmOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNjNWE4ZTg0YzBiMjgzNzdhZWZkNzFjOTc1NzAxYjMwMWIxNTMxZjkxZDgwNjRmZDFlZDVhNjA2YjA1OWI4ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjZhMmQ0OTRjMjQwYzllZWZiMGExMmRmZjJjNjZjNTc1NDRlMWU4MmJlZDU5NmI0NWMwZjM3ZWY2MzE1NjI5OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTU0YjRjZDg3ODY4NGM5NDlhMzJhYTU1M2ViNDlhYjAxYzNmYTIxMTE4YzhmMzEzNmM5Yzg0MDkzNGIxNGJlZCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.1",
+    "at": "2026-10-08T01:48:11.384Z"
+  }
+}
