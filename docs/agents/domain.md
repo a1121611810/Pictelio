@@ -4,7 +4,7 @@
 
 ## 探索前先读
 
-- **`CONTEXT-MAP.md`**（仓库根目录）—— 它把每个上下文指向各自的 `CONTEXT.md`，读取与主题相关的每个上下文。
+- **`CONTEXT-MAP.md`**（仓库根目录）—— 它把每个上下文指向各自的领域文档（`CONTEXT.md` / spec / ADR；无文档的包如实标「未创建」），读取与主题相关的每个上下文。
 - **`docs/adr/`** —— 读取与你将要工作的区域相关的 ADR。多上下文仓库中，还应检查 `packages/<context>/docs/adr/` 下的上下文级决策。
 
 如果这些文件不存在，**静默继续**。不要标记缺失，也不要建议立即创建 —— `/domain-modeling`（经 `/grill-with-docs` 与 `/improve-codebase-architecture` 触达）会在术语或决策真正确定时按需创建。
