@@ -40,8 +40,8 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 
 本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（无 MCP，直连 CLI）：
 
-**pi agent** 由全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`；
-**其他 agent** 直接用 bash 调 `codegraph` CLI（输出逐字等价）。
+**pi agent** 由全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`。
+（工具用法与 shell 等价形式见文末 `CODEGRAPH` 块，该块由 `codegraph` 工具维护，勿手改。）
 
 ### 默认原则
 
@@ -66,12 +66,6 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 逃逸阀：确认覆盖不了时**原样重试同一调用即放行**（禁止换 bash 绕过——bash 搜索本就被拦截）。
 - bash 中直接调 `codegraph` CLI 不被拦截，计为有效使用。
 
-### 禁止的默认行为
-
-未经 CodeGraph 尝试就用 Grep/Read 大规模探索、手拼调用链、顺序 Read 摸索架构、
-对 explore 已返回源码的文件再 Read 复验（输出是逐字节当前源码）。
-`.codegraph/` 索引未生成时，在项目根运行 `codegraph init`——**索引是用户决策，agent 不得擅自执行**。
-
 ## 文档查询规范（Documentation Query）
 
 文档查询遵循明确的优先级链：Context7 → MDN → `web_fetch`。
@@ -82,18 +76,17 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 - **浏览器标准 API（HTML/CSS/JS 标准 API、Web API 语法与兼容性）优先使用 MDN 工具（`mcp__mdn__*`）。**
 - 仅当 Context7 和 MDN 都不支持目标查询时，才使用 `web_fetch` 搜索官方文档。
 
-### 禁止的默认行为
+### 调用纪律
 
-未经 Context7 尝试就用 `web_fetch` 查库文档；对同一问题重复调 `resolve-library-id` 超 2 次；
-单个 `query-docs` 调里塞多个独立概念。
+同一问题的 `resolve-library-id` 调用不超过 2 次；单个 `query-docs` 调用只查一个概念。
 
 ## 四层词（先认层，再选工具）
 
-每个问题先归入一层；每层有唯一事实源，层间冲突时先信更底层并浮出矛盾。
+每个问题先归入一层；每层有唯一事实源，层间冲突时先信更底层并浮出矛盾。**本表只管分层判据，不管选哪个工具**——工具路由见「工具触发协议」。
 
 | 层 | 回答什么 | 事实源 | 保鲜 |
 |---|---------|--------|------|
-| **事实** | 代码在哪、怎么调用、改了炸多大 | 源码 + CodeGraph（`.codegraph/` 本地索引） | 索引随代码走 |
+| **事实** | 代码在哪、怎么调用、改了炸多大 | 源码 | 索引随代码走 |
 | **理由** | 为什么这样设计、这条约束哪来的 | `docs/adr/` 对号入座的 ADR | ADR 评审流程 |
 | **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `CONTEXT-MAP.md` → 各包领域文档（`CONTEXT.md` / spec / ADR） | 缺口如实标注（无入口即标「未创建」） |
 | **保鲜** | 上面三层是否仍为真 | 确定性检查（脚本 / 人工复核），不走模型重写 | —— |
