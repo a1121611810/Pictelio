@@ -23,7 +23,7 @@ import java.util.Locale;
  *
  * <p>职责：把一张官方 URL 的图片落盘到用户空间。
  * <ul>
- *   <li>字节获取复用 {@link PixivImageLoader#loadFile}（缓存优先 + per-URL 锁 + 图床
+ *   <li>字节获取复用 {@link PixivImageLoader#loadFileCachedFirst}（缓存优先 + per-URL 锁 + 图床
  *       resolve/镜像失败官方回退 + Referer/UA 注入，ADR-0143 语义不复制不偏离）；</li>
  *   <li>API ≥ 29：MediaStore（Pictures/Pictelio，IS_PENDING 两段式），无权限要求；</li>
  *   <li>API 28（minSdk）：应用专属外部目录 + MediaScanner 尽力入库——不给系统弹
@@ -83,7 +83,7 @@ public final class GallerySaver {
         if (officialUrl == null || officialUrl.isEmpty()) {
             throw new IOException("保存失败：图片 URL 为空");
         }
-        File source = loader.loadFile(officialUrl);
+        File source = loader.loadFileCachedFirst(officialUrl);
         return saveFile(context, source, fileName, subPath);
     }
 

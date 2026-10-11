@@ -37,7 +37,7 @@ import okhttp3.OkHttpClient;
  *
  * <p>期望值来源（oracle）：spec docs/specs/novel-export.md §3.3 payload schema 与 §5 格式能力矩阵；
  * 载荷字段名与共享包 {@code @pictelio/novel-export} 的 IR 逐字对齐（见 exportPayload.ts）。
- * 取图用测试假件注入（覆盖 {@link PixivImageLoader#loadBytes}），不触网络。
+ * 取图用测试假件注入（覆盖 {@link PixivImageLoader#loadBytesCachedFirst}），不触网络。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -71,7 +71,7 @@ public class NovelExporterTest {
         }
 
         @Override
-        public byte[] loadBytes(String url) throws IOException {
+        public byte[] loadBytesCachedFirst(String url) throws IOException {
             byte[] bytes = store.get(url);
             if (bytes == null) {
                 throw new IOException("fake 未提供图片: " + url);
