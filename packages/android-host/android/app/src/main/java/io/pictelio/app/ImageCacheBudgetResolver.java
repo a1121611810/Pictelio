@@ -53,8 +53,17 @@ public final class ImageCacheBudgetResolver {
         }
         int memoryClassMb = activityManager == null ? 0 : activityManager.getMemoryClass();
         boolean lowRamDevice = activityManager != null && activityManager.isLowRamDevice();
-        return resolveOrCompute(metrics.widthPixels, metrics.heightPixels,
+        long budget = resolveOrCompute(metrics.widthPixels, metrics.heightPixels,
                 ImageCacheBudget.MEMORY_CACHE_TARGET_SCREENS, memoryClassMb, lowRamDevice);
+        // 成功路径也留一行（2026-10-11）：内存预算是本轮唯一**没有任何观测出口**的数字——
+        // 降级才告警，故正常设备上算出的值在 logcat 里查不到，真机验收与线上排查都无从下手。
+        // 记 i 级（不是降级，不该是 w）。输入一并打出，便于对照 ADR-0222 §2.3 的公式手算复核。
+        Log.i(TAG, "内存缓存预算已按设备算出: " + (budget / 1024 / 1024) + "MB"
+                + "（屏幕 " + metrics.widthPixels + "x" + metrics.heightPixels
+                + " × " + ImageCacheBudget.MEMORY_CACHE_TARGET_SCREENS + " 屏"
+                + "，memoryClass " + memoryClassMb + "MB"
+                + "，低内存设备 " + lowRamDevice + "）");
+        return budget;
     }
 
     /**

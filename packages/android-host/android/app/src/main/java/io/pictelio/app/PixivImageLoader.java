@@ -154,6 +154,16 @@ public class PixivImageLoader {
     private static final Object CACHE_DIR_MUTATION_LOCK = new Object();
 
     /**
+     * 磁盘上限成功路径的一次性日志闸（2026-10-11）。
+     *
+     * <p>{@link #currentDiskBudget} 在<b>每次写盘后</b>的淘汰里都会调，故不能直接在里面打日志；
+     * 但只留降级告警会让「StatFs 真机读数与算出的上限」完全不可观测，而 Robolectric 的
+     * {@code StatFs} 返回 0 ⇒ 单测只覆盖了降级分支，#986 的真机数值欠账无法偿还。
+     */
+    private static final java.util.concurrent.atomic.AtomicBoolean DISK_BUDGET_LOGGED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    /**
      * 冷启动缓存维护的<b>闸门</b>（#985）：调度时关、维护结束开，缓存访问在 {@link #getCacheDir()}
      * 处等它（见 {@link #awaitStartupCacheMaintenance()}）。
      *
@@ -254,6 +264,18 @@ public class PixivImageLoader {
             Log.w(TAG, "可用存储读数非正（" + available + "B），磁盘缓存上限退回下界 "
                     + DiskCacheBudget.MIN_BYTES + "B");
             return -1L;
+        }
+        // 成功路径一次性留痕（2026-10-11，与内存预算的观测出口对称）：此前只有降级才告警，
+        // 故「StatFs 读到了多少、算出的上限是多少」在正常设备上完全查不到——而 Robolectric
+        // 的 StatFs 返回 0，单测只覆盖了降级分支，真机数值欠账无法偿还。用一次性闸避免
+        // 「每次淘汰都打一行」：currentDiskBudget 是每次写盘后都调的。
+        if (DISK_BUDGET_LOGGED.compareAndSet(false, true)) {
+            long budget = DiskCacheBudget.computeMaxBytes(available);
+            Log.i(TAG, "磁盘缓存上限已按可用存储算出: " + (budget / 1024 / 1024) + "MB"
+                    + "（StatFs 可用 " + (available / 1024 / 1024) + "MB"
+                    + "，比例 " + DiskCacheBudget.STORAGE_RATIO
+                    + "，钳制 " + (DiskCacheBudget.MIN_BYTES / 1024 / 1024)
+                    + "-" + (DiskCacheBudget.MAX_BYTES / 1024 / 1024) + "MB）");
         }
         return available;
     }
