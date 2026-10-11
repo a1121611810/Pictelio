@@ -117,6 +117,8 @@ public class PictelioImageService implements ILynxImageService {
     /** onInitialize 注入的 Application context（loader 惰性初始化用；避免 decodeImage/prefetch 传 null） */
     private volatile Context appContext;
     private volatile PixivImageLoader loader;
+    /** 统计采集器（#983）；进程级单例，惰性解析（与 loader 同一时机） */
+    private volatile ImageCacheStatsStore statsStore;
 
     public static PictelioImageService getInstance() {
         return INSTANCE;
@@ -169,6 +171,100 @@ public class PictelioImageService implements ILynxImageService {
      */
     public ImageMemoryCache memoryCacheForTrim() {
         return memoryCache;
+    }
+
+    // ── 可观测统计与清理（#983 的对外契约）───────────────────
+
+    /**
+     * 统计采集器（#983）：惰性解析，取 Application context。
+     *
+     * <p>与 {@link #loader()} 同构的惰性单例——{@code onInitialize} 未跑过但调用方
+     * 传了 context 时（{@code decodeImage} 的降级路径）仍能采到统计。
+     *
+     * @return 采集器；{@code context} 与 {@link #appContext} 皆无时返回 null
+     *         （此时调用点须显式告警，禁静默丢弃统计）
+     */
+    private ImageCacheStatsStore statsStore() {
+        ImageCacheStatsStore store = statsStore;
+        if (store != null) {
+            return store;
+        }
+        Context ctx = appContext;
+        if (ctx == null) {
+            return null;
+        }
+        synchronized (this) {
+            if (statsStore == null) {
+                statsStore = ImageCacheStatsStore.get(ctx);
+                // 装内存层取用口：使落盘（阈值触发/读快照）任何时机都拿得到最新的内建命中计数
+                statsStore.attachMemoryLayer(this::memoryCacheForTrim);
+            }
+            return statsStore;
+        }
+    }
+
+    /**
+     * 读取两层缓存统计快照（#983）——<b>下一张票（清理入口）的读取契约</b>。
+     *
+     * <p>读取即取现值：内存侧读 {@link ImageMemoryCache} 的实时量表与
+     * {@link LruCache} 内建计数，磁盘侧调 {@link PixivImageLoader#diskUsage()} 现算占用，
+     * 命中率侧取跨进程累计量。口径见 {@link ImageCacheStats} 类注释。
+     *
+     * <p>服务未初始化（{@link #onInitialize} 未调用）时<b>不静默返回全 0</b>：
+     * 记 Log.w 并返回空快照——那会让调用方把「没数据」误读成「命中率 0」。
+     *
+     * <p><b>调用方须知</b>：本方法会触发一次磁盘目录遍历（{@link PixivImageLoader#diskUsage()}，
+     * 阻塞 IO），<b>须放在后台线程</b>调用；它是低频诊断入口，不要挂在列表刷新这类
+     * 高频回调上。命中率的分子/分母本身在内存中读，不构成 IO。
+     */
+    public ImageCacheStats cacheStats() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计快照：服务未初始化（onInitialize 未调用），返回空统计");
+            return new ImageCacheStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        }
+        // 内存层用 memoryCacheForTrim()（不惰性创建）：读统计不该凭空造出一个空内存缓存
+        PixivImageLoader l = loader;
+        DiskCacheUsage usage = l == null ? null : l.diskUsage();
+        // snapshot 自身保证「读到即已持久」，此处不必再显式 flush
+        return store.snapshot(memoryCacheForTrim(), usage);
+    }
+
+    /**
+     * 清空内存层（#983）——为下一张票（清理入口）备好的<b>可调用清理点</b>。
+     *
+     * <p>此前 {@link ImageMemoryCache#clear()} 只有测试调、生产<b>零调用点</b>，
+     * 能力等同于不存在（这正是本票要消除的状态）。本方法把它提到服务层公开面上：
+     * 调用方不必自己去摸内存层引用，也不必知道内存层是惰性创建的。
+     *
+     * <p>不清统计：统计清零是另一件事（{@link #resetCacheStats()}），由调用方显式选择。
+     *
+     * @return 清理前的内存层占用字节数（供调用方展示「已释放多少」）
+     */
+    public long clearMemoryCache() {
+        ImageMemoryCache cache = memoryCacheForTrim();
+        if (cache == null) {
+            // 内存层尚未创建（还没加载过任何图）⇒ 无可清理，不是错误
+            return 0L;
+        }
+        long freedBytes = cache.totalBytes();
+        cache.clear();
+        return freedBytes;
+    }
+
+    /**
+     * 统计清零（#983）：把命中率相关累计量归零，占用量表不受影响。
+     *
+     * <p>下一张票在「用户主动清理」时可一并调用。单独暴露是为了让<b>清缓存</b>与
+     * <b>清统计</b>可分别选择——清缓存不必连带抹掉长期命中率数据。
+     */
+    public void resetCacheStats() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计清零：服务未初始化（onInitialize 未调用），跳过");
+            return;
+        }
+        store.reset(memoryCacheForTrim());
     }
 
     /**
@@ -267,6 +363,15 @@ public class PictelioImageService implements ILynxImageService {
             return;
         }
         final PixivImageLoader effectiveLoader = l;
+        // #983：分母「图片加载请求总数」在此记 1——每次真正进入内存层探测记一次。
+        // 记在空 URL 早退<b>之后</b>（无效请求不污染命中率），记在内存探测<b>之前</b>
+        // （本类唯一的内存层入口，键由 cacheKey 唯一产出，故计数与实际探测一一对应）。
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计采集跳过：服务未初始化，本次图片加载请求不计入分母: " + url);
+        } else {
+            store.recordRequest();
+        }
         // #980：内存层与磁盘层共用同一键空间——键由 PixivImageLoader.cacheKey 唯一产出
         //（rewrite 后的官方 CDN URL）。此前内存层直接用未 rewrite 的原始 url 当键，
         // 导致同一张图的代理路径形态与绝对地址形态在磁盘共享一条目、内存却记两份。

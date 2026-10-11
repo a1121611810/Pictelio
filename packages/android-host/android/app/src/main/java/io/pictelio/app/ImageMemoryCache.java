@@ -66,6 +66,30 @@ public final class ImageMemoryCache {
         return cache.totalBytes();
     }
 
+    // ── 可观测计数（#983）：直接透出 LRU 容器内建计数器 ────────
+
+    /**
+     * 内存层命中次数（#983）。
+     *
+     * <p><b>取自 {@link LruCache} 内建计数器</b>，本类不另记影子计数——影子计数会在
+     * {@link #clear()}/{@link #trimToSize(long)} 等旁路上漏记，且与容器实际状态可能漂移。
+     * 该计数为进程内单调量，进程重启归零（内存层本就是易失的；跨进程的累计由
+     * {@link ImageCacheStatsStore} 负责）。
+     */
+    public long memoryHits() {
+        return cache.hitCount();
+    }
+
+    /** 内存层未命中次数（#983），口径同 {@link #memoryHits()} */
+    public long memoryMisses() {
+        return cache.missCount();
+    }
+
+    /** 内存层因容量不足被逐出的次数（#983），口径见 {@link LruCache#evictionCount()} */
+    public long memoryEvictions() {
+        return cache.evictionCount();
+    }
+
     /**
      * 容量预算字节数（#981 内存压力响应）。
      *
