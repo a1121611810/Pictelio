@@ -75,7 +75,7 @@ const lines = [
   "  // ── F: Android 平台 ──",
   `  public static final int MIN_WEBVIEW_VERSION = ${cfg.minWebviewVersion};`,
   `  public static final String CACHE_DIR = "${cfg.cacheDir}";`,
-  `  public static final long CACHE_MAX_BYTES = ${cfg.cacheMaxBytes}L;`,
+  // cacheMaxBytes 于 #986 退役：磁盘上限改按可用存储比例计算并钳制（DiskCacheBudget）
   "}",
   "",
 ];

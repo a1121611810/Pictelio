@@ -3,6 +3,7 @@ package io.pictelio.app;
 import io.pictelio.app.config.OAuthConfig;
 
 import android.content.Context;
+import android.os.StatFs;
 import android.util.Base64;
 import android.util.Log;
 
@@ -20,6 +21,7 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -33,9 +35,9 @@ import okhttp3.Response;
  *   <li>URL 重写：{@code /pixiv-img/{path}} → {@code OAuthConfig.IMAGE_CDN_URL + "/" + path}</li>
  *   <li>OkHttp 下载：注入 {@code Referer}/{@code User-Agent}（i.pximg.net 防盗链必需），
  *       复用 {@link PixivApiCore#getSharedClient()} 共享连接池</li>
- *   <li>磁盘缓存读写 + 淘汰：目录/文件名/上限沿用现有约定（{@code OAuthConfig.CACHE_DIR}、
- *       Base64 URL-safe no-padding 文件名、{@code CACHE_MAX_BYTES}），与
- *       {@code ImageCachePlugin}/{@code PixivApiPlugin.prefetchImage} 同规则 → 双 client 共享缓存</li>
+ *   <li>磁盘缓存读写 + 淘汰：目录/文件名沿用现有约定（{@code OAuthConfig.CACHE_DIR}、
+ *       Base64 URL-safe no-padding 文件名），上限改为<b>按可用存储比例</b>计算
+ *       （{@link DiskCacheBudget}，#986），淘汰仍复用 {@link #enforceCacheLimit} 单一路径</li>
  *   <li>下载源决策（ADR-0143 D1/D4）：{@link ImageHostConfig#resolve} 决定镜像/官方下载源，
  *       镜像失败回退官方一次；<b>缓存键恒官方 URL</b>（D2 源无关命中不变量，本类缓存路径
  *       只认官方入参，不消费 resolve 返回值）</li>
@@ -56,6 +58,11 @@ import okhttp3.Response;
  * 淘汰按该时间戳升序——即「最近被<b>用过</b>」而非「最近被<b>写下</b>」。一手先例：Fresco
  * {@code imagepipeline-base} 磁盘缓存读取路径同款做法。淘汰触发点为「启动时 + 每次写入后」，
  * 使长期不写入的超限存量也能被回收。目录名与文件名约定不变（无存储格式迁移）。
+ *
+ * <p><b>磁盘上限随可用存储浮动（#986）</b>：上限不再是写死常量，而是
+ * {@link DiskCacheBudget#computeMaxBytes(long)}（可用存储 × 2%，钳制 10MB–250MB，一手出处
+ * 见该类注释）。上限在<b>每次淘汰时重新求值</b>，故存储紧张时自动收缩、恢复后自然增长；
+ * 收缩后超限条目由下方<b>同一条</b>淘汰路径按访问时间序回收（不另起删除逻辑）。
  */
 public class PixivImageLoader {
 
@@ -81,28 +88,88 @@ public class PixivImageLoader {
 
     private final Context context;
     private final OkHttpClient client;
-    private final long maxCacheBytes;
+    /** 磁盘上限供给器（#986）：每次淘汰时求值，故上限跟随当前可用存储浮动 */
+    private final LongSupplier maxCacheBytesSupplier;
     /** 图床下载源决策（ADR-0143 D1 深模块；resolve 不命中时行为与既有官方路径逐字节一致） */
     private final ImageHostConfig imageHostConfig;
     /** per-URL 锁：并发同 URL 加载时避免截断写同一缓存文件（拦截链路为多线程） */
     private final ConcurrentHashMap<String, Object> urlLocks = new ConcurrentHashMap<>();
 
+    /**
+     * 生产构造：磁盘上限按<b>当期可用存储</b>比例计算（#986），故上限供给器是惰性的、
+     * 每次淘汰时重新求值——存储紧张时自动收缩、恢复后自然增长。
+     */
     public PixivImageLoader(Context context) {
-        this(context, PixivApiCore.getSharedClient(), OAuthConfig.CACHE_MAX_BYTES);
+        this(context, PixivApiCore.getSharedClient(), () -> currentDiskBudget(context),
+                ImageHostConfig.get(context));
     }
 
-    /** 包可见注入构造（测试注入 mock 网络与可触发淘汰的小缓存上限）；图床配置默认走生产单例 */
+    /** 包可见注入构造（测试注入 mock 网络与固定的小缓存上限）；图床配置默认走生产单例 */
     PixivImageLoader(Context context, OkHttpClient client, long maxCacheBytes) {
-        this(context, client, maxCacheBytes, ImageHostConfig.get(context));
+        this(context, client, fixedBudget(maxCacheBytes));
     }
 
-    /** 全注入构造（包可见）：测试注入固定图床配置，不触生产单例与 SharedPreferences */
-    PixivImageLoader(Context context, OkHttpClient client, long maxCacheBytes,
+    /**
+     * 包可见注入构造（测试缝，#986）：注入<b>可变的</b>上限供给器，等价于设备可用存储随时间变化，
+     * 用于验证「上限收缩后同一条淘汰路径仍按访问时间序回收」。
+     */
+    PixivImageLoader(Context context, OkHttpClient client, LongSupplier maxCacheBytesSupplier) {
+        this(context, client, maxCacheBytesSupplier, ImageHostConfig.get(context));
+    }
+
+    /** 全注入构造（包可见）：测试注入固定图床配置与上限供给器，不触生产单例与 SharedPreferences */
+    PixivImageLoader(Context context, OkHttpClient client, LongSupplier maxCacheBytesSupplier,
             ImageHostConfig imageHostConfig) {
         this.context = context.getApplicationContext();
         this.client = client;
-        this.maxCacheBytes = maxCacheBytes;
+        this.maxCacheBytesSupplier = maxCacheBytesSupplier;
         this.imageHostConfig = imageHostConfig;
+    }
+
+    /** 全注入构造（包可见）：既有调用方以固定字节数注入上限 */
+    PixivImageLoader(Context context, OkHttpClient client, long maxCacheBytes,
+            ImageHostConfig imageHostConfig) {
+        this(context, client, fixedBudget(maxCacheBytes), imageHostConfig);
+    }
+
+    private static LongSupplier fixedBudget(long maxCacheBytes) {
+        return () -> maxCacheBytes;
+    }
+
+    /**
+     * 按<b>当期</b>可用存储求磁盘上限（#986）。
+     *
+     * <p>每次淘汰时调用（而非构造时算一次）：可用存储会变，冻结的取值会让「恢复后自然增长」
+     * 落空。开销为一次 {@code statfs}，相较同轮淘汰自身的 listFiles + 逐条 stat 可忽略。
+     */
+    private static long currentDiskBudget(Context app) {
+        return DiskCacheBudget.computeMaxBytes(availableBytes(app));
+    }
+
+    /**
+     * 探测缓存目录所在卷的可用字节（{@code StatFs}）；失败或非正值<b>不静默</b>：
+     * 记 Log.w 后返回 -1，由 {@link DiskCacheBudget#computeMaxBytes(long)} 兜到下界。
+     */
+    private static long availableBytes(Context app) {
+        long available;
+        try {
+            StatFs statFs = new StatFs(app.getCacheDir().getAbsolutePath());
+            available = statFs.getAvailableBytes();
+        } catch (Throwable t) {
+            Log.w(TAG, "读取可用存储失败，磁盘缓存上限退回下界 " + DiskCacheBudget.MIN_BYTES + "B", t);
+            return -1L;
+        }
+        if (available <= 0) {
+            Log.w(TAG, "可用存储读数非正（" + available + "B），磁盘缓存上限退回下界 "
+                    + DiskCacheBudget.MIN_BYTES + "B");
+            return -1L;
+        }
+        return available;
+    }
+
+    /** 当前生效的磁盘上限（字节）：包可见测试缝，亦是 #983 可观测统计的读点 */
+    long currentMaxCacheBytes() {
+        return maxCacheBytesSupplier.getAsLong();
     }
 
     // ── URL 重写（/pixiv-img/ → i.pximg.net） ─────────────────
@@ -435,6 +502,9 @@ public class PixivImageLoader {
      * 在整个使用期内都不会被回收（用户不翻新的图就一直占着盘）。
      * 本入口由 Application 冷启动调用一次，把淘汰触发点从「仅写入后」扩为「启动时 + 写入后」。
      *
+     * <p>与 #986 协同：清理按<b>当期</b>预算（{@link #maxCacheBytesSupplier}）判定超限，
+     * 故存储紧张导致上限收缩后，存量超限缓存在这里被回收——复用同一条淘汰路径，不另实现。
+     *
      * <p>失败路径<b>不静默</b>：目录不可读时记 Log.w 并跳过（不阻断启动）。
      */
     public void trimAtStartup() {
@@ -451,6 +521,10 @@ public class PixivImageLoader {
      * <p>排序键即文件 mtime，但语义已由「最后<b>写</b>下」转为「最后被<b>用过</b>」——
      * 命中路径 {@link #touchOnHit} 会刷新它（#978）。未命中过的新条目 mtime 等于写入时刻，
      * 与 LRU 语义一致。
+     *
+     * <p>上限来源为 {@link #maxCacheBytesSupplier}（#986：按当期可用存储比例计算），
+     * <b>本方法即唯一的删除实现</b>：写入后与启动清理两个触发点共用它——上限收缩时
+     * 超限条目按同一访问时间序被回收，不存在第二套删除逻辑。
      */
     private void enforceCacheLimit() {
         File cacheDir = getCacheDir();
@@ -460,6 +534,7 @@ public class PixivImageLoader {
             Log.w(TAG, "缓存目录不可读，本轮跳过淘汰: " + cacheDir);
             return;
         }
+        long maxCacheBytes = maxCacheBytesSupplier.getAsLong();
         long total = 0;
         for (File f : files) {
             total += f.length();
