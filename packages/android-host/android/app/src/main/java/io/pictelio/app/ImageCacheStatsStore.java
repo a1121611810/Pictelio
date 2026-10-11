@@ -157,13 +157,29 @@ public final class ImageCacheStatsStore {
         bump(requests);
     }
 
-    /** 记一次磁盘层命中（该次加载由缓存条目供给，未触网络） */
-    public void recordDiskHit() {
+    /**
+     * 记一次磁盘层命中（该次加载由缓存条目供给，未触网络）。
+     *
+     * <p><b>口径闸门（#984）</b>：只有 {@link ImageLoadChain#DISPLAY}（显示链路）
+     * 才计入分子。预取 / zip / 保存 / 导出链路的命中<b>不计入</b>——分母本就只数显示链路，
+     * 分子若含非显示链路，命中率会算出 &gt;100% 的荒谬值。归属判定是唯一决策点，不在调用方散落。
+     */
+    public void recordDiskHit(ImageLoadChain chain) {
+        if (chain != ImageLoadChain.DISPLAY) {
+            return;
+        }
         bump(diskHits);
     }
 
-    /** 记一次磁盘层未命中（该次加载需要发起网络下载） */
-    public void recordDiskMiss() {
+    /**
+     * 记一次磁盘层未命中（该次加载需要发起网络下载）。
+     *
+     * <p>口径闸门同 {@link #recordDiskHit(ImageLoadChain)}：非显示链路不计入。
+     */
+    public void recordDiskMiss(ImageLoadChain chain) {
+        if (chain != ImageLoadChain.DISPLAY) {
+            return;
+        }
         bump(diskMisses);
     }
 

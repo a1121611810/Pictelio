@@ -223,14 +223,19 @@ public class PixivImageLoader {
         return usage;
     }
 
-    /** 磁盘层自计：记一次命中（该次加载由缓存条目供给，未触网络）。热路径只做内存自增 */
-    private void recordDiskHit() {
-        statsStore().recordDiskHit();
+    /**
+     * 磁盘层自计：记一次命中（该次加载由缓存条目供给，未触网络）。热路径只做内存自增。
+     *
+     * <p><b>口径闸门在 {@link ImageCacheStatsStore} 内</b>（{@link ImageLoadChain#DISPLAY}
+     * 才计入分子），此处只负责把归属传下去——闸门不散落到调用点。
+     */
+    private void recordDiskHit(ImageLoadChain chain) {
+        statsStore().recordDiskHit(chain);
     }
 
-    /** 磁盘层自计：记一次未命中（该次加载需要发起网络下载） */
-    private void recordDiskMiss() {
-        statsStore().recordDiskMiss();
+    /** 磁盘层自计：记一次未命中（该次加载需要发起网络下载）；口径闸门同 {@link #recordDiskHit} */
+    private void recordDiskMiss(ImageLoadChain chain) {
+        statsStore().recordDiskMiss(chain);
     }
 
     // ── URL 重写（/pixiv-img/ → i.pximg.net） ─────────────────
@@ -377,11 +382,15 @@ public class PixivImageLoader {
      * 返回图片文件：缓存命中直接返回（并刷新访问时间戳）；未命中下载写盘并淘汰后返回；失败抛 IOException。
      *
      * <p>「缓存优先」语义显式写进方法名（#978）：调用方读代码即知命中不再触网络。
+     *
+     * <p><b>归因固定为 {@link ImageLoadChain#NON_DISPLAY}（#984）</b>：本入口的生产调用方
+     * 只有作品下载链路（{@code PictelioDownloader}）与作品导出链路，均非显示链路。
+     * 显示链路走 {@link #loadBytesCachedFirst(String, ImageLoadChain)}。
      */
     public File loadFileCachedFirst(String url) throws IOException {
         File cached = cachedFile(url);
         if (cached != null) {
-            recordDiskHit();
+            recordDiskHit(ImageLoadChain.NON_DISPLAY);
             return touchOnHit(cached);
         }
         // per-URL 锁 + double-check：并发同 URL 只下载一次，避免截断写同一缓存文件
@@ -392,10 +401,10 @@ public class PixivImageLoader {
                 // 并发同 URL 由别的线程先下完：本次请求<b>仍算磁盘命中</b>（未触网络），
                 // 故此处记命中而不记未命中——命中/未命中按「请求最终是否触网」计，
                 // 两者之和恒等于本层的请求数。
-                recordDiskHit();
+                recordDiskHit(ImageLoadChain.NON_DISPLAY);
                 return touchOnHit(cached);
             }
-            recordDiskMiss();
+            recordDiskMiss(ImageLoadChain.NON_DISPLAY);
             byte[] bytes = download(url);
             File file = new File(getCacheDir(), keyToFilename(url));
             writeFile(file, bytes);
@@ -410,13 +419,16 @@ public class PixivImageLoader {
      * 流式加载：缓存命中直接返回（并刷新访问时间戳）；未命中流式下载并原子写盘，
      * 全程按字节回调进度、响应取消。与 {@link #loadFileCachedFirst(String)} 同缓存键/下载源/
      * 镜像回退语义（ADR-0143 不偏离）。
+     *
+     * <p><b>归因固定为 {@link ImageLoadChain#NON_DISPLAY}（#984）</b>：本入口只服务作品保存与
+     * zip 下载（{@code PictelioDownloader}），两条链路的磁盘命中都不计入命中率分子。
      */
     public File loadFileWithProgressCachedFirst(String url, ProgressSink sink, Cancellation cancel)
             throws IOException {
         File cached = cachedFile(url);
         if (cached != null) {
             reportDone(sink, cached.length());
-            recordDiskHit();
+            recordDiskHit(ImageLoadChain.NON_DISPLAY);
             return touchOnHit(cached);
         }
         Object lock = urlLocks.computeIfAbsent(url, k -> new Object());
@@ -424,10 +436,10 @@ public class PixivImageLoader {
             cached = cachedFile(url);
             if (cached != null) {
                 reportDone(sink, cached.length());
-                recordDiskHit();
+                recordDiskHit(ImageLoadChain.NON_DISPLAY);
                 return touchOnHit(cached);
             }
-            recordDiskMiss();
+            recordDiskMiss(ImageLoadChain.NON_DISPLAY);
             File target = new File(getCacheDir(), keyToFilename(url));
             downloadToFile(url, target, sink, cancel);
             enforceCacheLimit();
@@ -534,21 +546,38 @@ public class PixivImageLoader {
     }
 
     /** {@link #loadFileCachedFirst(String)} 的字节形态（缓存命中读文件并刷新访问时间戳；
-     *  未命中下载后直接返回字节并写盘） */
+     *  未命中下载后直接返回字节并写盘）。
+     *
+     *  <p><b>默认按 {@link ImageLoadChain#NON_DISPLAY} 归因（#984）</b>：本重载无链路信息可依，
+     *  而漏传时的错误方向必须是「不计入分子」（低估）而非「把非显示命中算进分子」（&gt;100%）。
+     *  显示链路必须显式传 {@link ImageLoadChain#DISPLAY}。 */
     public byte[] loadBytesCachedFirst(String url) throws IOException {
+        return loadBytesCachedFirst(url, ImageLoadChain.NON_DISPLAY);
+    }
+
+    /**
+     * {@link #loadFileCachedFirst(String)} 的字节形态，<b>带链路归属</b>（#984）。
+     *
+     * <p>本方法是显示、预取、作品导出三条链路的<b>唯一共用入口</b>
+     * （{@code PictelioImageService} 的显示与预取两处 + {@code NovelPdfEncoder} 一处），
+     * 方法名无法区分链路，故归属必须由调用方显式声明，见 {@link ImageLoadChain}。
+     *
+     * @param chain 本次加载的链路归属；决定磁盘命中/未命中是否计入命中率分子，不影响缓存读写行为
+     */
+    public byte[] loadBytesCachedFirst(String url, ImageLoadChain chain) throws IOException {
         File cached = cachedFile(url);
         if (cached != null) {
-            recordDiskHit();
+            recordDiskHit(chain);
             return readAll(touchOnHit(cached));
         }
         Object lock = urlLocks.computeIfAbsent(url, k -> new Object());
         synchronized (lock) {
             cached = cachedFile(url);
             if (cached != null) {
-                recordDiskHit();
+                recordDiskHit(chain);
                 return readAll(touchOnHit(cached));
             }
-            recordDiskMiss();
+            recordDiskMiss(chain);
             byte[] bytes = download(url);
             writeFile(new File(getCacheDir(), keyToFilename(url)), bytes);
             enforceCacheLimit();
@@ -587,6 +616,68 @@ public class PixivImageLoader {
             }
             throw e;
         }
+    }
+
+    // ── 清空（#984）：只删图片缓存目录的内容 ──────────────────
+
+    /**
+     * 清空<b>磁盘缓存目录的内容</b>（#984）——用户主动「清理图片缓存」的磁盘侧。
+     *
+     * <h3>⚠️ 不可逆风险：本方法只允许删图片缓存目录里的条目</h3>
+     * {@code context.getCacheDir()} 下有<b>五个同级目录</b>，只有第一个是本类的职责范围：
+     * <pre>
+     *   cacheDir/
+     *   ├── pictelio-images            ← 本方法唯一的删除对象
+     *   ├── pictelio_translate_cache   ← 用户的翻译成果（删除需重新翻译，可能重新计费）
+     *   ├── ugoira/&lt;illustId&gt;/      ← 动图帧解压产物
+     *   ├── pictelio-novel-export      ← 可能正有进行中的作品导出
+     *   └── pictelio-ugoira-export    ← 同上
+     * </pre>
+     * <b>因此本方法的实现被刻意写成「逐条删目录内的子项」，绝不 {@code delete()} 目录本身、
+     * 更不碰父目录</b>——目录被删后下一次 {@link #getCacheDir()} 会重新创建，但若哪天有人
+     * 把锚点改成 {@code new File(context.getCacheDir(), "..")} 或直接删父目录，
+     * 上面四个兄弟目录会一起消失（翻译成果重译 + 导出中断）。防线是
+     * {@code ImageCacheClearScopeTest}：清理后逐个核对那四个目录的内容与文件数不变。
+     *
+     * <p><b>不做递归删除</b>：缓存条目按约定是扁平文件（{@link #keyToFilename}），
+     * 若目录里出现子目录（异常残留），{@code File.delete()} 会因非空而失败 →
+     * 计入 {@link ImageCacheClearResult#failed()} 并告警，而不是递归进去——
+     * 递归删除是「删多了一层」这类事故的典型写法，这里显式拒绝。
+     *
+     * <p><b>与启动清理的关系</b>：{@link #trimAtStartup()} 是<b>容量管理</b>（超限才淘汰、
+     * 保留最近使用的），本方法是<b>用户显式清空</b>（全删）。两者语义不同，不得互相替代，
+     * 也不得把本方法挂在启动/写入路径上自动触发（#984 拍板：清理只由设置页按钮触发）。
+     *
+     * <p><b>不静默降级</b>：目录不可读 → 记 Log.w 并返回 {@code failed=true}；
+     * 单条删不掉 → 逐条 Log.w 并计入 {@code failed}。
+     */
+    public ImageCacheClearResult clearDiskCache() {
+        File cacheDir = getCacheDir();
+        File[] files = cacheDir.listFiles();
+        if (files == null) {
+            Log.w(TAG, "缓存目录不可读，磁盘层清理失败: " + cacheDir);
+            return ImageCacheClearResult.NOTHING;
+        }
+        long freed = 0L;
+        long deleted = 0L;
+        boolean failed = false;
+        for (File f : files) {
+            long size = f.length();
+            if (f.delete()) {
+                freed += size;
+                deleted++;
+            } else {
+                // 不静默：删不掉必须留痕并让上层知道（可能仍有进行中的导出/保存持有该文件）
+                failed = true;
+                Log.w(TAG, "删除图片缓存条目失败（可能正被使用）: " + f.getName());
+            }
+        }
+        if (failed) {
+            Log.w(TAG, "磁盘层清理部分失败：已释放 " + freed + "B，目录 " + cacheDir);
+        }
+        // 量表立即归零（否则后台读数会停留在清理前的值，直到下一次遍历）
+        statsStore().publishDiskUsage(DiskCacheUsage.EMPTY);
+        return new ImageCacheClearResult(freed, deleted, failed);
     }
 
     /**

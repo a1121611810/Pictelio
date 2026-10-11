@@ -253,6 +253,20 @@ public class PictelioImageService implements ILynxImageService {
     }
 
     /**
+     * 统计读数是否<b>真实可用</b>（#984）——图片服务是否已初始化到能给出真读数的程度。
+     *
+     * <p>与 {@link #cacheStats()} 的差别：后者在服务未初始化时返回<b>全 0 的空快照</b>
+     * （并已 Log.w），若直接把它渲染成「0% / 0 字节」，用户会以为「缓存一直是空的」，
+     * 而真相是「读不到」。本方法供桥接层区分这两种状态，让界面显示「暂不可用」
+     * 而不是谎报 0（与 {@code advanced.metrics.noData}「分母为 0 不谎报 0%」同一纪律）。
+     *
+     * <p>判定依据与 {@link #cacheStats()} 的降级条件同源：拿不到 {@link ImageCacheStatsStore}。
+     */
+    public boolean isAvailable() {
+        return statsStore() != null;
+    }
+
+    /**
      * 统计清零（#983）：把命中率相关累计量归零，占用量表不受影响。
      *
      * <p>下一张票在「用户主动清理」时可一并调用。单独暴露是为了让<b>清缓存</b>与
@@ -265,6 +279,50 @@ public class PictelioImageService implements ILynxImageService {
             return;
         }
         store.reset(memoryCacheForTrim());
+    }
+
+    /**
+     * 一键清理图片缓存（#984）：<b>内存层 + 磁盘层</b>，并重置统计数据。
+     *
+     * <p>顺序刻意为「清内存 → 清磁盘 → 重置统计」：
+     * <ul>
+     *   <li>清内存（{@link #clearMemoryCache()}）——释放进程内 Bitmap 占用的字节；</li>
+     *   <li>清磁盘（{@link PixivImageLoader#clearDiskCache()}）——只删图片缓存目录的内容，
+     *       <b>不碰父目录与四个兄弟目录</b>（翻译成果 / ugoira 帧 / 两个进行中的导出目录），
+     *       锚定纪律与不可逆风险见该方法注释；</li>
+     *   <li>重置统计（{@link #resetCacheStats()}）——用户既然清了缓存，旧的命中率对它已无意义，
+     *       留着只会让清理后的首屏显示一个毫无来由的历史百分比。</li>
+     * </ul>
+     *
+     * <p><b>清理后图片可正常重建</b>：两层缓存都只是加速层，被清空后下次显示走一次网络下载
+     * 即重建，不存在「缓存被删 ⇒ 图片永久空白」的路径。
+     *
+     * <p><b>阻塞 IO</b>：磁盘侧要遍历目录并逐条 {@code delete()}，调用方<b>须放后台线程</b>
+     * （桥接模块已如此，见 {@code PictelioImageCacheModule}）。
+     *
+     * <p><b>不静默降级</b>：服务未初始化（{@link #onInitialize} 未调用、拿不到 context）
+     * 时返回 {@code failed=true} 的结果并记 Log.w，而不是谎报「已清理 0 字节、成功」。
+     *
+     * @return 磁盘侧清理结果；内存侧与统计侧失败已在各自方法内告警
+     */
+    public ImageCacheClearResult clearImageCache() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "一键清理：服务未初始化（onInitialize 未调用），磁盘与统计未清理");
+            return ImageCacheClearResult.NOTHING;
+        }
+        // 先把待落盘的累计量落盘，再清零，避免「清零前的值被随后一次 flush 写回」
+        store.flush();
+        clearMemoryCache();
+        PixivImageLoader l = loader;
+        ImageCacheClearResult diskResult = l == null
+                ? ImageCacheClearResult.NOTHING
+                : l.clearDiskCache();
+        if (l == null) {
+            Log.w(TAG, "一键清理：图片加载核心未初始化，磁盘层未清理");
+        }
+        resetCacheStats();
+        return diskResult;
     }
 
     /**
@@ -391,7 +449,11 @@ public class PictelioImageService implements ILynxImageService {
                     if (cached.isRecycled()) {
                         // 缓存项已失效（被外部 recycle/OOM）→ 移除条目并回退下载
                         memoryCache().remove(cacheKey);
-                        loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
+                        // #984：按 NON_DISPLAY 归因——本次请求的分子已在上面的内存命中里计入
+                        // 一次（deliver 是唯一计入内存命中的入口），磁盘结果不得重复计入，
+                        // 否则同一请求贡献 2 次分子、命中率突破 100%。
+                        loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                                ImageLoadChain.NON_DISPLAY);
                         return;
                     }
                     loadListener.onSuccess(
@@ -401,17 +463,26 @@ public class PictelioImageService implements ILynxImageService {
                 } catch (Throwable t) {
                     Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
                     memoryCache().remove(cacheKey);
-                    loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
+                    // #984：同上，回退分支不得重复计入分子
+                    loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                            ImageLoadChain.NON_DISPLAY);
                 }
             });
             return;
         }
-        executor.execute(() -> loadAndDeliver(url, requestInfo, loadListener, effectiveLoader));
+        // #984：正常显示链路 → 磁盘命中计入命中率分子
+        executor.execute(() -> loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                ImageLoadChain.DISPLAY));
     }
 
-    /** executor 线程内执行：磁盘缓存/下载 → 采样解码 → 入内存缓存 → onSuccess（fire-and-forget） */
+    /**
+     * executor 线程内执行：磁盘缓存/下载 → 采样解码 → 入内存缓存 → onSuccess（fire-and-forget）。
+     *
+     * @param chain 链路归属（#984）：决定磁盘命中是否计入命中率分子；不改变缓存读写行为
+     */
     private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
-            final ImageLoadListener loadListener, final PixivImageLoader l) {
+            final ImageLoadListener loadListener, final PixivImageLoader l,
+            final ImageLoadChain chain) {
         try {
             byte[] bytes;
             if (url.startsWith("file://")) {
@@ -426,7 +497,7 @@ public class PictelioImageService implements ILynxImageService {
             } else {
                 // #980：磁盘层与内存层取同一个键（cacheKey 幂等，此处再取一次不改变结果，
                 // 但显式写出以免日后有人把某一侧改回未 rewrite 的原始 URL）
-                bytes = l.loadBytesCachedFirst(PixivImageLoader.cacheKey(url));
+                bytes = l.loadBytesCachedFirst(PixivImageLoader.cacheKey(url), chain);
             }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
@@ -532,13 +603,16 @@ public class PictelioImageService implements ILynxImageService {
      */
     private void warmLayers(PixivImageLoader l, String key, String uri) {
         // 重复预取短路：内存层已有可用条目 ⇒ 预取目标已达成，不再读磁盘也不再解码
-        Bitmap existing = memoryCache().get(key);
+        // #984：用 probe（不计内建命中计数）而非 get——预取是投机探测、不是图片加载请求，
+        // 用 get 会让内存命中分子被非显示链路抬高，命中率可能算出 >100%。
+        Bitmap existing = memoryCache().probe(key);
         if (existing != null && !existing.isRecycled()) {
             return;
         }
         byte[] bytes;
         try {
-            bytes = l.loadBytesCachedFirst(key);
+            // #984：预取属非显示链路，磁盘命中不计入命中率分子
+            bytes = l.loadBytesCachedFirst(key, ImageLoadChain.NON_DISPLAY);
         } catch (Throwable t) {
             Log.w(TAG, "prefetchImage 失败（两层均未预热）: " + uri, t);
             return;

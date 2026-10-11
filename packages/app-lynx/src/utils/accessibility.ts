@@ -176,6 +176,9 @@ export const ADVANCED_A11Y_LABELS = {
   metricsTopShareGroup: '顶层触达率',
   metricsSubShareGroup: '二级使用占比',
   metricsEmptyRateGroup: '空段出现率',
+  // [#984] 图片缓存组：占用/命中率/清理。组标题独立成键，理由同上面三个指标子标题——
+  //   读屏用户需要先听到「图片缓存」这个分组，才知道下面几行读数是什么。
+  cacheGroupTitle: '图片缓存',
 } as const
 
 /** RefreshableList 列表操作 FAB menu 标注（ADR-0111）

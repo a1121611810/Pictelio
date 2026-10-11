@@ -41,6 +41,20 @@ public final class ImageMemoryCache {
         return cache.get(url);
     }
 
+    /**
+     * 探测命中（#984 口径修正）：<b>不计入</b> {@link #memoryHits()} / {@link #memoryMisses()}。
+     *
+     * <p><b>唯一调用点是预取链路的投机探测</b>（{@code PictelioImageService.warmLayers}
+     * 的「内存层是否已有可用条目」短路判断）。那次探测不是一次图片加载请求，
+     * 用 {@link #get} 会让 {@link ImageCacheStats} 的分子被非显示链路抬高、命中率可能 &gt;100%。
+     *
+     * <p>LRU 顺序仍被刷新（与改造前一致，见 {@link LruCache#probe}），淘汰行为零变化。
+     * 显示链路（{@code deliver}）继续用 {@link #get}——它是唯一应当计入内存命中分子的入口。
+     */
+    public Bitmap probe(String url) {
+        return cache.probe(url);
+    }
+
     /** 写入缓存；超上限自动按 LRU 逐出最旧 */
     public void put(String url, Bitmap bitmap) {
         cache.put(url, bitmap);

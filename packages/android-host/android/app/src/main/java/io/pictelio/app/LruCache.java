@@ -66,6 +66,22 @@ public final class LruCache<K, V> {
     }
 
     /**
+     * 探测命中（#984 口径修正）：<b>不计入</b>内建命中/未命中计数。
+     *
+     * <p><b>用途</b>：预取链路的「内存层是否已有可用条目」是一次<b>投机探测</b>，
+     * 不是一次图片加载请求。若用 {@link #get}，它会给 {@link ImageMemoryCache#memoryHits()}
+     * 凭空加一次命中，而 {@link ImageCacheStats} 的分母只数显示链路（{@code deliver}）
+     * ⇒ 分子被非显示链路抬高、命中率可能 &gt;100%。
+     *
+     * <p><b>与 {@link #get} 的唯一差别是计数</b>：LRU 顺序<b>同样被刷新</b>
+     * （底层 {@code map.get} 在 accessOrder 模式下总会移动条目），故淘汰行为与改造前逐字一致，
+     * 不引入任何新的淘汰语义变化。仅探测而不改顺序反倒是新的行为变更，需另作论证，故不做。
+     */
+    public synchronized V probe(K key) {
+        return map.get(key);
+    }
+
+    /**
      * 写入/覆盖条目；写入后总字节超限时从最旧开始逐出至不超。
      * 单条目即超限时该条目也会被逐出（缓存最终为空，与 Android LruCache 语义一致）。
      */
