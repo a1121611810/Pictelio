@@ -5,9 +5,14 @@ import android.graphics.Bitmap;
 /**
  * 图片 Bitmap 内存缓存（#147）——Lynx 图片渲染的内存缓存层。
  *
- * <p>键为图片 URL（{@code fetchImage} 入参原始 URL），值为解码后的 ARGB_8888 Bitmap，
+ * <p>键为图片 URL，值为解码后的 ARGB_8888 Bitmap，
  * 字节占用按 {@code width * height * 4}（每像素 4 字节）估算。基于 {@link LruCache}
  * （LRU 淘汰 + 线程安全），命中免磁盘读 + 解码。
+ *
+ * <p><b>键不是 {@code fetchImage} 的入参原始 URL</b>（#980 订正，此前本行写的就是那个已废止的语义）：
+ * 调用方必须先经 {@link PixivImageLoader#cacheKey(String)} 产出<b>rewrite 后的官方 CDN URL</b>
+ * 再 put/get，内存层与磁盘层因此共用同一键空间。照原始 URL 入参实现会把内存层重新与磁盘层分叉，
+ * 那正是 #980 修掉的 bug。反漂移防线为 {@code ImageCacheKeySpaceTest}。
  *
  * <p><b>容量不再写死（#979）</b>：此前是 64MB 常量，与设备无关；现在容量由
  * {@link ImageCacheBudgetResolver} 按设备事实算出后<b>注入</b>（本类不持有任何容量常量，
