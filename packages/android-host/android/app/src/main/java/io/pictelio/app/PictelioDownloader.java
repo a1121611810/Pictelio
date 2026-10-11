@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>职责：把一个下载任务从官方 URL 落到用户空间，并在过程中支持进度上报与取消。
  * <ul>
- *   <li>字节获取复用 {@link PixivImageLoader#loadFileWithProgress}（缓存优先 + 流式写盘 +
+ *   <li>字节获取复用 {@link PixivImageLoader#loadFileWithProgressCachedFirst}（缓存优先 + 流式写盘 +
  *       图床 resolve / 镜像失败官方回退 + Referer/UA 注入，ADR-0143 语义不复制不偏离）；</li>
  *   <li>落盘复用 {@link GallerySaver#saveFile}（MediaStore API 29+ / 应用目录 API 28）；</li>
  *   <li>取消：按 taskId 登记 {@link AtomicBoolean}，下载读取循环轮询中止（失败抛可读 IOException）。</li>
@@ -66,7 +66,7 @@ public final class PictelioDownloader {
         AtomicBoolean token = new AtomicBoolean(false);
         CANCELS.put(id, token);
         try {
-            File source = loader.loadFileWithProgress(sourceUrl, (done, total) -> {
+            File source = loader.loadFileWithProgressCachedFirst(sourceUrl, (done, total) -> {
                 if (listener != null) {
                     listener.onProgress(done, total);
                 }
@@ -110,7 +110,7 @@ public final class PictelioDownloader {
         AtomicBoolean token = new AtomicBoolean(false);
         CANCELS.put(id, token);
         try {
-            File zip = loader.loadFileWithProgress(zipUrl, (done, total) -> {
+            File zip = loader.loadFileWithProgressCachedFirst(zipUrl, (done, total) -> {
                 if (listener != null) {
                     listener.onProgress(done, total);
                 }

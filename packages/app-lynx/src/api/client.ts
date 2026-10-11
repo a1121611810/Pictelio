@@ -256,6 +256,8 @@ export function getNativeModules(): {
   PictelioShare?: unknown
   /** 送达通道 · 触达探测薄桥（spec notification-delivery-probe / #939） */
   PictelioNotification?: unknown
+  /** 图片缓存设置薄桥（#984）：占用/命中率展示 + 一键清理 */
+  PictelioImageCache?: unknown
 } | undefined {
   return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: unknown }).NativeModules as never

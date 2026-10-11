@@ -4,11 +4,11 @@
 
 | 类别 | 数量 |
 | --- | --- |
-| 编号 ADR（ADR-NNNN） | 201 |
+| 编号 ADR（ADR-NNNN） | 202 |
 | 术语表（glossary-*.md） | 47 |
 | 遗留编号（0001-0021，无 ADR- 前缀） | 21 |
 | 其他（迁移计划 / spikes 等） | 2 |
-| **合计** | **271** |
+| **合计** | **272** |
 
 ## 编号 ADR（按编号排序）
 
@@ -213,6 +213,7 @@
 - [ADR-0219-lynx-continue-reading.md](ADR-0219-lynx-continue-reading.md) — ADR-0219：继续读（本地话级阅读位置 + 书架第三段兑现）
 - [ADR-0220-notification-delivery-channel-probe.md](ADR-0220-notification-delivery-channel-probe.md) — ADR-0220：送达通道的形态选择（触达探测，而非通知功能）
 - [ADR-0221-row-action-leaves-trailing-band.md](ADR-0221-row-action-leaves-trailing-band.md) — ADR-0221：行内动作离开行尾——遮挡带是行尾的「固定占用者」
+- [ADR-0222-image-cache-redesign-decisions-and-glossary-baseline.md](ADR-0222-image-cache-redesign-decisions-and-glossary-baseline.md) — ADR-0222：图片缓存重设计——单一策略决策点与「两层缓存」词汇基线
 
 ## 术语表（glossary）
 
@@ -304,12 +305,12 @@
 | ADR-0103 | 43 |
 | ADR-0037 | 42 |
 | ADR-0170 | 40 |
+| ADR-0203 | 34 |
 | ADR-0167 | 33 |
 | ADR-0214 | 33 |
 | ADR-0201 | 32 |
 | ADR-0212 | 32 |
 | ADR-0139 | 29 |
-| ADR-0203 | 29 |
 | ADR-0107 | 28 |
 | ADR-0120 | 28 |
 | ADR-0206 | 26 |

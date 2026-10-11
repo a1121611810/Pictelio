@@ -11,6 +11,12 @@ import java.util.Map;
  * 从头部逐出最旧条目，直至总字节不超上限。全部操作 synchronized，可安全多线程调用
  * （Lynx 图片请求本身多线程）。
  *
+ * <p><b>内建可观测计数（#983）</b>：命中/未命中/淘汰三个计数<b>由容器自身维护</b>，
+ * 与增删发生在同一把锁内，故不存在「统计与实际不一致」的窗口——上层
+ * （{@link ImageMemoryCache} → {@code ImageCacheStats}）直接读这里的读数，
+ * <b>不另建影子计数器</b>（影子计数器会在 clear/trim 等旁路上漏记）。
+ * 计数为进程内单调量：进程重启归零（内存层本就是易失的）。
+ *
  * @param <K> key 类型
  * @param <V> value 类型
  */
@@ -26,6 +32,10 @@ public final class LruCache<K, V> {
     private final SizeOf<K, V> sizeOf;
     private final LinkedHashMap<K, V> map;
     private long totalBytes;
+    /** 内建计数（#983）：与增删同锁，无统计漂移窗口；进程内单调，重启归零 */
+    private long hitCount;
+    private long missCount;
+    private long evictionCount;
 
     /**
      * @param maxBytes 字节上限（&gt; 0）；put 后总字节超限时按 LRU 逐出
@@ -44,8 +54,30 @@ public final class LruCache<K, V> {
         this.map = new LinkedHashMap<>(16, 0.75f, true);
     }
 
-    /** 命中返回 value（并刷新其 LRU 顺序）；未命中返回 null */
+    /** 命中返回 value（并刷新其 LRU 顺序）；未命中返回 null。内建命中/未命中计数见 {@link #hitCount()} */
     public synchronized V get(K key) {
+        V value = map.get(key);
+        if (value == null) {
+            missCount++;
+        } else {
+            hitCount++;
+        }
+        return value;
+    }
+
+    /**
+     * 探测命中（#984 口径修正）：<b>不计入</b>内建命中/未命中计数。
+     *
+     * <p><b>用途</b>：预取链路的「内存层是否已有可用条目」是一次<b>投机探测</b>，
+     * 不是一次图片加载请求。若用 {@link #get}，它会给 {@link ImageMemoryCache#memoryHits()}
+     * 凭空加一次命中，而 {@link ImageCacheStats} 的分母只数显示链路（{@code deliver}）
+     * ⇒ 分子被非显示链路抬高、命中率可能 &gt;100%。
+     *
+     * <p><b>与 {@link #get} 的唯一差别是计数</b>：LRU 顺序<b>同样被刷新</b>
+     * （底层 {@code map.get} 在 accessOrder 模式下总会移动条目），故淘汰行为与改造前逐字一致，
+     * 不引入任何新的淘汰语义变化。仅探测而不改顺序反倒是新的行为变更，需另作论证，故不做。
+     */
+    public synchronized V probe(K key) {
         return map.get(key);
     }
 
@@ -62,13 +94,43 @@ public final class LruCache<K, V> {
         trimToSize();
     }
 
-    /** 逐出最旧条目直至总字节不超过上限 */
+    /** 逐出最旧条目直至总字节不超过构造上限 */
     private void trimToSize() {
-        while (totalBytes > maxBytes && !map.isEmpty()) {
+        evictUntil(maxBytes);
+    }
+
+    /**
+     * 收缩到不超过 {@code target}（#981 内存压力）：从最旧开始逐出。
+     *
+     * <p><b>不改变构造上限</b>：本方法只丢条目，{@link #maxBytes} 仍是原值，
+     * 故回前台后 {@link #put} 会照原上限重新填充（不会逐级收缩成小缓存）。
+     *
+     * @param target 目标字节上限（≥ 0；0 = 清空）。已是 ≤ 当前占用时为空操作
+     * @throws IllegalArgumentException {@code target} 为负
+     */
+    public synchronized void trimToSize(long target) {
+        if (target < 0) {
+            throw new IllegalArgumentException("target 必须 >= 0: " + target);
+        }
+        evictUntil(target);
+    }
+
+    /** 构造时给定的字节上限（#981：内存压力按预算比例算收缩目标，须能读回预算） */
+    public synchronized long maxBytes() {
+        return maxBytes;
+    }
+
+    /**
+     * 从最旧开始逐出条目直至总字节不超过 {@code target}。
+     * <b>调用方须持有本对象锁</b>（故不自带 synchronized，与 {@link #put} 共用同一把锁）。
+     */
+    private void evictUntil(long target) {
+        while (totalBytes > target && !map.isEmpty()) {
             // accessOrder 模式下头部即最久未使用条目（LRU）
             Map.Entry<K, V> eldest = map.entrySet().iterator().next();
             map.remove(eldest.getKey());
             totalBytes -= sizeOf.sizeOf(eldest.getKey(), eldest.getValue());
+            evictionCount++;
         }
     }
 
@@ -94,5 +156,29 @@ public final class LruCache<K, V> {
     /** 当前总字节数（便于诊断/测试验证字节上限） */
     public synchronized long totalBytes() {
         return totalBytes;
+    }
+
+    // ── 内建可观测计数（#983）────────────────────────────────
+
+    /** get 命中次数（进程内单调，进程重启归零） */
+    public synchronized long hitCount() {
+        return hitCount;
+    }
+
+    /** get 未命中次数（进程内单调，进程重启归零） */
+    public synchronized long missCount() {
+        return missCount;
+    }
+
+    /**
+     * LRU 逐出次数（进程内单调）。
+     *
+     * <p>口径：<b>仅计 {@link #evictUntil} 里的容量逐出</b>——同 key 覆盖 put 掉的旧值
+     * 不算淘汰（那是一次替换，不是容量压力），{@link #remove}/{@link #clear} 的显式清除
+     * 也不算（那是调用方主动要的，不是缓存自我淘汰）。故本计数回答的是
+     * 「缓存因装不下而丢弃了多少次」，而非「丢弃了多少条目」。
+     */
+    public synchronized long evictionCount() {
+        return evictionCount;
     }
 }

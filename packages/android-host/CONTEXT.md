@@ -28,12 +28,12 @@ _Avoid_: 客户端、app 层（「宿主」不含运行客户端之意）
 | `PictelioTemplateProvider` | 错误页等模板供给 |
 
 ### 共享核心（shared core）
-`android/app/src/main/java/` 下与 Lynx 解耦、可跨形态复用的核心：`PixivApiCore`（OAuth + API 协议）、`SecureStorageCompat`（Keystore + 首启迁移）、`ImageHostConfig` / `PixivImageLoader` / `ImageMemoryCache` / `LruCache`（图片三层缓存的 Java 侧）、`PictelioDownloader`、编码器族（`GifEncoder` / `Mp4Encoder` / `NovelDocxEncoder` / `NovelEpubEncoder` / `NovelPdfEncoder` + `NovelExporter` / `NovelExportModel`）、`BackupCrypto`、`GallerySaver`、`OAuthUtils`、`NetDiagProbe`、`ShareHelper`。
+`android/app/src/main/java/` 下与 Lynx 解耦、可跨形态复用的核心：`PixivApiCore`（OAuth + API 协议）、`SecureStorageCompat`（Keystore + 首启迁移）、`ImageHostConfig` / `PixivImageLoader` / `ImageMemoryCache` / `LruCache`（图片**两层缓存**的 Java 侧；`LruCache` 是 `ImageMemoryCache` 的内部容器，**与它同属内存层**、不另算一层）、`PictelioDownloader`、编码器族（`GifEncoder` / `Mp4Encoder` / `NovelDocxEncoder` / `NovelEpubEncoder` / `NovelPdfEncoder` + `NovelExporter` / `NovelExportModel`）、`BackupCrypto`、`GallerySaver`、`OAuthUtils`、`NetDiagProbe`、`ShareHelper`。
 _Avoid_: 把共享核心写进 lynx 侧（目录契约：Lynx 相关进 `lynx/java/`，无关进 `main/java/`）
 
 ### 图片代理（/pixiv-img/ proxy）
-JS 侧永不直连 `i.pximg.net`：统一走 `/pixiv-img/` 路径，真机上由 `PictelioImageService` 拦截 → `PixivImageLoader` 经 `ImageHostConfig` 出网；缓存三层（内存 `LruCache` / 内存盘 `ImageMemoryCache` / Java 磁盘），细节演进史见 ADR-0090。
-_Avoid_: `shouldInterceptRequest`（WebView 时代的拦截机制，已随 ADR-0203 删除，不是现行机制）
+JS 侧永不直连 `i.pximg.net`：统一走 `/pixiv-img/` 路径，真机上由 `PictelioImageService` 拦截 → `PixivImageLoader` 经 `ImageHostConfig` 出网；缓存**两层**（内存层 `ImageMemoryCache` / 磁盘层 `PixivImageLoader` 的 `getCacheDir()`），按「是否需要一次 IO 才能拿到数据」划分；现行编号见 ADR-0222。⚠️ **ADR-0090 标题里的「三层」（磁盘 / 浏览器缓存头 / JS 预取）是历史编号**，其中浏览器缓存头层随 ADR-0203 整体删除、在 Lynx 下已无载体，**不得**当作现行层数。
+_Avoid_: 把 `LruCache`（容器）与 `ImageMemoryCache`（容器的使用者）各算作一层；照搬 ADR-0090 的「三层」；用 `shouldInterceptRequest`（WebView 时代的拦截机制，已随 ADR-0203 删除，不是现行机制）
 
 ### 存量存储格式（persisted legacy format）
 `capacitor-storage_*` / `CapacitorStorage` 是历史用户数据格式：**一字不改**（ADR-0050）。首启由 `SecureStorageCompat` 迁移进 Keystore 体系。
@@ -55,4 +55,4 @@ _Avoid_: 「E2E 进 CI」（防线职责划分见 `docs/testing/conventions.md`�
 
 ## 相关 ADR
 
-ADR-0050（存量格式）· ADR-0090（图片三层缓存）· ADR-0142（git 引用校验）· ADR-0163（转换矩阵门）· ADR-0164（引擎决策）· ADR-0201（SplashScreen）· ADR-0203（宿主迁移）
+ADR-0050（存量格式）· ADR-0090（图片缓存·**历史编号**，现行层数见 0222）· ADR-0142（git 引用校验）· ADR-0163（转换矩阵门）· ADR-0164（引擎决策）· ADR-0201（SplashScreen）· ADR-0203（宿主迁移）· ADR-0222（图片缓存重设计决策与两层词汇基线）

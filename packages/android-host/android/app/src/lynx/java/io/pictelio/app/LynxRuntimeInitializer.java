@@ -83,6 +83,8 @@ public final class LynxRuntimeInitializer {
         LynxEnv.inst().registerModule("PictelioClipboard", PictelioClipboardModule.class); // 剪贴板薄桥（spec app-lynx-novel-text-selection §ID 6）
         // 送达通道 · 触达探测薄桥（spec notification-delivery-probe / ADR-0220 决策 4）
         LynxEnv.inst().registerModule("PictelioNotification", PictelioNotificationModule.class);
+        // 图片缓存设置薄桥（#984）：占用/命中率展示 + 一键清理的 JS 入口
+        LynxEnv.inst().registerModule("PictelioImageCache", PictelioImageCacheModule.class);
         LynxEnv.inst().enableLynxDebug(BuildConfig.DEBUG);
     }
 

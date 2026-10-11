@@ -19,7 +19,7 @@ import okhttp3.OkHttpClient;
  * <p><b>期望值来源（oracle）</b>：载荷字段名与 {@link NovelExporterTest} 逐字一致，
  * 对齐 spec docs/specs/novel-export.md §3.3 与共享包 {@code @pictelio/novel-export} 的 IR
  * （不是为实现编造的自洽 mock）。取图假件同 {@link NovelExporterTest} 的覆盖
- * {@link PixivImageLoader#loadBytes} 模式，并额外记录请求 URL 以断言取图调用。
+ * {@link PixivImageLoader#loadBytesCachedFirst} 模式，并额外记录请求 URL 以断言取图调用。
  */
 final class NovelExportTestData {
 
@@ -47,7 +47,7 @@ final class NovelExportTestData {
         }
 
         @Override
-        public byte[] loadBytes(String url) throws IOException {
+        public byte[] loadBytesCachedFirst(String url) throws IOException {
             requested.add(url);
             byte[] bytes = store.get(url);
             if (bytes == null) {

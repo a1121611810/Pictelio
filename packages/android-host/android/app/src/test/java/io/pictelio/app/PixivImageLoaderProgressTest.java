@@ -63,7 +63,7 @@ public class PixivImageLoaderProgressTest {
     public void loadFileWithProgress_reportsProgressAndWritesCache() throws IOException {
         String url = enqueue(200_000);
         List<long[]> reports = new ArrayList<>();
-        File file = loader.loadFileWithProgress(url,
+        File file = loader.loadFileWithProgressCachedFirst(url,
                 (done, total) -> reports.add(new long[]{done, total}), null);
 
         assertTrue(file.exists());
@@ -76,7 +76,7 @@ public class PixivImageLoaderProgressTest {
 
         // 二次加载命中缓存：立即报告 done == total == 文件长度，且不重复下载
         List<long[]> cachedReports = new ArrayList<>();
-        File again = loader.loadFileWithProgress(url,
+        File again = loader.loadFileWithProgressCachedFirst(url,
                 (done, total) -> cachedReports.add(new long[]{done, total}), null);
         assertEquals(file.getAbsolutePath(), again.getAbsolutePath());
         assertEquals(1, cachedReports.size());
@@ -87,7 +87,7 @@ public class PixivImageLoaderProgressTest {
     public void loadFileWithProgress_cancelAbortsWithIOException() {
         String url = enqueue(300_000);
         AtomicBoolean cancel = new AtomicBoolean(false);
-        IOException ex = assertThrows(IOException.class, () -> loader.loadFileWithProgress(url,
+        IOException ex = assertThrows(IOException.class, () -> loader.loadFileWithProgressCachedFirst(url,
                 (done, total) -> cancel.set(true), cancel::get));
         assertTrue("失败信息应含取消语义: " + ex.getMessage(), ex.getMessage().contains("取消"));
     }

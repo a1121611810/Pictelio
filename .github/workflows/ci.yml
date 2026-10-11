@@ -105,6 +105,10 @@ jobs:
 
       # 沙盒 #610：flavor 维度下线后 variant 退化为纯 buildType，闸门任务随之更名
       # （ADR-0177 D2 的任务名随之更新，门禁范围不变）。
+      # --no-build-cache：本 job 不 restore .gradle，故缓存恒冷、测试必然实跑——但那是**偶然**。
+      # android/gradle.properties 的 org.gradle.caching=true 一旦遇上被 restore 的 .gradle
+      # （给 CI 加 Gradle 缓存是很常见的优化），testDebugUnitTest 会 FROM-CACHE 重放历史结果
+      # 并仍报 BUILD SUCCESSFUL ⇒ 假绿。显式关掉，别把「缓存恒冷」当保证。
       - name: Gradle unit tests (testDebugUnitTest)
         working-directory: packages/android-host/android
-        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-daemon
+        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-daemon --no-build-cache

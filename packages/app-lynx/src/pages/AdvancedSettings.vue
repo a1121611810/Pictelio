@@ -2,9 +2,18 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）；本页无缓存语义，不入 include
 defineOptions({ name: 'advanced' })
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { goBack, navigate } from '../router'
 import { t } from '../i18n'
+import { getNativeModules, isNativeMode } from '../api/client'
+import {
+  formatBytes,
+  hitRatePercent,
+  parseClearResult,
+  parseStats,
+  type ImageCacheClearResult,
+  type ImageCacheStats,
+} from '../primitives/imageCache'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useUsageMetricsStore } from '../stores/usageMetrics'
 import {
@@ -124,6 +133,130 @@ const revisitLastText = computed(() => {
   return ms === null ? t('advanced.metrics.noData') : t('advanced.metrics.hours', { hours: (ms / 3_600_000).toFixed(1) })
 })
 const revisitSampleText = computed(() => t('advanced.metrics.samples', { count: snap.value.revisitIntervalsMs.length }))
+
+// ─── 图片缓存（#984）：占用 + 命中率 + 一键清理 ────────────────
+//【为什么在本页】「存储被莫名占满时用户要有自救手段」——占用与命中率是诊断面、清理是
+//   恢复手段，两者同属本页的既有定位（网络自检 / 平台自检都在这），不需要新导航目的地。
+//
+//【原生薄桥契约】NativeModules.PictelioImageCache（Java 侧 PictelioImageCacheModule）：
+//   getStats(cb) → cb(0, json) / cb(1, errMsg)
+//   clear(cb)   → cb(0, json) / cb(1, errMsg)
+//【双环境】web-core 开发预览没有该模块（见 isNativeMode 的探测纪律）⇒ 整组显示「不可用」，
+//   **不调用、不报错**——把原生缺失渲染成报错会在每个开发者的预览里刷出假故障。
+//
+//【先渲染、后加载】统计与清理都是 IO，onMounted 里才取；进页渲染不被阻塞（硬约束）。
+//
+//【无全局 toast 通道】lynx 没有全局 toast（见 IllustDetail.vue 同款说明），清理结果
+//   以**内联状态行**呈现，成功与失败都显式给出。
+interface NativeImageCacheModule {
+  getStats(callback: (ok: number, payload: string) => void): void
+  clear(callback: (ok: number, payload: string) => void): void
+}
+
+function nativeImageCache(): NativeImageCacheModule | undefined {
+  return getNativeModules()?.PictelioImageCache as NativeImageCacheModule | undefined
+}
+
+/** 双环境闸门：原生 Lynx 且薄桥已注册才可用；web-core 预览恒为 false */
+const cacheSupported = computed(() => isNativeMode() && !!nativeImageCache())
+
+const cacheStats = ref<ImageCacheStats | null>(null)
+/** 读数失败/未就绪的原因（null = 无）；有值时界面显示它而不是假装 0% */
+const cacheUnavailableReason = ref<string | null>(null)
+const cacheStatus = ref<string | null>(null)
+const clearing = ref(false)
+
+/** 读数是否可展示：模块可用、拿到快照、且原生确认读数真实（available） */
+const cacheStatsVisible = computed(() => cacheSupported.value && cacheStats.value?.available === true)
+
+/**
+ * 清理按钮此刻是否真的可点（单一事实源，模板三处同源引用）。
+ *
+ * 不可用时（web-core 预览 / 原生未初始化 / 读数不真实）与「正在清理」共用同一个禁用外观，
+ * 避免出现「容器是满 primary 的启用态、点了却零反馈」的伪可用按钮。
+ */
+const canClearCache = computed(() => cacheStatsVisible.value && !clearing.value)
+
+const cacheUsageText = computed(() =>
+  cacheStatsVisible.value ? formatBytes(cacheStats.value?.diskBytes ?? 0) : t('advanced.cache.noData'),
+)
+/**
+ * 条目数的**值**：走独立的 entriesValue key，**不复用**作为标签的 `advanced.cache.entries`。
+ * #988 真机走查抓到：两者曾共用同一 key，而该 key 的文案里没有 `{{count}}` 占位符
+ * ⇒ 值那侧传进来的 count 被静默丢弃，界面上「缓存条目」右侧一直显示「缓存条目」四个字，
+ * 条目数从未显示过。标签与值必须各自持有 key（见 usage 组的样本数行是正确做法）。
+ */
+const cacheEntriesText = computed(() =>
+  cacheStatsVisible.value
+    ? t('advanced.cache.entriesValue', { count: cacheStats.value?.diskEntries ?? 0 })
+    : t('advanced.cache.noData'),
+)
+const cacheMemoryText = computed(() =>
+  cacheStatsVisible.value ? formatBytes(cacheStats.value?.memoryBytes ?? 0) : t('advanced.cache.noData'),
+)
+/** 分母为 0 ⇒ 显示「暂无数据」而不是 0%（口径见 primitives/imageCache.hitRatePercent） */
+const cacheHitRateText = computed(() => {
+  if (!cacheStatsVisible.value) return t('advanced.cache.noData')
+  const pct = hitRatePercent(cacheStats.value?.hitRate ?? 0, cacheStats.value?.requests ?? 0)
+  return pct === null ? t('advanced.cache.noData') : `${Math.round(pct)}%`
+})
+
+function refreshCacheStats(): void {
+  const mod = nativeImageCache()
+  if (!mod) {
+    cacheUnavailableReason.value = t('advanced.cache.unavailable')
+    return
+  }
+  mod.getStats((ok, payload) => {
+    if (ok !== 0) {
+      cacheUnavailableReason.value = t('advanced.cache.readFailed', { reason: payload })
+      console.warn('[AdvancedSettings] 读取图片缓存统计失败', payload)
+      return
+    }
+    const parsed = parseStats(payload)
+    if (!parsed) {
+      cacheUnavailableReason.value = t('advanced.cache.readFailed', { reason: payload })
+      console.warn('[AdvancedSettings] 图片缓存统计解析失败', payload)
+      return
+    }
+    cacheUnavailableReason.value = parsed.available ? null : t('advanced.cache.unavailable')
+    cacheStats.value = parsed
+  })
+}
+
+function clearImageCache(): void {
+  const mod = nativeImageCache()
+  if (!mod || clearing.value) return
+  clearing.value = true
+  cacheStatus.value = null
+  mod.clear((ok, payload) => {
+    clearing.value = false
+    if (ok !== 0) {
+      cacheStatus.value = t('advanced.cache.clearFailed', { reason: payload })
+      console.warn('[AdvancedSettings] 清理图片缓存失败', payload)
+      return
+    }
+    const parsed: ImageCacheClearResult | null = parseClearResult(payload)
+    if (!parsed) {
+      cacheStatus.value = t('advanced.cache.clearFailed', { reason: payload })
+      console.warn('[AdvancedSettings] 清理结果解析失败', payload)
+      return
+    }
+    // 部分失败也要说出来：静默当成功就是在骗用户（禁静默降级）
+    cacheStatus.value = parsed.failed
+      ? t('advanced.cache.clearPartial', { size: formatBytes(parsed.freedBytes) })
+      : t('advanced.cache.cleared', { size: formatBytes(parsed.freedBytes) })
+    refreshCacheStats()
+  })
+}
+
+onMounted(() => {
+  if (!cacheSupported.value) {
+    cacheUnavailableReason.value = t('advanced.cache.unavailable')
+    return
+  }
+  refreshCacheStats()
+})
 
 </script>
 
@@ -260,10 +393,65 @@ const revisitSampleText = computed(() => t('advanced.metrics.samples', { count: 
         </view>
       </view>
 
-      <!-- ══ 本地使用度量组（spec §4 P0.5 四指标的唯一读出口）══ -->
+      <!-- ══ 图片缓存组（#984）：占用 + 命中率 + 一键清理 ══
+           双环境：web-core 预览下整组显示「不可用」，不调用原生、不报错 -->
       <view
         class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]"
         :style="listItemStyle(2)"
+      >
+        <text
+          class="text-title-small font-medium text-surface-on"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ADVANCED_A11Y_LABELS.cacheGroupTitle"
+          >{{ t('advanced.cache.title') }}</text
+        >
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-2">{{ t('advanced.cache.hint') }}</text>
+
+        <view class="flex flex-row items-center justify-between py-2">
+          <text class="text-body-medium text-surface-on">{{ t('advanced.cache.usage') }}</text>
+          <text class="text-body-medium text-surface-on-variant">{{ cacheUsageText }}</text>
+        </view>
+        <view class="flex flex-row items-center justify-between py-2">
+          <text class="text-body-medium text-surface-on">{{ t('advanced.cache.entries') }}</text>
+          <text class="text-body-medium text-surface-on-variant">{{ cacheEntriesText }}</text>
+        </view>
+        <view class="flex flex-row items-center justify-between py-2">
+          <text class="text-body-medium text-surface-on">{{ t('advanced.cache.memory') }}</text>
+          <text class="text-body-medium text-surface-on-variant">{{ cacheMemoryText }}</text>
+        </view>
+        <view class="flex flex-row items-center justify-between py-2">
+          <text class="text-body-medium text-surface-on">{{ t('advanced.cache.hitRate') }}</text>
+          <text class="text-body-medium text-surface-on-variant">{{ cacheHitRateText }}</text>
+        </view>
+
+        <!-- 不可用原因（web-core 预览 / 原生未初始化 / 读取失败）：显式说明，不静默 -->
+        <text
+          v-if="!cacheStatsVisible && cacheUnavailableReason"
+          class="text-body-medium text-surface-on-variant mt-2"
+          >{{ cacheUnavailableReason }}</text
+        >
+
+        <view
+          class="flex flex-row items-center justify-center py-3 mt-3 rounded-[var(--md-shape-full)]"
+          :class="canClearCache ? 'bg-primary' : 'bg-surface-container-high'"
+          :style="listItemStyle(0)"
+          @tap="canClearCache ? clearImageCache() : undefined"
+        >
+          <text
+            class="text-label-large"
+            :class="canClearCache ? 'text-primary-on' : 'text-surface-on-variant'"
+            >{{ clearing ? t('advanced.cache.clearing') : t('advanced.cache.clear') }}</text
+          >
+        </view>
+
+        <!-- 内联状态行（lynx 无全局 toast 通道）：成功/部分失败/失败都显式呈现 -->
+        <text v-if="cacheStatus" class="text-body-medium text-surface-on-variant mt-2">{{ cacheStatus }}</text>
+      </view>
+
+      <!-- ══ 本地使用度量组（spec §4 P0.5 四指标的唯一读出口）══ -->
+      <view
+        class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]"
+        :style="listItemStyle(3)"
       >
         <text
           class="text-title-small font-medium text-surface-on"

@@ -48,6 +48,33 @@ import java.util.concurrent.Executors;
  * <p>注册：{@code LynxServiceCenter.inst().registerService(PictelioImageService.getInstance())}
  * （在 {@code PictelioApp.initLynx()}，须早于任何 LynxView 创建）。
  *
+ * <p><b>测试缝（#977）</b>：包可见注入构造 {@link #PictelioImageService(ImageMemoryCache)}
+ * 让测试造干净实例，使内存层与磁盘层可分别断言。
+ *
+ * <p><b>内存层容量按设备算（#979）</b>：生产路径（单例）不再用写死的 64MB，
+ * 而是在 {@link #onInitialize} 拿到 Application context 后由 {@link ImageCacheBudgetResolver}
+ * 读取屏幕尺寸 / 内存等级 / 低内存设备判定，算出预算后注入 {@link ImageMemoryCache}。
+ * 系数与算法出处见 {@link ImageCacheBudget}（Glide {@code MemorySizeCalculator}）。
+ *
+ * <p><b>两层缓存共用一个键空间（#980）</b>：内存层与磁盘层（{@link PixivImageLoader} 缓存文件）
+ * 的键均由 {@link PixivImageLoader#cacheKey(String)} 唯一产出——即 rewrite 后的官方 CDN URL。
+ * 此前本类内存层直接以未 rewrite 的原始 {@code url} 为键，磁盘层却用 rewrite 产物，
+ * 同一张图以 {@code /pixiv-img/x} 与 {@code https://i.pximg.net/x} 两种形态请求时，
+ * 磁盘共享一条目而内存记两份（预算双份占用、命中率失真）。预取链路同用该产出点，
+ * 三条链路因此共用同一键空间（ADR-0222 §2.5）。
+ * <b>内存缓存是进程内易失的</b>，键变更后随升级自然清空，不做旧键迁移。
+ * {@code file://} 的 ugoira 帧走独立白名单分支、不参与图片缓存，不受本改动影响。
+ *
+ * <p><b>预取补齐内存层（#982）</b>：{@link #prefetchImage} 此前<b>只</b>把字节落进磁盘层，
+ * 内存层仍为空 ⇒ 预取过的图在首屏第一次显示时照样要磁盘读 + 解码，用户感知不到预取收益。
+ * 现预取在取到字节后额外解码并写入<b>同一个</b> {@link ImageMemoryCache}（与显示路径同一
+ * {@link PixivImageLoader#cacheKey(String)} 键、同一 {@link #memoryCache()} 实例），故首屏首次
+ * 显示直接命中内存层、既不读磁盘也不解码，且不产生第二次下载。字节仍<b>由
+ * {@link PixivImageLoader#loadBytesCachedFirst} 取得</b>——图床决策（{@code ImageHostConfig.resolve}）
+ * 与防盗链（Referer/UA 注入）都在这一条路径内，预取不自发 HTTP 请求，也不另设缓存入口。
+ * <b>预取不是旁路缓存</b>：它写入的就是显示会读的那一层，故 #983 的占用与命中率口径天然覆盖
+ * 预取条目，不需在预取侧另开计数。
+ *
  * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
  * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
  * Bitmap 的生命周期，渲染后可能 recycle，复用缓存原图会导致二次显示空白」。
@@ -71,24 +98,231 @@ public class PictelioImageService implements ILynxImageService {
 
     private static final String TAG = "PictelioImageService";
 
-    private static final PictelioImageService INSTANCE = new PictelioImageService();
+    private static final PictelioImageService INSTANCE = new PictelioImageService(null);
 
     /** 下载/解码线程池（fetchImage 为阻塞 IO + Bitmap 解码，不占 JS/主线程） */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    /** 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存 */
-    private final ImageMemoryCache memoryCache = new ImageMemoryCache();
+    /** 测试注入的内存层（#977）；null = 生产路径，内存层由本类按设备预算创建 */
+    private final ImageMemoryCache injectedMemoryCache;
+
+    /**
+     * 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存。
+     *
+     * <p>生产路径的容量不再写死 64MB（#979）：{@link #onInitialize} 拿到 Application
+     * context 后由 {@link ImageCacheBudgetResolver} 按设备算得并注入。
+     */
+    private volatile ImageMemoryCache memoryCache;
 
     /** onInitialize 注入的 Application context（loader 惰性初始化用；避免 decodeImage/prefetch 传 null） */
     private volatile Context appContext;
     private volatile PixivImageLoader loader;
+    /** 统计采集器（#983）；进程级单例，惰性解析（与 loader 同一时机） */
+    private volatile ImageCacheStatsStore statsStore;
 
     public static PictelioImageService getInstance() {
         return INSTANCE;
     }
 
-    private PictelioImageService() {
+    /**
+     * 包可见注入构造（测试缝 #977）：使测试能造出<b>干净实例</b>并持有内存层引用。
+     *
+     * <p>存在理由：服务此前只有「私有构造 + 静态单例」，而 {@code memoryCache} 从无清理点，
+     * 于是「第二次加载不再请求网络」这类断言的第二次命中极可能来自<b>单例内存层残留</b>，
+     * 磁盘层是否接通反而无机器防线。注入内存层后，测试可分别清空内存层 / 删除磁盘条目，
+     * 用排除法各自证明一层。
+     *
+     * <p>形态对齐 {@link ImageMemoryCache} 的包可见注入构造；<b>生产运行语义随 #979 变化</b>——
+     * 单例 {@link #INSTANCE} 传 null，内存层改由 {@link #onInitialize} 按设备预算创建
+     * （此前是 64MB 写死常量）。
+     *
+     * @param memoryCache 注入的内存层；null = 生产路径，按设备算容量
+     */
+    PictelioImageService(ImageMemoryCache memoryCache) {
+        this.injectedMemoryCache = memoryCache;
+        this.memoryCache = memoryCache;
         registerImageBehaviors();
+    }
+
+    /**
+     * 内存层访问口：生产路径若 {@link #onInitialize} 尚未跑过（拿不到 Application context），
+     * 退回 {@link ImageCacheBudgetResolver} 的保守末档预算——该降级由解析器自行
+     * {@code Log.w}（禁静默降级），此处不再重复告警。
+     */
+    private ImageMemoryCache memoryCache() {
+        ImageMemoryCache cache = memoryCache;
+        if (cache != null) {
+            return cache;
+        }
+        synchronized (this) {
+            if (memoryCache == null) {
+                memoryCache = new ImageMemoryCache(ImageCacheBudgetResolver.resolve(appContext));
+            }
+            return memoryCache;
+        }
+    }
+
+    /**
+     * 内存压力响应入口（#981）：返回<b>当前</b>内存层。
+     *
+     * <p><b>与 {@link #memoryCache()} 的区别在于不惰性创建</b>：压力回调可能早于首张图到达，
+     * 此时没有可释放的字节；返回 null 让 {@link ImageMemoryPressureHandler} 记日志跳过，
+     * 而不是为「准备释放」先造一个空缓存出来。
+     */
+    public ImageMemoryCache memoryCacheForTrim() {
+        return memoryCache;
+    }
+
+    // ── 可观测统计与清理（#983 的对外契约）───────────────────
+
+    /**
+     * 统计采集器（#983）：惰性解析，取 Application context。
+     *
+     * <p>与 {@link #loader()} 同构的惰性单例——{@code onInitialize} 未跑过但调用方
+     * 传了 context 时（{@code decodeImage} 的降级路径）仍能采到统计。
+     *
+     * @return 采集器；{@code context} 与 {@link #appContext} 皆无时返回 null
+     *         （此时调用点须显式告警，禁静默丢弃统计）
+     */
+    private ImageCacheStatsStore statsStore() {
+        ImageCacheStatsStore store = statsStore;
+        if (store != null) {
+            return store;
+        }
+        Context ctx = appContext;
+        if (ctx == null) {
+            return null;
+        }
+        synchronized (this) {
+            if (statsStore == null) {
+                statsStore = ImageCacheStatsStore.get(ctx);
+                // 装内存层取用口：使落盘（阈值触发/读快照）任何时机都拿得到最新的内建命中计数
+                statsStore.attachMemoryLayer(this::memoryCacheForTrim);
+            }
+            return statsStore;
+        }
+    }
+
+    /**
+     * 读取两层缓存统计快照（#983）——<b>下一张票（清理入口）的读取契约</b>。
+     *
+     * <p>读取即取现值：内存侧读 {@link ImageMemoryCache} 的实时量表与
+     * {@link LruCache} 内建计数，磁盘侧调 {@link PixivImageLoader#diskUsage()} 现算占用，
+     * 命中率侧取跨进程累计量。口径见 {@link ImageCacheStats} 类注释。
+     *
+     * <p>服务未初始化（{@link #onInitialize} 未调用）时<b>不静默返回全 0</b>：
+     * 记 Log.w 并返回空快照——那会让调用方把「没数据」误读成「命中率 0」。
+     *
+     * <p><b>调用方须知</b>：本方法会触发一次磁盘目录遍历（{@link PixivImageLoader#diskUsage()}，
+     * 阻塞 IO），<b>须放在后台线程</b>调用；它是低频诊断入口，不要挂在列表刷新这类
+     * 高频回调上。命中率的分子/分母本身在内存中读，不构成 IO。
+     */
+    public ImageCacheStats cacheStats() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计快照：服务未初始化（onInitialize 未调用），返回空统计");
+            return new ImageCacheStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        }
+        // 内存层用 memoryCacheForTrim()（不惰性创建）：读统计不该凭空造出一个空内存缓存
+        PixivImageLoader l = loader;
+        DiskCacheUsage usage = l == null ? null : l.diskUsage();
+        // snapshot 自身保证「读到即已持久」，此处不必再显式 flush
+        return store.snapshot(memoryCacheForTrim(), usage);
+    }
+
+    /**
+     * 清空内存层（#983）——为下一张票（清理入口）备好的<b>可调用清理点</b>。
+     *
+     * <p>此前 {@link ImageMemoryCache#clear()} 只有测试调、生产<b>零调用点</b>，
+     * 能力等同于不存在（这正是本票要消除的状态）。本方法把它提到服务层公开面上：
+     * 调用方不必自己去摸内存层引用，也不必知道内存层是惰性创建的。
+     *
+     * <p>不清统计：统计清零是另一件事（{@link #resetCacheStats()}），由调用方显式选择。
+     *
+     * @return 清理前的内存层占用字节数（供调用方展示「已释放多少」）
+     */
+    public long clearMemoryCache() {
+        ImageMemoryCache cache = memoryCacheForTrim();
+        if (cache == null) {
+            // 内存层尚未创建（还没加载过任何图）⇒ 无可清理，不是错误
+            return 0L;
+        }
+        long freedBytes = cache.totalBytes();
+        cache.clear();
+        return freedBytes;
+    }
+
+    /**
+     * 统计读数是否<b>真实可用</b>（#984）——图片服务是否已初始化到能给出真读数的程度。
+     *
+     * <p>与 {@link #cacheStats()} 的差别：后者在服务未初始化时返回<b>全 0 的空快照</b>
+     * （并已 Log.w），若直接把它渲染成「0% / 0 字节」，用户会以为「缓存一直是空的」，
+     * 而真相是「读不到」。本方法供桥接层区分这两种状态，让界面显示「暂不可用」
+     * 而不是谎报 0（与 {@code advanced.metrics.noData}「分母为 0 不谎报 0%」同一纪律）。
+     *
+     * <p>判定依据与 {@link #cacheStats()} 的降级条件同源：拿不到 {@link ImageCacheStatsStore}。
+     */
+    public boolean isAvailable() {
+        return statsStore() != null;
+    }
+
+    /**
+     * 统计清零（#983）：把命中率相关累计量归零，占用量表不受影响。
+     *
+     * <p>下一张票在「用户主动清理」时可一并调用。单独暴露是为了让<b>清缓存</b>与
+     * <b>清统计</b>可分别选择——清缓存不必连带抹掉长期命中率数据。
+     */
+    public void resetCacheStats() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计清零：服务未初始化（onInitialize 未调用），跳过");
+            return;
+        }
+        store.reset(memoryCacheForTrim());
+    }
+
+    /**
+     * 一键清理图片缓存（#984）：<b>内存层 + 磁盘层</b>，并重置统计数据。
+     *
+     * <p>顺序刻意为「清内存 → 清磁盘 → 重置统计」：
+     * <ul>
+     *   <li>清内存（{@link #clearMemoryCache()}）——释放进程内 Bitmap 占用的字节；</li>
+     *   <li>清磁盘（{@link PixivImageLoader#clearDiskCache()}）——只删图片缓存目录的内容，
+     *       <b>不碰父目录与四个兄弟目录</b>（翻译成果 / ugoira 帧 / 两个进行中的导出目录），
+     *       锚定纪律与不可逆风险见该方法注释；</li>
+     *   <li>重置统计（{@link #resetCacheStats()}）——用户既然清了缓存，旧的命中率对它已无意义，
+     *       留着只会让清理后的首屏显示一个毫无来由的历史百分比。</li>
+     * </ul>
+     *
+     * <p><b>清理后图片可正常重建</b>：两层缓存都只是加速层，被清空后下次显示走一次网络下载
+     * 即重建，不存在「缓存被删 ⇒ 图片永久空白」的路径。
+     *
+     * <p><b>阻塞 IO</b>：磁盘侧要遍历目录并逐条 {@code delete()}，调用方<b>须放后台线程</b>
+     * （桥接模块已如此，见 {@code PictelioImageCacheModule}）。
+     *
+     * <p><b>不静默降级</b>：服务未初始化（{@link #onInitialize} 未调用、拿不到 context）
+     * 时返回 {@code failed=true} 的结果并记 Log.w，而不是谎报「已清理 0 字节、成功」。
+     *
+     * @return 磁盘侧清理结果；内存侧与统计侧失败已在各自方法内告警
+     */
+    public ImageCacheClearResult clearImageCache() {
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "一键清理：服务未初始化（onInitialize 未调用），磁盘与统计未清理");
+            return ImageCacheClearResult.NOTHING;
+        }
+        // 先把待落盘的累计量落盘，再清零，避免「清零前的值被随后一次 flush 写回」
+        store.flush();
+        clearMemoryCache();
+        PixivImageLoader l = loader;
+        ImageCacheClearResult diskResult = l == null
+                ? ImageCacheClearResult.NOTHING
+                : l.clearDiskCache();
+        if (l == null) {
+            Log.w(TAG, "一键清理：图片加载核心未初始化，磁盘层未清理");
+        }
+        resetCacheStats();
+        return diskResult;
     }
 
     /**
@@ -138,6 +372,11 @@ public class PictelioImageService implements ILynxImageService {
     public void onInitialize(Context context) {
         appContext = context.getApplicationContext();
         loader = new PixivImageLoader(appContext);
+        // #979：生产路径的内存层容量按设备算（屏幕尺寸 × 屏数，再以进程内存比例封顶取小）；
+        // 测试注入路径已自带内存层，此处不动，避免冲掉测试缝。
+        if (injectedMemoryCache == null) {
+            memoryCache = new ImageMemoryCache(ImageCacheBudgetResolver.resolve(appContext));
+        }
     }
 
     /** 返回已初始化的 loader；onInitialize 未调用时按 appContext 惰性创建；二者皆无返回 null */
@@ -182,11 +421,24 @@ public class PictelioImageService implements ILynxImageService {
             return;
         }
         final PixivImageLoader effectiveLoader = l;
+        // #983：分母「图片加载请求总数」在此记 1——每次真正进入内存层探测记一次。
+        // 记在空 URL 早退<b>之后</b>（无效请求不污染命中率），记在内存探测<b>之前</b>
+        // （本类唯一的内存层入口，键由 cacheKey 唯一产出，故计数与实际探测一一对应）。
+        ImageCacheStatsStore store = statsStore();
+        if (store == null) {
+            Log.w(TAG, "统计采集跳过：服务未初始化，本次图片加载请求不计入分母: " + url);
+        } else {
+            store.recordRequest();
+        }
+        // #980：内存层与磁盘层共用同一键空间——键由 PixivImageLoader.cacheKey 唯一产出
+        //（rewrite 后的官方 CDN URL）。此前内存层直接用未 rewrite 的原始 url 当键，
+        // 导致同一张图的代理路径形态与绝对地址形态在磁盘共享一条目、内存却记两份。
+        final String cacheKey = PixivImageLoader.cacheKey(url);
         // #147 内存缓存命中：跳过磁盘读 + 解码。交付 Bitmap **副本**（ARGB_8888 copy）——
         // lynx 引擎管理所收 Bitmap 的生命周期（渲染后可能 recycle），复用原图实例会导致
         // 二次显示空白/JS 异常（模拟器实测 2026-08-06）；副本交付后引擎可安全处理。
         // #147 内存缓存命中：跳过磁盘读 + 解码（隔离实验已排除非缓存因素）
-        final Bitmap cached = memoryCache.get(url);
+        final Bitmap cached = memoryCache().get(cacheKey);
         if (cached != null) {
             executor.execute(() -> {
                 try {
@@ -196,8 +448,12 @@ public class PictelioImageService implements ILynxImageService {
                     // 零成本的 isRecycled()——若缓存项真的被外部回收，仍走重取而非崩。
                     if (cached.isRecycled()) {
                         // 缓存项已失效（被外部 recycle/OOM）→ 移除条目并回退下载
-                        memoryCache.remove(url);
-                        loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
+                        memoryCache().remove(cacheKey);
+                        // #984：按 NON_DISPLAY 归因——本次请求的分子已在上面的内存命中里计入
+                        // 一次（deliver 是唯一计入内存命中的入口），磁盘结果不得重复计入，
+                        // 否则同一请求贡献 2 次分子、命中率突破 100%。
+                        loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                                ImageLoadChain.NON_DISPLAY);
                         return;
                     }
                     loadListener.onSuccess(
@@ -206,30 +462,42 @@ public class PictelioImageService implements ILynxImageService {
                             new ImageInfo(cached.getWidth(), cached.getHeight(), false));
                 } catch (Throwable t) {
                     Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
-                    memoryCache.remove(url);
-                    loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
+                    memoryCache().remove(cacheKey);
+                    // #984：同上，回退分支不得重复计入分子
+                    loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                            ImageLoadChain.NON_DISPLAY);
                 }
             });
             return;
         }
-        executor.execute(() -> loadAndDeliver(url, requestInfo, loadListener, effectiveLoader));
+        // #984：正常显示链路 → 磁盘命中计入命中率分子
+        executor.execute(() -> loadAndDeliver(url, requestInfo, loadListener, effectiveLoader,
+                ImageLoadChain.DISPLAY));
     }
 
-    /** executor 线程内执行：磁盘缓存/下载 → 采样解码 → 入内存缓存 → onSuccess（fire-and-forget） */
+    /**
+     * executor 线程内执行：磁盘缓存/下载 → 采样解码 → 入内存缓存 → onSuccess（fire-and-forget）。
+     *
+     * @param chain 链路归属（#984）：决定磁盘命中是否计入命中率分子；不改变缓存读写行为
+     */
     private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
-            final ImageLoadListener loadListener, final PixivImageLoader l) {
+            final ImageLoadListener loadListener, final PixivImageLoader l,
+            final ImageLoadChain chain) {
         try {
             byte[] bytes;
             if (url.startsWith("file://")) {
                 // 解压写盘管线（ADR-0125）：file:// 帧直接读盘，不走 OkHttp（file scheme 会被拒）。
                 // 白名单已由 canParseUrl 前置校验，此处防御性二次检查。
+                // 该分支独立于两层缓存（帧不参与图片缓存），故不受 #980 键空间统一影响。
                 File f = new File(Uri.parse(url).getPath());
                 if (!isInUgoiraCacheDir(f)) {
                     throw new IOException("file:// 路径不在 ugoira 缓存白名单内: " + url);
                 }
                 bytes = java.nio.file.Files.readAllBytes(f.toPath());
             } else {
-                bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+                // #980：磁盘层与内存层取同一个键（cacheKey 幂等，此处再取一次不改变结果，
+                // 但显式写出以免日后有人把某一侧改回未 rewrite 的原始 URL）
+                bytes = l.loadBytesCachedFirst(PixivImageLoader.cacheKey(url), chain);
             }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
@@ -239,7 +507,8 @@ public class PictelioImageService implements ILynxImageService {
             // 解码成功入内存缓存（缓存存原图）并**直接交付同一实例**。
             // #147 曾交付副本防「引擎回收所收 Bitmap」，2026-10-04 实测该前提不成立：
             // 见本类「交付副本为何可以撤掉」注释。
-            memoryCache.put(url, bitmap);
+            // #980：键 = rewrite 后的官方 CDN URL，与磁盘层、与 deliver() 的读键恒等
+            memoryCache().put(PixivImageLoader.cacheKey(url), bitmap);
             loadListener.onSuccess(
                     new ImageContent(bitmap),
                     requestInfo,
@@ -308,6 +577,8 @@ public class PictelioImageService implements ILynxImageService {
 
     private void prefetch(final String uri) {
         if (uri == null || uri.isEmpty()) {
+            // 不静默：入参为空是调用方的错，静默返回会让「预取没生效」无从排查
+            Log.w(TAG, "prefetchImage 跳过：uri 为空");
             return;
         }
         final PixivImageLoader l = loader();
@@ -315,13 +586,62 @@ public class PictelioImageService implements ILynxImageService {
             Log.w(TAG, "prefetchImage 跳过：服务未初始化");
             return;
         }
-        executor.execute(() -> {
-            try {
-                l.loadBytes(PixivImageLoader.rewriteUrl(uri));
-            } catch (Throwable t) {
-                Log.w(TAG, "prefetchImage 失败: " + uri, t);
-            }
-        });
+        // #980：预取与显示拦截、zip 共用同一键空间（ADR-0222 §2.5）——同一产出点
+        final String key = PixivImageLoader.cacheKey(uri);
+        executor.execute(() -> warmLayers(l, key, uri));
+    }
+
+    /**
+     * executor 线程内执行预取：磁盘层（或网络）取字节 → 解码 → <b>填内存层</b>（#982）。
+     *
+     * <p><b>字节一律走 {@link PixivImageLoader#loadBytesCachedFirst}</b>：图床下载源决策与
+     * 防盗链注入都在那一条路径内，预取不自发 HTTP 请求、也不绕开磁盘层（预取与显示共用同一
+     * 缓存文件，故两次预取之间不会各下一份）。
+     *
+     * <p><b>失败一律显式告警</b>（禁静默降级），且告警同时说明磁盘层状态——预取失败不影响
+     * 正确性（显示时仍会自行下载），但必须留下可排查的痕迹。
+     */
+    private void warmLayers(PixivImageLoader l, String key, String uri) {
+        // 重复预取短路：内存层已有可用条目 ⇒ 预取目标已达成，不再读磁盘也不再解码
+        // #984：用 probe（不计内建命中计数）而非 get——预取是投机探测、不是图片加载请求，
+        // 用 get 会让内存命中分子被非显示链路抬高，命中率可能算出 >100%。
+        Bitmap existing = memoryCache().probe(key);
+        if (existing != null && !existing.isRecycled()) {
+            return;
+        }
+        byte[] bytes;
+        try {
+            // #984：预取属非显示链路，磁盘命中不计入命中率分子
+            bytes = l.loadBytesCachedFirst(key, ImageLoadChain.NON_DISPLAY);
+        } catch (Throwable t) {
+            Log.w(TAG, "prefetchImage 失败（两层均未预热）: " + uri, t);
+            return;
+        }
+        Bitmap bitmap;
+        try {
+            bitmap = decodeSampled(bytes);
+        } catch (Throwable t) {
+            // 解码抛异常（OOM / 驱动异常等）同样不得静默：预取是 fire-and-forget，
+            // 异常若逃进 executor 会被线程池吞掉，日志里什么都不留
+            Log.w(TAG, "prefetchImage 解码异常：内存层未填充（磁盘层已落盘）: " + uri, t);
+            return;
+        }
+        if (bitmap == null) {
+            // 字节已落磁盘层（展示时仍可命中磁盘），但内存层填不上 —— 显式告警，不静默吞掉
+            Log.w(TAG, "prefetchImage 解码失败：内存层未填充（磁盘层已落盘）: " + uri);
+            return;
+        }
+        // 单张就超过内存层预算时不入内存层：写入会把整层逐出（ImageMemoryCache 的 LRU 语义
+        // 是「超限即逐出最旧，直至为空」），对一张「可能永不上屏」的预取图是净损失。
+        // 磁盘层已兜底（展示时照常命中磁盘），故此处只跳过内存层并显式告警。
+        long cost = (long) bitmap.getWidth() * bitmap.getHeight() * 4L;
+        long budget = memoryCache().maxBytes();
+        if (cost > budget) {
+            Log.w(TAG, "prefetchImage 单图 " + cost + "B 超过内存层预算 " + budget
+                    + "B，不入内存层（磁盘层已落盘兜底）: " + uri);
+            return;
+        }
+        memoryCache().put(key, bitmap);
     }
 
     @Override

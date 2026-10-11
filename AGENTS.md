@@ -57,7 +57,7 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 | 按名快速定位符号（只要位置不要源码） | bash `codegraph query <name>` | 比 explore 便宜 |
 | 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 bash `codegraph impact <symbol>` | |
 | 变更文件 → 受影响测试 | bash `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
-| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；边数归零 = 索引腐化，人工 `codegraph index --force` |
+| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；**计数正常 ≠ 覆盖当前分支**——另看 `lastIndexed` 是否早于本分支，并用**本分支新引入的符号** `codegraph query <符号名>` 验活一次（返回空即索引陈旧，降级 grep 并声明）。边数归零 = 索引腐化，人工 `codegraph index --force` |
 
 ### tool_call 守卫（pi 扩展行为）
 
@@ -117,7 +117,7 @@ ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/dom
 细节一律**锚到 ADR 与源码**（精确语义以 ADR/源码为准绳）：
 
 - **PixivApiPlugin 网关** → ADR-0037 + `packages/app-lynx/src/api/`
-- **图片流水线三层缓存** → ADR-0090 + `packages/app-lynx/src/primitives/`（图片构建）
+- **图片流水线两层缓存**（内存层 / 磁盘层）→ ADR-0222（现行编号）+ ADR-0143（缓存键恒官方 URL）；演进史见 ADR-0090（**历史编号**，其「三层」层 B 已随 ADR-0203 删除）。词汇层见 `packages/android-host/CONTEXT.md`「图片代理」节
 - **Android 原生集成**（返回键、`/pixiv-img/` 图片代理（`PictelioImageService`）、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`（词汇层见 `packages/android-host/CONTEXT.md`）
 - **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳
 - **安全存储**（refresh_token 走 Keystore，首启迁移）→ `SecureStorageCompat`（android-host main/java）
@@ -254,7 +254,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 ## 任务完成前自检
 
 - **工具路由**：本次工具选择是否按「工具触发协议」执行？（事实 → CodeGraph；理由 → ADR；路线 → CONTEXT-MAP；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
-- **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）
+- **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）。**计数正常也可能覆盖不到新代码**——`lastIndexed` 早于本分支时，用本分支新符号 `codegraph query <名>` 验活，返回空即按陈旧处理并降级 grep/read（实证：2026-10-11 图片缓存分支，12909 节点 / 41016 边看着健康，但 `CACHE_DIR_MUTATION_LOCK` 等新符号全部返回空，两轴 review 都因此降级）
 - **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
 - **闭环规格**：凡产生了代码改动，强制闭环一律以
   [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) 为准 —— **含**「工作流强制规范」的

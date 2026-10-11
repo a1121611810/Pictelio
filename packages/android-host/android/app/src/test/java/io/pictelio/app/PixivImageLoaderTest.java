@@ -135,11 +135,11 @@ public class PixivImageLoaderTest {
     @Test
     public void loadFile_downloadsThenCaches_secondCallHitsCache() throws Exception {
         String url = enqueueImage(100);
-        File first = loader.loadFile(url);
+        File first = loader.loadFileCachedFirst(url);
         assertTrue(first.exists());
 
         // 第二次：缓存命中（MockWebServer 无新请求）
-        File second = loader.loadFile(url);
+        File second = loader.loadFileCachedFirst(url);
         assertEquals(first.getAbsolutePath(), second.getAbsolutePath());
         assertEquals(1, server.getRequestCount()); // 只发过一次网络请求
     }
@@ -147,9 +147,29 @@ public class PixivImageLoaderTest {
     @Test
     public void loadFile_writesIntoConfiguredCacheDir() throws Exception {
         String url = enqueueImage(50);
-        File file = loader.loadFile(url);
+        File file = loader.loadFileCachedFirst(url);
         assertTrue(file.getParentFile().getName().equals("pictelio-images"));
-        assertEquals(PixivImageLoader.keyToFilename(url), file.getName());
+        assertEquals(PixivImageLoader.keyToFilename(canonicalCdnUrl(url)), file.getName());
+    }
+
+    /**
+     * 代理形态 URL 的官方 CDN 形态（#987）。<b>oracle 独立</b>：取自本文件 {@link #CDN}
+     * 常量与 URL 自身的 path，<b>不</b>调用 loader 的 {@code cacheKey}／{@code rewriteUrl}
+     * ——否则期望值就成了被测实现的自我复述，键归一化一旦写错也照样绿。
+     *
+     * <p>{@code enqueueImage} / {@code server.url("/pixiv-img/…")} 产出的是
+     * {@code http://localhost:PORT/pixiv-img/x} 这种<b>含 {@code /pixiv-img/} 的绝对 URL</b>，
+     * 故它是代理形态而非普通 URL——缓存键必须归一到官方 CDN URL。
+     *
+     * <p><b>刻意省略生产的 {@code new URI(...).normalize()}</b>：本类 fixture 全是
+     * {@code /pixiv-img/<file>.jpg} 这类<b>不含 dot-segment</b> 的路径，两侧结果一致。
+     * 将来若fixture 带 {@code /a/../b}，生产会折叠而本 oracle 不会 ⇒ 断言<b>响亮转红</b>
+     * （不会假绿），届时更新本方法即可。独立 oracle 不复用 {@code rewriteUrl} 是刻意的。
+     */
+    private static String canonicalCdnUrl(String url) {
+        int idx = url.indexOf("/pixiv-img/");
+        assertTrue("fixture 应为含 /pixiv-img/ 的代理形态 URL: " + url, idx >= 0);
+        return CDN + "/" + url.substring(idx + "/pixiv-img/".length());
     }
 
     @Test
@@ -157,7 +177,7 @@ public class PixivImageLoaderTest {
         byte[] body = new byte[64];
         for (int i = 0; i < 64; i++) body[i] = (byte) i;
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
-        byte[] loaded = loader.loadBytes(server.url("/pixiv-img/data.bin").toString());
+        byte[] loaded = loader.loadBytesCachedFirst(server.url("/pixiv-img/data.bin").toString());
         assertEquals(64, loaded.length);
         assertEquals(0, loaded[0]);
         assertEquals(63, loaded[63]);
@@ -177,9 +197,9 @@ public class PixivImageLoaderTest {
         String url2 = enqueueImage(1000);
         String url3 = enqueueImage(1000);
 
-        loader.loadFile(url1);
-        loader.loadFile(url2);
-        File third = loader.loadFile(url3);
+        loader.loadFileCachedFirst(url1);
+        loader.loadFileCachedFirst(url2);
+        File third = loader.loadFileCachedFirst(url3);
 
         assertFalse("最旧缓存应被淘汰", loader.cachedFile(url1) != null);
         assertNotNull("次新缓存保留", loader.cachedFile(url2));
@@ -193,7 +213,7 @@ public class PixivImageLoaderTest {
     public void download_http403_throwsIOException() {
         server.enqueue(new MockResponse().setResponseCode(403));
         String url = server.url("/pixiv-img/forbidden.jpg").toString();
-        IOException ex = assertThrows(IOException.class, () -> loader.loadFile(url));
+        IOException ex = assertThrows(IOException.class, () -> loader.loadFileCachedFirst(url));
         assertTrue(ex.getMessage().contains("403"));
     }
 
@@ -201,7 +221,7 @@ public class PixivImageLoaderTest {
     public void download_http500_throwsIOException_andDoesNotCache() throws Exception {
         server.enqueue(new MockResponse().setResponseCode(500));
         String url = server.url("/pixiv-img/error.jpg").toString();
-        assertThrows(IOException.class, () -> loader.loadFile(url));
+        assertThrows(IOException.class, () -> loader.loadFileCachedFirst(url));
         assertNull("失败响应不得写缓存", loader.cachedFile(url));
     }
 
@@ -209,7 +229,7 @@ public class PixivImageLoaderTest {
     public void download_empty200Body_throwsIOException_andDoesNotCache() throws Exception {
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer()));
         String url = server.url("/pixiv-img/empty.jpg").toString();
-        assertThrows(IOException.class, () -> loader.loadFile(url));
+        assertThrows(IOException.class, () -> loader.loadFileCachedFirst(url));
         assertNull("空 body 不得写缓存", loader.cachedFile(url));
     }
 
@@ -229,7 +249,7 @@ public class PixivImageLoaderTest {
             workers[i] = new Thread(() -> {
                 try {
                     start.await();
-                    loader.loadFile(url);
+                    loader.loadFileCachedFirst(url);
                 } catch (Exception e) {
                     failure.set(e);
                 }
@@ -249,7 +269,7 @@ public class PixivImageLoaderTest {
     @Test
     public void download_sendsRefererAndUserAgent() throws Exception {
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[]{1, 2, 3})));
-        loader.loadFile(server.url("/pixiv-img/headers.jpg").toString());
+        loader.loadFileCachedFirst(server.url("/pixiv-img/headers.jpg").toString());
         RecordedRequest req = server.takeRequest();
         assertEquals("https://app-api.pixiv.net/", req.getHeader("Referer"));
         assertTrue(req.getHeader("User-Agent") != null && !req.getHeader("User-Agent").isEmpty());
@@ -264,7 +284,7 @@ public class PixivImageLoaderTest {
         String url = server.url("/pixiv-img/roundtrip-atomic.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
 
-        File file = loader.loadFile(url);
+        File file = loader.loadFileCachedFirst(url);
 
         // round-trip：磁盘内容与下载字节逐字节一致（目标文件完整，非截断）
         assertArrayEquals(body, Files.readAllBytes(file.toPath()));
@@ -282,12 +302,12 @@ public class PixivImageLoaderTest {
         String url = server.url("/pixiv-img/readonly-dir.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[512])));
         File dir = loader.getCacheDir();
-        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        File target = new File(dir, PixivImageLoader.keyToFilename(canonicalCdnUrl(url)));
         assertTrue(target.createNewFile()); // 预置空目标：断言失败后仍为空、未被半截内容污染
         org.junit.Assume.assumeTrue("目录写权限未生效，前置条件不成立", dir.setWritable(false));
         try {
             // 临时文件创建失败（只读目录）→ IOException 上抛，目标不被截断写入
-            assertThrows(IOException.class, () -> loader.loadFile(url));
+            assertThrows(IOException.class, () -> loader.loadFileCachedFirst(url));
             assertEquals("目标文件不得被写入半截内容", 0, target.length());
             File[] tmpFiles = dir.listFiles((d, name) -> name.endsWith(".tmp"));
             assertNotNull(tmpFiles);
@@ -307,13 +327,13 @@ public class PixivImageLoaderTest {
         String url = server.url("/pixiv-img/readonly-target.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
         File dir = loader.getCacheDir();
-        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        File target = new File(dir, PixivImageLoader.keyToFilename(canonicalCdnUrl(url)));
         // 预置只读空目标（length=0 使 cachedFile 视为未命中，强制走写盘路径）
         assertTrue(target.createNewFile());
         assertTrue(target.setReadOnly());
         // 旧实现直接 FileOutputStream(只读目标) 抛 FileNotFoundException；
         // tmp+rename 后（POSIX rename 只看目录写权限）应成功替换且内容完整
-        File file = loader.loadFile(url);
+        File file = loader.loadFileCachedFirst(url);
         assertEquals(target.getAbsolutePath(), file.getAbsolutePath());
         assertArrayEquals(body, Files.readAllBytes(file.toPath()));
     }
@@ -382,7 +402,7 @@ public class PixivImageLoaderTest {
                 new OkHttpClient.Builder().build(), 1 << 20,
                 singleMirrorConfig(mirrorServer.url("/").toString()));
 
-        assertArrayEquals(body, loader.loadBytes(official));
+        assertArrayEquals(body, loader.loadBytesCachedFirst(official));
 
         // 请求打到镜像（resolve 仅替换 host:port，path 逐字节保留），官方零流量
         assertEquals(1, mirrorServer.getRequestCount());
@@ -411,7 +431,7 @@ public class PixivImageLoaderTest {
                 new OkHttpClient.Builder().build(), 1 << 20,
                 singleMirrorConfig(mirrorServer.url("/").toString()));
 
-        assertArrayEquals(body, loader.loadBytes(official));
+        assertArrayEquals(body, loader.loadBytesCachedFirst(official));
 
         // 镜像恰一次失败 + 官方恰一次重试成功（回退不递归：官方再失败即上抛，见 both-fail 用例）
         assertEquals(1, mirrorServer.getRequestCount());
@@ -435,7 +455,7 @@ public class PixivImageLoaderTest {
         loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
                 new OkHttpClient.Builder().build(), 1 << 20, singleMirrorConfig(deadBase));
 
-        assertArrayEquals(body, loader.loadBytes(official));
+        assertArrayEquals(body, loader.loadBytesCachedFirst(official));
         assertEquals(1, server.getRequestCount());
         assertNotNull(loader.cachedFile(official));
     }
@@ -452,7 +472,7 @@ public class PixivImageLoaderTest {
                 new OkHttpClient.Builder().build(), 1 << 20,
                 singleMirrorConfig(mirrorServer.url("/").toString()));
 
-        IOException ex = assertThrows(IOException.class, () -> loader.loadBytes(official));
+        IOException ex = assertThrows(IOException.class, () -> loader.loadBytesCachedFirst(official));
         // 申报语义（ticket #378）：重试仍失败抛镜像原始异常——503 来自镜像而非官方的 500
         assertTrue(ex.getMessage().contains("503"));
         assertEquals(1, mirrorServer.getRequestCount());
@@ -470,7 +490,7 @@ public class PixivImageLoaderTest {
         loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
                 new OkHttpClient.Builder().build(), 1 << 20, hostOffConfig());
 
-        assertArrayEquals(body, loader.loadBytes(official));
+        assertArrayEquals(body, loader.loadBytesCachedFirst(official));
         assertEquals(1, server.getRequestCount());
         assertNotNull(loader.cachedFile(official));
     }
