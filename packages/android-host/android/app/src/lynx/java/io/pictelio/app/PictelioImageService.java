@@ -65,6 +65,16 @@ import java.util.concurrent.Executors;
  * <b>内存缓存是进程内易失的</b>，键变更后随升级自然清空，不做旧键迁移。
  * {@code file://} 的 ugoira 帧走独立白名单分支、不参与图片缓存，不受本改动影响。
  *
+ * <p><b>预取补齐内存层（#982）</b>：{@link #prefetchImage} 此前<b>只</b>把字节落进磁盘层，
+ * 内存层仍为空 ⇒ 预取过的图在首屏第一次显示时照样要磁盘读 + 解码，用户感知不到预取收益。
+ * 现预取在取到字节后额外解码并写入<b>同一个</b> {@link ImageMemoryCache}（与显示路径同一
+ * {@link PixivImageLoader#cacheKey(String)} 键、同一 {@link #memoryCache()} 实例），故首屏首次
+ * 显示直接命中内存层、既不读磁盘也不解码，且不产生第二次下载。字节仍<b>由
+ * {@link PixivImageLoader#loadBytesCachedFirst} 取得</b>——图床决策（{@code ImageHostConfig.resolve}）
+ * 与防盗链（Referer/UA 注入）都在这一条路径内，预取不自发 HTTP 请求，也不另设缓存入口。
+ * <b>预取不是旁路缓存</b>：它写入的就是显示会读的那一层，故 #983 的占用与命中率口径天然覆盖
+ * 预取条目，不需在预取侧另开计数。
+ *
  * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
  * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
  * Bitmap 的生命周期，渲染后可能 recycle，复用缓存原图会导致二次显示空白」。
@@ -391,6 +401,8 @@ public class PictelioImageService implements ILynxImageService {
 
     private void prefetch(final String uri) {
         if (uri == null || uri.isEmpty()) {
+            // 不静默：入参为空是调用方的错，静默返回会让「预取没生效」无从排查
+            Log.w(TAG, "prefetchImage 跳过：uri 为空");
             return;
         }
         final PixivImageLoader l = loader();
@@ -398,14 +410,59 @@ public class PictelioImageService implements ILynxImageService {
             Log.w(TAG, "prefetchImage 跳过：服务未初始化");
             return;
         }
-        executor.execute(() -> {
-            try {
-                // #980：预取与显示拦截、zip 共用同一键空间（ADR-0222 §2.5）——同一产出点
-                l.loadBytesCachedFirst(PixivImageLoader.cacheKey(uri));
-            } catch (Throwable t) {
-                Log.w(TAG, "prefetchImage 失败: " + uri, t);
-            }
-        });
+        // #980：预取与显示拦截、zip 共用同一键空间（ADR-0222 §2.5）——同一产出点
+        final String key = PixivImageLoader.cacheKey(uri);
+        executor.execute(() -> warmLayers(l, key, uri));
+    }
+
+    /**
+     * executor 线程内执行预取：磁盘层（或网络）取字节 → 解码 → <b>填内存层</b>（#982）。
+     *
+     * <p><b>字节一律走 {@link PixivImageLoader#loadBytesCachedFirst}</b>：图床下载源决策与
+     * 防盗链注入都在那一条路径内，预取不自发 HTTP 请求、也不绕开磁盘层（预取与显示共用同一
+     * 缓存文件，故两次预取之间不会各下一份）。
+     *
+     * <p><b>失败一律显式告警</b>（禁静默降级），且告警同时说明磁盘层状态——预取失败不影响
+     * 正确性（显示时仍会自行下载），但必须留下可排查的痕迹。
+     */
+    private void warmLayers(PixivImageLoader l, String key, String uri) {
+        // 重复预取短路：内存层已有可用条目 ⇒ 预取目标已达成，不再读磁盘也不再解码
+        Bitmap existing = memoryCache().get(key);
+        if (existing != null && !existing.isRecycled()) {
+            return;
+        }
+        byte[] bytes;
+        try {
+            bytes = l.loadBytesCachedFirst(key);
+        } catch (Throwable t) {
+            Log.w(TAG, "prefetchImage 失败（两层均未预热）: " + uri, t);
+            return;
+        }
+        Bitmap bitmap;
+        try {
+            bitmap = decodeSampled(bytes);
+        } catch (Throwable t) {
+            // 解码抛异常（OOM / 驱动异常等）同样不得静默：预取是 fire-and-forget，
+            // 异常若逃进 executor 会被线程池吞掉，日志里什么都不留
+            Log.w(TAG, "prefetchImage 解码异常：内存层未填充（磁盘层已落盘）: " + uri, t);
+            return;
+        }
+        if (bitmap == null) {
+            // 字节已落磁盘层（展示时仍可命中磁盘），但内存层填不上 —— 显式告警，不静默吞掉
+            Log.w(TAG, "prefetchImage 解码失败：内存层未填充（磁盘层已落盘）: " + uri);
+            return;
+        }
+        // 单张就超过内存层预算时不入内存层：写入会把整层逐出（ImageMemoryCache 的 LRU 语义
+        // 是「超限即逐出最旧，直至为空」），对一张「可能永不上屏」的预取图是净损失。
+        // 磁盘层已兜底（展示时照常命中磁盘），故此处只跳过内存层并显式告警。
+        long cost = (long) bitmap.getWidth() * bitmap.getHeight() * 4L;
+        long budget = memoryCache().maxBytes();
+        if (cost > budget) {
+            Log.w(TAG, "prefetchImage 单图 " + cost + "B 超过内存层预算 " + budget
+                    + "B，不入内存层（磁盘层已落盘兜底）: " + uri);
+            return;
+        }
+        memoryCache().put(key, bitmap);
     }
 
     @Override
