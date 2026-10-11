@@ -101,6 +101,8 @@ public class PixivImageLoader {
     private final ImageHostConfig imageHostConfig;
     /** per-URL 锁：并发同 URL 加载时避免截断写同一缓存文件（拦截链路为多线程） */
     private final ConcurrentHashMap<String, Object> urlLocks = new ConcurrentHashMap<>();
+    /** 磁盘层自计统计的采集器（#983）；惰性解析，进程级单例（见 {@link ImageCacheStatsStore}） */
+    private volatile ImageCacheStatsStore statsStore;
 
     /**
      * 生产构造：磁盘上限按<b>当期可用存储</b>比例计算（#986），故上限供给器是惰性的、
@@ -177,6 +179,58 @@ public class PixivImageLoader {
     /** 当前生效的磁盘上限（字节）：包可见测试缝，亦是 #983 可观测统计的读点 */
     long currentMaxCacheBytes() {
         return maxCacheBytesSupplier.getAsLong();
+    }
+
+    // ── 磁盘层自计统计（#983）─────────────────────────────────
+
+    /**
+     * 统计采集器（惰性解析，进程级单例）。
+     *
+     * <p>惰性而非构造期解析：构造期解析会让每个测试实例都去开一次 SharedPreferences，
+     * 而本类有多个仅作网络/淘汰测试缝存在的短命实例。
+     */
+    private ImageCacheStatsStore statsStore() {
+        ImageCacheStatsStore store = statsStore;
+        if (store == null) {
+            store = ImageCacheStatsStore.get(context);
+            statsStore = store;
+        }
+        return store;
+    }
+
+    /**
+     * 磁盘层占用读数（#983 的对外读取契约）：条目数 + 字节数，一次 {@code listFiles} 求值。
+     *
+     * <p><b>不在热路径调用</b>——加载路径只复用 {@link #enforceCacheLimit} 已经算好的
+     * 总量（那里本来就要遍历目录），本方法供「读快照 / 清理前展示」等低频场景现算。
+     * <b>含一次目录遍历（阻塞 IO），调用方须放在后台线程</b>（与
+     * {@code PictelioAppLynx.TRIM_EXECUTOR} 同款做法），别在 UI 刷新里反复调。
+     * 目录不可读<b>不静默</b>：Log.w 后返回 {@link DiskCacheUsage#EMPTY}。
+     */
+    public DiskCacheUsage diskUsage() {
+        File cacheDir = getCacheDir();
+        File[] files = cacheDir.listFiles();
+        if (files == null) {
+            Log.w(TAG, "缓存目录不可读，占用统计按 0 计: " + cacheDir);
+            return DiskCacheUsage.EMPTY;
+        }
+        long total = 0L;
+        for (File f : files) {
+            total += f.length();
+        }
+        DiskCacheUsage usage = new DiskCacheUsage(files.length, total);
+        statsStore().publishDiskUsage(usage);
+        return usage;
+    }
+
+    /** 磁盘层自计：记一次命中（该次加载由缓存条目供给，未触网络）。热路径只做内存自增 */
+    private void recordDiskHit() {
+        statsStore().recordDiskHit();
+    }
+
+    /** 磁盘层自计：记一次未命中（该次加载需要发起网络下载） */
+    private void recordDiskMiss() {
+        statsStore().recordDiskMiss();
     }
 
     // ── URL 重写（/pixiv-img/ → i.pximg.net） ─────────────────
@@ -327,6 +381,7 @@ public class PixivImageLoader {
     public File loadFileCachedFirst(String url) throws IOException {
         File cached = cachedFile(url);
         if (cached != null) {
+            recordDiskHit();
             return touchOnHit(cached);
         }
         // per-URL 锁 + double-check：并发同 URL 只下载一次，避免截断写同一缓存文件
@@ -334,8 +389,13 @@ public class PixivImageLoader {
         synchronized (lock) {
             cached = cachedFile(url);
             if (cached != null) {
+                // 并发同 URL 由别的线程先下完：本次请求<b>仍算磁盘命中</b>（未触网络），
+                // 故此处记命中而不记未命中——命中/未命中按「请求最终是否触网」计，
+                // 两者之和恒等于本层的请求数。
+                recordDiskHit();
                 return touchOnHit(cached);
             }
+            recordDiskMiss();
             byte[] bytes = download(url);
             File file = new File(getCacheDir(), keyToFilename(url));
             writeFile(file, bytes);
@@ -356,6 +416,7 @@ public class PixivImageLoader {
         File cached = cachedFile(url);
         if (cached != null) {
             reportDone(sink, cached.length());
+            recordDiskHit();
             return touchOnHit(cached);
         }
         Object lock = urlLocks.computeIfAbsent(url, k -> new Object());
@@ -363,8 +424,10 @@ public class PixivImageLoader {
             cached = cachedFile(url);
             if (cached != null) {
                 reportDone(sink, cached.length());
+                recordDiskHit();
                 return touchOnHit(cached);
             }
+            recordDiskMiss();
             File target = new File(getCacheDir(), keyToFilename(url));
             downloadToFile(url, target, sink, cancel);
             enforceCacheLimit();
@@ -475,14 +538,17 @@ public class PixivImageLoader {
     public byte[] loadBytesCachedFirst(String url) throws IOException {
         File cached = cachedFile(url);
         if (cached != null) {
+            recordDiskHit();
             return readAll(touchOnHit(cached));
         }
         Object lock = urlLocks.computeIfAbsent(url, k -> new Object());
         synchronized (lock) {
             cached = cachedFile(url);
             if (cached != null) {
+                recordDiskHit();
                 return readAll(touchOnHit(cached));
             }
+            recordDiskMiss();
             byte[] bytes = download(url);
             writeFile(new File(getCacheDir(), keyToFilename(url)), bytes);
             enforceCacheLimit();
@@ -567,6 +633,11 @@ public class PixivImageLoader {
         for (File f : files) {
             total += f.length();
         }
+        // #983：本次遍历已把「条目数 + 占用字节数」算出来了，顺手发布给统计层——
+        // 写入路径本来就要遍历目录，这样<b>不新增任何 IO</b>，热路径代价仅两次赋值。
+        // 读数取自<b>本次遍历时刻</b>（即淘汰前）；淘汰后的准确值由 {@link #diskUsage()} 现算，
+        // 快照读取走的就是后者，故这里只是让后台量表不至于长期停留在 0。
+        statsStore().publishDiskUsage(new DiskCacheUsage(files.length, total));
         if (total <= maxCacheBytes) {
             return;
         }
