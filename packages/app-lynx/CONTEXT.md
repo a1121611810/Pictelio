@@ -722,15 +722,26 @@ _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `w
 > **为什么必须搬**：app-lynx 侧原生读端**正在执行**这个契约（`PictelioImageService` / Java 下载层），而它的文档在被删目录里。
 
 **缓存键（Cache key）**【2026-09-06 新增，跨上下文】：
-图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip 三链路共用同一键空间。
+图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip 三链路共用同一键空间。〔**zip 一侧的实现约束尚未满足**，见下方⚠️框〕
 
 > **覆盖范围与现状（2026-10-11 登记，ADR-0222 §2.5；#980 已交付）**：这两条不变量**覆盖内存层与磁盘层两层**。
-> 两层的键均由 `PixivImageLoader.cacheKey(url)` **唯一产出**（= `rewriteUrl` 产物 = 官方 CDN URL），
-> 故同一张图以代理路径与绝对地址两种形态请求时，**内存层与磁盘层各只有一条目**。
-> 反漂移防线由 `ImageCacheKeySpaceTest` 把守（断言内存层键恒等于 rewrite 产物、且不以原始 url 为键）。
 > 层数与层名以 `packages/android-host/CONTEXT.md`「图片代理」节为准（**两层缓存**，现行编号见 ADR-0222）。
+>
+> ⚠️ **「唯一产出」的覆盖范围只到预取与显示两条链路**（2026-10-11 code-review 订正）：
+> `PixivImageLoader.cacheKey(url)` 是**预取 + 显示**两层的键的唯一产出点（内存层与磁盘层各只有一条目，
+> 同一张图以代理路径与绝对地址两种形态请求不会分叉）。但**zip / 导出 / 保存到相册**三条链路
+> （`NovelPdfEncoder`、`NovelDocxEncoder`、`NovelEpubEncoder`、`NovelExporter`、`GallerySaver`、
+> `PictelioDownloader`）把 URL **直接**交给 `loadBytesCachedFirst(url)` / `loadFileCachedFirst(url)`，
+> 而这两个入口**内部不再调用 `cacheKey`**——`cachedFile()` 直接 `keyToFilename(url)`。
+> 它们今天不出分叉，靠的是「这些调用点传入的本来就是官方 URL，而 `rewriteUrl` 对官方 URL 幂等」
+> ⇒ **巧合正确，不是结构性正确**。
+> 处置见 ADR-0222 §4 与对应 follow-up issue；**不要**据本节以为该缺口已不存在。
+> 反漂移防线目前由 `ImageCacheKeySpaceTest` 把守（断言内存层键恒等于 rewrite 产物、且不以原始 url 为键）——
+> **该防线覆盖预取与显示链路，不覆盖上述三条链路**。
 
-_Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历史 bug 根源，已由 anti-drift 测试把守）；绕过 `cacheKey()` 自行拼键（那是内存层曾与磁盘层分叉的根因）
+_Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历史 bug 根源，已由 anti-drift 测试把守）；
+**新增**链路不得绕过 `cacheKey()` 自行拼键（那是内存层曾与磁盘层分叉的根因）——注意现有 zip / 导出 / 保存三条链路
+**尚未**纳入该约束，属已登记的待收口缺口，不是可照抄的范例
 
 **源无关命中（Source-agnostic hit）**【2026-09-06 新增，跨上下文】：
 缓存命中判定只依赖「该图是否曾以任意来源缓存过」，与当前图床开关、模式、host 选择完全无关。切换图床/换镜像不失效、不重下；同一图全生命周期只有一个缓存条目。
