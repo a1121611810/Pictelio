@@ -169,6 +169,14 @@ const clearing = ref(false)
 /** 读数是否可展示：模块可用、拿到快照、且原生确认读数真实（available） */
 const cacheStatsVisible = computed(() => cacheSupported.value && cacheStats.value?.available === true)
 
+/**
+ * 清理按钮此刻是否真的可点（单一事实源，模板三处同源引用）。
+ *
+ * 不可用时（web-core 预览 / 原生未初始化 / 读数不真实）与「正在清理」共用同一个禁用外观，
+ * 避免出现「容器是满 primary 的启用态、点了却零反馈」的伪可用按钮。
+ */
+const canClearCache = computed(() => cacheStatsVisible.value && !clearing.value)
+
 const cacheUsageText = computed(() =>
   cacheStatsVisible.value ? formatBytes(cacheStats.value?.diskBytes ?? 0) : t('advanced.cache.noData'),
 )
@@ -417,13 +425,13 @@ onMounted(() => {
 
         <view
           class="flex flex-row items-center justify-center py-3 mt-3 rounded-[var(--md-shape-full)]"
-          :class="clearing ? 'bg-surface-container-high' : 'bg-primary'"
+          :class="canClearCache ? 'bg-primary' : 'bg-surface-container-high'"
           :style="listItemStyle(0)"
-          @tap="cacheStatsVisible && !clearing ? clearImageCache() : undefined"
+          @tap="canClearCache ? clearImageCache() : undefined"
         >
           <text
             class="text-label-large"
-            :class="cacheStatsVisible && !clearing ? 'text-primary-on' : 'text-surface-on-variant'"
+            :class="canClearCache ? 'text-primary-on' : 'text-surface-on-variant'"
             >{{ clearing ? t('advanced.cache.clearing') : t('advanced.cache.clear') }}</text
           >
         </view>
