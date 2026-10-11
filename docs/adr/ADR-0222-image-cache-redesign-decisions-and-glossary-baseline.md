@@ -100,6 +100,10 @@ _Why 两层而非三层_：ADR-0090 的层 B（WebView HTTP 磁盘缓存）属**
 同一张图的两种形态会「磁盘一条目、内存两条目」。防线：`ImageCacheKeySpaceTest`
 断言内存层键恒等于 rewrite 产物、且不以原始 url 为键。
 
+> ⚠️ **「唯一产出」的覆盖范围只到预取与显示两条链路**（2026-10-11 Spec 轴 code review 登记，
+> 勿据本段以为 zip / 导出 / 保存也已统一）：那三条链路的 7 处调用点绕过 `cacheKey`，
+> 详见 §4 与 [#987](https://github.com/a1121611810/Pictelio/issues/987)。
+
 ### 2.6 命名与存量处置
 
 - 磁盘层入口方法名须体现「缓存优先」语义（现名 `loadBytes` 掩盖了该语义）。
@@ -143,7 +147,13 @@ _Why 两层而非三层_：ADR-0090 的层 B（WebView HTTP 磁盘缓存）属**
   - **#980** 键空间统一**已交付**——两层键均由 `cacheKey` 唯一产出。**注意覆盖范围**：产出点收敛只覆盖**预取与显示**两条链路，zip / 导出 / 保存三条链路的键**结构性缺口**见 [#987](https://github.com/a1121611810/Pictelio/issues/987)（#980 有意未把 rewrite 下沉进缓存路径，见下）。
 - **#982–#985 亦已交付**（2026-10-11 补记，与上方同批合入集成分支）：**#982** 预取已补齐内存层（首屏免磁盘读与解码）；**#983** 两层缓存已接入可观测统计与持久化；**#984** 清理入口已落地（设置页展示占用与命中率 + 一键清理）；**#985** 存量缓存已按「布局代次只清一次、不迁移」清空。**实现分片至此全部交付完毕**，无剩余待交付项。
 - **仍不得宣称的部分（与交付状态无关，是证据状态）**：
-  - **zip / 导出 / 保存三条链路的键未纳入 `cacheKey` 唯一产出点**（[#987](https://github.com/a1121611810/Pictelio/issues/987)）。`NovelPdfEncoder` / `NovelDocxEncoder` / `NovelEpubEncoder` / `NovelExporter` / `GallerySaver` / `PictelioDownloader` 六处把 URL **直接**交给 `loadBytesCachedFirst` / `loadFileCachedFirst`，而这两个入口内部不再调用 `cacheKey`（`cachedFile()` 直接 `keyToFilename(url)`）。今天不出分叉靠的是「传入的本来就是官方 URL，而 `rewriteUrl` 幂等」⇒ **巧合正确，非结构性正确**。**#980 有意未把 rewrite 下沉进缓存路径**（会击穿约 17 条 MockWebServer 键断言，见 `cacheKey` javadoc），故这是独立决策而非遗漏。`ImageCacheKeySpaceTest` 的防线**只覆盖两条链路**，词汇层已同步收窄（`packages/app-lynx/CONTEXT.md` 图床缓存契约节）。
+  - **zip / 导出 / 保存三条链路的键未纳入 `cacheKey` 唯一产出点**（[#987](https://github.com/a1121611810/Pictelio/issues/987)）。准确枚举是 **7 处调用点 / 3 个入口方法**（2026-10-11 Round 2 订正，此前写作「6 处 / 2 个方法」并漏了第三个入口）：
+    - `NovelPdfEncoder:403`、`NovelDocxEncoder:430`、`NovelEpubEncoder:476`、`NovelExporter:579` → `loadBytesCachedFirst(url)`
+    - `GallerySaver:86` → `loadFileCachedFirst(officialUrl)`
+    - `PictelioDownloader:69`（作品保存）与 `:113`（zip 下载）→ **`loadFileWithProgressCachedFirst(url, sink, cancel)`**，即保存与 zip 两条链路**全部**走这个入口
+
+    这三个入口**内部都不调用 `cacheKey`**（各自走 `cachedFile(url)` / `keyToFilename(url)`）。今天不出分叉靠的是「传入的本来就是官方 URL，而 `rewriteUrl` 幂等」⇒ **巧合正确，非结构性正确**。**#980 有意未把 rewrite 下沉进缓存路径**（会击穿约 17 条 MockWebServer 键断言，见 `cacheKey` javadoc），故这是独立决策而非遗漏。`ImageCacheKeySpaceTest` 的防线**只覆盖两条链路**，词汇层已同步收窄（`packages/app-lynx/CONTEXT.md` 图床缓存契约节）。
+    **排查提示**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径。
   - **真机验收（模拟器）已做的部分**（2026-10-11，见 §4.1）——**#979 两档内存预算**与**#986 `StatFs` 真机数值**已实测并与手算一致；**#982 的解码失败分支**与 **#984 的产品面 UI / web-core 降级**仍**未做**，不得宣称。
   - **本 ADR 不宣称任何真机峰值结论**：#979 已验证的是**预算公式的取小逻辑与两档差异**，**不是内存峰值实测**——峰值需在真机加载大量图片后读 `dumpsys meminfo`，本轮未做，模拟器数据更不得作为依据。
 - **#985 的三处刻意边界**（不得读成「已修」，登记于 2026-10-11 Spec 轴 code review）：
@@ -211,5 +221,6 @@ debug APK 实装实启，数据取自 logcat 与 `run-as` 下的文件系统快�
 
 - 领域词汇层新增「两层缓存 / 内存层 / 磁盘层」，并把 ADR-0090 标注为**历史编号**；两套「三层」编号合并为一套。
 - 「缓存键恒官方 CDN URL」「三链路共用同一键空间」两条不变量保留并**覆盖两层**（#980 已交付）：键由 `PixivImageLoader.cacheKey()` 唯一产出。此前标注的「内存层当前未满足」已不成立，勿再据此词条认为内存层仍分叉。
+  **⚠️ 但「唯一产出」只覆盖预取与显示两条链路**——zip / 导出 / 保存三条链路的 7 处调用点仍绕过 `cacheKey`（[#987](https://github.com/a1121611810/Pictelio/issues/987)，§4 与 §2.5 均有登记）。本条的「已不成立」只针对内存层与磁盘层的分叉，**不代表三条链路已统一**。
 - 内存预算系数与「命中刷新时间戳」两项做法各自带**外部一手出处**，后续实现票可直接沿用，**不必重新论证**，也不得凭感觉改系数。
 - 三条拒绝项各有独立理由，**重开任一条须新开 ADR 推翻本节**。

@@ -727,15 +727,19 @@ _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `w
 > **覆盖范围与现状（2026-10-11 登记，ADR-0222 §2.5；#980 已交付）**：这两条不变量**覆盖内存层与磁盘层两层**。
 > 层数与层名以 `packages/android-host/CONTEXT.md`「图片代理」节为准（**两层缓存**，现行编号见 ADR-0222）。
 >
-> ⚠️ **「唯一产出」的覆盖范围只到预取与显示两条链路**（2026-10-11 code-review 订正）：
+> ⚠️ **「唯一产出」的覆盖范围只到预取与显示两条链路**（2026-10-11 code-review 登记）：
 > `PixivImageLoader.cacheKey(url)` 是**预取 + 显示**两层的键的唯一产出点（内存层与磁盘层各只有一条目，
-> 同一张图以代理路径与绝对地址两种形态请求不会分叉）。但**zip / 导出 / 保存到相册**三条链路
-> （`NovelPdfEncoder`、`NovelDocxEncoder`、`NovelEpubEncoder`、`NovelExporter`、`GallerySaver`、
-> `PictelioDownloader`）把 URL **直接**交给 `loadBytesCachedFirst(url)` / `loadFileCachedFirst(url)`，
-> 而这两个入口**内部不再调用 `cacheKey`**——`cachedFile()` 直接 `keyToFilename(url)`。
+> 同一张图以代理路径与绝对地址两种形态请求不会分叉）。但 **zip / 导出 / 保存**三条链路**没有**纳入——
+> 共 **7 处调用点、3 个入口方法**：
+> `loadBytesCachedFirst(url)`（`NovelPdfEncoder:403`、`NovelDocxEncoder:430`、`NovelEpubEncoder:476`、
+> `NovelExporter:579`）、`loadFileCachedFirst(officialUrl)`（`GallerySaver:86`）、
+> `loadFileWithProgressCachedFirst(url, sink, cancel)`（`PictelioDownloader:69` 作品保存、`:113` zip 下载
+> ——保存与 zip 两条链路**全部**走它）。这三个入口**内部都不调用 `cacheKey`**，而是
+> `cachedFile(url)` 直接 `keyToFilename(url)`。
 > 它们今天不出分叉，靠的是「这些调用点传入的本来就是官方 URL，而 `rewriteUrl` 对官方 URL 幂等」
 > ⇒ **巧合正确，不是结构性正确**。
-> 处置见 ADR-0222 §4 与对应 follow-up issue；**不要**据本节以为该缺口已不存在。
+> 处置见 ADR-0222 §4 与 follow-up issue #987；**不要**据本节以为该缺口已不存在。
+> **排查提示**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径。
 > 反漂移防线目前由 `ImageCacheKeySpaceTest` 把守（断言内存层键恒等于 rewrite 产物、且不以原始 url 为键）——
 > **该防线覆盖预取与显示链路，不覆盖上述三条链路**。
 
