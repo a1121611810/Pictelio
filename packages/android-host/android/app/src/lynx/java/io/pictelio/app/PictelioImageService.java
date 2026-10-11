@@ -48,6 +48,9 @@ import java.util.concurrent.Executors;
  * <p>注册：{@code LynxServiceCenter.inst().registerService(PictelioImageService.getInstance())}
  * （在 {@code PictelioApp.initLynx()}，须早于任何 LynxView 创建）。
  *
+ * <p><b>测试缝（#977）</b>：包可见注入构造 {@link #PictelioImageService(ImageMemoryCache)}
+ * 让测试造干净实例，使内存层与磁盘层可分别断言（单例路径的生产语义不变）。
+ *
  * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
  * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
  * Bitmap 的生命周期，渲染后可能 recycle，复用缓存原图会导致二次显示空白」。
@@ -71,13 +74,13 @@ public class PictelioImageService implements ILynxImageService {
 
     private static final String TAG = "PictelioImageService";
 
-    private static final PictelioImageService INSTANCE = new PictelioImageService();
+    private static final PictelioImageService INSTANCE = new PictelioImageService(new ImageMemoryCache());
 
     /** 下载/解码线程池（fetchImage 为阻塞 IO + Bitmap 解码，不占 JS/主线程） */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     /** 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存 */
-    private final ImageMemoryCache memoryCache = new ImageMemoryCache();
+    private final ImageMemoryCache memoryCache;
 
     /** onInitialize 注入的 Application context（loader 惰性初始化用；避免 decodeImage/prefetch 传 null） */
     private volatile Context appContext;
@@ -87,7 +90,19 @@ public class PictelioImageService implements ILynxImageService {
         return INSTANCE;
     }
 
-    private PictelioImageService() {
+    /**
+     * 包可见注入构造（测试缝 #977）：使测试能造出<b>干净实例</b>并持有内存层引用。
+     *
+     * <p>存在理由：服务此前只有「私有构造 + 静态单例」，而 {@code memoryCache} 从无清理点，
+     * 于是「第二次加载不再请求网络」这类断言的第二次命中极可能来自<b>单例内存层残留</b>，
+     * 磁盘层是否接通反而无机器防线。注入内存层后，测试可分别清空内存层 / 删除磁盘条目，
+     * 用排除法各自证明一层。
+     *
+     * <p>形态对齐 {@link ImageMemoryCache} 的包可见注入构造；<b>生产运行语义不变</b>——
+     * 单例 {@link #INSTANCE} 仍以默认 {@link ImageMemoryCache} 构造，与改动前等价。
+     */
+    PictelioImageService(ImageMemoryCache memoryCache) {
+        this.memoryCache = memoryCache;
         registerImageBehaviors();
     }
 
