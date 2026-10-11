@@ -18,9 +18,9 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 | 任务涉及 | 第一步必须 | 依据 |
 |----------|-----------|------|
 | 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 先认层：理由 → `docs/adr/` 对号入座的 ADR；路线 → `CONTEXT-MAP.md` | 「四层词」 |
-| 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（pi 原生工具 `codegraph_explore` 或 bash `codegraph` CLI） | 「代码智能规范」速查表 |
-| 第三方库/框架文档 | Context7（`mcp__context7__*`） | 「文档查询规范」决策链 |
-| 浏览器标准 API | MDN（`mcp__mdn__*`） | 「文档查询规范」决策链 |
+| 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（接入形态见「代码智能规范」，按本会话实际可用的那一种） | 「代码智能规范」速查表 |
+| 第三方库/框架文档 | Context7（工具清单里 `context7` 开头的那个） | 「文档查询规范」决策链 |
+| 浏览器标准 API | MDN（工具清单里 `mdn` 开头的那个） | 「文档查询规范」决策链 |
 | 理解一个功能（why + where 都涉及） | **先 ADR / 地图，后 CodeGraph** | 「四层词」协作规则 |
 
 ### 允许的降级（仅限以下场景，未命中则必须触发）
@@ -38,10 +38,18 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 
 ## 代码智能规范（Code Intelligence）
 
-本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（无 MCP，直连 CLI）：
+本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。
 
-**pi agent** 由全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`。
-（工具用法与 shell 等价形式见文末 `CODEGRAPH` 块，该块由 `codegraph` 工具维护，勿手改。）
+### 接入形态：以本会话工具清单为准
+
+CodeGraph 有两种等价接入，能力相同、只有调用开销不同。开工前扫一眼工具清单，取实际存在的那一种：
+
+- **MCP 工具**（优先，少一层 shell 往返）：认工具清单里 `codegraph` 开头的那个。各客户端加各自的命名空间前缀，全名不固定——`mcp__codegraph__codegraph_explore`、`mcp__codegraph__explore` 都出现过，**认前缀与首词，别认全名**。
+- **CLI**（保底，任何环境都可用）：`codegraph explore "<符号名 空格分隔>"`。环境里没配该 MCP 时它就是唯一入口。
+
+清单里没直接列出 MCP 工具时，先按名搜一次工具库再下判断——部分客户端把 MCP 工具延后加载，「清单里没有」不等于「没配」。
+
+文末 `CODEGRAPH` 块由 `codegraph install` 生成（标记符内勿手改），内容与本节等价——留它是给读不到完整入口文件的 harness 与子代理兜底。
 
 ### 默认原则
 
@@ -53,15 +61,15 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 
 | 场景 | 首选 | 说明 |
 |------|------|------|
-| 理解代码 / 定位符号 / 调用链 / 影响面（绝大多数问题） | `codegraph_explore` 工具或 bash `codegraph explore "<符号名...>"` | 一次返回符号源码（视同已 Read）+ 调用路径 + blast radius（含关联测试）。query 写精确符号名，空格分隔多个 |
-| 按名快速定位符号（只要位置不要源码） | bash `codegraph query <name>` | 比 explore 便宜 |
-| 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 bash `codegraph impact <symbol>` | |
-| 变更文件 → 受影响测试 | bash `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
-| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；**计数正常 ≠ 覆盖当前分支**——另看 `lastIndexed` 是否早于本分支，并用**本分支新引入的符号** `codegraph query <符号名>` 验活一次（返回空即索引陈旧，降级 grep 并声明）。边数归零 = 索引腐化，人工 `codegraph index --force` |
+| 理解代码 / 定位符号 / 调用链 / 影响面（绝大多数问题） | CodeGraph 的 explore（MCP 工具与 CLI 同参数，取用见「接入形态」） | 一次返回符号源码（视同已 Read）+ 调用路径 + blast radius（含关联测试）。query 写精确符号名，空格分隔多个 |
+| 按名快速定位符号（只要位置不要源码） | `codegraph query <name>` | 比 explore 便宜 |
+| 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 `codegraph impact <symbol>` | |
+| 变更文件 → 受影响测试 | `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
+| 索引健康检查 | `codegraph status --json` | 节点/边计数；**计数正常 ≠ 覆盖当前分支**——另看 `lastIndexed` 是否早于本分支，并用**本分支新引入的符号** `codegraph query <符号名>` 验活一次（返回空即索引陈旧，降级 grep 并声明）。边数归零 = 索引腐化，人工 `codegraph index --force` |
 
-### tool_call 守卫（pi 扩展行为）
+### tool_call 守卫（本环境若装有标识符 grep 拦截器）
 
-用 grep 做"标识符形态 pattern + 全项目/代码目录"的搜索会被 block 并引导到 `codegraph_explore`。
+用 grep 做"标识符形态 pattern + 全项目/代码目录"的搜索会被 block 并引导到 CodeGraph。
 放行场景：非代码文本（配置/文档/日志）、单文件内搜索、path 在索引根之外、正则/中文 pattern。
 逃逸阀：确认覆盖不了时**原样重试同一调用即放行**（禁止换 bash 绕过——bash 搜索本就被拦截）。
 - bash 中直接调 `codegraph` CLI 不被拦截，计为有效使用。
@@ -72,9 +80,9 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 
 ### 默认原则
 
-- **第三方库/框架的 API 文档、使用指南、配置说明，默认优先使用 Context7 工具（`mcp__context7__*`）。**
-- **浏览器标准 API（HTML/CSS/JS 标准 API、Web API 语法与兼容性）优先使用 MDN 工具（`mcp__mdn__*`）。**
-- 仅当 Context7 和 MDN 都不支持目标查询时，才使用 `web_fetch` 搜索官方文档。
+- **第三方库/框架的 API 文档、使用指南、配置说明 → Context7。**
+- **浏览器标准 API（HTML/CSS/JS 标准 API、Web API 语法与兼容性）→ MDN。**
+- 两者都不支持目标查询时才降级 `web_fetch` 搜官方文档。
 
 ### 调用纪律
 
@@ -272,7 +280,12 @@ Grill 澄清 → to-spec → to-tickets → implement
 <!-- CODEGRAPH_START -->
 ## CodeGraph
 
-已建索引（`.codegraph/` 存在）时优先于 grep/read：pi agent 用原生 `codegraph_explore`，其余 bash 调 `codegraph explore`（子命令 `query` / `impact` / `affected` / `status`）。无索引则跳过——索引是用户决策，不得擅自 `codegraph init`。
+In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+
+If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
 <!-- CODEGRAPH_END -->
 
 ## Agent skills
