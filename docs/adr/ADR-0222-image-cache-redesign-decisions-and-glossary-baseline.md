@@ -151,13 +151,13 @@ _Why 两层而非三层_：ADR-0090 的层 B（WebView HTTP 磁盘缓存）属**
   - **#980** 键空间统一**已交付**——两层键均由 `cacheKey` 唯一产出。其覆盖范围**已由 #987 补齐至全部五条链路**（见下）；#980 有意未把 rewrite 下沉进缓存路径（见 §2.5）。
 - **#982–#985 亦已交付**（2026-10-11 补记，与上方同批合入集成分支）：**#982** 预取已补齐内存层（首屏免磁盘读与解码）；**#983** 两层缓存已接入可观测统计与持久化；**#984** 清理入口已落地（设置页展示占用与命中率 + 一键清理）；**#985** 存量缓存已按「布局代次只清一次、不迁移」清空。**实现分片至此全部交付完毕**，无剩余待交付项。
 - **仍不得宣称的部分（与交付状态无关，是证据状态）**：
-- **已收口的结构性缺口（2026-10-11，#987 已交付）**——zip / 导出 / 保存三条链路的键**已**纳入 `cacheKey` 唯一产出点。此前缺口为 **7 处调用点 / 3 个入口方法**（Round 2 订正，此前写作「6 处 / 2 个方法」并漏了第三个入口）：
-  - `NovelPdfEncoder:403`、`NovelDocxEncoder:430`、`NovelEpubEncoder:476`、`NovelExporter:579` → `loadBytesCachedFirst(url)`
-  - `GallerySaver:86` → `loadFileCachedFirst(officialUrl)`
-  - `PictelioDownloader:69`（作品保存）与 `:113`（zip 下载）→ **`loadFileWithProgressCachedFirst(url, sink, cancel)`**，即保存与 zip 两条链路**全部**走这个入口
+  - **已收口的结构性缺口（2026-10-11，#987 已交付）**——zip / 导出 / 保存三条链路的键**已**纳入 `cacheKey` 唯一产出点。此前缺口为 **7 处调用点 / 3 个入口方法**（Round 2 订正，此前写作「6 处 / 2 个方法」并漏了第三个入口）：
+    - `NovelPdfEncoder:403`、`NovelDocxEncoder:430`、`NovelEpubEncoder:476`、`NovelExporter:579` → `loadBytesCachedFirst(url)`
+    - `GallerySaver:86` → `loadFileCachedFirst(officialUrl)`
+    - `PictelioDownloader:69`（作品保存）与 `:113`（zip 下载）→ **`loadFileWithProgressCachedFirst(url, sink, cancel)`**，即保存与 zip 两条链路**全部**走这个入口
 
-  这三个入口此前**内部不调用 `cacheKey`**（各自走 `cachedFile(url)` / `keyToFilename(url)`），当时不出分叉靠的是「传入的本来就是官方 URL，而 `rewriteUrl` 幂等」⇒ **巧合正确，非结构性正确**。修法**不改这 7 处调用点**（改则漏一处即复现原 bug），而是把键的产出收口到 loader 内部的唯一文件名产出点 `cacheFileName(url)`——读路径与三个入口的写路径全部经它，**结构上**无法再分叉。
-  防线：新增 `ImageCacheZipChainKeyTest`（逐入口 × 两个方向断言代理形态与官方形态共用同一条目）。**排查提示（仍有效）**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径——保存与 zip 两条链路全部走第三个入口。
+    这三个入口此前**内部不调用 `cacheKey`**（各自走 `cachedFile(url)` / `keyToFilename(url)`），当时不出分叉靠的是「传入的本来就是官方 URL，而 `rewriteUrl` 幂等」⇒ **巧合正确，非结构性正确**。修法**不改这 7 处调用点**（改则漏一处即复现原 bug），而是把键的产出收口到 loader 内部的唯一文件名产出点 `cacheFileName(url)`——读路径与三个入口的写路径全部经它，**结构上**无法再分叉。
+    防线：新增 `ImageCacheZipChainKeyTest`（逐入口 × 两个方向断言代理形态与官方形态共用同一条目）。**排查提示（仍有效）**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径——保存与 zip 两条链路全部走第三个入口。
   - **真机验收（模拟器）已做的部分**（2026-10-11，见 §4.1）——**#979 两档内存预算**与**#986 `StatFs` 真机数值**已实测并与手算一致；**#984 的产品面 UI**已走查（并抓出条目数从未显示的真 bug，见本节下一条）；**#982 的解码失败分支**改由 CI 钉住（前提已订正，见 §4.1 末段），**#984 的 web-core 降级**不可行。
   - **本 ADR 不宣称任何真机峰值结论**：#979 已验证的是**预算公式的取小逻辑与两档差异**，**不是内存峰值实测**——峰值需在真机加载大量图片后读 `dumpsys meminfo`，本轮未做，模拟器数据更不得作为依据。
 - **#985 的三处刻意边界**（不得读成「已修」，登记于 2026-10-11 Spec 轴 code review）：

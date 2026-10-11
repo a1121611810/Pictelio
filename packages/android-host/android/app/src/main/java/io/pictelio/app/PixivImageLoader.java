@@ -369,10 +369,18 @@ public class PixivImageLoader {
      * 内存预算被双份占用，命中率统计随之失真。本函数把「键怎么算」收敛到一处，
      * 两条链路不可能再算出不同的键。
      *
-     * <p><b>为何不把 rewrite 下沉进本类的缓存路径</b>：本类缓存方法的入参契约是
-     * 「调用方已给出官方 URL」（ADR-0143 D2 源无关命中），而下载源由 {@link ImageHostConfig}
-     * 在 {@link #download} 内部决策。若在本类内部再 rewrite 一次，键将与下载源耦合，
-     * 且会改变既有磁盘侧键断言的语义。本函数只做<b>产出</b>，消费仍由各层显式完成。
+     * <p><b>形态归一 ≠ 换源（#980 定产出，#987 定消费）</b>：本函数只做<b>形态归一</b>
+     * （代理路径 → 官方 CDN URL），它与 {@link ImageHostConfig} 的<b>换源</b>是两件事——
+     * 前者决定「同一张图是否共用同一条目」，后者决定「从哪台机器取字节」。
+     * <br><br>
+     * <b>消费分两处</b>：内存层由调用点<b>显式</b>取键；磁盘层经
+     * {@code cacheFileName(url)} <b>内部</b>取键（#987：读路径与三个
+     * {@code *CachedFirst} 入口的写路径全部经它）。
+     * <br><br>
+     * <b>唯一禁止的是把 {@code cacheKey} 挪进 {@link #download} 或 {@link ImageHostConfig#resolve}</b>
+     * ——那才会让缓存键跟随下载源，切源 / 开关图床 / 换镜像将使已缓存条目失效，
+     * 直接违反 ADR-0143 D2 源无关命中。（注意：这与「在磁盘路径内部取键」是两回事，
+     * 后者正是 #987 做的事且是正确的。）
      *
      * <p><b>幂等</b>：{@code rewriteUrl} 对已 rewrite 的官方 URL 原样返回
      * （其中不含 {@code /pixiv-img/}），故重复调用本函数不改变结果。

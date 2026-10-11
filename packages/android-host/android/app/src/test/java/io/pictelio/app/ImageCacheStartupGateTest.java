@@ -103,6 +103,11 @@ public class ImageCacheStartupGateTest {
 
     @After
     public void tearDown() {
+        // 必须**无条件**放行：若某个用例在 releaseTask.countDown() 之前就断言失败，
+        // 维护任务会一直挂着、闸门一直关着。而 startupMaintenanceGate 是**静态**的，
+        // 且 app/build.gradle 未设 forkEvery（全模块单测共享同一个 JVM）⇒ 污染会以
+        // 「别的用例莫名其妙等了 15s 超时」这种完全误导的形态爆出来，而不是指向真凶。
+        releaseTask.countDown();
         pool.shutdownNow();
     }
 

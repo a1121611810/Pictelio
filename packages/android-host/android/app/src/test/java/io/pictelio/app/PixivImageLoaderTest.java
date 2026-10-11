@@ -160,6 +160,11 @@ public class PixivImageLoaderTest {
      * <p>{@code enqueueImage} / {@code server.url("/pixiv-img/…")} 产出的是
      * {@code http://localhost:PORT/pixiv-img/x} 这种<b>含 {@code /pixiv-img/} 的绝对 URL</b>，
      * 故它是代理形态而非普通 URL——缓存键必须归一到官方 CDN URL。
+     *
+     * <p><b>刻意省略生产的 {@code new URI(...).normalize()}</b>：本类 fixture 全是
+     * {@code /pixiv-img/<file>.jpg} 这类<b>不含 dot-segment</b> 的路径，两侧结果一致。
+     * 将来若fixture 带 {@code /a/../b}，生产会折叠而本 oracle 不会 ⇒ 断言<b>响亮转红</b>
+     * （不会假绿），届时更新本方法即可。独立 oracle 不复用 {@code rewriteUrl} 是刻意的。
      */
     private static String canonicalCdnUrl(String url) {
         int idx = url.indexOf("/pixiv-img/");
