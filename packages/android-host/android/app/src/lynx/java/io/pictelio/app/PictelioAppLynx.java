@@ -13,8 +13,10 @@ import java.util.concurrent.Executors;
  * （issue #122）：进程冷启动由本类触发；进程复用场景由 LynxActivity 兜底触发。
  * 单点内部 AtomicBoolean 自守护，重复调用安全。
  *
- * <p>图片磁盘缓存的启动清理（#978）在本类 {@code onCreate} 触发一次，见
- * {@link #trimImageCacheAtStartup()}。
+ * <p>图片磁盘缓存的冷启动维护在本类 {@code onCreate} 调度一次（跑在 {@link #TRIM_EXECUTOR}），
+ * 见 {@link #trimImageCacheAtStartup()}：#985 的<b>存量清空</b>（只一次、不迁移）与
+ * #978 的<b>容量回收</b>（每次冷启动、超限才淘汰）在同一后台任务内按序执行，
+ * 二者共用同一条删除路径（{@link PixivImageLoader#clearDiskCache()}）。
  *
  * <p>图片内存层的内存压力响应（#981）在本类 {@code onCreate} 注册一次，见
  * {@link #registerImageMemoryPressureResponse()}；只注册这一次，不随 Lynx runtime 的
@@ -70,19 +72,15 @@ public class PictelioAppLynx extends Application {
     }
 
     /**
-     * 启动清理图片磁盘缓存（#978）：把淘汰触发点从「仅写入后」扩为「启动时 + 写入后」，
-     * 使长期不写入的超限存量也能被回收。
+     * 调度冷启动图片磁盘缓存维护（#985 存量清空 + #978 容量回收）。
      *
-     * <p>跑在后台单线程：{@code enforceCacheLimit} 要 listFiles + 逐条 stat + 排序，
-     * 目录条目多时在主线程会拖慢冷启动。失败仅记 Log.w（不阻断启动，trimAtStartup 内部兜底）。
+     * <p>跑在本类已存在的 {@link #TRIM_EXECUTOR}（#978 已复用过、#981 的内存压力收缩也复用它）
+     * ——<b>不新开常驻线程</b>。维护是阻塞 IO 且与首屏无关，故整段在后台，冷启动耗时不受影响。
+     *
+     * <p>关闸/开闸与「缓存访问在维护期间排队」的纪律由被调方自持
+     * （{@link PixivImageLoader#scheduleStartupCacheMaintenance}），本类只负责把执行器交出去。
      */
     private void trimImageCacheAtStartup() {
-        TRIM_EXECUTOR.execute(() -> {
-            try {
-                new PixivImageLoader(this).trimAtStartup();
-            } catch (Throwable t) {
-                Log.w(TAG, "启动清理图片缓存失败（不阻断启动）", t);
-            }
-        });
+        new PixivImageLoader(this).scheduleStartupCacheMaintenance(TRIM_EXECUTOR);
     }
 }

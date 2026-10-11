@@ -3,6 +3,7 @@ package io.pictelio.app;
 import io.pictelio.app.config.OAuthConfig;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.StatFs;
 import android.util.Base64;
 import android.util.Log;
@@ -20,6 +21,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
@@ -64,6 +67,12 @@ import okhttp3.Response;
  * 见该类注释）。上限在<b>每次淘汰时重新求值</b>，故存储紧张时自动收缩、恢复后自然增长；
  * 收缩后超限条目由下方<b>同一条</b>淘汰路径按访问时间序回收（不另起删除逻辑）。
  *
+ * <p><b>升级清空存量缓存（#985）</b>：{@link #purgeLegacyCacheOnUpgrade()} 按<b>缓存布局代次</b>
+ * 只清空一次——存量直接清空、不做迁移（缓存非真相源，可从网络重建），清空后状态等同全新安装。
+ * 它<b>不实现删除逻辑</b>，删除一律委托 {@link #clearDiskCache()}，与用户手动清理同一条路径。
+ * 与上文的启动容量回收（{@link #trimAtStartup()}）语义不同、不得互相替代：前者是<b>存量处置</b>
+ * （只一次、全删），后者是<b>容量管理</b>（每次冷启动、超限才淘汰、保留最近被用过的）。
+ *
  * <p><b>两层缓存共用一个键空间（#980）</b>：缓存键由 {@link #cacheKey(String)} 唯一产出，
  * 内存层（{@code PictelioImageService} 的 {@code ImageMemoryCache}）与本类磁盘层消费<b>同一</b>个键。
  * 此前磁盘层键是 rewrite 产物、内存层却用未 rewrite 的原始 URL——同一张图以代理路径与绝对地址
@@ -86,6 +95,68 @@ public class PixivImageLoader {
     private static final String TAG = "PixivImageLoader";
     /** 缓存目录名（对齐 OAuthConfig.CACHE_DIR / PixivApiPlugin.CACHE_DIR_NAME） */
     private static final String CACHE_DIR_NAME = "pictelio-images";
+
+    /**
+     * 升级清空标记的持久化文件名（#985，<b>独立于存量格式契约</b>，理由与
+     * {@code ImageCacheStatsStore} 同源）：刻意不是 {@code SecureStorageCompat.PREFS_NAME}
+     * （安全存储），也不是图床配置所在的 {@code "CapacitorStorage"}——那两处的键空间属于
+     * ADR-0050 存量用户数据，一字不改。本文件只<b>新增</b>一个标记文件，不读写存量键空间。
+     */
+    private static final String UPGRADE_PREFS_NAME = "pictelio-image-cache-upgrade";
+    /** 键：已清空到的缓存布局代次（值见 {@link #CACHE_LAYOUT_GENERATION}） */
+    private static final String KEY_PURGED_GENERATION = "purged_generation";
+    /**
+     * 缓存布局代次（#985）：升级清空只做一次，靠它而非「版本号大小比较」判定。
+     *
+     * <p>为何不用 versionCode 比大小：清空必须<b>恰好一次</b>，而版本号语义是
+     * 「用户装到了哪版」，两者在降级安装、跳版升级、应用市场回滚下会分叉。
+     * 代次只表达「存量缓存是否已按当前布局清过」，与用户装没装某一版无关。
+     * 日后缓存目录布局/语义再变，递增此串即可让清空对新代次重新生效一次。
+     *
+     * <p>取值 {@code v1} = 图片缓存重设计（#978 真 LRU / #980 键空间统一 / #986 上限浮动）
+     * 后的首个代次：这三者改的是<b>淘汰策略与键空间</b>，目录名与文件名约定未变，故存量条目
+     * 虽可被新策略正确管理，但按 ADR-0222 §2.6「存量直接清空、不做迁移」的决策仍一次性清掉。
+     */
+    private static final String CACHE_LAYOUT_GENERATION = "v1";
+
+    /**
+     * 缓存目录<b>内容增删</b>的进程级互斥锁（#985 随升级清空引入）。
+     *
+     * <h3>为什么需要它</h3>
+     * 删除方（用户手动清理 {@code clearDiskCache} / 升级清空 / 容量淘汰
+     * {@code enforceCacheLimit}）与写入方（{@link #writeFile} 的 tmp→目标 rename）
+     * 此前<b>没有任何互斥</b>：删除恰好落在 rename 中间时，tmp 已被删掉，
+     * {@code renameTo} 失败并抛 {@link IOException}，调用方（如「保存到相册」）
+     * 会把一次后台清理显示成用户可见的失败。容量淘汰只在超限时删、命中概率低，
+     * 而升级清空是<b>一次性全删</b>，把这个原本罕见的竞态放大成了必然，故此处让二者互斥。
+     *
+     * <h3>边界（刻意不做满）</h3>
+     * 本锁只保护<b>目录内容的增删</b>，不覆盖「把 {@link File} 句柄返回给调用方、调用方之后才读」
+     * 的时序（如 {@code loadFileCachedFirst}）；对<b>升级存量清空</b>这一条路径，该时序已由
+     * 冷启动闸门（{@link #awaitStartupCacheMaintenance()}）整体排除，但用户手动清理与容量淘汰
+     * 仍保留这一暴露面（早于本票即如此），不属本票范围。
+     *
+     * <h3>不会死锁</h3>
+     * 持锁期间不做网络 IO（下载早于写盘完成），且删除方不获取任何 per-URL 锁，
+     * 故不存在与 {@link #urlLocks} 的反向等待顺序。
+     */
+    private static final Object CACHE_DIR_MUTATION_LOCK = new Object();
+
+    /**
+     * 冷启动缓存维护的<b>闸门</b>（#985）：调度时关、维护结束开，缓存访问在 {@link #getCacheDir()}
+     * 处等它（见 {@link #awaitStartupCacheMaintenance()}）。
+     *
+     * <p>初值 count=0（已开闸）：未经 {@link #scheduleStartupCacheMaintenance} 调度的进程
+     * （例如不经 Application 冷启动的测试）不会因为等一个不存在的闸门而卡住。
+     */
+    private static volatile CountDownLatch startupMaintenanceGate = new CountDownLatch(0);
+    /**
+     * 正在执行维护的线程——让该线程自身不被「等待维护结束」挡住
+     * （维护内部同样会走 {@link #getCacheDir()}）。
+     */
+    private static volatile Thread startupMaintenanceThread;
+    /** 等待冷启动维护的兜底超时（秒）：超时只记告警并放行，不把启动卡死（缓存本非真相源） */
+    private static final long STARTUP_MAINTENANCE_WAIT_SECONDS = 15L;
     /** 镜像下载预算（实现定值：connect 5s / call 15s，低于官方 connect 15s / read 30s / call 45s
      *  ——ADR-0143 D4「低于官方」的具体化；劣化镜像快失败，不拖慢官方回退） */
     private static final int MIRROR_CONNECT_TIMEOUT_SECONDS = 5;
@@ -284,7 +355,15 @@ public class PixivImageLoader {
         return Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
     }
 
+    /**
+     * 取图片缓存目录——<b>全部缓存访问的唯一入口</b>（读、写、清空、淘汰都经此）。
+     *
+     * <p>因此它也是「等待冷启动缓存维护」的<b>唯一收口点</b>（见
+     * {@link #awaitStartupCacheMaintenance()}）：维护期间若有别的线程来读写缓存，
+     * 在这里排队而不是拿到一个马上就会被删掉的文件。
+     */
     public File getCacheDir() {
+        awaitStartupCacheMaintenance();
         File dir = new File(context.getCacheDir(), CACHE_DIR_NAME);
         if (!dir.exists()) {
             dir.mkdirs();
@@ -596,25 +675,27 @@ public class PixivImageLoader {
      */
     static void writeFile(File file, byte[] bytes) throws IOException {
         File tmp = new File(file.getAbsolutePath() + ".tmp");
-        try {
-            try (FileOutputStream fos = new FileOutputStream(tmp)) {
-                fos.write(bytes);
-                fos.flush();
-            }
-            if (!tmp.renameTo(file)) {
-                // 个别文件系统的 rename 不覆盖已存在目标：先删旧目标再重试一次
-                if (file.exists() && !file.delete()) {
-                    throw new IOException("无法删除旧缓存文件: " + file);
+        synchronized (CACHE_DIR_MUTATION_LOCK) {
+            try {
+                try (FileOutputStream fos = new FileOutputStream(tmp)) {
+                    fos.write(bytes);
+                    fos.flush();
                 }
                 if (!tmp.renameTo(file)) {
-                    throw new IOException("rename 失败: " + tmp + " -> " + file);
+                    // 个别文件系统的 rename 不覆盖已存在目标：先删旧目标再重试一次
+                    if (file.exists() && !file.delete()) {
+                        throw new IOException("无法删除旧缓存文件: " + file);
+                    }
+                    if (!tmp.renameTo(file)) {
+                        throw new IOException("rename 失败: " + tmp + " -> " + file);
+                    }
                 }
+            } catch (IOException e) {
+                if (!tmp.delete()) {
+                    Log.w(TAG, "tmp 清理失败（留待容量淘汰/清空缓存回收）: " + tmp);
+                }
+                throw e;
             }
-        } catch (IOException e) {
-            if (!tmp.delete()) {
-                Log.w(TAG, "tmp 清理失败（留待容量淘汰/清空缓存回收）: " + tmp);
-            }
-            throw e;
         }
     }
 
@@ -661,15 +742,19 @@ public class PixivImageLoader {
         long freed = 0L;
         long deleted = 0L;
         boolean failed = false;
-        for (File f : files) {
-            long size = f.length();
-            if (f.delete()) {
-                freed += size;
-                deleted++;
-            } else {
-                // 不静默：删不掉必须留痕并让上层知道（可能仍有进行中的导出/保存持有该文件）
-                failed = true;
-                Log.w(TAG, "删除图片缓存条目失败（可能正被使用）: " + f.getName());
+        // 与写盘互斥：否则删除可能落在某次写盘的 tmp→目标 rename 中间，把一次后台清理
+        // 变成调用方可见的 IOException（见 CACHE_DIR_MUTATION_LOCK）
+        synchronized (CACHE_DIR_MUTATION_LOCK) {
+            for (File f : files) {
+                long size = f.length();
+                if (f.delete()) {
+                    freed += size;
+                    deleted++;
+                } else {
+                    // 不静默：删不掉必须留痕并让上层知道（可能仍有进行中的导出/保存持有该文件）
+                    failed = true;
+                    Log.w(TAG, "删除图片缓存条目失败（可能正被使用）: " + f.getName());
+                }
             }
         }
         if (failed) {
@@ -678,6 +763,122 @@ public class PixivImageLoader {
         // 量表立即归零（否则后台读数会停留在清理前的值，直到下一次遍历）
         statsStore().publishDiskUsage(DiskCacheUsage.EMPTY);
         return new ImageCacheClearResult(freed, deleted, failed);
+    }
+
+    // ── 升级清空（#985）：只执行一次，存量直接清空不迁移 ──────────
+
+    /**
+     * 升级后清空存量图片缓存（#985），<b>恰好执行一次</b>。
+     *
+     * <h3>为什么需要它</h3>
+     * 旧缓存由「写死上限 + 按写入序淘汰 + 内存/磁盘两套键空间」那套策略写下，新版策略接手后
+     * 它们既非真相源、又无法说清用户到底在用哪套（ADR-0222 §2.6：<b>存量直接清空、不做迁移</b>）。
+     * 缓存删后可从网络重建，故清空后行为与全新安装完全一致。
+     *
+     * <h3>「只执行一次」的判据</h3>
+     * 标记写在<b>数据目录下的 SharedPreferences</b>（{@code shared_prefs/}），内容是已清空到的
+     * <b>缓存布局代次</b>（{@link #CACHE_LAYOUT_GENERATION}）。选择落数据目录而非缓存目录的
+     * 三个理由：
+     * <ol>
+     *   <li><b>不能放进图片缓存目录</b>——{@link #clearDiskCache()} 逐条删目录内的全部子项，
+     *       标记会被自己清掉，于是每次冷启动都重跑一次；</li>
+     *   <li><b>不能作为 cacheDir 的兄弟文件</b>——{@code getCacheDir()} 会被系统在存储紧张时
+     *       回收，标记随之消失，用户重新缓存的图会在下次冷启动被无谓清掉；</li>
+     *   <li><b>不用 versionCode 比大小</b>——降级安装、跳版升级、市场回滚下版本号与
+     *       「存量是否已清过」会分叉（见常量注释）。</li>
+     * </ol>
+     *
+     * <h3>与清理入口复用同一条路径（票面硬要求）</h3>
+     * 本方法<b>不实现任何删除逻辑</b>：唯一的删除动作是调用 {@link #clearDiskCache()}——
+     * 与用户手动「清理图片缓存」（#984 桥接模块 {@code PictelioImageCacheModule}）走同一方法。
+     * 因此「只删图片缓存目录内的子项、绝不删目录本身、绝不碰父目录与四个兄弟目录、显式拒绝递归」
+     * 这套锚定纪律对升级清空同样成立，且由 {@code ImageCacheClearScopeTest} 与本票的
+     * {@code ImageCacheUpgradePurgeTest} 共同钉死。
+     *
+     * <h3>与 {@link #trimAtStartup()} 的关系：语义不同，不得互相替代</h3>
+     * {@code trimAtStartup} 是<b>容量管理</b>（超限才淘汰、保留最近被用过的条目，每次冷启动都跑）；
+     * 本方法是<b>存量处置</b>（全删、只跑一次）。二者触发时机、判定条件、目的都不同，
+     * 启动时按「先存量清空、后容量回收」的顺序各跑一次。
+     *
+     * <h3>失败不静默、也不假装清过</h3>
+     * 清空失败（目录不可读 / 有条目删不掉）时记 {@code Log.w} 且<b>不写标记</b>——
+     * 下次冷启动自动重试，绝不出现「标记说清过了、实际还剩半截旧缓存」的状态。
+     *
+     * <p><b>阻塞 IO</b>：内部遍历目录并逐条 {@code delete()}，调用方<b>须放后台线程</b>
+     * （{@code PictelioAppLynx} 已挂在缓存维护执行器上）。
+     *
+     * @return 本次是否<b>执行了</b>清空动作（{@code false} = 本代次早已清过、无需再跑）。
+     *         注意：返回 {@code true} 只代表「动作已执行」，成败以日志与是否落标记为准
+     *         （目录不可读时目录仍为空，从结果上与成功清空不可区分，故不以此返回值冒充成败）。
+     */
+    public boolean purgeLegacyCacheOnUpgrade() {
+        SharedPreferences prefs = context.getSharedPreferences(UPGRADE_PREFS_NAME, Context.MODE_PRIVATE);
+        if (CACHE_LAYOUT_GENERATION.equals(prefs.getString(KEY_PURGED_GENERATION, null))) {
+            return false;
+        }
+        ImageCacheClearResult result = clearDiskCache();
+        if (result.failed()) {
+            // 不落标记 ⇒ 下次冷启动重试；显式告警，不静默吞掉也不谎报「已清过」
+            Log.w(TAG, "升级清空存量图片缓存未完全成功，本次不落标记、下次冷启动重试: " + result);
+            return true;
+        }
+        prefs.edit().putString(KEY_PURGED_GENERATION, CACHE_LAYOUT_GENERATION).apply();
+        Log.i(TAG, "升级已清空存量图片缓存（不迁移），清空结果: " + result);
+        return true;
+    }
+
+    /**
+     * 调度冷启动缓存维护（#985 + #978）——<b>全仓唯一调用点</b>在 {@code PictelioAppLynx.onCreate}。
+     *
+     * <p>顺序刻意为「先存量清空（#985，只一次、全删、不迁移），后容量回收（#978，每次冷启动、
+     * 超限才淘汰）」：两者语义不同、缺一不可；先清空则本轮容量回收无事可做。
+     *
+     * <h3>为什么维护期间要关闸</h3>
+     * 存量清空是<b>一次性全删</b>，若与并发的缓存访问交错，用户会看到实打实的故障：
+     * 写盘侧 tmp 被删 → rename 失败 → 「保存到相册」报错；读盘侧刚拿到的文件被删 →
+     * {@code FileNotFoundException}。二者都<b>不是缓存该有的语义</b>（缓存只是加速层，
+     * 条目随时可重建），故让缓存访问在 {@link #getCacheDir()} 处等维护结束，
+     * 而不是各自去容忍这些故障。
+     *
+     * <p>执行器由调用方传入（{@code PictelioAppLynx} 传 #978 已有的 {@code TRIM_EXECUTOR}）：
+     * 维护是阻塞 IO 且与首屏无关，<b>不新开常驻线程</b>；关闸在<b>提交前</b>完成，
+     * 故提交之后的任何缓存访问都能看见它。
+     */
+    public void scheduleStartupCacheMaintenance(Executor executor) {
+        final CountDownLatch gate = new CountDownLatch(1);
+        startupMaintenanceGate = gate;
+        executor.execute(() -> {
+            startupMaintenanceThread = Thread.currentThread();
+            try {
+                purgeLegacyCacheOnUpgrade();
+                trimAtStartup();
+            } catch (Throwable t) {
+                Log.w(TAG, "启动缓存维护失败（不阻断启动）", t);
+            } finally {
+                gate.countDown();
+            }
+        });
+    }
+
+    /**
+     * 等冷启动缓存维护结束（见 {@link #scheduleStartupCacheMaintenance}）。
+     *
+     * <p>三种情况直接放行：闸门本就开着（从未调度）、调用方就是维护线程自身、
+     * 或被中断。等待<b>有兜底超时</b>且超时记 Log.w——不让一个后台任务把启动永久卡住，
+     * 也<b>不静默</b>（超时是异常路径，必须留痕）。
+     */
+    private static void awaitStartupCacheMaintenance() {
+        CountDownLatch gate = startupMaintenanceGate;
+        if (gate.getCount() == 0L || Thread.currentThread() == startupMaintenanceThread) {
+            return;
+        }
+        try {
+            if (!gate.await(STARTUP_MAINTENANCE_WAIT_SECONDS, TimeUnit.SECONDS)) {
+                Log.w(TAG, "等待启动缓存维护超时（继续；缓存非真相源，最坏只是多留一次旧条目）");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -734,13 +935,16 @@ public class PixivImageLoader {
         }
         // 按访问时间升序（最久未用在前），逐个删除直到低于上限（#978：语义由写入序改为访问序）
         Arrays.sort(files, Comparator.comparingLong(File::lastModified));
-        for (File f : files) {
-            if (total <= maxCacheBytes) {
-                break;
-            }
-            total -= f.length();
-            if (!f.delete()) {
-                Log.w(TAG, "淘汰缓存文件失败: " + f.getName());
+        // 与写盘互斥（见 CACHE_DIR_MUTATION_LOCK）：淘汰也是删除方，同样不得落在 rename 中间
+        synchronized (CACHE_DIR_MUTATION_LOCK) {
+            for (File f : files) {
+                if (total <= maxCacheBytes) {
+                    break;
+                }
+                total -= f.length();
+                if (!f.delete()) {
+                    Log.w(TAG, "淘汰缓存文件失败: " + f.getName());
+                }
             }
         }
     }

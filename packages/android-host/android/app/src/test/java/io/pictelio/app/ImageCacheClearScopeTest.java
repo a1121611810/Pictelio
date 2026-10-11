@@ -90,6 +90,10 @@ public class ImageCacheClearScopeTest {
     @Before
     public void setUp() {
         ctx = ApplicationProvider.getApplicationContext();
+        // #985：Robolectric 会真的启动 Application，其 onCreate 提交的后台「升级存量清空」
+        // 与本用例并发，可能晚到并删掉本用例刚摆好的 fixture。先等它落标记收敛，再摆 fixture。
+        // 升级清空本身的断言由 ImageCacheUpgradePurgeTest 负责，此处只求 fixture 不被抹掉。
+        ImageCacheUpgradePurgeTest.awaitStartupPurgeSettled(ctx);
         ctx.getSharedPreferences(ImageCacheStatsStore.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().clear().commit();
         ImageCacheStatsStore.resetSingletonForTest();
