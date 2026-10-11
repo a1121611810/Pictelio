@@ -12,6 +12,18 @@
 // oracle：MD3 状态层与「不可用不该呈现 primary 实色」的交互契约（AGENTS.md「app-lynx 的 MD3
 //   约定 → 状态层」）；可用性判据本身是 AdvancedSettings.vue 内 `cacheStatsVisible`（读数真实）
 //   与 `clearing`（清理进行中）两个既有 ref，不是本测试发明的。
+//
+// 规模线核对（workflows/review-fix-loop.md「门禁冻结线」#1）：本文件 4.4KB / 被测对象 24.4KB
+//   = 18%，在 30% 线内。
+//
+// **已知失效面（抓不到什么）** —— 按「假绿比没门禁更糟」登记，不得只记它抓到了什么：
+//   1. 本门禁是**源码文本断言**，只能证明三处绑定在文本上同源。改用运行时计算得出等价外观
+//      （例如把 canClearCache 换成函数调用、或让 canClearCache 内部读别的 ref）仍会红，
+//      但若有人把判定挪进 computed 之外的 watch/事件里做二次覆盖，本门禁看不见。
+//   2. 它**不校验 MD3 令牌值**是否正确（bg-primary / text-primary-on 的具体色值由
+//      tokens.css 单一事实源保证），只校验选择器挂对了。
+//   3. 它**不能替代目视验收**：按钮实际渲染出的对比度与触控反馈仍需真机/浏览器走查
+//      （#984 已登记该欠账）。
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
