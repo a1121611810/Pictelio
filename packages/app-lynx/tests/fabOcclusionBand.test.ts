@@ -133,8 +133,12 @@ const LEADING_SITES = [
  * ⚠️ **两侧都要认 `"` 作边界**（2026-10-12 由文末阳性对照查出）：`class="a b"` 里 `a` 的前面
  * 是 `"`、`b` 的后面也是 `"`，都不是空白。原判据只认 `^` / 空白 ⇒ **类属性的首个类与末个类一律漏判**。
  * 实测漏网 6 处 `justify-between"`（`Me.vue` / `SearchSheet.vue` / `SettingsEndpoint.vue` ×2 /
- * `RelatedInlineSection.vue` / `NovelDetail.vue`），其中 `SearchSheet.vue:420` 正是 ADR-0221 §4
- * 「刻意不处理」表里登记过的站点 —— 门禁对它一直是瞎的。
+ * `RelatedInlineSection.vue` / `NovelDetail.vue`）——复算命令：
+ *   grep -rn 'justify-between"' src --include=*.vue | wc -l   ⇒ 6
+ * ⚠️ **这 6 处按设计仍不在本门禁视野内**：扫描能力已整体删除（见文件头失效面 1），本门禁只读
+ * 下方那 7 处登记站点。边界修复只提升「未来新增站点被登记时」的可判定性，**不追溯覆盖存量**。
+ * （此处曾断言「SearchSheet 是 §4 登记过的站点」——**错的**：§4 登记的是该文件的 chip 内历史 ✕，
+ * 而上面那处 `justify-between` 是词条区标题行，两个不同元素。已一并订正，行号以 §4 现读为准。）
  *
  * ⚠️ **裸 `absolute` 已从枚举移除**：绝对定位靠不靠右取决于 `left-*` / `right-*`，`right-*` 已覆盖；
  * 留着裸 `absolute` 只会在放开 `"` 边界后把**每一个**绝对定位元素（含已改用 `left-*` 的收起 ✕）
@@ -509,15 +513,22 @@ describe('门禁判别力自检 · 阳性对照（防「全绿 = 无事发生」
     expect(judgeStillInBand(已迁行首, 已迁行首.indexOf('@tap="onTap"'), AFTER_CONTENT).inBand).toBe(false)
   })
 
-  it('带内证明 · 只量动作元素**自己**的开标签，量到别处即为逃逸（外部复核攻击 A）', () => {
-    // 极性已经被上一条钉住；这一条钉的是**测量范围**。把 `openTagAt(tpl, actionAt)` 换成
-    // `tpl` 会让判据变松（量得太宽），而当时的两条单行夹具分辨不出来 —— 因为它们的尾推
-    // 令牌恰好就在动作元素自身。判据变松的方向正是 #957 要杀的方向：豁免静默续命。
+  it('带内证明 · 判据不得**量得太宽**（量到动作元素之外即为逃逸；外部复核攻击 A）', () => {
+    // 极性被上一条钉住；这一条钉的是**测量范围的下界**。把 `openTagAt(tpl, actionAt)` 换成
+    // `tpl`（量得太宽）会让判据变松，而当时的两条单行夹具分辨不出来 —— 因为它们的尾推令牌
+    // 恰好就在动作元素自身。判据变松正是 #957 要杀的方向：已修站点的豁免静默续命。
+    // 真实危害不是假想：`RankingEntryCard.vue:141/152` 本就有两处与收起 ✕ 无关的 `right-*`
+    // 令牌（夹具即照此构造）。
+    //
+    // ⚠️ **刻意不钉住「量得太窄」那一侧**（如改量行根：外部复核实测该变异仍全绿）。那一侧是
+    // **fail-safe**：量窄只会把真在带内的站点误判成「不在带内」⇒ 门禁**假红**，
+    // 而「豁免静默存活」才是 #957 要杀的。故此处只守会放行豁免的那个方向。
     const at = 远处有尾推令牌.indexOf('@tap="onTap"')
     expect(judgeStillInBand(远处有尾推令牌, at, AFTER_CONTENT).inBand, '源码顺序分支被模板后段的无关令牌带偏').toBe(false)
-    expect(judgeStillInBand(远处有尾推令牌, at, { kind: 'pushed' }), 'pushed 分支量了整个模板而非动作自己的开标签').toMatchObject({
-      inBand: false,
-    })
+    expect(
+      judgeStillInBand(远处有尾推令牌, at, { kind: 'pushed' }),
+      'pushed 分支量了整个模板而非动作自己的开标签',
+    ).toMatchObject({ inBand: false })
   })
 
   it('带内证明 · pushed 分支双向可判（自带尾推类 ⇒ 成立；改 left-* ⇒ 腐烂）', () => {
