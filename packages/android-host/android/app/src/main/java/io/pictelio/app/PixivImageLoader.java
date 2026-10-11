@@ -391,8 +391,19 @@ public class PixivImageLoader {
 
     // ── 磁盘缓存（对齐 ImageCachePlugin/PixivApiPlugin 同规则） ─
 
-    /** URL → 缓存文件名（Base64 URL-safe no-padding；同 keyToFilename 契约） */
-    public static String keyToFilename(String url) {
+    /**
+     * URL → 缓存文件名（Base64 URL-safe no-padding；同 keyToFilename 契约）。
+     *
+     * <p><b>包可见是刻意的（#987）</b>：本方法是<b>原始</b>键到文件名的直译，
+     * <b>未经 {@link #cacheKey(String)} 归一</b>。磁盘层<b>不得</b>直接调用它——
+     * 生产代码里唯一的合法用法是经 {@code cacheFileName(url)}（本包内）间接调用。
+     * 收窄到包可见即把「键必须归一」从<b>约定</b>变成<b>编译器保证</b>：
+     * 包外任何新代码都无法绕过 {@code cacheFileName} 另起一个文件名产出点。
+     *
+     * <p>保留可见的原因：本包内测试需要它来<b>独立</b>构造「期望的文件名」，
+     * 若一并私有化，测试就只能调用被测实现反推期望值，违反 oracle 溯源（测试硬约束 #6）。
+     */
+    static String keyToFilename(String url) {
         return Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
     }
 
