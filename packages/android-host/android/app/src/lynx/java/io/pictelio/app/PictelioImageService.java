@@ -56,6 +56,15 @@ import java.util.concurrent.Executors;
  * 读取屏幕尺寸 / 内存等级 / 低内存设备判定，算出预算后注入 {@link ImageMemoryCache}。
  * 系数与算法出处见 {@link ImageCacheBudget}（Glide {@code MemorySizeCalculator}）。
  *
+ * <p><b>两层缓存共用一个键空间（#980）</b>：内存层与磁盘层（{@link PixivImageLoader} 缓存文件）
+ * 的键均由 {@link PixivImageLoader#cacheKey(String)} 唯一产出——即 rewrite 后的官方 CDN URL。
+ * 此前本类内存层直接以未 rewrite 的原始 {@code url} 为键，磁盘层却用 rewrite 产物，
+ * 同一张图以 {@code /pixiv-img/x} 与 {@code https://i.pximg.net/x} 两种形态请求时，
+ * 磁盘共享一条目而内存记两份（预算双份占用、命中率失真）。预取链路同用该产出点，
+ * 三条链路因此共用同一键空间（ADR-0222 §2.5）。
+ * <b>内存缓存是进程内易失的</b>，键变更后随升级自然清空，不做旧键迁移。
+ * {@code file://} 的 ugoira 帧走独立白名单分支、不参与图片缓存，不受本改动影响。
+ *
  * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
  * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
  * Bitmap 的生命周期，渲染后可能 recycle，复用缓存原图会导致二次显示空白」。
@@ -237,11 +246,15 @@ public class PictelioImageService implements ILynxImageService {
             return;
         }
         final PixivImageLoader effectiveLoader = l;
+        // #980：内存层与磁盘层共用同一键空间——键由 PixivImageLoader.cacheKey 唯一产出
+        //（rewrite 后的官方 CDN URL）。此前内存层直接用未 rewrite 的原始 url 当键，
+        // 导致同一张图的代理路径形态与绝对地址形态在磁盘共享一条目、内存却记两份。
+        final String cacheKey = PixivImageLoader.cacheKey(url);
         // #147 内存缓存命中：跳过磁盘读 + 解码。交付 Bitmap **副本**（ARGB_8888 copy）——
         // lynx 引擎管理所收 Bitmap 的生命周期（渲染后可能 recycle），复用原图实例会导致
         // 二次显示空白/JS 异常（模拟器实测 2026-08-06）；副本交付后引擎可安全处理。
         // #147 内存缓存命中：跳过磁盘读 + 解码（隔离实验已排除非缓存因素）
-        final Bitmap cached = memoryCache().get(url);
+        final Bitmap cached = memoryCache().get(cacheKey);
         if (cached != null) {
             executor.execute(() -> {
                 try {
@@ -251,7 +264,7 @@ public class PictelioImageService implements ILynxImageService {
                     // 零成本的 isRecycled()——若缓存项真的被外部回收，仍走重取而非崩。
                     if (cached.isRecycled()) {
                         // 缓存项已失效（被外部 recycle/OOM）→ 移除条目并回退下载
-                        memoryCache().remove(url);
+                        memoryCache().remove(cacheKey);
                         loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                         return;
                     }
@@ -261,7 +274,7 @@ public class PictelioImageService implements ILynxImageService {
                             new ImageInfo(cached.getWidth(), cached.getHeight(), false));
                 } catch (Throwable t) {
                     Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
-                    memoryCache().remove(url);
+                    memoryCache().remove(cacheKey);
                     loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                 }
             });
@@ -278,13 +291,16 @@ public class PictelioImageService implements ILynxImageService {
             if (url.startsWith("file://")) {
                 // 解压写盘管线（ADR-0125）：file:// 帧直接读盘，不走 OkHttp（file scheme 会被拒）。
                 // 白名单已由 canParseUrl 前置校验，此处防御性二次检查。
+                // 该分支独立于两层缓存（帧不参与图片缓存），故不受 #980 键空间统一影响。
                 File f = new File(Uri.parse(url).getPath());
                 if (!isInUgoiraCacheDir(f)) {
                     throw new IOException("file:// 路径不在 ugoira 缓存白名单内: " + url);
                 }
                 bytes = java.nio.file.Files.readAllBytes(f.toPath());
             } else {
-                bytes = l.loadBytesCachedFirst(PixivImageLoader.rewriteUrl(url));
+                // #980：磁盘层与内存层取同一个键（cacheKey 幂等，此处再取一次不改变结果，
+                // 但显式写出以免日后有人把某一侧改回未 rewrite 的原始 URL）
+                bytes = l.loadBytesCachedFirst(PixivImageLoader.cacheKey(url));
             }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
@@ -294,7 +310,8 @@ public class PictelioImageService implements ILynxImageService {
             // 解码成功入内存缓存（缓存存原图）并**直接交付同一实例**。
             // #147 曾交付副本防「引擎回收所收 Bitmap」，2026-10-04 实测该前提不成立：
             // 见本类「交付副本为何可以撤掉」注释。
-            memoryCache().put(url, bitmap);
+            // #980：键 = rewrite 后的官方 CDN URL，与磁盘层、与 deliver() 的读键恒等
+            memoryCache().put(PixivImageLoader.cacheKey(url), bitmap);
             loadListener.onSuccess(
                     new ImageContent(bitmap),
                     requestInfo,
@@ -372,7 +389,8 @@ public class PictelioImageService implements ILynxImageService {
         }
         executor.execute(() -> {
             try {
-                l.loadBytesCachedFirst(PixivImageLoader.rewriteUrl(uri));
+                // #980：预取与显示拦截、zip 共用同一键空间（ADR-0222 §2.5）——同一产出点
+                l.loadBytesCachedFirst(PixivImageLoader.cacheKey(uri));
             } catch (Throwable t) {
                 Log.w(TAG, "prefetchImage 失败: " + uri, t);
             }
