@@ -149,7 +149,22 @@ public class PixivImageLoaderTest {
         String url = enqueueImage(50);
         File file = loader.loadFileCachedFirst(url);
         assertTrue(file.getParentFile().getName().equals("pictelio-images"));
-        assertEquals(PixivImageLoader.keyToFilename(url), file.getName());
+        assertEquals(PixivImageLoader.keyToFilename(canonicalCdnUrl(url)), file.getName());
+    }
+
+    /**
+     * 代理形态 URL 的官方 CDN 形态（#987）。<b>oracle 独立</b>：取自本文件 {@link #CDN}
+     * 常量与 URL 自身的 path，<b>不</b>调用 loader 的 {@code cacheKey}／{@code rewriteUrl}
+     * ——否则期望值就成了被测实现的自我复述，键归一化一旦写错也照样绿。
+     *
+     * <p>{@code enqueueImage} / {@code server.url("/pixiv-img/…")} 产出的是
+     * {@code http://localhost:PORT/pixiv-img/x} 这种<b>含 {@code /pixiv-img/} 的绝对 URL</b>，
+     * 故它是代理形态而非普通 URL——缓存键必须归一到官方 CDN URL。
+     */
+    private static String canonicalCdnUrl(String url) {
+        int idx = url.indexOf("/pixiv-img/");
+        assertTrue("fixture 应为含 /pixiv-img/ 的代理形态 URL: " + url, idx >= 0);
+        return CDN + "/" + url.substring(idx + "/pixiv-img/".length());
     }
 
     @Test
@@ -282,7 +297,7 @@ public class PixivImageLoaderTest {
         String url = server.url("/pixiv-img/readonly-dir.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[512])));
         File dir = loader.getCacheDir();
-        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        File target = new File(dir, PixivImageLoader.keyToFilename(canonicalCdnUrl(url)));
         assertTrue(target.createNewFile()); // 预置空目标：断言失败后仍为空、未被半截内容污染
         org.junit.Assume.assumeTrue("目录写权限未生效，前置条件不成立", dir.setWritable(false));
         try {
@@ -307,7 +322,7 @@ public class PixivImageLoaderTest {
         String url = server.url("/pixiv-img/readonly-target.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
         File dir = loader.getCacheDir();
-        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        File target = new File(dir, PixivImageLoader.keyToFilename(canonicalCdnUrl(url)));
         // 预置只读空目标（length=0 使 cachedFile 视为未命中，强制走写盘路径）
         assertTrue(target.createNewFile());
         assertTrue(target.setReadOnly());

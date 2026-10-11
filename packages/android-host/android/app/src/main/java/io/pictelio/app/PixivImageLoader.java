@@ -389,6 +389,33 @@ public class PixivImageLoader {
     }
 
     /**
+     * URL → <b>本类内部使用的缓存文件名</b>（#987）：{@code keyToFilename(cacheKey(url))}。
+     *
+     * <p><b>为什么收口到这里</b>：#980 只把<b>预取与显示</b>两条链路收敛到 {@link #cacheKey(String)}，
+     * 剩下的 zip / 导出 / 保存三条链路把 URL <b>直接</b>交给 {@link #loadBytesCachedFirst} /
+     * {@link #loadFileCachedFirst} / {@link #loadFileWithProgressCachedFirst}，而这三个入口内部
+     * 各自 {@code keyToFilename(url)}、<b>不</b>调 {@code cacheKey} ⇒ 磁盘键<b>结构上</b>不受
+     * 「缓存键恒官方 CDN URL」不变量保护。今天不出分叉只因这些调用点传入的恰好已是官方 URL，
+     * 而 {@link #cacheKey(String)} 对官方 URL <b>幂等</b>——那是<b>巧合正确</b>，不是结构性正确。
+     *
+     * <p><b>为什么不改调用点而改这里</b>：改调用点要让 7 处各自记得调 {@code cacheKey}，
+     * 漏一处就复现原 bug；收口到唯一的文件名产出点则<b>结构性</b>成立，且因 {@code cacheKey}
+     * 幂等，<b>对现有调用点行为零变化</b>（预取与显示本就已先过一遍 {@code cacheKey}，
+     * 这里再过一次仍是同一结果）。
+     *
+     * <p><b>边界</b>：本方法只统一<b>键的产出</b>，不改变<b>下载源</b>的决策——
+     * 下载仍由 {@link #download} 内部的 {@link ImageHostConfig} 负责（ADR-0143 D2 源无关命中）。
+     * 切勿把 {@code cacheKey} 挪进 {@code download}：那会让键与下载源耦合。
+     *
+     * <p>防线：{@code ImageCacheKeySpaceTest} 断言 {@code cacheKey} 幂等 +
+     * {@code ImageCacheZipChainKeyTest}（#987 新增）断言三条链路传入代理形态 URL 时
+     * 与官方形态<b>共用同一条目</b>。
+     */
+    private static String cacheFileName(String url) {
+        return keyToFilename(cacheKey(url));
+    }
+
+    /**
      * 取图片缓存目录——<b>全部缓存访问的唯一入口</b>（读、写、清空、淘汰都经此）。
      *
      * <p>因此它也是「等待冷启动缓存维护」的<b>唯一收口点</b>（见
@@ -404,9 +431,14 @@ public class PixivImageLoader {
         return dir;
     }
 
-    /** 缓存命中返回文件（非空）；未命中返回 null。<b>纯查询</b>：不刷新访问时间戳 */
+    /**
+     * 缓存命中返回文件（非空）；未命中返回 null。<b>纯查询</b>：不刷新访问时间戳。
+     *
+     * <p>键经 {@link #cacheFileName(String)} 产出，故本方法与三个 {@code *CachedFirst} 入口
+     * 的写入路径<b>必然同名</b>，读与写不可能落到不同条目上（#987）。
+     */
     public File cachedFile(String url) {
-        File f = new File(getCacheDir(), keyToFilename(url));
+        File f = new File(getCacheDir(), cacheFileName(url));
         return f.exists() && f.length() > 0 ? f : null;
     }
 
@@ -518,7 +550,7 @@ public class PixivImageLoader {
             }
             recordDiskMiss(ImageLoadChain.NON_DISPLAY);
             byte[] bytes = download(url);
-            File file = new File(getCacheDir(), keyToFilename(url));
+            File file = new File(getCacheDir(), cacheFileName(url));
             writeFile(file, bytes);
             enforceCacheLimit();
             return file;
@@ -552,7 +584,7 @@ public class PixivImageLoader {
                 return touchOnHit(cached);
             }
             recordDiskMiss(ImageLoadChain.NON_DISPLAY);
-            File target = new File(getCacheDir(), keyToFilename(url));
+            File target = new File(getCacheDir(), cacheFileName(url));
             downloadToFile(url, target, sink, cancel);
             enforceCacheLimit();
             return target;
@@ -691,7 +723,7 @@ public class PixivImageLoader {
             }
             recordDiskMiss(chain);
             byte[] bytes = download(url);
-            writeFile(new File(getCacheDir(), keyToFilename(url)), bytes);
+            writeFile(new File(getCacheDir(), cacheFileName(url)), bytes);
             enforceCacheLimit();
             return bytes;
         }
