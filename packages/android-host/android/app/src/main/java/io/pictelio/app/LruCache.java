@@ -62,9 +62,38 @@ public final class LruCache<K, V> {
         trimToSize();
     }
 
-    /** 逐出最旧条目直至总字节不超过上限 */
+    /** 逐出最旧条目直至总字节不超过构造上限 */
     private void trimToSize() {
-        while (totalBytes > maxBytes && !map.isEmpty()) {
+        evictUntil(maxBytes);
+    }
+
+    /**
+     * 收缩到不超过 {@code target}（#981 内存压力）：从最旧开始逐出。
+     *
+     * <p><b>不改变构造上限</b>：本方法只丢条目，{@link #maxBytes} 仍是原值，
+     * 故回前台后 {@link #put} 会照原上限重新填充（不会逐级收缩成小缓存）。
+     *
+     * @param target 目标字节上限（≥ 0；0 = 清空）。已是 ≤ 当前占用时为空操作
+     * @throws IllegalArgumentException {@code target} 为负
+     */
+    public synchronized void trimToSize(long target) {
+        if (target < 0) {
+            throw new IllegalArgumentException("target 必须 >= 0: " + target);
+        }
+        evictUntil(target);
+    }
+
+    /** 构造时给定的字节上限（#981：内存压力按预算比例算收缩目标，须能读回预算） */
+    public synchronized long maxBytes() {
+        return maxBytes;
+    }
+
+    /**
+     * 从最旧开始逐出条目直至总字节不超过 {@code target}。
+     * <b>调用方须持有本对象锁</b>（故不自带 synchronized，与 {@link #put} 共用同一把锁）。
+     */
+    private void evictUntil(long target) {
+        while (totalBytes > target && !map.isEmpty()) {
             // accessOrder 模式下头部即最久未使用条目（LRU）
             Map.Entry<K, V> eldest = map.entrySet().iterator().next();
             map.remove(eldest.getKey());

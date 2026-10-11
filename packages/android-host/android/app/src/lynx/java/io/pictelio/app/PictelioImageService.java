@@ -142,6 +142,17 @@ public class PictelioImageService implements ILynxImageService {
     }
 
     /**
+     * 内存压力响应入口（#981）：返回<b>当前</b>内存层。
+     *
+     * <p><b>与 {@link #memoryCache()} 的区别在于不惰性创建</b>：压力回调可能早于首张图到达，
+     * 此时没有可释放的字节；返回 null 让 {@link ImageMemoryPressureHandler} 记日志跳过，
+     * 而不是为「准备释放」先造一个空缓存出来。
+     */
+    public ImageMemoryCache memoryCacheForTrim() {
+        return memoryCache;
+    }
+
+    /**
      * 注册 &lt;image&gt;/&lt;inline-image&gt; 元素 Behavior（对齐官方 LynxImageService 构造逻辑，
      * 真机实测 #59：只实现 ILynxImageService 接口不够——不注册 behavior 则 lynx 引擎
      * 无法创建 image UI，骨架屏永久显示、无任何图片日志）。
