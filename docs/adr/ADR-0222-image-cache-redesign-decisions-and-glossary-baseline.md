@@ -1,0 +1,144 @@
+# ADR-0222：图片缓存重设计——单一策略决策点与「两层缓存」词汇基线
+
+- **状态**：已接受（Accepted，2026-10-11）｜**词汇层已实施**（本 ADR 自身）｜**实现分片待交付**（#977–#983）
+- **日期**：2026-10-11
+- **相关**：[ADR-0090（图片缓存三层分离架构，本 ADR 取代其编号体系）](./ADR-0090-image-cache-three-layer.md)、[ADR-0143（图床下载源与「缓存键恒官方 URL」契约）](./ADR-0143-imagehost-download-source-java-sink.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)、[ADR-0054（图片流水线统一核心）](./ADR-0054-image-pipeline-unified-core.md)
+- **术语文档**：[packages/android-host/CONTEXT.md](../../packages/android-host/CONTEXT.md)（图片代理节，**权威**：两层缓存 / 内存层 / 磁盘层）、[packages/app-lynx/CONTEXT.md](../../packages/app-lynx/CONTEXT.md)（图床缓存契约节，**权威**：缓存键 / 源无关命中）
+- **证据**：spec [#975](https://github.com/a1121611810/Pictelio/issues/975)；实现分片 #977（测试缝）、#978（磁盘真 LRU）、#979（内存预算）、#980（键空间统一）、#981（内存压力）、#982（预取补齐）、#983（可观测统计）
+
+---
+
+## 1. 背景
+
+图片缓存此前**没有一套可依赖的「容量 / 淘汰 / 可观测」决策**。本轮重设计的动因是五个互相咬合的缺陷（详见 spec #975）：
+
+1. **容量写死不看设备**：内存层固定 64MB、磁盘层固定 300MB，皆为常量。
+2. **磁盘层不是真 LRU**：淘汰按「最后修改时间」排序，而该时间**只在写入时更新**——天天在看的图因「写得早」反而最先被删；淘汰还只在写入后触发，启动时不清理。
+3. **两层键空间不一致**：磁盘层以 rewrite 后的官方 CDN URL 为键，内存层以未 rewrite 的原始 URL 为键。
+4. **预取只喂磁盘**：首屏首次显示仍要磁盘读 + 解码。
+5. **完全不可观测、也无从清理**：没有命中率、没有占用展示、没有手动清理入口。
+
+**本 ADR 只解决其中「词汇与决策」这一层**：把决策与明确拒绝项一次写清，并统一被腐化的编号。代码改动由 #977–#983 分片交付。
+
+### 1.1 两套互不相干的「三层」编号（本 ADR 的直接动因）
+
+| 来源 | 编号方式 | 现状 |
+|---|---|---|
+| `packages/android-host/CONTEXT.md`「缓存三层」 | 内存 `LruCache` / 内存盘 `ImageMemoryCache` / Java 磁盘 | ❌ **把容器与其使用者各算作一层**——`LruCache` 是 `ImageMemoryCache` 的内部实现，两者是同一层 |
+| ADR-0090 标题的「三层」 | A 磁盘 / B 浏览器缓存头 / C JS 预取 | ❌ **层 B 在 Lynx 下已无载体**，随 WebView 客户端整体删除（ADR-0203） |
+
+两套编号指向**不同的层集合**，并存会持续误导后续改动。⇒ 统一为一套。
+
+---
+
+## 2. 决策
+
+### 2.1 现行编号：**两层缓存**
+
+按**是否需要一次 IO 才能拿到数据**划分，与容器/使用者无关：
+
+| 层 | 载体 | 命中效果 | 当前键 |
+|---|---|---|---|
+| **内存层** | `ImageMemoryCache`（内部持 `LruCache` 作 LRU 容器；**二者同属这一层**） | 免磁盘读 + 解码 | ⚠️ 原始 URL（**待 #980 修正**） |
+| **磁盘层** | `PixivImageLoader` 的 `getCacheDir()` 文件 | 免网络 | 官方 CDN URL（rewrite 产物） |
+
+**ADR-0090 的「三层」是历史编号**（磁盘 / 浏览器缓存头 / JS 预取），其中**浏览器缓存头层已随 ADR-0203 整体删除**，在 Lynx 下无载体。引用 ADR-0090 时须按本节重新对号入座，**不得**当作现行层数。
+
+_Why 两层而非三层_：ADR-0090 的层 B（WebView HTTP 磁盘缓存）属**引擎能力**而非本仓自管缓存；Lynx 不暴露它，本仓也无从配置或观测它。把它计入层数，等于让一个不存在的载体长期占据架构讨论。
+
+### 2.2 单一策略决策点
+
+引入**集中的缓存策略对象**作为「内存预算、磁盘预算、内存压力响应、统计口径」的**唯一决策点**；内存层与磁盘层只消费它，不再各自持有常量。该对象必须是**纯计算、可注入**的（不直接依赖 `Context`），使容量预算算法能被纯 JVM 单测直接验证。
+
+### 2.3 内存预算的外部一手出处
+
+**做法**：内存预算 = 屏数法（按屏幕尺寸 × 屏数估算目标值）**与** 进程可用内存比例封顶**取小**；低端机（`isLowRamDevice()`）用更保守的系数。
+
+**一手出处：Glide `MemorySizeCalculator`（bumptech/glide，`library/src/main/java/com/bumptech/glide/load/engine/cache/MemorySizeCalculator.java`）**，已逐行核对源码：
+
+| 量 | Glide 真实取值 |
+|---|---|
+| 封顶系数 | `MAX_SIZE_MULTIPLIER = 0.4f` |
+| 低端机封顶系数 | `LOW_MEMORY_MAX_SIZE_MULTIPLIER = 0.33f` |
+| 内存缓存屏数 | `MEMORY_CACHE_TARGET_SCREENS = 2` |
+| bitmap pool 屏数 | `BITMAP_POOL_TARGET_SCREENS = 4`（Android O 以下）/ `1`（O 及以上） |
+| 竞争余量 | `ARRAY_POOL_SIZE_BYTES = 4MB`，低端机减半 |
+| 超限收缩 | 目标值之和超 `availableSize` 时，按比例缩减两池（`part = availableSize / (两池屏数之和)`） |
+
+⚠️ **必须同时记明的反证**：网络上流传的「**Glide 默认 1/8**」**并非 Glide 的事实**——`MemorySizeCalculator` 源码中不存在该系数（已核对）。1/8 是 **Android 官方《Caching Bitmaps》指南的示例值**，属另一出处、另一语境，**不得据以实现**。
+（取证说明：本轮该官方指南页已下线、返回 404，Wayback 亦无快照，故此处只登记「1/8 出自官方指南示例」这一**归属**，不作现时引用；Glide 侧系数为本轮逐行核对源码所得。）
+
+### 2.4 磁盘淘汰改按访问时间
+
+**做法**：磁盘条目在**命中时刷新其访问时间戳**，使淘汰顺序反映「最近被用过」而非「最近被写下」；淘汰触发点从「仅写入后」扩展为「**启动时 + 写入后**」。
+
+**一手出处：Fresco 磁盘缓存实现（facebook/fresco，`imagepipeline-base/src/main/java/com/facebook/cache/disk/DefaultDiskStorage.kt`）**，已逐行核对源码：
+
+- 读取路径调用 `touch(resourceId, debugInfo)`，其实现为 `query(resourceId, touch = true)`：
+  ```kotlin
+  private fun query(resourceId: String?, touch: Boolean): Boolean {
+    val contentFile = getContentFileFor(resourceId)
+    val exists = contentFile.exists()
+    if (touch && exists) {
+      contentFile.setLastModified(mClock.now())   // ← 命中即刷新时间戳
+    }
+    return exists
+  }
+  ```
+- 淘汰比较所依据的时间戳取自同源：`EntryImpl.getTimestamp()` 返回 `cachedFile.lastModified()`。
+
+⇒ 「命中刷新访问时间戳」是**成熟实现既有做法**，不是臆想。写盘路径另有 `commit()` 显式 `setLastModified(time)`。
+
+### 2.5 保留的两条键不变量
+
+1. **缓存键恒官方 CDN URL**（ADR-0143 §D2）
+2. **预取 / 显示拦截 / zip 三链路共用同一键空间**
+
+⚠️ **这两条现覆盖内存层与磁盘层两层，但内存层尚未满足**——`PictelioImageService` 当前以未 rewrite 的原始 `url` 作内存层键，磁盘层则以 `rewriteUrl(url)` 产物为键。**内存层归位属后续票 #980，本 ADR 不宣称其已完成**。
+
+### 2.6 命名与存量处置
+
+- 磁盘层入口方法名须体现「缓存优先」语义（现名 `loadBytes` 掩盖了该语义）。
+- 存量缓存**直接清空、不做迁移**：缓存不是真相源，删后可从网络重建；避免新旧两套策略并存以致无法判断用户在用哪套。
+
+---
+
+## 3. 明确拒绝项（逐条登记理由，防下个 agent 重提）
+
+### 3.1 不引入第三方图片库（Glide / Coil / Fresco）
+
+替换整条图片链路的收益（省掉自写预算/淘汰/并发）**不抵其代价**：既有加载链路的**产品语义**（画质档位、三态机、lazy-load 分工、图床决策、防盗链注入）均已围绕自管实现成型且有契约测试把守；整体替换会一次性冲掉这些不变量。Fresco 仅作为**做法出处**被采纳（§2.4），不作为依赖引入。
+
+### 3.2 不引入 OkHttp Cache（HTTP 缓存层）
+
+三条理由，任一条独立成立：
+
+1. **前提不成立**：Pixiv CDN 不下发 `Cache-Control` / `ETag`，HTTP 缓存无从生效。
+2. **会形成双轨缓存**：与自管磁盘层并存即双轨——而既有决策已把双轨缓存判为**架构劣化**（镜像流量绕开缓存即其反面教材，ADR-0143）。
+3. **条件请求层无价值**：Pixiv 图片 URL 不含签名、内容不可变，`ETag` 校验拿不到增量收益。
+
+### 3.3 不做可插拔淘汰策略抽象（LFU / 2Q / TinyLFU / ARC）
+
+**在没有命中率数据之前，策略抽象是拿不到收益的复杂度。** 顺序必须是「**先能观测，再谈策略是否够用**」——没有命中率就无法判断 LRU 是否已经够好，也无法判断换策略是否真的更好。策略抽象留待 #983（可观测统计）交付后再议。
+
+### 3.4 其他不做的事
+
+不改解码采样算法（2048 上限不动、不引入按请求尺寸精细采样）；不引入硬件 Bitmap / bitmap pool；不动多图详情页加载策略；不做缓存加密或访问控制（缓存内容为公开作品图元数据，随 `cacheDir` 生命周期）。
+
+---
+
+## 4. 不宣称的事项（防下一个 agent 过度归因）
+
+- 本 ADR **不**宣称两层键空间已统一。当前内存层仍以原始 URL 为键，**该缺陷属 #980**。
+- 本 ADR **不**宣称磁盘层已是真 LRU。「命中刷新时间戳 + 启动清理」**属 #978**，当前实现仍按写入时的 `lastModified` 排序（`PixivImageLoader.enforceCacheLimit`）。
+- 本 ADR **不**宣称内存预算已按设备计算。当前仍为写死常量 `ImageMemoryCache.MAX_BYTES = 64MB`，**属 #979**。
+- 本 ADR **不**宣称缓存行为可被证明。现有「第二次不再请求网络」的测试因复用单例、内存层从未清理而**不构成磁盘层生效的证据**；补齐该断言属 **#977**。
+
+---
+
+## 5. 后果
+
+- 领域词汇层新增「两层缓存 / 内存层 / 磁盘层」，并把 ADR-0090 标注为**历史编号**；两套「三层」编号合并为一套。
+- 「缓存键恒官方 CDN URL」「三链路共用同一键空间」两条不变量保留，并**显式标注其内存层当前未满足**（#980），避免下一个 agent 把词条误读为既成事实。
+- 内存预算系数与「命中刷新时间戳」两项做法各自带**外部一手出处**，后续实现票可直接沿用，**不必重新论证**，也不得凭感觉改系数。
+- 三条拒绝项各有独立理由，**重开任一条须新开 ADR 推翻本节**。
