@@ -286,7 +286,10 @@ public class PictelioImageServiceTest {
     @Test
     public void fetchImage_emptyBody_deliversFailure() throws Exception {
         // 200 但空 body → PixivImageLoader 拒绝（空 body 不缓存）→ onFailure
-        // 注：Bitmap 解码失败路径（decode 返回 null）在 Robolectric 下 shadow 过于宽容不可靠，归真机验证点
+        // 注（2026-10-11 订正）：Bitmap 解码失败路径（decode 返回 null）此前记为「Robolectric 下
+        // shadow 过于宽容不可靠，归真机验证点」——该结论是在默认 LEGACY 图形模式下得出的，是错的。
+        // 切到 @GraphicsMode(NATIVE) 后实测该分支在单测里可观测，现由
+        // PictelioImageServiceDecodeFailureTest 钉住。本类不开 NATIVE 是刻意的（见该类 javadoc）。
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer()));
         RecordingListener listener = new RecordingListener();
 

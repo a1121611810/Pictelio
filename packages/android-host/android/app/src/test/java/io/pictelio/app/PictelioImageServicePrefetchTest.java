@@ -64,9 +64,16 @@ import okhttp3.mockwebserver.RecordedRequest;
  * 超时则带描述失败。禁固定墙钟等待；禁用「睡一觉再断言」。
  *
  * <p><b>未覆盖</b>：①「重复预取不重复解码」——短路后不产生任何可观察变化，fire-and-forget
- * 又无可等待的完成信号，硬写断言只会得到恒真的假防线；②「字节拿到但解码不出 Bitmap」的告警分支
- * ——本轮实测（Robolectric 4.14.1）影子库对非图片字节解码过于宽容，该分支在单测里<b>不可观测</b>
- * （与 {@link PictelioImageServiceTest} 既有的同类归真机备注一致），故不设断言，归真机走查。
+ * 又无可等待的完成信号，硬写断言只会得到恒真的假防线。
+ *
+ * <p><b>已订正（2026-10-11）</b>：本类初稿曾把②「字节拿到但解码不出 Bitmap」的告警分支也列为未覆盖，
+ * 理由是「本轮实测（Robolectric 4.14.1）影子库对非图片字节解码过于宽容，该分支在单测里不可观测，
+ * 归真机走查」，并称与 {@link PictelioImageServiceTest} 的同类备注一致。
+ * <b>该结论是错的</b>——它是在 Robolectric 默认（LEGACY）图形模式下得出的。切到
+ * {@code @GraphicsMode(NATIVE)}（真实原生解码）后实测：非图片字节的 bounds 为
+ * {@code outWidth=-1}、{@code decodeByteArray} 返回 {@code null}，该分支<b>在单测里可观测</b>。
+ * 现由 {@link PictelioImageServiceDecodeFailureTest} 钉住，<b>不再归真机走查</b>。
+ * 本类<b>不开</b> NATIVE 图形模式是刻意的：避免改变既有用例的影子行为。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
