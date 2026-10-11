@@ -264,6 +264,29 @@ describe('createTagNeighborDeps 接线（ADR-0197 D2/D13 + D16 门控三条）',
 
 // ─── 4~6. store 状态迁移 ───
 
+// ─── #993：时序档（与 novelTranslateStore 的 slowCacheMiss 同族但注入点不同）──────────────────
+// 注入点是**源作品取详情的 IO**（mockState.loadDetail），那边延迟的是 store 启动前的缓存读。
+// 恶意档常驻：把「等在途落定」写回固定墙钟等待后，本组用例会确定性变红。
+const rawHostileDelayMs = Number(process.env.PIXIVIZER_TEST_IO_DELAY_MS)
+const HOSTILE_IO_DELAY_MS =
+  Number.isFinite(rawHostileDelayMs) && rawHostileDelayMs > 0 ? Math.min(rawHostileDelayMs, 1000) : 250
+const TIMING_PROFILES = [
+  { profile: '正常时序', ioDelayMs: 0 },
+  {
+    profile: `恶意时序·源作品 IO 晚 ${HOSTILE_IO_DELAY_MS}ms`,
+    ioDelayMs: HOSTILE_IO_DELAY_MS,
+  },
+] as const
+
+/** 在途 promise 晚 delayMs 才可达（resolve 一个 promise 会自动接管） */
+function delayedPromise<T>(promise: Promise<T>, delayMs: number): Promise<T> {
+  if (delayMs <= 0) return promise
+  return new Promise<T>((resolve) => setTimeout(() => resolve(promise), delayMs))
+}
+
+/** 条件等待预算：远大于注入延迟 + 负载抖动，且远小于 vitest 5s 单测超时 */
+const WAIT_FOR_OPTS = { timeout: 2500 } as const
+
 describe('useTagNeighborStore 状态迁移（ADR-0197 D2/D6/D8；先渲染后加载 + 竞态闸）', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -409,23 +432,38 @@ describe('useTagNeighborStore 状态迁移（ADR-0197 D2/D6/D8；先渲染后加
     expect(store.status()).toBe('ready')
   })
 
-  it('reset：清结果态 + 中止在途，保留源作品共享缓存（详情页写入，重进无害）', async () => {
-    const store = useTagNeighborStore()
-    store.setSourceIllust(mkIllust(14, REAL_TAG_ORDER))
-    const pending = deferred<{ illust: PixivIllust }>()
-    mockState.loadDetail.mockReturnValueOnce(pending.promise)
-    const p = store.load(15) // 15 无缓存 → 停在取源作品
-    store.reset()
-    expect(store.status()).toBe('idle')
-    expect(store.entries()).toEqual([])
-    expect(store.errorMessage()).toBe('')
-    expect(store.phase1SkippedReason()).toBeNull()
-    expect(store.phase2Ran()).toBe(false)
-    expect(store.getSourceIllust()?.id).toBe(14)
-    pending.resolve({ illust: mkIllust(15, REAL_TAG_ORDER) })
-    await p
-    // 卸载后的在途响应被丢弃：状态不因陈旧响应翻回 ready
-    expect(store.status()).toBe('idle')
+  describe.each(TIMING_PROFILES)('reset 中止在途（[$profile]）', ({ ioDelayMs }) => {
+    it('reset：清结果态 + 中止在途，保留源作品共享缓存（详情页写入，重进无害）', async () => {
+      const store = useTagNeighborStore()
+      store.setSourceIllust(mkIllust(14, REAL_TAG_ORDER))
+      const pending = deferred<{ illust: PixivIllust }>()
+      mockState.loadDetail.mockReturnValueOnce(delayedPromise(pending.promise, ioDelayMs))
+      const p = store.load(15) // 15 无缓存 → 停在取源作品
+      const settled = vi.fn()
+      void p.then(() => settled())
+      store.reset()
+      try {
+        // reset 是**同步**路径（generation++ / AbortController.abort / clearResults），
+        // 这六条是同步事实，不等任何时间；此前它们跑在 pending.resolve 之前，
+        // 而 resolve 就是本用例唯一的收尾动作 → 断言一抛就永不执行（跨用例在飞 IO）。
+        expect(store.status()).toBe('idle')
+        expect(store.entries()).toEqual([])
+        expect(store.errorMessage()).toBe('')
+        expect(store.phase1SkippedReason()).toBeNull()
+        expect(store.phase2Ran()).toBe(false)
+        expect(store.getSourceIllust()?.id).toBe(14)
+      } finally {
+        // 收尾：在途请求必须落定，否则 load() 的 promise 带着未处理的 IO 泄漏到下一个用例
+        pending.resolve({ illust: mkIllust(15, REAL_TAG_ORDER) })
+        await p
+        expect(mockState.loadDetail).toHaveBeenCalledTimes(1) // mockReturnValueOnce 未被多调
+      }
+      // 等条件：在途轮**确实落定**（不是「睡够了」）——恶意档下它晚 250ms 才可达，
+      // 谁把这里写回固定墙钟等待，本断言会确定性失败
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledTimes(1), WAIT_FOR_OPTS)
+      // 卸载后的在途响应被丢弃：状态不因陈旧响应翻回 ready
+      expect(store.status()).toBe('idle')
+    })
   })
 })
 

@@ -138,6 +138,8 @@ expect(pressed).toBe("true");
    - **失败路径必须收尾**：涉及 in-flight 异步的用例用 `try/finally` 结束挂起迭代器、`await` 在飞 promise。断言失败即泄漏的 invocation 会在**下一个用例**的窗口里继续跑，制造与被测代码无关的失败——这是跨用例污染型 flaky 的通用成因，也是「失败信息与真实缺陷对不上」的常见来源。
    - **计数断言按标识映射**：并发 mock 的分发按业务标识（如 chapterId）而非调用序号。序号映射（「第 1 次给 A、其余给 B」）会把多余的第 N 次调用静默派给最后一个分支，使「多调一次」只表现为计数差、难以归因。
    - **防线先例**：`packages/app-lynx/tests/unit/stores/novelTranslateStore.test.ts` 的 `describe.each` 时序档（正常 + 「provider 前 I/O 慢 250ms」恶意档）——恶意档常驻运行，把上述写法变成确定性红灯，而不是等 CI 偶发。诊断与复现方法见 `docs/research/flaky-novel-translate-store-diagnosis.md`。
+   - **无 store 状态可等时（#993 补充）**：若被观测事实不是 store 状态，而是**监听器计数**（事件总线 `count(event)`）或**原生桥回调**（`translateStream` / `abortStream` / `translatePoll` 的 mock 回调），不要退回复制 store 用例的等法——改为**延迟注入原生桥 mock 本身**的同形时序档（与 `novelTranslateStore` 的 `slowCacheMiss` 同族但注入点不同），再用 `vi.waitFor(() => expect(emitter.count(...)))` 等该事实。同时：① `finally` 里的收尾必须含**摘监听器 + 拉干在飞桥调用**（只恢复被删的全局量不算收尾）；② 「确实落定」这类负向/时序事实要用可观测标记（settle 标记 + `vi.waitFor`）断言，不能拿 `loadingMore()` 之类已被其它路径复位的字段当判据。
+   - **墙钟断言不可替代行为断言**：「取消/结束在 N ms 内返回」这类 `Date.now()` 差值断言测的是机器速度，负载一大必假红。用假时钟驱动窗口（`vi.useFakeTimers()` + `advanceTimersByTimeAsync`），断言「零时钟推进即落定」等速度无关事实。
    - **存量**：本条为新增禁令，仓内仍有未清存量（例如 #758 收口范围外的固定墙钟等待，见 #761 清单）；新增/改动用例一律按本条执行，存量按清单排期。
 
 ### E2E 状态构造基建（driver）— **WebView-only**

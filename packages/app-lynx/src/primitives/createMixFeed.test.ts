@@ -75,6 +75,23 @@ function source(name: string, fetchPage: MixFeedSource['fetchPage']): MixFeedSou
   return { name, fetchPage }
 }
 
+// ─── #993：时序档（与 novelTranslateStore 的 slowCacheMiss 同族但注入点不同）──────────────────
+// 注入点是**分页源的 fetchPage 落定**（那边延迟的是 store 启动前的缓存读）。
+// 恶意档常驻：把「等在途翻页落定」写回固定墙钟等待/固定轮数微任务刷新后确定性变红。
+const rawHostileDelayMs = Number(process.env.PIXIVIZER_TEST_IO_DELAY_MS)
+const HOSTILE_IO_DELAY_MS =
+  Number.isFinite(rawHostileDelayMs) && rawHostileDelayMs > 0 ? Math.min(rawHostileDelayMs, 1000) : 250
+const TIMING_PROFILES = [
+  { profile: '正常时序', ioDelayMs: 0 },
+  {
+    profile: `恶意时序·分页 IO 晚 ${HOSTILE_IO_DELAY_MS}ms`,
+    ioDelayMs: HOSTILE_IO_DELAY_MS,
+  },
+] as const
+
+/** 条件等待预算：远大于注入延迟 + 负载抖动，且远小于 vitest 5s 单测超时 */
+const WAIT_FOR_OPTS = { timeout: 2500 } as const
+
 // ─── 测试 ───
 
 describe('createMixFeed', () => {
@@ -91,14 +108,21 @@ describe('createMixFeed', () => {
       cooldownMs: 0,
     })
     // createMixFeed 构造即同步发起首载（Promise.all 并行）：两个 fetchPage 都已被调用
-    expect(fetchA).toHaveBeenCalledTimes(1)
-    expect(fetchB).toHaveBeenCalledTimes(1)
-    expect(feed.loading()).toBe(true)
+    try {
+      expect(fetchA).toHaveBeenCalledTimes(1)
+      expect(fetchB).toHaveBeenCalledTimes(1)
+      expect(feed.loading()).toBe(true)
 
-    resolveA({ items: [mkIllust('a1', 10)], nextUrl: null })
-    await flush()
-    expect(feed.loading()).toBe(false)
-    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1'])
+      resolveA({ items: [mkIllust('a1', 10)], nextUrl: null })
+      await flush()
+      expect(feed.loading()).toBe(false)
+      expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1'])
+    } finally {
+      // 收尾隔离（#995）：断言在此前失败时 `resolveA` 永不被调用 ⇒ `fetchA` 的 promise 悬挂，
+      // feed 内部的 Promise.all 也跟着不落定。`resolve` 幂等（重复 resolve 同一 promise 无副作用）。
+      resolveA({ items: [], nextUrl: null })
+      feed.dispose()
+    }
   })
 
   it('交替合并：默认 ratio 4:1（每 4 条 illust 插 1 条 novel）', async () => {
@@ -256,41 +280,75 @@ describe('createMixFeed', () => {
     expect(fetchA).toHaveBeenCalledTimes(1)
   })
 
-  it('refresh 竞态：在途旧 fetchMore 响应被丢弃，最终 items 是 refresh 后的', async () => {
-    let resolveA2!: (v: Page) => void
-    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
-      items: [mkIllust('a1', 1), mkIllust('a2', 2), mkIllust('a3', 3), mkIllust('a4', 4)],
-      nextUrl: 'A2',
-    }))
-    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [mkNovel('b1', 10)], nextUrl: 'B2' }))
+  // #993：本用例的可观测事实是**在途 fetchPage 的落定**，注入点选它（与
+  // novelTranslateStore 的 slowCacheMiss 同族但注入点不同：那边延迟缓存读）。
+  // 恶意档常驻：把「等在途翻页落定」写回固定墙钟等待/微任务轮数后确定性变红。
+  describe.each(TIMING_PROFILES)('refresh 竞态收尾（[$profile]）', ({ ioDelayMs }) => {
+    it('refresh 竞态：在途旧 fetchMore 响应被丢弃，最终 items 是 refresh 后的', async () => {
+      let resolveA2!: (v: Page) => void
+      const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+        items: [mkIllust('a1', 1), mkIllust('a2', 2), mkIllust('a3', 3), mkIllust('a4', 4)],
+        nextUrl: 'A2',
+      }))
+      const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+        items: [mkNovel('b1', 10)],
+        nextUrl: 'B2',
+      }))
 
-    const feed = createMixFeed({
-      sources: [source('illust', fetchA), source('novel', fetchB)],
-      pageSize: 100,
-      throttleMs: 0,
-      cooldownMs: 0,
+      const feed = createMixFeed({
+        sources: [source('illust', fetchA), source('novel', fetchB)],
+        pageSize: 100,
+        throttleMs: 0,
+        cooldownMs: 0,
+      })
+      await flush()
+      expect(feed.items().map((i) => i.key)).toEqual(['a1', 'a2', 'a3', 'a4', 'b1'])
+
+      // fetchMore 翻页（deferred，pending 空时候选 A/B 比例均衡取首个 = A）
+      fetchA.mockImplementationOnce(
+        () =>
+          new Promise<Page>((res) => {
+            // 恶意档：在途响应晚 ioDelayMs 才抵达（真实分页 IO 的延迟形态）
+            resolveA2 = (v: Page) => {
+              if (ioDelayMs > 0) setTimeout(() => res(v), ioDelayMs)
+              else res(v)
+            }
+          }),
+      )
+      // #993：此前 `void feed.fetchMore()` 丢掉了 promise —— 断言一抛，这条在途翻页
+      // 就带着未处理的 promise 泄漏到后面的用例。收进 finally 显式 await。
+      const moreP = feed.fetchMore()
+      const moreSettled = vi.fn()
+      void moreP.then(() => moreSettled())
+      try {
+        await flush()
+        await vi.waitFor(() => expect(feed.loadingMore()).toBe(true), WAIT_FOR_OPTS)
+
+        // refresh：立即返回全新数据，generation++
+        fetchA.mockImplementationOnce(async () => ({ items: [mkIllust('a1r', 101)], nextUrl: null }))
+        fetchB.mockImplementationOnce(async () => ({ items: [mkNovel('b1r', 110)], nextUrl: null }))
+        await feed.refresh()
+        await flush()
+        expect(feed.items().map((i) => i.key)).toEqual(['a1r', 'b1r'])
+
+        // 旧 fetchMore 响应迟到：generation 已变 → 丢弃，不影响 refresh 后的数据
+        resolveA2({ items: [mkIllust('stale', 999)], nextUrl: null })
+        // 等条件：在途翻页**确实落定**（不是「睡够了」）。注意 loadingMore 在 refresh
+        // 路径已被置回 false（createMixFeed.ts:251），拿它当「已落定」的判据没有区分度；
+        // 恶意档下它晚 ioDelayMs 才可达，谁把这里写回固定墙钟/固定轮数微任务刷新，
+        // 本断言会确定性失败。
+        await vi.waitFor(() => expect(moreSettled).toHaveBeenCalledTimes(1), WAIT_FOR_OPTS)
+        expect(feed.items().map((i) => i.key)).toEqual(['a1r', 'b1r'])
+        expect(feed.loadingMore()).toBe(false)
+      } finally {
+        resolveA2?.({ items: [], nextUrl: null }) // 幂等：已被上面 resolve 过则空转
+        await moreP.catch(() => undefined)
+        feed.dispose()
+        // mockImplementationOnce 链：多调一次会静默落回默认实现 → 用调用数钉死分发
+        expect(fetchA).toHaveBeenCalledTimes(3) // 首载 + 翻页 A2 + refresh
+        expect(fetchB).toHaveBeenCalledTimes(2) // 首载 + refresh
+      }
     })
-    await flush()
-    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'a2', 'a3', 'a4', 'b1'])
-
-    // fetchMore 翻页（deferred，pending 空时候选 A/B 比例均衡取首个 = A）
-    fetchA.mockImplementationOnce(() => new Promise<Page>((res) => (resolveA2 = res)))
-    void feed.fetchMore()
-    await flush()
-    expect(feed.loadingMore()).toBe(true)
-
-    // refresh：立即返回全新数据，generation++
-    fetchA.mockImplementationOnce(async () => ({ items: [mkIllust('a1r', 101)], nextUrl: null }))
-    fetchB.mockImplementationOnce(async () => ({ items: [mkNovel('b1r', 110)], nextUrl: null }))
-    await feed.refresh()
-    await flush()
-    expect(feed.items().map((i) => i.key)).toEqual(['a1r', 'b1r'])
-
-    // 旧 fetchMore 响应迟到：generation 已变 → 丢弃，不影响 refresh 后的数据
-    resolveA2({ items: [mkIllust('stale', 999)], nextUrl: null })
-    await flush()
-    expect(feed.items().map((i) => i.key)).toEqual(['a1r', 'b1r'])
-    expect(feed.loadingMore()).toBe(false)
   })
 
   it('throttle：节流窗口内第二次 fetchMore 被跳过，窗口结束自动补发（T1 重试）', async () => {
@@ -510,21 +568,27 @@ describe('createMixFeed', () => {
       throttleMs: 0,
       cooldownMs: 3000,
     })
-    await flush()
+    // #993：dispose 是本用例唯一会清全局状态的动作（挂起补触发 + 代递增 + abort），
+    // 此前它排在断言之后 → 断言一抛，冷却窗口的幽灵翻页就泄漏到下一个用例。
+    try {
+      await flush()
 
-    // 冷却窗口内吞掉 → 挂起补触发（t=3000）
-    await feed.fetchMore()
-    await flush()
-    expect(vi.getTimerCount()).toBe(1)
+      // 冷却窗口内吞掉 → 挂起补触发（t=3000）
+      await feed.fetchMore()
+      await flush()
+      expect(vi.getTimerCount()).toBe(1)
 
-    // dispose：挂起补触发被清、无残留定时器
-    feed.dispose()
-    expect(vi.getTimerCount()).toBe(0)
+      // dispose：挂起补触发被清、无残留定时器
+      feed.dispose()
+      expect(vi.getTimerCount()).toBe(0)
 
-    // 推进超过原窗口：无幽灵翻页
-    await vi.advanceTimersByTimeAsync(5000)
-    await flush()
-    expect(fetchA).toHaveBeenCalledTimes(1) // 仅首载
+      // 推进超过原窗口：无幽灵翻页
+      await vi.advanceTimersByTimeAsync(5000)
+      await flush()
+      expect(fetchA).toHaveBeenCalledTimes(1) // 仅首载
+    } finally {
+      feed.dispose() // 幂等：断言失败时也不留定时器与在途响应
+    }
   })
 
   it('首载全部失败：error 置为首个错误，items 空', async () => {

@@ -48,6 +48,72 @@ function installFakeLynx(): FakeEmitter {
   return emitter
 }
 
+// ─────────────────── #993：时序档（与 novelTranslateStore 的 slowCacheMiss 同族但注入点不同）───────────────────
+//
+// 形态沿用 `novelTranslateStore.test.ts` 的 `describe.each(TIMING_PROFILES)` + `vi.waitFor`（#758/#762），
+// **注入点不同**：那边延迟「provider 启动前的缓存读」，这边延迟 **原生桥方法调用本身**
+// （translateStream / abortStream / translatePoll 晚 delayMs 才被调、回调也晚到）。
+// 取这个注入点的原因：本文件的可观测事实不是 store 状态（没有状态可等），而是
+// **事件总线监听器计数**与**原生桥调用记录**，它们唯一的上游就是原生桥 mock。
+//
+// 恶意档常驻运行：任何人再把 `vi.waitFor(条件)` 写回 `await sleep(N)` 后立即断言，
+// 恶意档会**确定性变红**（250ms > 任何合理的 N），而不是等 CI 在负载下偶发失败。
+const rawHostileDelayMs = Number(process.env.PIXIVIZER_TEST_BRIDGE_DELAY_MS)
+const HOSTILE_BRIDGE_DELAY_MS =
+  Number.isFinite(rawHostileDelayMs) && rawHostileDelayMs > 0 ? Math.min(rawHostileDelayMs, 1000) : 250
+const TIMING_PROFILES = [
+  { profile: '正常时序', bridgeDelayMs: 0 },
+  {
+    profile: `恶意时序·原生桥回调晚 ${HOSTILE_BRIDGE_DELAY_MS}ms`,
+    bridgeDelayMs: HOSTILE_BRIDGE_DELAY_MS,
+  },
+] as const
+
+/**
+ * 条件等待预算：远大于注入延迟（≤1000ms）+ 负载抖动，失败时能拿到断言差异；
+ * 且单次 2500ms 远小于 vitest 5s 单测超时，不会用 "Test timed out" 盖掉真实失败原因。
+ */
+const WAIT_FOR_OPTS = { timeout: 2500 } as const
+
+/** 在飞的（被延迟注入的）原生桥调用数——收尾断言用：保证没有回调在用例结束后才迟到。 */
+let bridgeInFlight = 0
+
+/**
+ * 原生桥延迟注入：把回调式原生方法整体延后 delayMs 才调用（回调也随之晚到）。
+ * 返回值在生产侧被忽略（三个方法都是 `mod.x(args..., cb)` 形态），故不返回。
+ * 正常档直接透传原对象（零行为变化）。
+ */
+function withBridgeDelay<T extends Record<string, unknown>>(mod: T, delayMs: number): T {
+  if (delayMs <= 0) return mod
+  const wrapped: Record<string, unknown> = {}
+  for (const [name, raw] of Object.entries(mod)) {
+    if (typeof raw !== 'function') {
+      wrapped[name] = raw
+      continue
+    }
+    const fn = raw as (...args: unknown[]) => unknown
+    wrapped[name] = (...args: unknown[]) => {
+      bridgeInFlight++
+      setTimeout(() => {
+        try {
+          fn(...args)
+        } finally {
+          bridgeInFlight--
+        }
+      }, delayMs)
+    }
+  }
+  return wrapped as T
+}
+
+/** 收尾：等本档注入的延迟桥调用全部落定（不留跨用例的在飞回调/定时器） */
+const drainBridgeCalls = (): Promise<void> =>
+  vi.waitFor(() => expect(bridgeInFlight).toBe(0), WAIT_FOR_OPTS)
+
+/** 收尾：把挂起的迭代器拉到底（abort 后 next() 必抛 AbortError；此处吞掉即可） */
+const settleIter = (iter: { next: () => Promise<unknown> }): Promise<unknown> =>
+  iter.next().catch(() => undefined)
+
 describe('attachTranslateFrameListener（事件总线交付通道）', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>
 
@@ -264,29 +330,50 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect(deltas).toHaveLength(1)
   })
 
-  it('provider.abort() 后监听器被解绑（不泄漏）', async () => {
-    const emitter = installFakeLynx()
-    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-      PictelioTranslate: {
-        translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
-        // #653 修复后 provider.abort() / signal.abort() 会真的调到原生 abortStream；
-        // 生产 PictelioTranslate 必暴露该 @LynxMethod（ADR-0170 §D7）。漏 mock 会让无关用例
-        // 抛 "mod.abortStream is not a function"。
-        abortStream: (_id: string, cb: (err: string | null) => void) => cb(null),
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'pending' }), ''),
-      },
-    }
-    const provider = nativeTranslateProvider()
-    provider.translate(
-      { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
-      { baseURL: 'https://x', apiKey: '', model: 'm' },
-      new AbortController().signal,
-    )
-    await new Promise((r) => setTimeout(r, 10))
-    expect(emitter.count('pictelioTranslateFrame')).toBe(1)
-    provider.abort()
-    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+  // #993：本用例的「监听器解绑」必须在两档时序下都成立，且**自身不留下在飞 IO**——
+  // 此前它只断监听器、不 abort signal，pending 轮询会以 250ms × 600 继续跑到用例之后。
+  describe.each(TIMING_PROFILES)('provider.abort 收尾（[$profile]）', ({ bridgeDelayMs }) => {
+    beforeEach(() => {
+      bridgeInFlight = 0
+    })
+
+    it('provider.abort() 后监听器被解绑（不泄漏）', async () => {
+      const emitter = installFakeLynx()
+      ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+        PictelioTranslate: withBridgeDelay(
+          {
+            translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
+            // #653 修复后 provider.abort() / signal.abort() 会真的调到原生 abortStream；
+            // 生产 PictelioTranslate 必暴露该 @LynxMethod（ADR-0170 §D7）。漏 mock 会让无关用例
+            // 抛 "mod.abortStream is not a function"。
+            abortStream: (_id: string, cb: (err: string | null) => void) => cb(null),
+            translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+              cb(JSON.stringify({ type: 'pending' }), ''),
+          },
+          bridgeDelayMs,
+        ),
+      }
+      const provider = nativeTranslateProvider()
+      const controller = new AbortController()
+      // 监听器订阅在 translate() 内**同步**完成 → 直接断言，无需等任何时间
+      const iter = provider.translate(
+        { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+        { baseURL: 'https://x', apiKey: '', model: 'm' },
+        controller.signal,
+      )
+      try {
+        expect(emitter.count('pictelioTranslateFrame')).toBe(1)
+        provider.abort()
+        expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+      } finally {
+        // 收尾：provider.abort() 只解绑监听器、**不清轮询定时器**；不 abort signal 的话
+        // pending 轮询会继续 600 × 250ms 直到用例结束之后（跨用例幽灵 IO）。
+        controller.abort()
+        await settleIter(iter)
+        await drainBridgeCalls()
+        expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+      }
+    })
   })
 
   it('轮询回调失败（原生 reject）→ 抛错，不得静默成功', async () => {
@@ -388,11 +475,15 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
 // （:603-606），但该 promise 只在 callback 通道投递 done 帧时 settle（实测不可靠），
 // → 句柄永远 null → abort 失联 → 用户点停止/切章节/离开页面，原生 OkHttp Call
 // 不会取消。本组用例钉住：JS abort 必能触达原生 bridge。
-describe('native 取消通道（#653：JS abort 必须触达原生 abortStream）', () => {
+describe.each(TIMING_PROFILES)('native 取消通道（#653：JS abort 必须触达原生 abortStream）[$profile]', ({ bridgeDelayMs }) => {
   let warnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    bridgeInFlight = 0
+    // 用例各自安装 fake lynx；先清掉上一例留下的全局 emitter，否则「没装 emitter 的用例」
+    // 会静默复用上一例的监听器表（跨用例耦合，#993 收口）
+    delete (globalThis as { lynx?: unknown }).lynx
   })
 
   afterEach(() => {
@@ -405,19 +496,22 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
     let abortStreamCalledWith: string | null = null
     let sentToken = ''
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-      PictelioTranslate: {
-        translateStream: (json: string) => {
-          sentToken = (JSON.parse(json) as { _abortToken?: string })._abortToken ?? ''
-          // 永不 settle —— callback 通道实测不可靠的场景
-          return new Promise<{ abort: () => Promise<void> }>(() => {})
+      PictelioTranslate: withBridgeDelay(
+        {
+          translateStream: (json: string) => {
+            sentToken = (JSON.parse(json) as { _abortToken?: string })._abortToken ?? ''
+            // 永不 settle —— callback 通道实测不可靠的场景
+            return new Promise<{ abort: () => Promise<void> }>(() => {})
+          },
+          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+            cb(JSON.stringify({ type: 'pending' }), ''),
+          abortStream: (id: string, cb: (err: string | null) => void) => {
+            abortStreamCalledWith = id
+            cb(null)
+          },
         },
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'pending' }), ''),
-        abortStream: (id: string, cb: (err: string | null) => void) => {
-          abortStreamCalledWith = id
-          cb(null)
-        },
-      },
+        bridgeDelayMs,
+      ),
     }
     const provider = nativeTranslateProvider()
     const controller = new AbortController()
@@ -426,20 +520,24 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
       { baseURL: 'https://x', apiKey: '', model: 'm' },
       controller.signal,
     )
-    // 等 mock.translateStream 被调过（同步）
-    await new Promise((r) => setTimeout(r, 0))
-    expect(sentToken).not.toBe('')
+    try {
+      // 等条件：原生 translateStream 真被调过（恶意档下该调用晚 250ms 送达）
+      await vi.waitFor(() => expect(sentToken).not.toBe(''), WAIT_FOR_OPTS)
 
-    // 用户主动 abort
-    controller.abort()
+      // 用户主动 abort
+      controller.abort()
 
-    // 关键断言 1：原生 abortStream 必被调用
-    expect(abortStreamCalledWith).not.toBeNull()
-    // 关键断言 2：传入的 id = translateStream 请求里的 _abortToken
-    expect(abortStreamCalledWith).toBe(sentToken)
+      // 关键断言 1 + 2：原生 abortStream 必被调用，且传入的 id = 请求里的 _abortToken
+      // （恶意档下 abortStream 调用同样晚到 → 必须等条件，不能等时间）
+      await vi.waitFor(() => expect(abortStreamCalledWith).toBe(sentToken), WAIT_FOR_OPTS)
 
-    // 关键断言 3：迭代器抛 AbortError（spec §7.2 aborted 状态），不是 error chunk
-    await expect(iter.next()).rejects.toThrow('aborted')
+      // 关键断言 3：迭代器抛 AbortError（spec §7.2 aborted 状态），不是 error chunk
+      await expect(iter.next()).rejects.toThrow('aborted')
+    } finally {
+      controller.abort()
+      await settleIter(iter)
+      await drainBridgeCalls()
+    }
   })
 
   it('provider.abort() → abortStream 也被调用（同 streamId）', async () => {
@@ -448,43 +546,21 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
     let abortStreamCalledWith: string | null = null
     let sentToken = ''
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-      PictelioTranslate: {
-        translateStream: (json: string) => {
-          sentToken = (JSON.parse(json) as { _abortToken?: string })._abortToken ?? ''
-          return new Promise<{ abort: () => Promise<void> }>(() => {})
+      PictelioTranslate: withBridgeDelay(
+        {
+          translateStream: (json: string) => {
+            sentToken = (JSON.parse(json) as { _abortToken?: string })._abortToken ?? ''
+            return new Promise<{ abort: () => Promise<void> }>(() => {})
+          },
+          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+            cb(JSON.stringify({ type: 'pending' }), ''),
+          abortStream: (id: string, cb: (err: string | null) => void) => {
+            abortStreamCalledWith = id
+            cb(null)
+          },
         },
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'pending' }), ''),
-        abortStream: (id: string, cb: (err: string | null) => void) => {
-          abortStreamCalledWith = id
-          cb(null)
-        },
-      },
-    }
-    const provider = nativeTranslateProvider()
-    provider.translate(
-      { novelId: 1, chapterId: 'c1', paragraphs: ['原文'], options: { xRestrict: 0 } },
-      { baseURL: 'https://x', apiKey: '', model: 'm' },
-      new AbortController().signal,
-    )
-    await new Promise((r) => setTimeout(r, 0))
-
-    provider.abort()
-
-    expect(abortStreamCalledWith).toBe(sentToken)
-    expect(abortStreamCalledWith).not.toBe('')
-  })
-
-  it('abort 后事件总线再投递帧 → 被丢弃（陈旧流不得写进当前翻译）', async () => {
-    // 取消后原生仍可能送出在途帧（OkHttp 取消未必立刻收尾）；JS 侧必须不再写入。
-    const emitter = installFakeLynx()
-    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-      PictelioTranslate: {
-        translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'pending' }), ''),
-        abortStream: (_id: string, cb: (err: string | null) => void) => cb(null),
-      },
+        bridgeDelayMs,
+      ),
     }
     const provider = nativeTranslateProvider()
     const controller = new AbortController()
@@ -493,21 +569,66 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
       { baseURL: 'https://x', apiKey: '', model: 'm' },
       controller.signal,
     )
-    await new Promise((r) => setTimeout(r, 0))
-    controller.abort()
-    await expect(iter.next()).rejects.toThrow('aborted')
+    try {
+      await vi.waitFor(() => expect(sentToken).not.toBe(''), WAIT_FOR_OPTS)
 
-    // 在途帧抵达（OkHttp 取消未必立刻收尾 → Java 侧仍可能 emit）
-    emitter.emit(
-      'pictelioTranslateFrame',
-      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '陈旧' }] }),
+      provider.abort()
+
+      await vi.waitFor(() => expect(abortStreamCalledWith).toBe(sentToken), WAIT_FOR_OPTS)
+      expect(abortStreamCalledWith).not.toBe('')
+    } finally {
+      // 收尾：provider.abort() 不清轮询定时器（pending 会继续 600 × 250ms），
+      // 必须补 abort signal + 拉干迭代器与在飞桥调用，否则泄漏跨用例。
+      controller.abort()
+      await settleIter(iter)
+      await drainBridgeCalls()
+    }
+  })
+
+  it('abort 后事件总线再投递帧 → 被丢弃（陈旧流不得写进当前翻译）', async () => {
+    // 取消后原生仍可能送出在途帧（OkHttp 取消未必立刻收尾）；JS 侧必须不再写入。
+    const emitter = installFakeLynx()
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: withBridgeDelay(
+        {
+          translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
+          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+            cb(JSON.stringify({ type: 'pending' }), ''),
+          abortStream: (_id: string, cb: (err: string | null) => void) => cb(null),
+        },
+        bridgeDelayMs,
+      ),
+    }
+    const provider = nativeTranslateProvider()
+    const controller = new AbortController()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: 'c1', paragraphs: ['原文'], options: { xRestrict: 0 } },
+      { baseURL: 'https://x', apiKey: '', model: 'm' },
+      controller.signal,
     )
-    await new Promise((r) => setTimeout(r, 5))
+    try {
+      // 等条件：本流已订阅上全局事件总线（订阅随 translateStream 送达而来）
+      await vi.waitFor(() => expect(emitter.count('pictelioTranslateFrame')).toBe(1), WAIT_FOR_OPTS)
+      controller.abort()
+      await expect(iter.next()).rejects.toThrow('aborted')
 
-    // 监听器已解绑（abort 必须解绑，否则下次翻译会收到这条流的帧 → 污染）
-    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
-    // 迭代器不应再产出任何 chunk（finished/aborted 已生效）
-    await expect(iter.next()).rejects.toThrow('aborted')
+      // 在途帧抵达（OkHttp 取消未必立刻收尾 → Java 侧仍可能 emit）
+      emitter.emit(
+        'pictelioTranslateFrame',
+        JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '陈旧' }] }),
+      )
+
+      // 监听器已解绑（abort 必须解绑，否则下次翻译会收到这条流的帧 → 污染）：
+      // 解绑是**同步**事实（onAbort → detachOnce），故直接断言，不等任何时间
+      expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+      // 迭代器不应再产出任何 chunk（finished/aborted 已生效）
+      await expect(iter.next()).rejects.toThrow('aborted')
+    } finally {
+      controller.abort()
+      await settleIter(iter)
+      await drainBridgeCalls()
+      expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+    }
   })
 
   it('abortStream 失败（cb(errMsg)） → console.warn 兜底，不得 unhandled rejection', async () => {
@@ -515,35 +636,48 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
     // 会以 unhandled rejection 冒泡（修复前 abort 不可达所以从不暴露）。
     const emitter = installFakeLynx()
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-      PictelioTranslate: {
-        translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'pending' }), ''),
-        // 模拟 Java 侧 abortStream 失败（如 native bridge 故障 / native 模块未注册）
-        abortStream: (_id: string, cb: (err: string | null) => void) => cb('native bridge 故障'),
-      },
+      PictelioTranslate: withBridgeDelay(
+        {
+          translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
+          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+            cb(JSON.stringify({ type: 'pending' }), ''),
+          // 模拟 Java 侧 abortStream 失败（如 native bridge 故障 / native 模块未注册）
+          abortStream: (_id: string, cb: (err: string | null) => void) => cb('native bridge 故障'),
+        },
+        bridgeDelayMs,
+      ),
     }
     const provider = nativeTranslateProvider()
     const controller = new AbortController()
-    provider.translate(
+    const iter = provider.translate(
       { novelId: 1, chapterId: 'c1', paragraphs: ['原文'], options: { xRestrict: 0 } },
       { baseURL: 'https://x', apiKey: '', model: 'm' },
       controller.signal,
     )
-    await new Promise((r) => setTimeout(r, 0))
+    try {
+      await vi.waitFor(() => expect(emitter.count('pictelioTranslateFrame')).toBe(1), WAIT_FOR_OPTS)
 
-    // abort 不应抛同步异常（catch 已包住 abortStream）
-    expect(() => controller.abort()).not.toThrow()
+      // abort 不应抛同步异常（catch 已包住 abortStream）
+      expect(() => controller.abort()).not.toThrow()
 
-    // 等异步 abortStream rejection 被 catch 吃掉 → console.warn 已发
-    await new Promise((r) => setTimeout(r, 10))
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('abort 触发失败'),
-      expect.anything(),
-    )
+      // 等条件：异步 abortStream rejection 被 catch 吃掉后 console.warn 才发
+      // （恶意档下该回调晚 250ms → 固定墙钟等待在此确定性失败）
+      await vi.waitFor(
+        () =>
+          expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('abort 触发失败'),
+            expect.anything(),
+          ),
+        WAIT_FOR_OPTS,
+      )
 
-    // 监听器仍须解绑（abort 失败不能阻塞 detach 路径）
-    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+      // 监听器仍须解绑（abort 失败不能阻塞 detach 路径）
+      expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+    } finally {
+      controller.abort()
+      await settleIter(iter)
+      await drainBridgeCalls()
+    }
   })
 
   it('无 DOMException（Lynx PrimJS 真实环境）→ onAbort 不抛，abortStream 仍触达', async () => {
@@ -551,45 +685,60 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
     // `new DOMException("aborted", "AbortError")` 这一行直接抛 → 后面的
     // `abortHandle?.abort()` 永远不执行 → 整个 #653 修复在设备上形同未做。
     // 本用例钉住 polyfill 路径：临时删 globalThis.DOMException，模拟 PrimJS。
+    const emitter = installFakeLynx()
     let abortStreamCalledWith: string | null = null
     const originalDE = (globalThis as { DOMException?: unknown }).DOMException
     // @ts-expect-error 模拟 Lynx PrimJS：无 DOMException 全局
     delete (globalThis as { DOMException?: unknown }).DOMException
+    // #993：收尾必须**先于**恢复 DOMException 收干净——只恢复全局量而不 abort /
+    // 不摘监听器 / 不拉干在飞回调，才是本用例此前真正的跨用例泄漏面。
+    let controller: AbortController | null = null
+    let iter: { next: () => Promise<unknown> } | null = null
     try {
       ;(globalThis as { NativeModules?: unknown }).NativeModules = {
-        PictelioTranslate: {
-          translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
-          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-            cb(JSON.stringify({ type: 'pending' }), ''),
-          abortStream: (id: string, cb: (err: string | null) => void) => {
-            abortStreamCalledWith = id
-            cb(null)
+        PictelioTranslate: withBridgeDelay(
+          {
+            translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
+            translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+              cb(JSON.stringify({ type: 'pending' }), ''),
+            abortStream: (id: string, cb: (err: string | null) => void) => {
+              abortStreamCalledWith = id
+              cb(null)
+            },
           },
-        },
+          bridgeDelayMs,
+        ),
       }
       const provider = nativeTranslateProvider()
-      const controller = new AbortController()
-      const iter = provider.translate(
+      controller = new AbortController()
+      iter = provider.translate(
         { novelId: 1, chapterId: 'c1', paragraphs: ['原文'], options: { xRestrict: 0 } },
         { baseURL: 'https://x', apiKey: '', model: 'm' },
         controller.signal,
       )
-      await new Promise((r) => setTimeout(r, 0))
+      // 等条件：本流已订阅上全局事件总线
+      await vi.waitFor(() => expect(emitter.count('pictelioTranslateFrame')).toBe(1), WAIT_FOR_OPTS)
 
       // 必须不抛
-      expect(() => controller.abort()).not.toThrow()
+      expect(() => controller!.abort()).not.toThrow()
 
       // 关键断言：即便 DOMException 缺失，abortStream 仍被调用（=核心修复未回退）
-      expect(abortStreamCalledWith).not.toBeNull()
+      await vi.waitFor(() => expect(abortStreamCalledWith).not.toBeNull(), WAIT_FOR_OPTS)
+      // 监听器已解绑（此前 finally 只恢复 DOMException，监听器留在全局 emitter 上）
+      expect(emitter.count('pictelioTranslateFrame')).toBe(0)
       // 迭代器抛 AbortError（用 err.name 判，不依赖 instanceof DOMException）
       try {
-        await iter.next()
+        await iter!.next()
         expect.fail('iter.next() 应当抛 AbortError')
       } catch (e) {
         expect(e).toBeInstanceOf(Error)
         expect((e as Error).name).toBe('AbortError')
       }
     } finally {
+      controller?.abort()
+      if (iter) await settleIter(iter)
+      await drainBridgeCalls()
+      expect(emitter.count('pictelioTranslateFrame')).toBe(0)
       // 恢复 globalThis，避免污染后续用例
       ;(globalThis as { DOMException?: unknown }).DOMException = originalDE
     }

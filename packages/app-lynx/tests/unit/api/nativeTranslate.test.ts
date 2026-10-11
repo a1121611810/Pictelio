@@ -193,6 +193,29 @@ describe("clearEndpoint Promise 包装", () => {
   })
 })
 
+// ─── #993：时序档（与 novelTranslateStore 的 slowCacheMiss 同族但注入点不同）──────────────────
+// 注入点是**原生桥 mock 的调用**（translateStream / abortStream），那边延迟的是缓存读。
+// 恶意档常驻：把条件等待写回固定墙钟后，本用例会确定性变红（而不是等 CI 偶发）。
+const rawHostileDelayMs = Number(process.env.PIXIVIZER_TEST_BRIDGE_DELAY_MS)
+const HOSTILE_BRIDGE_DELAY_MS =
+  Number.isFinite(rawHostileDelayMs) && rawHostileDelayMs > 0 ? Math.min(rawHostileDelayMs, 1000) : 250
+const TIMING_PROFILES = [
+  { profile: "正常时序", bridgeDelayMs: 0 },
+  {
+    profile: `恶意时序·原生桥回调晚 ${HOSTILE_BRIDGE_DELAY_MS}ms`,
+    bridgeDelayMs: HOSTILE_BRIDGE_DELAY_MS,
+  },
+] as const
+
+/** 条件等待预算：远大于注入延迟 + 负载抖动，且远小于 vitest 5s 单测超时 */
+const WAIT_FOR_OPTS = { timeout: 2500 } as const
+
+/** 单个宏任务轮次 = Node 派发 unhandledRejection 的最小边界（微任务队列排空后）；
+ *  它是「拒绝报告机会已过」的条件，不是「睡够 N 毫秒」的墙钟。 */
+function macrotaskTurn(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve))
+}
+
 describe("translateStream 流式契约", () => {
   let mod: ReturnType<typeof createFakeModule>
 
@@ -285,46 +308,75 @@ describe("translateStream 流式契约", () => {
     expect(chunks).toHaveLength(2)
   })
 
-  it("abort 后 Java 端回 err（'Canceled'）→ JS 侧静默忽略（aborted 标记）", async () => {
-    let capturedCb: ((c: string | null, e: string | null) => void) | null = null
-    let capturedReqJson = ""
-    mod.translateStream.mockImplementation(
-      (_reqJson: string, cb: (c: string | null, e: string | null) => void) => {
-        capturedReqJson = _reqJson
-        capturedCb = cb
-      },
-    )
-    mod.abortStream.mockImplementation((_id: string, cb: (e: string | null) => void) => cb(""))
-
-    const p = translateStream(
-      JSON.stringify({ baseURL: "https://api.openai.com/v1", model: "gpt-5", input: ["x"] }),
-      () => {},
-    )
-    await new Promise((r) => setTimeout(r, 0))
-
-    // 模拟 done 帧 → resolve abort handle
-    capturedCb!(JSON.stringify({ type: "done" }), "")
-    const { abort, streamId } = await p
-
-    // 触发 abort
-    await abort()
-    expect(mod.abortStream).toHaveBeenCalledWith(streamId, expect.any(Function))
-
-    // 模拟 Java abort 后再次给 err 回调（OkHttp 中断后 Java 侧 catch → cb('', 'Canceled')）
-    // 因 aborted=true 应被忽略（不抛 unhandled rejection；aborted 与 failed 语义分离）
-    let unhandled = false
-    const handler = () => {
-      unhandled = true
+  // #993：本组用例的可观测事实是**原生桥回调**（无 store 状态可等）→ 挂时序档 +
+  // vi.waitFor 等条件，失败路径必须 try/finally 收干净。
+  describe.each(TIMING_PROFILES)("abort 语义（aborted 标记与静默忽略）[$profile]", ({ bridgeDelayMs }) => {
+    const delayed = <T extends (...args: never[]) => unknown>(fn: T): T => {
+      if (bridgeDelayMs <= 0) return fn
+      return ((...args: never[]) => {
+        setTimeout(() => {
+          ;(fn as unknown as (...a: never[]) => void)(...args)
+        }, bridgeDelayMs)
+      }) as unknown as T
     }
-    process.on("unhandledRejection", handler)
-    capturedCb!(null, "网络错误：Canceled")
-    await new Promise((r) => setTimeout(r, 5))
-    process.off("unhandledRejection", handler)
-    expect(unhandled).toBe(false)
 
-    // 验证 _abortToken 已注入（与 abortStream 的 streamId 对齐）
-    const body = JSON.parse(capturedReqJson) as Record<string, unknown>
-    expect(body._abortToken).toBe(streamId)
+    it("abort 后 Java 端回 err（'Canceled'）→ JS 侧静默忽略（aborted 标记）", async () => {
+      let capturedCb: ((c: string | null, e: string | null) => void) | null = null
+      let capturedReqJson = ""
+      mod.translateStream.mockImplementation(
+        delayed(
+          (_reqJson: string, cb: (c: string | null, e: string | null) => void) => {
+            capturedReqJson = _reqJson
+            capturedCb = cb
+          },
+        ),
+      )
+      mod.abortStream.mockImplementation(
+        delayed((_id: string, cb: (e: string | null) => void) => cb("")),
+      )
+
+      const p = translateStream(
+        JSON.stringify({ baseURL: "https://api.openai.com/v1", model: "gpt-5", input: ["x"] }),
+        () => {},
+      )
+      // 等条件：原生 translateStream 真被调过、cb 已被捕获（恶意档下该调用晚 250ms）
+      await vi.waitFor(() => expect(capturedCb).not.toBeNull(), WAIT_FOR_OPTS)
+
+      // 模拟 done 帧 → resolve abort handle
+      capturedCb!(JSON.stringify({ type: "done" }), "")
+      const { abort, streamId } = await p
+
+      let unhandled = 0
+      const handler = () => {
+        unhandled++
+      }
+      process.on("unhandledRejection", handler)
+      try {
+        // 触发 abort
+        await abort()
+        expect(mod.abortStream).toHaveBeenCalledWith(streamId, expect.any(Function))
+
+        // 观测手段自检（oracle：负向断言不能空转）：先确认 handler 真的挂在 process 上，
+        // 否则下面的 unhandled === 0 只是「没人监听」的同义反复。
+        process.emit("unhandledRejection", new Error("探针"), Promise.resolve())
+        expect(unhandled).toBe(1)
+        unhandled = 0
+
+        // 模拟 Java abort 后再次给 err 回调（OkHttp 中断后 Java 侧 catch → cb('', 'Canceled')）
+        // 因 aborted=true 应被忽略（不抛 unhandled rejection；aborted 与 failed 语义分离）
+        capturedCb!(null, "网络错误：Canceled")
+        await macrotaskTurn()
+        expect(unhandled).toBe(0)
+
+        // 验证 _abortToken 已注入（与 abortStream 的 streamId 对齐）
+        const body = JSON.parse(capturedReqJson) as Record<string, unknown>
+        expect(body._abortToken).toBe(streamId)
+      } finally {
+        // #993：此前 process.off 在断言之后裸跑 —— 断言一抛，**全局 process 监听器就留在
+        // 别的测试文件里**（本批最严重的跨文件泄漏面）。必须无条件摘除。
+        process.off("unhandledRejection", handler)
+      }
+    })
   })
 
   it("原生契约破坏：cb(null, null) → reject（无 err 即不假成功）", async () => {

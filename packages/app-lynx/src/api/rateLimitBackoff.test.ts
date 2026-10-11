@@ -169,11 +169,6 @@ describe("runWithRateLimitBackoff（sleep/onRetry 注入，429 触发口径）",
 const SLEEP_CFG: RateLimitBackoffConfig = { enabled: true, maxRetries: 3, baseDelayMs: 400, maxDelayMs: 10_000 }
 const SLEEP_NOMINAL_MS = 396
 
-/** 让已排队的微任务全部落定（真实 timers 下等一个 0ms 宏任务，不推进 396ms 等待窗口） */
-function flushMicrotasks(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
-}
-
 /** 与 p 赛跑：p 在 ms 内落定 → "settled"，否则 "timeout"（清掉赛跑定时器，不留悬挂计时） */
 async function settlesWithin(p: Promise<unknown>, ms: number): Promise<"settled" | "timeout"> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -207,26 +202,43 @@ describe("defaultSleep 三态（真实 timers；abort 中止契约）", () => {
     expect(getEventListeners(controller.signal, "abort")).toHaveLength(0) // 早退分支不挂监听
   })
 
-  it("等待中取消：窗口内 20ms 时 abort → 立即 reject（abort 语义）、fn 仅 1 次、监听已摘除", async () => {
-    const controller = new AbortController()
-    const fn = vi.fn(async (): Promise<string> => "never")
-    fn.mockRejectedValue(rateLimitError())
-    const p = runWithRateLimitBackoff(fn, SLEEP_CFG, { signal: controller.signal })
-    const caught = p.then(
-      () => null,
-      (e: unknown) => e,
-    )
-    await flushMicrotasks() // 首个 429 归因完成 → 已进入等待窗口
-    expect(fn).toHaveBeenCalledTimes(1)
-    expect(getEventListeners(controller.signal, "abort")).toHaveLength(1) // 正向验证：等待期挂了监听
-    await new Promise((resolve) => setTimeout(resolve, 20)) // 窗口内推进 20ms（≪ 396ms）
-    expect(fn).toHaveBeenCalledTimes(1) // 仍在等待：未到期、未重试
-    const t0 = Date.now()
-    controller.abort()
-    expect(String(await caught)).toMatch(/abort/i)
-    expect(Date.now() - t0).toBeLessThan(300) // 取消即返回，远早于名义窗口（396ms）
-    expect(fn).toHaveBeenCalledTimes(1) // 取消后不再重试
-    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0) // cleanup 已摘监听
+  it("等待中取消：窗口内 abort → 立即 reject（abort 语义）、fn 仅 1 次、监听已摘除", async () => {
+    // #993：本档用**假时钟**驱动退避窗口。原先用真实 timers + `Date.now()` 差值断言
+    // 「取消后 < 300ms 落定」——那是墙钟断言，负载一大必假红（且与「名义窗口 396ms」
+    // 硬编码耦合）。速度无关的替代事实：取消后**零时钟推进**即落定 + 监听已摘除。
+    vi.useFakeTimers()
+    try {
+      const controller = new AbortController()
+      const fn = vi.fn(async (): Promise<string> => "never")
+      fn.mockRejectedValue(rateLimitError())
+      const p = runWithRateLimitBackoff(fn, SLEEP_CFG, { signal: controller.signal })
+      const caught = p.then(
+        () => null,
+        (e: unknown) => e,
+      ) // 先挂 handler 防 unhandled rejection
+
+      // 等条件：首个 429 已归因完成 → 等待窗口已开（监听器挂上 = 条件本身）
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fn).toHaveBeenCalledTimes(1)
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(1)
+
+      // 窗口内推进 20ms（≪ 名义 396ms）：仍在等，未重试
+      await vi.advanceTimersByTimeAsync(20)
+      expect(fn).toHaveBeenCalledTimes(1)
+
+      const clockAtCancel = Date.now()
+      controller.abort()
+
+      // 关键事实（替代墙钟断言）：取消后**不推进任何时钟**就落定
+      await vi.advanceTimersByTimeAsync(0)
+      expect(String(await caught)).toMatch(/abort/i)
+      expect(Date.now()).toBe(clockAtCancel)
+      expect(fn).toHaveBeenCalledTimes(1) // 取消后不再重试
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(0) // cleanup 已摘监听
+      expect(vi.getTimerCount()).toBe(0) // 退避定时器已清，无幽灵重试
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("定时自然到期：等待约 396ms 后重试成功 resolve、fn 2 次、监听已摘除（cleanup）", async () => {
