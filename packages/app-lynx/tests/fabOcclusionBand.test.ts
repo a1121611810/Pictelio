@@ -19,8 +19,12 @@
 //    §4「刻意不处理」表）+ code review。
 // 2. **不做几何判定**，只判源码顺序与对齐写法；遮挡带自身的像素锚点由 `tests/fabGeometry.test.ts` 承担。
 // 3. **只看这四个文件**。其它文件里等价的已修写法若被改回行尾，本门禁不红。
-// 4. **读不到票的开关状态**（不调 `gh`、CI 无网络）⇒ 债务是否仍成立用**站点活性**代理：
-//    站点标记消失，或不再被 ADR-0221 §4 登记 ⇒ 红。
+// 4. **读不到票的开关状态**（不调 `gh`、CI 无网络）⇒ 债务是否仍成立用**站点条件**代理。
+//    票 #957 把该代理从「标记字符串还在」升级为「**该站点仍真在行尾**」（源码顺序 / 尾推类，
+//    见下方 `带内证明`）：**站点一旦被修好，豁免即刻自动腐烂**——不需要任何人记得来删登记。
+//    ⚠️ **残留缺口（不可再收窄）**：若有人在 GitHub 上**直接关掉 #950 / #951 而站点并未修复**，
+//    本门禁**不会**红。CI 内读不到票状态是物理限制，不是配置疏漏；此缺口只能靠关闭流程兜底
+//    （关票前必须先让对应站点转红或删登记）。**不要把这里的全绿读成「票与站点一致」。**
 // 5. **只认静态 `class="…"`**：`:class` 里的动态拼接类名不参与「尾推」判据。
 //
 // ## 期望值出处（oracle 溯源，禁从被测实现反推）
@@ -166,22 +170,52 @@ describe('ADR-0221 决策 2 · 四处已修站点的行首位置', () => {
 // 这一组**不是**扫描命中集合的配平（扫描能力已删除，见文件头）——它是「已知仍落在带内、
 // 且刻意不处理」的四处站点台账：票号是豁免的唯一凭据，站点修掉后必须连登记一起删。
 
+/**
+ * **带内证明**：豁免登记的前提是「这个动作**仍落在**遮挡带内」。只登记一个 marker 字符串
+ * 不足以证明这一点——标记还在、动作却早已迁到行首时，豁免会**静默存活**（票 #957 修的正是
+ * 这个洞：旧判据是 `toContain(marker)`，任何保留下 marker 的修复都能骗过它）。
+ *
+ * 两种证明，都只用本门禁已经在信的静态判据（源码顺序 + 尾推类），**不做任何几何推断**
+ * ——文件头已登记几何估算层会假绿并被整体删除，这里不得把它请回来：
+ *
+ * - `after-content`：动作在**内容列之后**（`flex-row` 不换行 ⇒ 源码顺序即视觉左右顺序）
+ * - `pushed`：动作元素自带尾推写法（`absolute` + `right-*` 等），位置根本不由源码顺序决定
+ *
+ * ⇒ **站点修好 ⇒ 证明不再成立 ⇒ 门禁红 ⇒ 豁免自动失效**。这兑现了 ADR-0221 §7「票关闭后
+ * 豁免必须失效」中**能离线兑现的那一半**；另一半（票被关而站点未修）见文件头失效面 4。
+ */
+type 带内证明 = { kind: 'after-content'; content: string } | { kind: 'pushed' }
+
 const BAND_DEBT = [
   {
     ticket: 950,
     why: '关注/取关控件（UserRow，3 条路由共用）。非破坏性 toggle，失败形态是「点了没反应」而非「数据没了」；其 px-4 比 40dp 药丸更宽，重叠比例比已修四处更高 ⇒ 须独立评估。',
-    sites: [{ file: 'src/components/UserRow.vue', marker: 'onToggle' }],
+    sites: [
+      {
+        file: 'src/components/UserRow.vue',
+        marker: 'onToggle',
+        proof: { kind: 'after-content', content: 'class="flex flex-col ml-3.5 flex-1"' } as const,
+      },
+    ],
   },
   {
     ticket: 951,
     why: '关注作者 pill（IllustDetail）、关注数/粉丝数 chip（UserHome）、榜单卡折叠 ✕（RankingEntryCard）。三者非破坏性（pill/chip 是导航与 toggle，折叠是本次会话内收起），不与破坏性动作的迁移同批处理。',
     sites: [
-      { file: 'src/pages/IllustDetail.vue', marker: 'toggleFollowAuthor' },
-      { file: 'src/pages/UserHome.vue', marker: 'openFollowers' },
-      { file: 'src/components/RankingEntryCard.vue', marker: 'dismissed = true' },
+      {
+        file: 'src/pages/IllustDetail.vue',
+        marker: 'toggleFollowAuthor',
+        proof: { kind: 'after-content', content: 'class="text-body-medium text-surface-on-variant ml-2 flex-1"' } as const,
+      },
+      {
+        file: 'src/pages/UserHome.vue',
+        marker: 'openFollowers',
+        proof: { kind: 'after-content', content: '@tap="openFollowing"' } as const,
+      },
+      { file: 'src/components/RankingEntryCard.vue', marker: 'dismissed = true', proof: { kind: 'pushed' } as const },
     ],
   },
-] as const
+] as const satisfies readonly { ticket: number; why: string; sites: readonly { file: string; marker: string; proof: 带内证明 }[] }[]
 
 describe('ADR-0221 决策 2 · 带内债务登记', () => {
   it('登记恰好是 #950 / #951 两票、四站点（不多不少、票号不重复）', () => {
@@ -201,6 +235,30 @@ describe('ADR-0221 决策 2 · 带内债务登记', () => {
       expect(entry.why.length, `#${entry.ticket} 缺登记理由`).toBeGreaterThan(30)
       for (const site of entry.sites) {
         expect(readPkg(site.file), `#${entry.ticket} 的 ${site.file} 读不到（已改名/移动？）或不再含 ${site.marker} ⇒ 站点已修或已搬家：请关闭该票并删除这条登记`).toContain(site.marker)
+      }
+    }
+  })
+
+  it('每笔债务的「仍落在带内」前提成立——站点被修好即豁免自动腐烂（票 #957）', () => {
+    for (const entry of BAND_DEBT) {
+      for (const site of entry.sites) {
+        const tpl = templateOf(readPkg(site.file))
+        const where = `#${entry.ticket} 的 ${site.file}（${site.marker}）`
+        const actionAt = tpl.indexOf(site.marker)
+        expect(actionAt, `${where}：找不到动作标记 —— 判据输入无效`).toBeGreaterThanOrEqual(0)
+
+        const gone =
+          `${where}：该动作**已不落在行尾** ⇒ 登记豁免的前提（仍落在 GlobalFab 遮挡带内）不再成立。\n` +
+          '        票 #957 起，豁免不再靠「标记还在」续命：站点修好必须让本条转红。\n' +
+          '        请关闭该票，并删除本文件中这条 site 登记（同时更新 ADR-0221 §4 与上方集合断言）。'
+
+        if (site.proof.kind === 'after-content') {
+          const contentAt = tpl.indexOf(site.proof.content)
+          expect(contentAt, `${where}：内容列锚点消失（判据输入无效）`).toBeGreaterThanOrEqual(0)
+          expect(actionAt, gone).toBeGreaterThan(contentAt)
+        } else {
+          expect(openTagAt(tpl, actionAt), gone).toMatch(TRAILING_PUSH)
+        }
       }
     }
   })
