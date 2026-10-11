@@ -722,30 +722,31 @@ _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `w
 > **为什么必须搬**：app-lynx 侧原生读端**正在执行**这个契约（`PictelioImageService` / Java 下载层），而它的文档在被删目录里。
 
 **缓存键（Cache key）**【2026-09-06 新增，跨上下文】：
-图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip 三链路共用同一键空间。〔**zip 一侧的实现约束尚未满足**，见下方⚠️框〕
+图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip、保存、下载五条链路共用同一键空间。
 
-> **覆盖范围与现状（2026-10-11 登记，ADR-0222 §2.5；#980 已交付）**：这两条不变量**覆盖内存层与磁盘层两层**。
+> **覆盖范围与现状（2026-10-11 登记，ADR-0222 §2.5；#980 + #987 已交付）**：这两条不变量**覆盖内存层与磁盘层两层**。
 > 层数与层名以 `packages/android-host/CONTEXT.md`「图片代理」节为准（**两层缓存**，现行编号见 ADR-0222）。
 >
-> ⚠️ **「唯一产出」的覆盖范围只到预取与显示两条链路**（2026-10-11 code-review 登记）：
-> `PixivImageLoader.cacheKey(url)` 是**预取 + 显示**两层的键的唯一产出点（内存层与磁盘层各只有一条目，
-> 同一张图以代理路径与绝对地址两种形态请求不会分叉）。但 **zip / 导出 / 保存**三条链路**没有**纳入——
-> 共 **7 处调用点、3 个入口方法**：
-> `loadBytesCachedFirst(url)`（`NovelPdfEncoder:403`、`NovelDocxEncoder:430`、`NovelEpubEncoder:476`、
-> `NovelExporter:579`）、`loadFileCachedFirst(officialUrl)`（`GallerySaver:86`）、
-> `loadFileWithProgressCachedFirst(url, sink, cancel)`（`PictelioDownloader:69` 作品保存、`:113` zip 下载
-> ——保存与 zip 两条链路**全部**走它）。这三个入口**内部都不调用 `cacheKey`**，而是
-> `cachedFile(url)` 直接 `keyToFilename(url)`。
-> 它们今天不出分叉，靠的是「这些调用点传入的本来就是官方 URL，而 `rewriteUrl` 对官方 URL 幂等」
-> ⇒ **巧合正确，不是结构性正确**。
-> 处置见 ADR-0222 §4 与 follow-up issue #987；**不要**据本节以为该缺口已不存在。
-> **排查提示**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径。
-> 反漂移防线目前由 `ImageCacheKeySpaceTest` 把守（断言内存层键恒等于 rewrite 产物、且不以原始 url 为键）——
-> **该防线覆盖预取与显示链路，不覆盖上述三条链路**。
+> ✅ **「唯一产出」已覆盖全部五条链路**（#987 交付）。`PixivImageLoader.cacheKey(url)` 是
+> **预取 / 显示 / zip 导出 / 保存到相册 / 下载器**五条链路的键的唯一产出点——同一张图以代理路径与
+> 绝对地址两种形态请求不会分叉。
+> 此前只有预取与显示两条：另外三条链路的 **7 处调用点 / 3 个入口方法**（`loadBytesCachedFirst(url)`
+> ← `NovelPdfEncoder` / `NovelDocxEncoder` / `NovelEpubEncoder` / `NovelExporter`；
+> `loadFileCachedFirst(officialUrl)` ← `GallerySaver`；`loadFileWithProgressCachedFirst(url, sink, cancel)`
+> ← `PictelioDownloader` 的作品保存与 zip 下载——**保存与 zip 两条链路全部走它**）把 URL 直接交给入口，
+> 入口内部只 `keyToFilename(url)`。它们当时不出分叉，靠的是「这些调用点传入的本来就是官方 URL，
+> 而 `rewriteUrl` 对官方 URL 幂等」⇒ **巧合正确，不是结构性正确**。
+> 修法**不改这 7 处调用点**（改则漏一处即复现原 bug），而是把键的产出**收口到 loader 内部的唯一文件名
+> 产出点** `cacheFileName(url) = keyToFilename(cacheKey(url))`：读路径 `cachedFile` 与三个入口的写路径
+> 全部经它，**结构上**无法再分叉。
+> 防线：`ImageCacheZipChainKeyTest` 逐入口 × 两个方向断言两种形态共用同一条目；
+> `ImageCacheKeySpaceTest` 把守内存层键恒等于 rewrite 产物。两者覆盖范围与本节声明一致。
+> **排查提示（仍有效）**：只 grep `loadBytesCachedFirst` / `loadFileCachedFirst` 会完整漏掉保存与 zip 路径。
 
 _Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历史 bug 根源，已由 anti-drift 测试把守）；
-**新增**链路不得绕过 `cacheKey()` 自行拼键（那是内存层曾与磁盘层分叉的根因）——注意现有 zip / 导出 / 保存三条链路
-**尚未**纳入该约束，属已登记的待收口缺口，不是可照抄的范例
+**新增**链路不得绕过 `cacheKey()` 自行拼键（那是内存层曾与磁盘层分叉的根因）——正确做法是**新增调用点照常把 URL 交给
+`*CachedFirst` 入口**，键的归一由 loader 内部的 `cacheFileName` 负责（#987）；**不要**在调用点自己先 `cacheKey` 再传，
+也不要把 `cacheKey` 挪进下载路径（会让键与下载源耦合，违反 ADR-0143 D2）
 
 **源无关命中（Source-agnostic hit）**【2026-09-06 新增，跨上下文】：
 缓存命中判定只依赖「该图是否曾以任意来源缓存过」，与当前图床开关、模式、host 选择完全无关。切换图床/换镜像不失效、不重下；同一图全生命周期只有一个缓存条目。
