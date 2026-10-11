@@ -11,8 +11,10 @@
 //   :is-followed     关注态（调用方归一化后的布尔——PixivUser.is_followed 可能缺省，
 //                    FollowList 对 following 列表把 undefined 归一为 true 后传入）
 //   :busy            操作进行中：true 期间忽略 toggle 点击（不改视觉）
-//   :follow-label    未关注按钮文案（调用方 i18n 注入；组件零文案，noDeadKeys 面不变）
-//   :followed-label  已关注按钮文案
+//   :follow-label    未关注态无障碍标签文案（调用方 i18n 注入；票 #950 行首化后状态文字
+//                    **不再渲染**，两个 label prop 只喂 :accessibility-label，组件零可见文案，
+//                    noDeadKeys 面不变）
+//   :followed-label  已关注态无障碍标签文案（同上）
 //   @row-tap         行信息区（头像+名）tap → 上抛（进用户主页决策留调用方）
 //   @toggle          关注按钮 tap（busy 期间不发射）
 //
@@ -40,9 +42,9 @@ const props = withDefaults(
     isFollowed: boolean
     /** 操作进行中：忽略 toggle 点击（不改视觉，防重入口径与调用方一致） */
     busy?: boolean
-    /** 未关注按钮文案 */
+    /** 未关注态无障碍标签文案（只喂 :accessibility-label，不渲染为可见文字） */
     followLabel: string
-    /** 已关注按钮文案 */
+    /** 已关注态无障碍标签文案（同上） */
     followedLabel: string
   }>(),
   { busy: false },
@@ -73,7 +75,7 @@ function onToggle(): void {
          文字不再渲染 ⇒ 状态改由 accessibility-label 承载（图标自身无文字语义，
          不补这条就是读屏用户的净损失）。 -->
     <view
-      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
+      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-full"
       :class="[pressColor.className, isFollowed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="isFollowed ? followedLabel : followLabel"

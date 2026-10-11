@@ -2,7 +2,11 @@
 // oracle 溯源（AGENTS.md 测试硬约束 6）：断言期望值全部独立来源于 ADR-0199 D3 公式
 //   delay = floor(random() × min(maxDelayMs, baseDelayMs × 2^attempt))   [full jitter]
 // 而非实现反推：用注入 random 的已知端点值（0 / 1-Number.EPSILON）提取分布两端，
-// 用 base×2^attempt 手工计算名义序列。sleep / random 全注入 → 不依赖 fake timers、零真实等待。
+// 用 base×2^attempt 手工计算名义序列。
+// 等待口径分档如实声明（勿一概而论）：前两组 sleep / random 全注入 → 零真实等待、不碰时钟；
+// 「defaultSleep 三态」组刻意不注入 sleep（否则测不到真实等待实现），其中「先验已 abort」
+// 用真实定时器（观测「200ms 内落定」上界），「等待中取消」「定时自然到期」切假时钟，
+// 按可观察条件断言（推进即落定 + 监听/定时器已摘净），不读墙钟差值。
 // 术语口径（docs/adr/glossary-app-lynx-rate-limit-backoff.md）：「重试上限」不含首次请求。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { getEventListeners } from "node:events"
@@ -241,17 +245,52 @@ describe("defaultSleep 三态（真实 timers；abort 中止契约）", () => {
     }
   })
 
-  it("定时自然到期：等待约 396ms 后重试成功 resolve、fn 2 次、监听已摘除（cleanup）", async () => {
-    const controller = new AbortController()
-    const fn = vi.fn(async (): Promise<string> => "ok")
-    fn.mockRejectedValueOnce(rateLimitError()) // 首次 429 → 退避一次 → 第二次成功
-    const t0 = Date.now()
-    await expect(runWithRateLimitBackoff(fn, SLEEP_CFG, { signal: controller.signal })).resolves.toBe("ok")
-    const elapsed = Date.now() - t0
-    expect(fn).toHaveBeenCalledTimes(2)
-    // 名义 396ms 的 96% 为下界：证明走的是真定时器等待，而不是 0 延迟立即重试（留调度抖动余量）
-    expect(elapsed).toBeGreaterThanOrEqual(SLEEP_NOMINAL_MS - 16)
-    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0) // 定时器路径同样摘除监听
+  it("定时自然到期：满名义窗口（396ms）才重试成功 resolve、fn 2 次、监听已摘除（cleanup）", async () => {
+    // #993 同批：本例改**假时钟**推进。原先是真实 timers + `Date.now()` 差值下界
+    // （elapsed ≥ 396-16）——墙钟断言，负载一大即假红，且把名义窗口写死进时序。
+    // 速度无关的替代事实（两条独立证据）：
+    //   1) 延迟真值由 onRetry(attempt, delayMs) 直读 = 396（ADR-0199 D3 手算：random 钉 0.99
+    //      → floor(0.99 × 400)，实测 0.99 × 400 === 396 精确可表示，边界断言不依赖运气）；
+    //   2) 定时器在名义窗口前**不**触发、恰在 396ms 触发——「没走 0 延迟立即重试」
+    //      由「推进到 395ms 仍未落定且 fn 仍 1 次」证明，不再用墙钟毫秒数反推。
+    vi.useFakeTimers()
+    try {
+      const controller = new AbortController()
+      const fn = vi.fn(async (): Promise<string> => "ok")
+      fn.mockRejectedValueOnce(rateLimitError()) // 首次 429 → 退避一次 → 第二次成功
+      const onRetry = vi.fn()
+      let state: "pending" | "resolved" = "pending"
+      // 先挂 handler 防 unhandled rejection
+      const p = runWithRateLimitBackoff(fn, SLEEP_CFG, { signal: controller.signal, onRetry })
+      const observed = p.then(
+        () => {
+          state = "resolved"
+          return "resolved" as const
+        },
+        (e: unknown) => e,
+      )
+
+      // 等条件：首个 429 归因完成 → 退避定时器已开（监听挂上 + 恰好一个定时器在跑）
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fn).toHaveBeenCalledTimes(1)
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(1)
+      expect(vi.getTimerCount()).toBe(1)
+      expect(onRetry).toHaveBeenNthCalledWith(1, 1, SLEEP_NOMINAL_MS) // 延迟真值 = 396ms
+
+      // 推进到名义窗口前一毫秒（395ms）：仍在等，未落定、未重试
+      await vi.advanceTimersByTimeAsync(SLEEP_NOMINAL_MS - 1)
+      expect(state).toBe("pending")
+      expect(fn).toHaveBeenCalledTimes(1)
+
+      // 补最后 1ms → 定时自然到期 → resolve → 第二次调用成功
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await observed).toBe("resolved")
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(0) // 定时器路径同样摘除监听
+      expect(vi.getTimerCount()).toBe(0) // 退避定时器已清，无幽灵重试
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

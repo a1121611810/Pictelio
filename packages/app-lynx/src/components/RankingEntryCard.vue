@@ -179,7 +179,7 @@ onUnmounted(() => feed.dispose())
            点它开的是搜索弹层而不是收起。改 `left-2` 后该角无冲突：左下信息块在 `bottom-3`、
            2/3 名竖排在 `bottom-3 right-2.5`，左上角原本空着。 -->
       <view
-        class="absolute left-2 top-2 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-[var(--md-scrim)] active:opacity-80"
+        class="absolute left-2 top-2 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-full bg-[var(--md-scrim)] active:opacity-80"
         :style="{ transition: pressOpacity.transition }"
         accessibility-element
         :accessibility-label="t('ranking.entry.collapseAria')"

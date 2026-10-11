@@ -15,10 +15,14 @@
 // ## 这道门禁**不能**抓什么（显式登记，防下一个人把「全绿」读成「这类问题不存在」）
 //
 // 1. **不再全仓扫描**。新出现的行内动作若落在遮挡带内，本门禁**不会**红 —— 扫描能力已随
-//    几何估算一并删除。覆盖这类站点的是：票 #950 / #951（下方登记的四个债务站点，ADR-0221
-//    §4「刻意不处理」表）+ code review。
+//    几何估算一并删除。已覆盖的是下方**三组共 7 处已登记站点**（`LEADING_SITES` 4 +
+//    `LEADING_FOLLOW_ACTIONS` 2 + `DISMISS_SITE` 1）。债务登记 `BAND_DEBT` 已于 2026-10-12
+//    清空（票 #950 / #951 结清）：新豁免必须同时登记进 `BAND_DEBT` 与 ADR-0221 §4
+//    「刻意不处理」表，缺任一项「债务清零」那条即红。
 // 2. **不做几何判定**，只判源码顺序与对齐写法；遮挡带自身的像素锚点由 `tests/fabGeometry.test.ts` 承担。
-// 3. **只看这四个文件**。其它文件里等价的已修写法若被改回行尾，本门禁不红。
+// 3. **只看那 7 处登记站点**。其它文件里等价的已修写法若被改回行尾，本门禁不红
+//    （2026-10-12 反向枚举实测：同签名形态在 `src/**/*.vue` 另有约 27 处 / 15 个文件，
+//    其中 `/me` 设置行占大头；是否真落在带内还取决于竖直位置，而本门禁刻意不做几何判定）。
 // 4. **读不到票的开关状态**（不调 `gh`、CI 无网络）⇒ 债务是否仍成立用**站点条件**代理。
 //    票 #957 把该代理从「标记字符串还在」升级为「**该站点仍真在行尾**」（源码顺序 / 尾推类，
 //    见下方 `带内证明`）：**站点一旦被修好，豁免即刻自动腐烂**——不需要任何人记得来删登记。
@@ -28,8 +32,10 @@
 // 5. **只认静态 `class="…"`**：`:class` 里的动态拼接类名不参与「尾推」判据。
 //
 // ## 期望值出处（oracle 溯源，禁从被测实现反推）
-// 四个站点清单与「动作在内容列之前」= ADR-0221 §4「本次处理」表；债务票 #950 / #951 及其
-// 四站点 = 同一张表的「刻意不处理」表 + 票面。三类锚点均为逐文件现读核对过的**唯一串**。
+// 「动作在内容列之前」「间距写在右侧」= ADR-0221 §4「本次处理」表 + §2 决策 2 的形态定义；
+// 已修站点清单（4 + 2 + 1）= ADR-0221 §4「本次处理」表逐行核对；债务登记（当前为空）=
+// ADR-0221 §4「刻意不处理」表 + 票面。三类锚点均为逐文件现读核对过的**唯一串**。
+// 文末「判别力自检」的期望值则来自**判据自身的定义**（源码顺序 / 尾推类），不是从实现反推的快照。
 
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -105,14 +111,25 @@ const LEADING_SITES = [
   },
 ] as const
 
-/** 把 flex 的动作推到行尾的写法：`justify-between` / `justify-end` / `ml-auto` / 绝对定位靠右 /
- *  **`flex-row-reverse`**（反转整行 ⇒ 源码在前的动作反而落到右端）。
+/** 把 flex 的动作推到行尾的写法：`justify-between` / `justify-end` / `ml-auto` /
+ *  **绝对定位靠右**（`right-*`，含反转整行的 `flex-row-reverse` —— 反转后源码在前的动作反而落到右端）。
  *  ⚠️ 只枚举**确知**的尾推写法（本仓写法收敛所致），不是通用 CSS 判据 —— 见文件头失效面 5。
  *  `flex-row-reverse` 于 2026-10-12 补入：全仓 `src/` 零使用 ⇒ 加它不会让任何既有站点转红，
  *  但堵住了「源码顺序判据对反转行失效」这个洞（`flex-row-reverse` 不在原枚举里时，
- *  源码顺序仍会判「动作在前」而实际落在行尾）。 */
+ *  源码顺序仍会判「动作在前」而实际落在行尾）。
+ *
+ * ⚠️ **两侧都要认 `"` 作边界**（2026-10-12 由文末阳性对照查出）：`class="a b"` 里 `a` 的前面
+ * 是 `"`、`b` 的后面也是 `"`，都不是空白。原判据只认 `^` / 空白 ⇒ **类属性的首个类与末个类一律漏判**。
+ * 实测漏网 6 处 `justify-between"`（`Me.vue` / `SearchSheet.vue` / `SettingsEndpoint.vue` ×2 /
+ * `RelatedInlineSection.vue` / `NovelDetail.vue`），其中 `SearchSheet.vue:420` 正是 ADR-0221 §4
+ * 「刻意不处理」表里登记过的站点 —— 门禁对它一直是瞎的。
+ *
+ * ⚠️ **裸 `absolute` 已从枚举移除**：绝对定位靠不靠右取决于 `left-*` / `right-*`，`right-*` 已覆盖；
+ * 留着裸 `absolute` 只会在放开 `"` 边界后把**每一个**绝对定位元素（含已改用 `left-*` 的收起 ✕）
+ * 都误判成尾推。那是「意图写绝对定位靠右、枚举却只写了 absolute」的措辞与实现脱节。
+ */
 const TRAILING_PUSH =
-  /(?:^|\s)(?:justify-between|justify-end|ml-auto|absolute|flex-row-reverse|right-[^"\s]+)(?:\s|$)/
+  /(?:^|[\s"])(?:justify-between|justify-end|ml-auto|flex-row-reverse|right-[^"\s]+)(?=[\s"]|$)/
 
 /** 交互面属性（用于「动作之后不得再有交互兄弟」）。`@tap.stop` / `@long-press` 等。 */
 const INTERACTIVE = /@(?:tap|long-?press|click)(?![\w-])/g
@@ -173,7 +190,8 @@ describe('ADR-0221 决策 2 · 四处已修站点的行首位置', () => {
 
 // ═══════════════ 债务登记（ADR-0221 §4「刻意不处理」表）═══════════════
 // 这一组**不是**扫描命中集合的配平（扫描能力已删除，见文件头）——它是「已知仍落在带内、
-// 且刻意不处理」的四处站点台账：票号是豁免的唯一凭据，站点修掉后必须连登记一起删。
+// 且刻意不处理」的站点台账：票号是豁免的唯一凭据，站点修掉后必须连登记一起删。
+// **当前为空**（2026-10-12，票 #950 / #951 结清）；下方判据的能力由文末「判别力自检」持续证明。
 
 /**
  * **带内证明**：豁免登记的前提是「这个动作**仍落在**遮挡带内」。只登记一个 marker 字符串
@@ -188,8 +206,43 @@ describe('ADR-0221 决策 2 · 四处已修站点的行首位置', () => {
  *
  * ⇒ **站点修好 ⇒ 证明不再成立 ⇒ 门禁红 ⇒ 豁免自动失效**。这兑现了 ADR-0221 §7「票关闭后
  * 豁免必须失效」中**能离线兑现的那一半**；另一半（票被关而站点未修）见文件头失效面 4。
+ *
+ * ⚠️ 登记清零后这条判据在真实站点上**没有执行实例**，故判定逻辑抽为 {@link judgeStillInBand}
+ * 并由文末「判别力自检」在合成模板上双向验证。少了那组自检，本判据会退化成一段永不执行的
+ * 死代码，而周围的 `.not.toMatch` 全称否定断言仍会全绿 —— 门禁冻结线 #5：假绿比没门禁更糟。
  */
 type 带内证明 = { kind: 'after-content'; content: string } | { kind: 'pushed' }
+
+/**
+ * 「该站点仍落在遮挡带内」的判定。**抽成纯函数**是为了让它能在合成模板上被自检 ——
+ * `BAND_DEBT` 清零后真实登记为 0 条，若判据只能靠真实登记驱动，它就**一次都不会执行**，
+ * 而它周围全是 `.not.toMatch` 断言：那时把 `TRAILING_PUSH` 改成永不命中的正则，整份门禁
+ * **仍然全绿**（ArchUnit `failOnEmptyShould` 那个坑）。自检见文末「判别力自检」。
+ *
+ * `invalid` 非空表示**判据输入无效**（锚点消失）——此时 `inBand` 无意义，调用方必须先红在这里，
+ * 不得把「量不出来」当成「量出来没问题」。
+ */
+function judgeStillInBand(
+  tpl: string,
+  actionAt: number,
+  proof: 带内证明,
+): { inBand: boolean; invalid?: string } {
+  if (actionAt < 0) return { inBand: false, invalid: '找不到动作标记' }
+  if (proof.kind === 'after-content') {
+    const contentAt = tpl.indexOf(proof.content)
+    if (contentAt < 0) return { inBand: false, invalid: '内容列锚点消失' }
+    // flex-row 不换行 ⇒ 源码顺序即视觉左右顺序；动作排在内容列**之后**才叫落在行尾
+    return { inBand: actionAt > contentAt }
+  }
+  // 位置根本不由源码顺序决定：动作元素自己带尾推写法即算落在行尾
+  return { inBand: TRAILING_PUSH.test(openTagAt(tpl, actionAt)) }
+}
+
+/** 豁免腐烂时的失败文案（债务循环与文末自检共用，避免两处各说各话）。 */
+const gone = (where: string): string =>
+  `${where}：该动作**已不落在行尾** ⇒ 登记豁免的前提（仍落在 GlobalFab 遮挡带内）不再成立。\n` +
+  '        票 #957 起，豁免不再靠「标记还在」续命：站点修好必须让本条转红。\n' +
+  '        请关闭该票，并删除本文件中这条 site 登记（同时更新 ADR-0221 §4 与上方集合断言）。'
 
 const BAND_DEBT: readonly {
   ticket: number
@@ -269,21 +322,9 @@ describe('ADR-0221 决策 2 · 带内债务登记', () => {
       for (const site of entry.sites) {
         const tpl = templateOf(readPkg(site.file))
         const where = `#${entry.ticket} 的 ${site.file}（${site.marker}）`
-        const actionAt = tpl.indexOf(site.marker)
-        expect(actionAt, `${where}：找不到动作标记 —— 判据输入无效`).toBeGreaterThanOrEqual(0)
-
-        const gone =
-          `${where}：该动作**已不落在行尾** ⇒ 登记豁免的前提（仍落在 GlobalFab 遮挡带内）不再成立。\n` +
-          '        票 #957 起，豁免不再靠「标记还在」续命：站点修好必须让本条转红。\n' +
-          '        请关闭该票，并删除本文件中这条 site 登记（同时更新 ADR-0221 §4 与上方集合断言）。'
-
-        if (site.proof.kind === 'after-content') {
-          const contentAt = tpl.indexOf(site.proof.content)
-          expect(contentAt, `${where}：内容列锚点消失（判据输入无效）`).toBeGreaterThanOrEqual(0)
-          expect(actionAt, gone).toBeGreaterThan(contentAt)
-        } else {
-          expect(openTagAt(tpl, actionAt), gone).toMatch(TRAILING_PUSH)
-        }
+        const verdict = judgeStillInBand(tpl, tpl.indexOf(site.marker), site.proof)
+        expect(verdict.invalid, `${where}：${verdict.invalid ?? ''} —— 判据输入无效，不能当成通过`).toBeUndefined()
+        expect(verdict.inBand, gone(where)).toBe(true)
       }
     }
   })
@@ -368,10 +409,93 @@ describe('ADR-0221 决策 2 · 关注开关行首化（票 #950 / #951）', () =
     const actionAt = tpl.indexOf(DISMISS_SITE.marker)
     expect(actionAt, `${DISMISS_SITE.file}：找不到收起按钮`).toBeGreaterThanOrEqual(0)
     const tag = openTagAt(tpl, actionAt)
+    // 两侧都认 `"` 作边界：`class="absolute top-2 right-2"` 的 `right-2` 后面是 `"` 而非空白，
+    // 只认空白会让「收起按钮改回右浮层」这个回归漏过去（同 TRAILING_PUSH 的漏网区）
     expect(
       tag,
       `${DISMISS_SITE.file}：收起按钮带 right-* 定位 ⇒ 它回到 GlobalFab 遮挡带内（票 #951）。请改用 left-*。`,
-    ).not.toMatch(/(?:^|\s)right-[^"\s]+(?:\s|$)/)
+    ).not.toMatch(/(?:^|[\s"])right-[^"\s]+(?=[\s"]|$)/)
     expect(tag, `${DISMISS_SITE.file}：收起按钮未用 left-* 定位（锚点已变，请同步本文件）`).toContain(DISMISS_SITE.left)
+  })
+})
+
+// ═══════════════ 判别力自检（阳性对照）═══════════════
+// 这一组**不读任何项目文件**，只喂合成模板。它存在的原因：
+//
+// `BAND_DEBT` 已清空（票 #950 / #951 结清）⇒ 上面那条 #957 核心判据的真实登记为 **0 条**。
+// 而本文件里其余 5 处尾推判据全是 `.not.toMatch` —— 那是**全称否定断言**：集合为空时恒真。
+// 于是「把 TRAILING_PUSH 改成永不命中的正则」会让**整份门禁依然全绿**，判别力无法被证明。
+// 这正是 ArchUnit `failOnEmptyShould` 那个坑（正则/集合失效 ⇒ 全称断言静默恒真）。
+//
+// 门禁纪律「抽取器自身有效（扫描面非空 + 命中数下界）+ 阳性对照」要求的就是这一组。
+// 它的判别力检验很直接：把下面任一期望值反过来改，本组必须变红。
+
+/** 合成模板：动作排在内容列**之后**（= 仍在行尾，豁免成立）。 */
+const 仍在行尾 = [
+  '<view class="flex flex-row items-center">',
+  '  <view class="flex flex-col flex-1" data-testid="内容列">文字</view>',
+  '  <view class="mr-1.5" @tap="onTap">',
+].join('\n')
+
+/** 合成模板：动作已迁到内容列**之前**（= 站点修好，豁免必须腐烂）。 */
+const 已迁行首 = [
+  '<view class="flex flex-row items-center">',
+  '  <view class="mr-1.5" @tap="onTap">',
+  '  <view class="flex flex-col flex-1" data-testid="内容列">文字</view>',
+].join('\n')
+
+const AFTER_CONTENT: 带内证明 = { kind: 'after-content', content: 'data-testid="内容列"' }
+
+describe('门禁判别力自检 · 阳性对照（防「全绿 = 无事发生」）', () => {
+  it('TRAILING_PUSH 对每种已知尾推写法都命中（含类属性首/末位），且不误伤行首写法', () => {
+    // 命中数下界：枚举里的每一项都要能被正则命中。少改一项、或正则整体失效，本条即红。
+    // 前两条刻意取「首/末位」形态 —— `class="…"` 的首个类前面是 `"`、末个类后面是 `"`，
+    // 这两处正是原判据的漏网区（实测漏掉 6 处 `justify-between"`）。
+    for (const cls of [
+      'class="justify-between flex items-center"', // 首位（前面是 `"`）
+      'class="flex justify-between"', // 末位（后面是 `"`）
+      'class="flex flex-row items-center justify-between items-center"', // 中间
+      'class="justify-end"',
+      'class="ml-auto"',
+      'class="absolute right-2 top-2"',
+      'class="absolute top-2 right-2"',
+      'class="flex flex-row-reverse items-center"',
+    ]) {
+      expect(
+        TRAILING_PUSH.test(cls),
+        `TRAILING_PUSH 未命中已知尾推写法「${cls}」—— 正则失效或类属性首/末位漏判，会让本文件 5 处 .not.toMatch 断言静默恒真（ArchUnit failOnEmptyShould 同款陷阱）。`,
+      ).toBe(true)
+    }
+    // 反向：现行行首写法不得被误判成尾推，否则「已修站点」会假红、门禁会被改坏而不自知。
+    // 末条尤其重要：裸 `absolute` 已从枚举移除，靠左的浮层（收起 ✕ 改用 left-* 后的形态）不算尾推。
+    expect(TRAILING_PUSH.test('class="flex flex-row items-center mr-1.5"')).toBe(false)
+    expect(TRAILING_PUSH.test('class="absolute left-2 top-2"')).toBe(false)
+    expect(TRAILING_PUSH.test('class="absolute"')).toBe(false)
+  })
+
+  it('带内证明 · after-content 分支双向可判（仍在行尾 ⇒ 成立；已迁行首 ⇒ 腐烂）', () => {
+    expect(judgeStillInBand(仍在行尾, 仍在行尾.indexOf('@tap="onTap"'), AFTER_CONTENT).inBand).toBe(true)
+    expect(judgeStillInBand(已迁行首, 已迁行首.indexOf('@tap="onTap"'), AFTER_CONTENT).inBand).toBe(false)
+  })
+
+  it('带内证明 · pushed 分支双向可判（自带尾推类 ⇒ 成立；改 left-* ⇒ 腐烂）', () => {
+    const 右浮层 = '<view class="absolute right-2 top-2" @tap="close">'
+    const 左浮层 = '<view class="absolute left-2 top-2" @tap="close">'
+    expect(judgeStillInBand(右浮层, 右浮层.indexOf('@tap="close"'), { kind: 'pushed' }).inBand).toBe(true)
+    expect(judgeStillInBand(左浮层, 左浮层.indexOf('@tap="close"'), { kind: 'pushed' }).inBand).toBe(false)
+  })
+
+  it('带内证明 · 判据输入无效时报 invalid，不静默判成「不在带内」也不静默判成通过', () => {
+    // 锚点消失 = 量不出来，必须与「量出来不在带内」区分开，否则删掉内容列就能骗过门禁
+    expect(judgeStillInBand(已迁行首, -1, AFTER_CONTENT).invalid).toBe('找不到动作标记')
+    const 无内容列 = '<view class="flex flex-row items-center"><view @tap="onTap"></view></view>'
+    expect(judgeStillInBand(无内容列, 无内容列.indexOf('@tap="onTap"'), AFTER_CONTENT).invalid).toBe('内容列锚点消失')
+  })
+
+  it('债务判据在空登记下不会「假装跑过」（自检这条的存在性，防有人把自检一并删掉）', () => {
+    // 不是同义反复：它钉的是「真实登记为 0 条」这一**当前事实**，而上面的自检钉的是判据**能力**。
+    // 两者缺一，门禁就会出现「全绿但什么都证明不了」的状态。
+    expect(BAND_DEBT.length, 'BAND_DEBT 非空 ⇒ 请同步本组自检与文件头失效面登记').toBe(0)
+    expect(typeof judgeStillInBand, 'judgeStillInBand 被移除 ⇒ #957 的判据已无处可证').toBe('function')
   })
 })

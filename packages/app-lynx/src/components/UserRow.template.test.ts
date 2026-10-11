@@ -37,7 +37,7 @@ describe('UserRow 公开接口（user + isFollowed/busy + followLabel/followedLa
     expect(code).toContain('@tap="onToggle"')
   })
 
-  it('组件零 i18n：不 import t、模板无 t( 调用（按钮文案经 followLabel/followedLabel 注入）', () => {
+  it('组件零 i18n：不 import t、模板无 t( 调用（无障碍标签文案经 followLabel/followedLabel 注入）', () => {
     expect(code).not.toMatch(/from '\.\.\/i18n'/)
     expect(code).not.toMatch(/\bt\(/)
   })
@@ -91,6 +91,29 @@ describe('UserRow 行卡结构（FollowList 存量逐 class 快照）', () => {
     // 若文案又回到模板里，说明形态回退成了行尾药丸，门禁会另行转红。
     expect(code).toContain(':accessibility-label="isFollowed ? followedLabel : followLabel"')
     expect(code).not.toContain('{{ isFollowed ? followedLabel : followLabel }}')
+  })
+
+  // [ ADR-0221 §4 的 a11y 配平契约 ] 票 #950 补：行首化把开关改成**纯图标**按钮后，关注状态
+  // 对读屏用户只剩 :accessibility-label 一条通路，「element 与 label 是否仍成对」就成了唯一
+  // 能挡住「标签被顺手删掉」的防线（先例：IllustDetail.template.test.ts 同类断言）。
+  it('a11y 配平：开关 element : label = 1 : 1，且唯一那处 element 就是开关本体', () => {
+    // 期望值来源（禁自证）：本模板只有**一处**可交互控件需要无障碍标注 —— 行首关注/取关开关。
+    // 行信息区那个 @tap 是「进用户主页」的导航入口，其可见文本（{{ user.name }} / @{{ user.account }}）
+    // 已由读屏逐字念出，按既有语义**无需**另配标签；此处照实反映，不为凑成 1:1 去改生产代码的
+    // a11y 语义。故 element 绝对计数 = 1、label 绝对计数 = 1。
+    // ⚠️ 不写 `expect(labelCount).toBe(elementCount)`：那只是把两个计数互相重述，删掉任意
+    //   一处都会同时变成 1:0 而仍然全绿 —— 等于没断言（门禁冻结线 #5：假绿比没门禁更糟）。
+    const elementCount = (code.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    const labelCount = (code.match(/:accessibility-label=/g) ?? []).length
+    expect(elementCount).toBe(1)
+    expect(labelCount, '开关丢了无障碍标签 ⇒ 文字移除后关注状态对读屏用户不可见').toBe(1)
+    // 两条属性必须落在**同一个 view** 上：拆到两个节点 = 多出一个无标签的可交互节点。
+    const annotated = /<view\b[^>]*:accessibility-element="A11Y_ELEMENT_ENABLED"[^>]*>/.exec(code)
+    expect(annotated, '找不到带 :accessibility-element 的 view —— 判据输入无效').not.toBeNull()
+    expect(annotated![0]).toContain('@tap="onToggle"')
+    // 双 label prop 是**必填**接口（withDefaults 未给兜底），故这一条绑定必须同时消费两态分支：
+    // 少任一分支 = 未关注 / 已关注之一对读屏用户静默。
+    expect(annotated![0]).toContain(':accessibility-label="isFollowed ? followedLabel : followLabel"')
   })
 })
 

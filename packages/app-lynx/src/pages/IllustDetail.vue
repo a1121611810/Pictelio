@@ -573,7 +573,7 @@ onMounted(async () => {
                状态改由 accessibility-label 承载，复用同一对 i18n key、不新增文案面。 -->
           <view
             v-if="!isSelfAuthor"
-            class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
+            class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-full"
             :class="[pressColor.className, following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="followA11yLabel"
