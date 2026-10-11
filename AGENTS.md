@@ -57,7 +57,7 @@ CodeGraph 不可用（`.codegraph/` 未生成、返回空结果）· 已知路�
 | 按名快速定位符号（只要位置不要源码） | bash `codegraph query <name>` | 比 explore 便宜 |
 | 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 bash `codegraph impact <symbol>` | |
 | 变更文件 → 受影响测试 | bash `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
-| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；边数归零 = 索引腐化，人工 `codegraph index --force` |
+| 索引健康检查 | bash `codegraph status --json` | 节点/边计数；**计数正常 ≠ 覆盖当前分支**——另看 `lastIndexed` 是否早于本分支，并用**本分支新引入的符号** `codegraph query <符号名>` 验活一次（返回空即索引陈旧，降级 grep 并声明）。边数归零 = 索引腐化，人工 `codegraph index --force` |
 
 ### tool_call 守卫（pi 扩展行为）
 
@@ -254,7 +254,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 ## 任务完成前自检
 
 - **工具路由**：本次工具选择是否按「工具触发协议」执行？（事实 → CodeGraph；理由 → ADR；路线 → CONTEXT-MAP；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
-- **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）
+- **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）。**计数正常也可能覆盖不到新代码**——`lastIndexed` 早于本分支时，用本分支新符号 `codegraph query <名>` 验活，返回空即按陈旧处理并降级 grep/read（实证：2026-10-11 图片缓存分支，12909 节点 / 41016 边看着健康，但 `CACHE_DIR_MUTATION_LOCK` 等新符号全部返回空，两轴 review 都因此降级）
 - **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
 - **闭环规格**：凡产生了代码改动，强制闭环一律以
   [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) 为准 —— **含**「工作流强制规范」的
