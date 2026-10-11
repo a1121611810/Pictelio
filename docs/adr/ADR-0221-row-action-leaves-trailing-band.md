@@ -114,9 +114,10 @@
 | `components/RankingEntryCard.vue` | 收起 ✕ | `/illusts` | `absolute` 浮层，非行内 flex 动作 |
 
 **怎么保住状态语义**（这是本批唯一的真问题）：字体子集里**没有** `person_add` /
-`person_check`（仅 `person` / `check` / `favorite_border`），故三处一律
-**两态同用 `person` 图标 + 沿用原有的填充对比**（未关注 = outline 边框 + 透明底，
+`person_check`（仅 `person` / `check` / `favorite_border`），故**两处关注开关**（`UserRow` /
+`IllustDetail`）一律**两态同用 `person` 图标 + 沿用原有的填充对比**（未关注 = outline 边框 + 透明底，
 已关注 = `bg-primary` 实心 + 反色）——与被替换的药丸同一套视觉语言，未新造语义。
+（第三处 `RankingEntryCard` 的收起 ✕ **无两态**，用的是 `close` 图标，不适用本段。）
 文字移除后，状态**只**由 `accessibility-label` 承载，三处全部补齐；
 「每个 `:accessibility-element` 配一个 label」这条既有配平契约同步扩展（见
 `IllustDetail.template.test.ts` / `UserRow.template.test.ts`）。
@@ -202,9 +203,23 @@
   整份门禁**仍然全绿**（ArchUnit `failOnEmptyShould` 同款陷阱）。现把判定抽为纯函数
   `judgeStillInBand`，并补一组**不读任何项目文件**的合成模板自检，双向证明判据会红。
   ② 同一自检还查出尾推正则的**两侧边界漏判**：`class="…"` 的首个类前面是 `"`、末个类后面是 `"`，
-  原判据只认 `^` / 空白 ⇒ **类属性首/末位一律漏判**，实测漏网 6 处 `justify-between"`
+  原判据只认 `^` / 空白 ⇒ **类属性首/末位一律漏判**。实测漏网 6 处 `justify-between"`
   （`Me.vue` / `SearchSheet.vue` / `SettingsEndpoint.vue` ×2 / `RelatedInlineSection.vue` /
-  `NovelDetail.vue`），其中 `SearchSheet.vue:420` 正是 §4「刻意不处理」表里登记过的站点 ——
-  门禁对它一直是瞎的。已改为两侧都认 `"` 作边界，并把裸 `absolute` 从枚举移除
+  `NovelDetail.vue`）。已改为两侧都认 `"` 作边界，并把裸 `absolute` 从枚举移除
   （靠不靠右取决于 `left-*` / `right-*`，`right-*` 已覆盖；留着它只会让每个绝对定位元素都误判）。
+  ⚠️ **但这 6 处按设计仍不在门禁视野内** —— 扫描能力已整体删除，本门禁只读那 7 处登记站点，
+  边界修复只提升「未来新增站点被登记时」的可判定性，**不追溯覆盖存量**。
+  同轮补入 `order-first` / `order-last` / `order-<数字>`（同 `flex-row-reverse` 的论证：
+  `order` 在本工程 preset 白名单内会产真规则，而全仓 `src/` 零使用 ⇒ 加它零成本）。
   检出实验：同一变异（`justify-between` 置于类属性末尾）下**新判据红、旧判据绿**。
+- **门禁自检的判别力仍有一个自由度是空的，已补上**（2026-10-12，外部复核第 2 轮查出）：
+  上述自检**只钉住了「极性」**（判为真 / 判为假），**没钉住「测量范围」** —— 把
+  `openTagAt(tpl, actionAt)` 换成 `tpl`（量得太宽），自检原本**仍然全绿**，因为两条夹具都是
+  单行、尾推令牌恰好就在动作元素自身。危害不是假想：`RankingEntryCard.vue:141/152` 本来就有
+  两处与收起 ✕ 无关的 `right-*` 令牌，量宽后它们会替一个**已修好**的站点「续命」——
+  而「站点已修好、豁免却静默存活」正是 #957 要杀的方向。已补一条夹具：动作在行首且自身
+  开标签干净、模板**后段**另有 `right-*` ⇒ 必须判「不在带内」。复验：同一攻击现确定性转红。
+  ⚠️ 同一轮还构造出**新的已知失效面**并已登记到门禁文件头失效面 6：`openTagAt` 返回完整开标签，
+  `"` 成边界后**任何属性值**里的枚举词都会造成假阳性（如 `data-bandprobe="ml-auto"`）。
+  收窄办法是只取 `class="…"` 的值再判；本轮不做（改判据本体须重跑一轮抗攻击复核），
+  故**显式登记**而非当作已解决。

@@ -20,9 +20,15 @@
 //    清空（票 #950 / #951 结清）：新豁免必须同时登记进 `BAND_DEBT` 与 ADR-0221 §4
 //    「刻意不处理」表，缺任一项「债务清零」那条即红。
 // 2. **不做几何判定**，只判源码顺序与对齐写法；遮挡带自身的像素锚点由 `tests/fabGeometry.test.ts` 承担。
-// 3. **只看那 7 处登记站点**。其它文件里等价的已修写法若被改回行尾，本门禁不红
-//    （2026-10-12 反向枚举实测：同签名形态在 `src/**/*.vue` 另有约 27 处 / 15 个文件，
-//    其中 `/me` 设置行占大头；是否真落在带内还取决于竖直位置，而本门禁刻意不做几何判定）。
+// 3. **只看那 7 处登记站点**（文件见下方 `LEADING_SITES` / `LEADING_FOLLOW_ACTIONS` /
+//    `DISMISS_SITE` 三组）。其它文件里等价的已修写法若被改回行尾，本门禁不红。
+//    未覆盖面可复算（外部复核 2026-10-12 订正：此前此处写的是「约 27 处 / 15 个文件」，
+//    该数字来自二手报告、无推导命令，按两种口径都复算不出来 —— 已删除）：
+//      $ grep -rlE "justify-between|justify-end|ml-auto|flex-row-reverse|order-(first|last|[0-9]+)|right-[0-9a-z[]" \
+//          src --include=*.vue | wc -l
+//      31
+//    ⚠️ 这**不是**「31 个 bug」：是否真落在带内还取决于竖直位置，而本门禁刻意不做几何判定。
+//    它只是「同类写法在仓内的分布」，用来提醒下一个人：本门禁的覆盖面是 7 处，不是全仓。
 // 4. **读不到票的开关状态**（不调 `gh`、CI 无网络）⇒ 债务是否仍成立用**站点条件**代理。
 //    票 #957 把该代理从「标记字符串还在」升级为「**该站点仍真在行尾**」（源码顺序 / 尾推类，
 //    见下方 `带内证明`）：**站点一旦被修好，豁免即刻自动腐烂**——不需要任何人记得来删登记。
@@ -30,6 +36,12 @@
 //    本门禁**不会**红。CI 内读不到票状态是物理限制，不是配置疏漏；此缺口只能靠关闭流程兜底
 //    （关票前必须先让对应站点转红或删登记）。**不要把这里的全绿读成「票与站点一致」。**
 // 5. **只认静态 `class="…"`**：`:class` 里的动态拼接类名不参与「尾推」判据。
+// 6. **判据作用在整个开标签上，不只作用在 `class` 属性值里**（外部复核 2026-10-12 登记）：
+//    `openTagAt` 返回的是完整开标签，而 `"` 成为边界后，**任何属性值**里写着枚举词都会误判
+//    （已构造：`data-bandprobe="ml-auto"` 使整行假红）。本仓现实中不易触发（无此类属性值），
+//    但**门禁假阳性会被人用白名单掩盖** —— 那比漏判更危险，因为它会把真信号一起淹掉。
+//    收窄办法是只取 `class="…"` 的值再判；本轮不做（会改动判据本体，须重跑一轮抗攻击复核），
+//    故在此显式登记为**已知失效面**，而不是当作已解决。
 //
 // ## 期望值出处（oracle 溯源，禁从被测实现反推）
 // 「动作在内容列之前」「间距写在右侧」= ADR-0221 §4「本次处理」表 + §2 决策 2 的形态定义；
@@ -127,9 +139,15 @@ const LEADING_SITES = [
  * ⚠️ **裸 `absolute` 已从枚举移除**：绝对定位靠不靠右取决于 `left-*` / `right-*`，`right-*` 已覆盖；
  * 留着裸 `absolute` 只会在放开 `"` 边界后把**每一个**绝对定位元素（含已改用 `left-*` 的收起 ✕）
  * 都误判成尾推。那是「意图写绝对定位靠右、枚举却只写了 absolute」的措辞与实现脱节。
+ *
+ * ⚠️ **`order-*` 于 2026-10-12 补入**（同 `flex-row-reverse` 的论证）：`order` 在本工程 Lynx preset
+ * 的 corePlugin 白名单内（实测会产出真规则），而 `order-*` 在全仓 `src/` **零使用**
+ * （`grep -rEoh "\border-[a-z0-9-]+" src --include=*.vue | wc -l` = 0）⇒ 加它零成本。
+ * 只收 `order-first` / `order-last` / `order-<数字>`，**不含 `order-none`**（那恰恰是不尾推）。
+ * 响应式变体前缀（`md:` / `sm:`）**不构成同类洞**：本工程 preset 白名单无 `screens` / `responsive`。
  */
 const TRAILING_PUSH =
-  /(?:^|[\s"])(?:justify-between|justify-end|ml-auto|flex-row-reverse|right-[^"\s]+)(?=[\s"]|$)/
+  /(?:^|[\s"])(?:justify-between|justify-end|ml-auto|flex-row-reverse|order-(?:first|last|\d+)|right-[^"\s]+)(?=[\s"]|$)/
 
 /** 交互面属性（用于「动作之后不得再有交互兄弟」）。`@tap.stop` / `@long-press` 等。 */
 const INTERACTIVE = /@(?:tap|long-?press|click)(?![\w-])/g
@@ -444,6 +462,19 @@ const 已迁行首 = [
   '  <view class="flex flex-col flex-1" data-testid="内容列">文字</view>',
 ].join('\n')
 
+/** 合成模板：动作已迁行首且**自身开标签干净**，但模板**后面**另有一处无关的 `right-*`。
+ *  这条专门封住「测量范围」这个自由度 —— 判据必须只量动作元素**自己**的开标签。
+ *  反例即外部复核的攻击 A：`openTagAt(tpl, actionAt)` 一旦被换成 `tpl`，这里会被后段那处
+ *  无关的 `right-*` 替它续命（已修站点的豁免静默存活），而当时的自检**仍然全绿**。
+ *  真实危害不是假想：`RankingEntryCard.vue` 模板里本来就有 `right-[30vw]`（:141）与
+ *  `right-2.5`（:152）两处与收起 ✕ 无关的令牌。 */
+const 远处有尾推令牌 = [
+  '<view class="flex flex-row items-center">',
+  '  <view class="mr-1.5" @tap="onTap">',
+  '  <view class="flex flex-col flex-1" data-testid="内容列">文字</view>',
+  '  <view class="absolute right-[30vw] bottom-3">名次</view>',
+].join('\n')
+
 const AFTER_CONTENT: 带内证明 = { kind: 'after-content', content: 'data-testid="内容列"' }
 
 describe('门禁判别力自检 · 阳性对照（防「全绿 = 无事发生」）', () => {
@@ -476,6 +507,17 @@ describe('门禁判别力自检 · 阳性对照（防「全绿 = 无事发生」
   it('带内证明 · after-content 分支双向可判（仍在行尾 ⇒ 成立；已迁行首 ⇒ 腐烂）', () => {
     expect(judgeStillInBand(仍在行尾, 仍在行尾.indexOf('@tap="onTap"'), AFTER_CONTENT).inBand).toBe(true)
     expect(judgeStillInBand(已迁行首, 已迁行首.indexOf('@tap="onTap"'), AFTER_CONTENT).inBand).toBe(false)
+  })
+
+  it('带内证明 · 只量动作元素**自己**的开标签，量到别处即为逃逸（外部复核攻击 A）', () => {
+    // 极性已经被上一条钉住；这一条钉的是**测量范围**。把 `openTagAt(tpl, actionAt)` 换成
+    // `tpl` 会让判据变松（量得太宽），而当时的两条单行夹具分辨不出来 —— 因为它们的尾推
+    // 令牌恰好就在动作元素自身。判据变松的方向正是 #957 要杀的方向：豁免静默续命。
+    const at = 远处有尾推令牌.indexOf('@tap="onTap"')
+    expect(judgeStillInBand(远处有尾推令牌, at, AFTER_CONTENT).inBand, '源码顺序分支被模板后段的无关令牌带偏').toBe(false)
+    expect(judgeStillInBand(远处有尾推令牌, at, { kind: 'pushed' }), 'pushed 分支量了整个模板而非动作自己的开标签').toMatchObject({
+      inBand: false,
+    })
   })
 
   it('带内证明 · pushed 分支双向可判（自带尾推类 ⇒ 成立；改 left-* ⇒ 腐烂）', () => {
