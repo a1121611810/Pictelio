@@ -14,8 +14,11 @@ import org.robolectric.annotation.Config;
 /**
  * {@link ImageMemoryCache} 内存缓存单测（#147，Robolectric 提供 Bitmap）。
  *
- * <p>覆盖：put/get 往返（含默认 64MB 实例）、未命中返回 null、超上限按 LRU 淘汰最旧、
- * clear。淘汰用例通过包可见注入构造用小上限 {@link LruCache} 逼出（避免在单测里塞满 64MB）。
+ * <p>覆盖：put/get 往返（含按注入容量建的实例）、未命中返回 null、超上限按 LRU 淘汰最旧、
+ * clear。淘汰用例通过包可见注入构造用小上限 {@link LruCache} 逼出。
+ *
+ * <p>容量自 #979 起由 {@link ImageCacheBudgetResolver} 按设备算得后注入，
+ * 本类不再有「默认 64MB」实例可测。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -40,9 +43,10 @@ public class ImageMemoryCacheTest {
     }
 
     @Test
-    public void defaultCache_putGetWorks() {
-        // 默认 64MB 上限实例正常读写
-        ImageMemoryCache cache = new ImageMemoryCache();
+    public void injectedCapacity_putGetWorks() {
+        // 容量由调用方注入（#979 起不再有无参默认容量）：给足一屏预算，读写照常
+        long oneScreen = 1080L * 2400L * ImageCacheBudget.BYTES_PER_PIXEL;
+        ImageMemoryCache cache = new ImageMemoryCache(oneScreen);
         Bitmap bmp = bitmap(10, 10);
         cache.put("https://i.pximg.net/b.jpg", bmp);
         assertSame(bmp, cache.get("https://i.pximg.net/b.jpg"));

@@ -88,7 +88,8 @@ public class PictelioImageServiceTest {
         server.start();
         ctx = ApplicationProvider.getApplicationContext();
         // 干净实例：内存层与磁盘层均从零开始，不依赖静态单例的残留状态（#977）
-        memoryCache = new ImageMemoryCache();
+        // 容量显式给足（#979 起无参默认容量已移除，生产走按设备算的预算）
+        memoryCache = new ImageMemoryCache(64L * 1024 * 1024);
         clearDiskCache();
         service = new PictelioImageService(memoryCache);
         service.onInitialize(ctx);
