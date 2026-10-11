@@ -63,6 +63,13 @@ import okhttp3.Response;
  * {@link DiskCacheBudget#computeMaxBytes(long)}（可用存储 × 2%，钳制 10MB–250MB，一手出处
  * 见该类注释）。上限在<b>每次淘汰时重新求值</b>，故存储紧张时自动收缩、恢复后自然增长；
  * 收缩后超限条目由下方<b>同一条</b>淘汰路径按访问时间序回收（不另起删除逻辑）。
+ *
+ * <p><b>两层缓存共用一个键空间（#980）</b>：缓存键由 {@link #cacheKey(String)} 唯一产出，
+ * 内存层（{@code PictelioImageService} 的 {@code ImageMemoryCache}）与本类磁盘层消费<b>同一</b>个键。
+ * 此前磁盘层键是 rewrite 产物、内存层却用未 rewrite 的原始 URL——同一张图以代理路径与绝对地址
+ * 两种形态请求时磁盘共享一条目而内存记两份。此差异已消除，ADR-0143 D2「缓存键恒官方 CDN URL」
+ * 与 ADR-0222 §2.5「预取/显示/zip 三链路共用同一键空间」两条不变量现覆盖两层。
+ * <b>本类缓存方法的入参契约不变</b>：调用方传入的应是官方 URL（{@code cacheKey} 幂等，重复调用无害）。
  */
 public class PixivImageLoader {
 
@@ -188,6 +195,27 @@ public class PixivImageLoader {
             // 非法 URI 字符（如未编码空格）：回退原始拼接，与既有 interceptImage 行为一致
             return cdnUrl;
         }
+    }
+
+    /**
+     * <b>缓存键的唯一产出点（#980）</b>：内存层与磁盘层<b>必须</b>都用本函数产出键。
+     *
+     * <p>为什么需要它：此前磁盘层由调用方先 {@code rewriteUrl} 再传进来（键 = 官方 URL），
+     * 而内存层直接拿未 rewrite 的原始 {@code url} 当键。同一张图若以 {@code /pixiv-img/x}
+     * 与 {@code https://i.pximg.net/x} 两种形态请求，磁盘共享一条目、内存却记两份——
+     * 内存预算被双份占用，命中率统计随之失真。本函数把「键怎么算」收敛到一处，
+     * 两条链路不可能再算出不同的键。
+     *
+     * <p><b>为何不把 rewrite 下沉进本类的缓存路径</b>：本类缓存方法的入参契约是
+     * 「调用方已给出官方 URL」（ADR-0143 D2 源无关命中），而下载源由 {@link ImageHostConfig}
+     * 在 {@link #download} 内部决策。若在本类内部再 rewrite 一次，键将与下载源耦合，
+     * 且会改变既有磁盘侧键断言的语义。本函数只做<b>产出</b>，消费仍由各层显式完成。
+     *
+     * <p><b>幂等</b>：{@code rewriteUrl} 对已 rewrite 的官方 URL 原样返回
+     * （其中不含 {@code /pixiv-img/}），故重复调用本函数不改变结果。
+     */
+    public static String cacheKey(String url) {
+        return rewriteUrl(url);
     }
 
     // ── 磁盘缓存（对齐 ImageCachePlugin/PixivApiPlugin 同规则） ─
