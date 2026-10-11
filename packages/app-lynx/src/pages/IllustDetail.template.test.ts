@@ -126,6 +126,11 @@ describe('IllustDetail 标签近邻入口（ADR-0197 D14）', () => {
     // 走 t() 而非注册表。配平口径不变——「每个 a11y 标注都配一个 element」，故 element
     // 总量 = 注册表标签数 + 沉浸标签数（缺任一即红）。
     const immersiveLabelCount = (code.match(/:accessibility-label="immersiveA11yLabel/g) ?? []).length
-    expect(elementCount).toBe(labelCount + immersiveLabelCount)
+    // [ 票 #951 ] 关注开关行首化后另有 1 处**两态动态**标签 `followA11yLabel`：开关已不渲染
+    // 「关注 / 已关注」文字（只剩 person 图标），状态对读屏用户**只**由这条标签承载。
+    // 写法与沉浸标签同款（具名 computed），故同口径计入配平。
+    const followLabelCount = (code.match(/:accessibility-label="followA11yLabel"/g) ?? []).length
+    expect(followLabelCount, '关注开关丢了无障碍标签 ⇒ 文字移除后状态对读屏用户不可见').toBe(1)
+    expect(elementCount).toBe(labelCount + immersiveLabelCount + followLabelCount)
   })
 })

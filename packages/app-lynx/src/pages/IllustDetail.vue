@@ -200,6 +200,12 @@ const followError = ref('') // 独立于 errorMsg——避免关注失败击穿�
 
 const isSelfAuthor = computed(() => useAuthStore().currentUser?.id === illust.value?.user.id)
 
+/** 关注开关的无障碍名称（票 #951）。图标本身无文字语义——关注状态改由本标签承载，
+ *  与 `immersiveA11yLabel` 同款「具名动态标签」写法，好让 a11y 配平断言能把它计入。 */
+const followA11yLabel = computed(() =>
+  following.value ? t('illustDetail.follow.following') : t('illustDetail.follow.follow'),
+)
+
 async function toggleFollowAuthor() {
   if (followBusy.value || !illust.value) return
   followBusy.value = true
@@ -560,6 +566,21 @@ onMounted(async () => {
              更重，层级倒置 → 500。 -->
         <text class="text-headline-small font-regular text-surface-on">{{ artworkTitle(illust.title) }}</text>
         <view class="flex flex-row items-center mt-2">
+          <!-- 关注作者：**行首**圆形图标按钮（ADR-0221 决策 2 / 票 #951）。
+               原位置在行尾，落在 GlobalFab 遮挡带内 ⇒ 点它开的是搜索弹层而不是 toggle。
+               状态表达同 UserRow #950：字体子集无 person_add / person_check，两态同用 `person`，
+               靠填充对比（outline 边框 / bg-primary 实心）区分；文字不渲染，
+               状态改由 accessibility-label 承载，复用同一对 i18n key、不新增文案面。 -->
+          <view
+            v-if="!isSelfAuthor"
+            class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
+            :class="[pressColor.className, following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="followA11yLabel"
+            @tap="toggleFollowAuthor"
+          >
+            <AppIcon name="person" :class="following ? 'text-primary' : 'text-primary-on'" />
+          </view>
           <!-- 作者行命中区只含头像 + 名字（#542）：整行可点会让心形附近的坐标偏移
                静默跳转作者页（自动化假绿路径）；收窄后偏移落空处 = 响亮失败 -->
           <view
@@ -575,17 +596,6 @@ onMounted(async () => {
               class="w-[10.667vw] h-[10.667vw] rounded-full"
             />
             <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
-          </view>
-          <!-- P0-T3：关注作者（非本人时显示） -->
-          <view
-            v-if="!isSelfAuthor"
-            class="px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-            :class="[pressColor.className, following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
-            @tap="toggleFollowAuthor"
-          >
-            <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
-              {{ following ? t('illustDetail.follow.following') : t('illustDetail.follow.follow') }}
-            </text>
           </view>
         </view>
         <text v-if="followError" class="text-label-medium text-error mt-1">{{ followError }}</text>

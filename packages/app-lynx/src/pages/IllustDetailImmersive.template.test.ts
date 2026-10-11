@@ -156,7 +156,10 @@ describe('浮层打开强制退出沉浸（决策 3 浮层优先级）', () => {
 describe('无障碍（决策 9：动态标签 + 两态可退出路径）', () => {
   it('三处图片容器都挂动态 accessibility-label 与 accessibility-element', () => {
     expect((code.match(/:accessibility-label="immersiveA11yLabel/g) ?? []).length).toBe(3)
-    expect((code.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length).toBe(4)
+    // 4 = 3 处沉浸图片容器 + 1 处退出入口。第 5 处是**关注开关**（票 #951 行首化）：
+    // 它同样挂了自己的两态动态标签 `followA11yLabel`，配平断言见
+    // IllustDetail.template.test.ts「a11y 注册表键全部被消费且 label/element 配平」。
+    expect((code.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length).toBe(5)
   })
 
   it('多图分支的标签带「第 n / N 张」，单图 / ugoira 分支不带', () => {

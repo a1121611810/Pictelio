@@ -105,9 +105,14 @@ const LEADING_SITES = [
   },
 ] as const
 
-/** 把 flex 的动作推到行尾的写法：`justify-between` / `justify-end` / `ml-auto` / 绝对定位靠右。
- *  ⚠️ 只枚举**确知**的尾推写法（本仓写法收敛所致），不是通用 CSS 判据 —— 见文件头失效面 5。 */
-const TRAILING_PUSH = /(?:^|\s)(?:justify-between|justify-end|ml-auto|absolute|right-[^"\s]+)(?:\s|$)/
+/** 把 flex 的动作推到行尾的写法：`justify-between` / `justify-end` / `ml-auto` / 绝对定位靠右 /
+ *  **`flex-row-reverse`**（反转整行 ⇒ 源码在前的动作反而落到右端）。
+ *  ⚠️ 只枚举**确知**的尾推写法（本仓写法收敛所致），不是通用 CSS 判据 —— 见文件头失效面 5。
+ *  `flex-row-reverse` 于 2026-10-12 补入：全仓 `src/` 零使用 ⇒ 加它不会让任何既有站点转红，
+ *  但堵住了「源码顺序判据对反转行失效」这个洞（`flex-row-reverse` 不在原枚举里时，
+ *  源码顺序仍会判「动作在前」而实际落在行尾）。 */
+const TRAILING_PUSH =
+  /(?:^|\s)(?:justify-between|justify-end|ml-auto|absolute|flex-row-reverse|right-[^"\s]+)(?:\s|$)/
 
 /** 交互面属性（用于「动作之后不得再有交互兄弟」）。`@tap.stop` / `@long-press` 等。 */
 const INTERACTIVE = /@(?:tap|long-?press|click)(?![\w-])/g
@@ -186,48 +191,68 @@ describe('ADR-0221 决策 2 · 四处已修站点的行首位置', () => {
  */
 type 带内证明 = { kind: 'after-content'; content: string } | { kind: 'pushed' }
 
-const BAND_DEBT = [
+const BAND_DEBT: readonly {
+  ticket: number
+  why: string
+  sites: readonly { file: string; marker: string; proof: 带内证明 }[]
+}[] = [
+  // ✅ **当前为空**（2026-10-12，票 #950 / #951 结清）。
+  //
+  // 曾经的四条登记，两条真债已修（见下方 LEADING_FOLLOW_ACTIONS 与 DISMISS_SITE），
+  // 一条**验伪为误报**：`src/pages/UserHome.vue` 的「关注数 / 粉丝数 chip」按 ADR-0221 §4 的
+  // 措辞本就只写「非破坏性导航 chip」、**从未声称「同带重叠」**——是 #951 票面把它们
+  // 归进「三者均落在 GlobalFab 遮挡带内」时顺带算进去的。静态算：卡片 `m-3 p-3.5` ⇒
+  // 内容盒 6.73–90.27vw，头像 17.067vw、内容列 `ml-3.5` ⇒ chip 行起点 27.0vw；两个 chip
+  // 宽度由文字决定（各 `px-2`），合计约 35vw ⇒ **右缘 ≈ 62vw，距带左沿 80.80vw 尚有 ~19vw**。
+  // 它们是**内容不是动作**，搬到行首反而是语义错误，正确处置是**移出登记**而非改代码。
+  //
+  // 新增登记必须同时：① 在本数组补一条 ② 在 ADR-0221 §4「刻意不处理」表补一行
+  // ③ 给出可验证理由。缺任一项，下面的「债务清零」断言会红。
+]
+
+/**
+ * 两处**非破坏性**关注开关的行首位置（票 #950 / #951，2026-10-12 由债务转正修）。
+ *
+ * 与 `LEADING_SITES` 的差别，也是**为什么单列一组**：那四处是破坏性动作，行内其后
+ * 不得再有交互兄弟（误触代价是删数据）；这两处是行**本身就该可点**的作者/用户入口
+ * （点行进主页），其后的交互面是特性而非缺陷，故不套用「其后无交互兄弟」那条判据。
+ * 位置判据与间距判据仍完全一致：动作在内容列**之前**、间距写 `mr-*`、无尾推类。
+ */
+const LEADING_FOLLOW_ACTIONS = [
   {
-    ticket: 950,
-    why: '关注/取关控件（UserRow，3 条路由共用）。非破坏性 toggle，失败形态是「点了没反应」而非「数据没了」；其 px-4 比 40dp 药丸更宽，重叠比例比已修四处更高 ⇒ 须独立评估。',
-    sites: [
-      {
-        file: 'src/components/UserRow.vue',
-        marker: 'onToggle',
-        proof: { kind: 'after-content', content: 'class="flex flex-col ml-3.5 flex-1"' } as const,
-      },
-    ],
+    file: 'src/components/UserRow.vue',
+    action: '@tap="onToggle"',
+    row: 'class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest',
+    content: 'class="flex flex-col ml-3.5 flex-1"',
   },
   {
-    ticket: 951,
-    why: '关注作者 pill（IllustDetail）、关注数/粉丝数 chip（UserHome）、榜单卡折叠 ✕（RankingEntryCard）。三者非破坏性（pill/chip 是导航与 toggle，折叠是本次会话内收起），不与破坏性动作的迁移同批处理。',
-    sites: [
-      {
-        file: 'src/pages/IllustDetail.vue',
-        marker: 'toggleFollowAuthor',
-        proof: { kind: 'after-content', content: 'class="text-body-medium text-surface-on-variant ml-2 flex-1"' } as const,
-      },
-      {
-        file: 'src/pages/UserHome.vue',
-        marker: 'openFollowers',
-        proof: { kind: 'after-content', content: '@tap="openFollowing"' } as const,
-      },
-      { file: 'src/components/RankingEntryCard.vue', marker: 'dismissed = true', proof: { kind: 'pushed' } as const },
-    ],
+    file: 'src/pages/IllustDetail.vue',
+    action: '@tap="toggleFollowAuthor"',
+    row: 'class="flex flex-row items-center mt-2"',
+    content: 'data-testid="illust-detail-author"',
   },
-] as const satisfies readonly { ticket: number; why: string; sites: readonly { file: string; marker: string; proof: 带内证明 }[] }[]
+] as const
+
+/**
+ * 榜单卡「收起 ✕」的定位（票 #951）：它不是行内 flex 动作而是 `absolute` 浮层，
+ * 故不适用上面两组的源码顺序判据，单独钉**靠右即错**。
+ * 原 `right-2` 使按钮横跨 84.3–95.0vw，正落在带内；改 `left-2` 后左上角无冲突
+ * （左下信息块 `bottom-3`、2/3 名竖排 `bottom-3 right-2.5`）。
+ */
+const DISMISS_SITE = {
+  file: 'src/components/RankingEntryCard.vue',
+  marker: '@tap.stop="dismissed = true"',
+  left: 'class="absolute left-2 top-2',
+} as const
 
 describe('ADR-0221 决策 2 · 带内债务登记', () => {
-  it('登记恰好是 #950 / #951 两票、四站点（不多不少、票号不重复）', () => {
-    const tickets = BAND_DEBT.map((e) => e.ticket)
-    expect([...tickets].sort((a, b) => a - b), '登记的债务票集合变了 —— 增删豁免须同步本断言与 ADR-0221 §4').toEqual([950, 951])
-    expect(new Set(tickets).size, `票号重复登记：${tickets.join(' / ')}`).toBe(tickets.length)
-    expect(BAND_DEBT.flatMap((e) => e.sites.map((s) => `${s.file}::${s.marker}`)).sort(), '登记的债务站点集合变了').toEqual([
-      'src/components/RankingEntryCard.vue::dismissed = true',
-      'src/components/UserRow.vue::onToggle',
-      'src/pages/IllustDetail.vue::toggleFollowAuthor',
-      'src/pages/UserHome.vue::openFollowers',
-    ])
+  it('债务登记为空（#950 / #951 已结清；新增登记须同步本断言与 ADR-0221 §4）', () => {
+    expect(
+      BAND_DEBT.map((e) => `#${e.ticket}（${e.sites.length} 站点）`),
+      '带内债务登记非空 —— 新增豁免必须：① 在 BAND_DEBT 补一条 ② 在 ADR-0221 §4「刻意不处理」' +
+        '表补一行 ③ 给出可验证理由。三者缺一，本断言即红。这道断言存在的意义是让「新增债务」' +
+        '变成一次显式决定，而不是改代码时顺手留下的例外。',
+    ).toEqual([])
   })
 
   it('每个登记站点的文件与标记仍在（站点没了 ⇒ 豁免已腐烂，必须删登记）', () => {
@@ -277,5 +302,76 @@ describe('ADR-0221 决策 2 · 带内债务登记', () => {
         ).toBe(true)
       }
     }
+  })
+})
+
+// ═══════════════ #950 / #951 结清后的正向断言 ════════════════
+// 债务清零只是「不再豁免」；这三处若被改回行尾/右侧，仍得有东西变红——否则清零只是把风险
+// 从「已登记的例外」变成「没人看的例外」。判据与 LEADING_SITES 同源（源码顺序 + 尾推类），
+// 不引入任何几何推断。
+
+describe('ADR-0221 决策 2 · 关注开关行首化（票 #950 / #951）', () => {
+  it('两处关注开关排在内容列之前，且间距写在右侧（mr-* 而非 ml-*）', () => {
+    for (const site of LEADING_FOLLOW_ACTIONS) {
+      const tpl = templateOf(readPkg(site.file))
+      const where = `${site.file}（${site.action}）`
+      const rowAt = tpl.indexOf(site.row)
+      const actionAt = tpl.indexOf(site.action)
+      const contentAt = tpl.indexOf(site.content)
+      expect(rowAt, `${where}：行根锚点消失（判据输入无效）`).toBeGreaterThanOrEqual(0)
+      expect(actionAt, `${where}：找不到关注开关 —— 站点标记已变，请同步本文件锚点`).toBeGreaterThanOrEqual(0)
+      expect(contentAt, `${where}：内容列锚点消失（判据输入无效）`).toBeGreaterThanOrEqual(0)
+
+      expect(
+        actionAt,
+        `${where}：关注开关排到了内容列**之后** ⇒ 它回到了行尾，落在 GlobalFab 遮挡带内，` +
+          '点它开的是搜索弹层而不是 toggle（票 #950 / #951）。请迁回行首。',
+      ).toBeLessThan(contentAt)
+
+      // 判据读**被测文件**的行根，不读本文件的常量 —— 后者只能证明「常量没被改」
+      const rowTag = openTagAt(tpl, rowAt)
+      expect(rowTag, `${where}：行根出现尾推对齐类 ⇒ 源码顺序不再决定视觉左右`).not.toMatch(TRAILING_PUSH)
+      const tag = openTagAt(tpl, actionAt)
+      expect(tag, `${where}：开关元素带尾推写法（${tag.trim()}）`).not.toMatch(TRAILING_PUSH)
+      expect(tag, `${where}：开关的间距不写在右侧（mr-*）—— 现行写法 mr-1.5`).toMatch(/(?:^|\s)mr-[\d.]+(?:\s|$)/)
+    }
+  })
+
+  it('关注开关是圆形图标按钮，且无障碍标签随状态变化（文字不再渲染 ⇒ label 是唯一语义来源）', () => {
+    for (const site of LEADING_FOLLOW_ACTIONS) {
+      const tpl = templateOf(readPkg(site.file))
+      const where = site.file
+      const actionAt = tpl.indexOf(site.action)
+      // 从**开标签**起切：`innerSpanOfView` 返回的是元素内部区间，若从 `actionAt`（= `@tap` 属性）
+      // 起切会把排在它前面的 class 整段漏掉 —— 判据输入不完整时必须红，不能凑合绿
+      const openIdx = tpl.lastIndexOf('<view', actionAt)
+      const span = innerSpanOfView(tpl, openIdx)
+      expect(span, `${where}：开关元素的 view 标签配平失败 —— 判据输入无效`).not.toBeNull()
+      const inner = tpl.slice(openIdx, span!.end)
+
+      expect(inner, `${where}：开关内没有图标`).toMatch(/<AppIcon\s[^>]*name="person"/)
+      // 固定尺寸 = 切状态时内容区不抖动（原 px-4 药丸「已关注」比「关注」宽，会挤动内容）
+      expect(inner, `${where}：开关不是固定 10.667vw 圆形`).toMatch(/w-\[10\.667vw\][^>]*h-\[10\.667vw\]/)
+      // 状态语义只剩 label 这一条通路，缺它读屏用户拿不到「关注/已关注」
+      expect(inner, `${where}：开关缺 accessibility-label ⇒ 文字移除后状态对读屏用户不可见`).toMatch(
+        /:accessibility-label="/,
+      )
+      expect(
+        inner,
+        `${where}：状态文字仍渲染在按钮内 ⇒ 行首药丸方案未真正退场，与门禁预期不符`,
+      ).not.toMatch(/<text[^>]*>\s*\{\{\s*(?:isFollowed|following)/)
+    }
+  })
+
+  it('榜单卡「收起 ✕」不靠右（票 #951）', () => {
+    const tpl = templateOf(readPkg(DISMISS_SITE.file))
+    const actionAt = tpl.indexOf(DISMISS_SITE.marker)
+    expect(actionAt, `${DISMISS_SITE.file}：找不到收起按钮`).toBeGreaterThanOrEqual(0)
+    const tag = openTagAt(tpl, actionAt)
+    expect(
+      tag,
+      `${DISMISS_SITE.file}：收起按钮带 right-* 定位 ⇒ 它回到 GlobalFab 遮挡带内（票 #951）。请改用 left-*。`,
+    ).not.toMatch(/(?:^|\s)right-[^"\s]+(?:\s|$)/)
+    expect(tag, `${DISMISS_SITE.file}：收起按钮未用 left-* 定位（锚点已变，请同步本文件）`).toContain(DISMISS_SITE.left)
   })
 })

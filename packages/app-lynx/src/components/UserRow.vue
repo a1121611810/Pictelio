@@ -19,8 +19,10 @@
 // 平台事实：@tap 绑在内层 view（行信息区 / 按钮 view）——text 根与 list-item 根级 @tap
 // 原生无效（ADR-0055 家族）。
 import { computed } from 'vue'
+import AppIcon from './AppIcon.vue'
 import SkeletonImage from './SkeletonImage.vue'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import type { PixivUser } from '../api/types'
 import { useMotion } from '../composables/motion'
 
@@ -62,6 +64,23 @@ function onToggle(): void {
 
 <template>
   <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
+    <!-- 关注/取关按钮：**行首**圆形图标按钮（ADR-0221 决策 2 / 票 #950）。
+         原位置在行尾，实测右缘 93.06vw，落在 GlobalFab 遮挡带 80.80–95.73vw 内 ⇒
+         点它开的是搜索弹层而不是 toggle（失败形态是「点了没反应」，故 ADR-0221 §4 记为债务）。
+         **状态怎么表达**：字体子集里没有 person_add / person_check（仅 person / check /
+         favorite_border），故两态同用 `person`，靠**填充对比**区分 —— 未关注 = outline 边框 +
+         透明底，已关注 = bg-primary 实心 + 反色，与原药丸同一套视觉语言，未新造语义。
+         文字不再渲染 ⇒ 状态改由 accessibility-label 承载（图标自身无文字语义，
+         不补这条就是读屏用户的净损失）。 -->
+    <view
+      class="self-center mr-1.5 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
+      :class="[pressColor.className, isFollowed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
+      :accessibility-element="A11Y_ELEMENT_ENABLED"
+      :accessibility-label="isFollowed ? followedLabel : followLabel"
+      @tap="onToggle"
+    >
+      <AppIcon name="person" :class="isFollowed ? 'text-primary' : 'text-primary-on'" />
+    </view>
     <!-- 行信息区：tap 进用户主页（事件上抛；view 承载 @tap，ADR-0055 家族） -->
     <view class="flex-1 flex flex-row items-center" @tap="emit('row-tap')">
       <SkeletonImage
@@ -75,16 +94,6 @@ function onToggle(): void {
         <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ user.name }}</text>
         <text class="text-label-medium text-outline mt-0.5">@{{ user.account }}</text>
       </view>
-    </view>
-    <!-- 关注/取关按钮：is_followed 驱动两态（外框 / 实心）；业务语义留调用方 -->
-    <view
-      class="ml-2 px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-      :class="[pressColor.className, isFollowed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary']"
-      @tap="onToggle"
-    >
-      <text class="text-body-medium" :class="isFollowed ? 'text-primary' : 'text-primary-on'">
-        {{ isFollowed ? followedLabel : followLabel }}
-      </text>
     </view>
   </view>
 </template>

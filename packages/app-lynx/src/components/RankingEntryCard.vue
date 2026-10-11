@@ -174,9 +174,12 @@ onUnmounted(() => feed.dispose())
           <AppIcon name="arrow_forward" :size="3.2" class="text-white opacity-90" />
         </view>
       </view>
-      <!-- 收起（当次隐藏） -->
+      <!-- 收起（当次隐藏）。**行首**侧绝对定位（ADR-0221 决策 2 / 票 #951）：
+           原 `right-2` 使按钮横跨 84.3–95.0vw，正落在 GlobalFab 遮挡带 80.80–95.73vw 内 ⇒
+           点它开的是搜索弹层而不是收起。改 `left-2` 后该角无冲突：左下信息块在 `bottom-3`、
+           2/3 名竖排在 `bottom-3 right-2.5`，左上角原本空着。 -->
       <view
-        class="absolute right-2 top-2 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-[var(--md-scrim)] active:opacity-80"
+        class="absolute left-2 top-2 w-[10.667vw] h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-[var(--md-scrim)] active:opacity-80"
         :style="{ transition: pressOpacity.transition }"
         accessibility-element
         :accessibility-label="t('ranking.entry.collapseAria')"

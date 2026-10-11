@@ -102,16 +102,42 @@
 | `pages/WatchLater.vue:116-123` | 移除 | `/later` | 无（硬删） |
 | `pages/MuteTags.vue:89-96` | 取消静音 | `/mute-tags` | 无 |
 
+**后续处理（3 处，非破坏性；票 #950 / #951，2026-10-12）**
+
+上一批的四处全是**破坏性**动作（硬删 / 有确认层），图标化零信息损失。剩下三处的形态债
+在同一天结清，处理方式与上一批**不同**，故单列：
+
+| 站点 | 动作 | 路由 | 与上一批的差别 |
+|---|---|---|---|
+| `components/UserRow.vue` | 关注 / 取关 | `/user/:id/following`、`/user/:id/followers`、`/mypixiv` | **有状态 toggle**：原靠「关注」/「已关注」文案表达状态，改纯图标会丢可发现性 |
+| `pages/IllustDetail.vue` | 关注作者 | `/illust/:id` | 同上 |
+| `components/RankingEntryCard.vue` | 收起 ✕ | `/illusts` | `absolute` 浮层，非行内 flex 动作 |
+
+**怎么保住状态语义**（这是本批唯一的真问题）：字体子集里**没有** `person_add` /
+`person_check`（仅 `person` / `check` / `favorite_border`），故三处一律
+**两态同用 `person` 图标 + 沿用原有的填充对比**（未关注 = outline 边框 + 透明底，
+已关注 = `bg-primary` 实心 + 反色）——与被替换的药丸同一套视觉语言，未新造语义。
+文字移除后，状态**只**由 `accessibility-label` 承载，三处全部补齐；
+「每个 `:accessibility-element` 配一个 label」这条既有配平契约同步扩展（见
+`IllustDetail.template.test.ts` / `UserRow.template.test.ts`）。
+
+顺带修掉一个原有抖动：药丸是 `px-4` + 变长文案，「已关注」比「关注」宽，切状态时会挤动内容；
+改为固定 10.667vw 圆形后不再抖。
+
 **刻意不处理（登记在案，避免下个 reviewer 当成遗漏）**
 
 | 站点 | 为什么不处理 |
 |---|---|
-| `components/UserRow.vue:80-88`（关注/取关，3 路由） | 同带重叠，但**非破坏性**、是 toggle；失败形态是「点了没反应」而非「数据没了」。⚠️ 其 `px-4` 比 40dp 药丸更宽，**重叠比例比本次四处更高** ⇒ 需独立评估 |
-| `components/RankingEntryCard.vue:181-186`（折叠 ✕） | 同带重叠，但为**本次会话内**的折叠，非破坏性，且已有 `active:opacity-80` |
-| `pages/IllustDetail.vue:580-589`（关注作者） | 同形态 pill，非破坏性 |
-| `pages/UserHome.vue:299-307`（关注数/粉丝数 chip） | 非破坏性导航 chip |
 | `components/SearchSheet.vue:438`（历史 ✕） | 在 modal 内 ⇒ `hasOpenModal` 强制 `mode='hidden'`，**不可能重叠** |
 | `pages/NovelIntro.vue:528-536` | 动作行钉在页面底部，与 FAB 竖直带（43.7–58.7vw）不交叠 |
+
+> ⚠️ **已验伪并移出登记**：`pages/UserHome.vue`（关注数 / 粉丝数 chip）。
+> 本表当初对它的措辞是「非破坏性导航 chip」、**从未声称「同带重叠」**——是票 #951
+> 把它们归进「三者均落在 GlobalFab 遮挡带内」时顺带算进去的。静态复算：卡片 `m-3 p-3.5`
+> ⇒ 内容盒 6.73–90.27vw，头像 17.067vw、内容列 `ml-3.5` ⇒ chip 行起点 27.0vw；两个 chip
+> 宽度由文字决定（各 `px-2`），合计约 35vw ⇒ **右缘 ≈ 62vw，距带左沿 80.80vw 尚有约 19vw**。
+> 它们是**内容不是动作**，搬到行首反而是语义错误 ⇒ 正确处置是**移出登记**，不是改代码。
+> （此为静态推算、非真机测量；但 ~19vw 的余量远大于任何合理误差，不影响结论。）
 
 ---
 

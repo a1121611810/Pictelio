@@ -76,7 +76,7 @@ describe('UserRow 行卡结构（FollowList 存量逐 class 快照）', () => {
     )
   })
 
-  it('关注按钮两态类串逐字：已关注=外框（border outline / text-primary），未关注=实心（bg-primary / text-primary-on）', () => {
+  it('关注开关两态：容器类串逐字 + 状态由 accessibility-label 承载（票 #950 行首化）', () => {
     // ⚠️ 未关注分支的按压类已按 ADR-0211 决策 8 归正：
     //   `active:bg-state-pressed-primary`（预计算实色）→ `active:bg-layer-pressed-on-primary`（alpha 正路）。
     //   同元素带 `bg-primary`，满足 `stateLayerOnPrimary.test.ts` 的 C3 消费约束。
@@ -85,7 +85,12 @@ describe('UserRow 行卡结构（FollowList 存量逐 class 快照）', () => {
       /:class="\[pressColor\.className, isFollowed \? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-layer-pressed-on-primary'\]"/,
     )
     expect(code).toMatch(/:class="isFollowed \? 'text-primary' : 'text-primary-on'"/)
-    expect(code).toContain('{{ isFollowed ? followedLabel : followLabel }}')
+    // ⚠️ 票 #950：开关已按 ADR-0221 决策 2 行首化，形态改为**纯图标**（person）。
+    // 「关注 / 已关注」文案因此不再渲染 —— 状态改由 accessibility-label 承载。
+    // 这两条合起来钉住「状态既没丢、也没退回可见文字」：少了 label，读屏用户拿不到状态；
+    // 若文案又回到模板里，说明形态回退成了行尾药丸，门禁会另行转红。
+    expect(code).toContain(':accessibility-label="isFollowed ? followedLabel : followLabel"')
+    expect(code).not.toContain('{{ isFollowed ? followedLabel : followLabel }}')
   })
 })
 
