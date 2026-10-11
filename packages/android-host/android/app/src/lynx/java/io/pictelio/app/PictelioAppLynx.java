@@ -79,8 +79,16 @@ public class PictelioAppLynx extends Application {
      *
      * <p>关闸/开闸与「缓存访问在维护期间排队」的纪律由被调方自持
      * （{@link PixivImageLoader#scheduleStartupCacheMaintenance}），本类只负责把执行器交出去。
+     *
+     * <p>整段包 {@code catch (Throwable)}，与同类的 {@link #registerImageMemoryPressureResponse()}
+     * 形状一致：被调方只兜住了<b>任务体</b>，<b>调度侧</b>（构造 loader、关闸、提交执行器）一旦抛出
+     * 就会逃出 {@code Application.onCreate} 直接崩启动，与本方法「不阻断启动」的意图相悖。
      */
     private void trimImageCacheAtStartup() {
-        new PixivImageLoader(this).scheduleStartupCacheMaintenance(TRIM_EXECUTOR);
+        try {
+            new PixivImageLoader(this).scheduleStartupCacheMaintenance(TRIM_EXECUTOR);
+        } catch (Throwable t) {
+            Log.w(TAG, "调度冷启动图片缓存维护失败（不阻断启动）", t);
+        }
     }
 }
