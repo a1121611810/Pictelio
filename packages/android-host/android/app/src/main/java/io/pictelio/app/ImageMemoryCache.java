@@ -13,6 +13,10 @@ import android.graphics.Bitmap;
  * {@link ImageCacheBudgetResolver} 按设备事实算出后<b>注入</b>（本类不持有任何容量常量，
  * 也不自行推断设备——那是策略类的职责，见 ADR-0222 §2.2 单一策略决策点）。
  * 调用方拿不到设备事实时须显式给值（如单测用小上限触发淘汰），不给默认容量。
+ *
+ * <p><b>内存压力收缩（#981）</b>：本类只提供 {@link #trimToSize(long)} 这一收缩原语，
+ * <b>不自行决定收缩到什么程度</b>——比例在策略类 {@link ImageCacheBudget}，
+ * 级别到比例的映射在 {@link ImageMemoryPressureHandler}。
  */
 public final class ImageMemoryCache {
 
@@ -55,5 +59,31 @@ public final class ImageMemoryCache {
     /** 当前条目数 */
     public int size() {
         return cache.size();
+    }
+
+    /** 当前总字节数（诊断用） */
+    public long totalBytes() {
+        return cache.totalBytes();
+    }
+
+    /**
+     * 容量预算字节数（#981 内存压力响应）。
+     *
+     * <p>即构造时注入的设备预算值——内存压力按它的百分比算收缩目标，故须能读回。
+     */
+    public long maxBytes() {
+        return cache.maxBytes();
+    }
+
+    /**
+     * 收缩到不超过 {@code target} 字节（#981 内存压力）：从最久未使用开始逐出。
+     *
+     * <p><b>不改变构造容量</b>，故回前台后可照原容量重新填充。
+     *
+     * @param target 目标字节上限（≥ 0；0 = 清空内存层）
+     * @throws IllegalArgumentException {@code target} 为负
+     */
+    public void trimToSize(long target) {
+        cache.trimToSize(target);
     }
 }

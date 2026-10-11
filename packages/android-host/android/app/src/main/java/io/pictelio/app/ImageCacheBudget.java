@@ -50,6 +50,39 @@ public final class ImageCacheBudget {
     /** 低内存设备封顶系数：出处 Glide {@code LOW_MEMORY_MAX_SIZE_MULTIPLIER} */
     public static final float LOW_MEMORY_MAX_SIZE_MULTIPLIER = 0.33f;
 
+    // ── 内存压力响应（#981，ADR-0222 §2.2 单一策略决策点的「内存压力响应」一维）──
+    // 与上面的 Glide 系数不同源：那两个出自 Glide 源码，这两条出自 AOSP
+    // ComponentCallbacks2 的 onTrimMemory 文档语义（见各自的 KDoc），是本仓自定取值。
+
+    /**
+     * 界面不可见（{@code TRIM_MEMORY_UI_HIDDEN}）时保留的内存层比例。
+     *
+     * <p><b>取值依据（AOSP {@code ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN} 文档）</b>：
+     * 「进程 UI 已不再对用户可见……此时应释放较大分配让机器用于别的进程。
+     * <b>但在此状态下收缩会影响用户体验——进程应能快速恢复</b>，故只释放那些妨碍快速恢复的资源」。
+     * ⇒ 判为<b>部分收缩</b>而非清空。
+     *
+     * <p><b>0.5 的推导</b>：预算 {@link #MEMORY_CACHE_TARGET_SCREENS} 屏，预算按屏数法分支取值时
+     * 保留一半即<b>整一屏</b>——恰是「快速恢复所需的最小可见状态」；按内存封顶分支取值时
+     * 减半即为把进程占用让出一半。二者都落在文档描述的取舍之内。
+     *
+     * <p>⚠️ 本系数<b>不是</b> Glide 的任何常量（Glide 源码无此值，同 {@link #MAX_SIZE_MULTIPLIER}
+     * 的出处说明），也不出自官方文档的字面值，是本仓自定取值。
+     */
+    public static final float UI_HIDDEN_KEEP_RATIO = 0.5f;
+
+    /**
+     * 进程进入后台（{@code TRIM_MEMORY_BACKGROUND}）时保留的内存层比例 = 全清。
+     *
+     * <p><b>取值依据（AOSP {@code ComponentCallbacks2.TRIM_MEMORY_BACKGROUND} 文档）</b>：
+     * 「进程接近 LRU 列表的<b>开头</b>……此时应<b>尽可能多</b>释放内存，否则系统可能因要腾地方
+     * 杀掉别的进程」⇒ 判为<b>全部释放</b>。
+     *
+     * <p>清空的只是<b>内存层</b>：磁盘层不随内存压力收缩（#981 验收项），故回到前台时
+     * 重新填充只付「磁盘读 + 解码」，不付网络。
+     */
+    public static final float BACKGROUND_KEEP_RATIO = 0f;
+
     private static final long BYTES_PER_MB = 1024L * 1024L;
 
     private ImageCacheBudget() {}
@@ -84,6 +117,30 @@ public final class ImageCacheBudget {
         float multiplier = lowRamDevice ? LOW_MEMORY_MAX_SIZE_MULTIPLIER : MAX_SIZE_MULTIPLIER;
         // 用 double 承载乘法：float32 在 100MB 量级上会丢精度，导致同样输入得到不可预期的末位差异
         return (long) ((double) memoryClassMb * BYTES_PER_MB * (double) multiplier);
+    }
+
+    /**
+     * 内存压力收缩后的保留字节上限（#981）= 预算 × 保留比例。
+     *
+     * <p>纯函数（无 Android 依赖），比例由 {@link #UI_HIDDEN_KEEP_RATIO} /
+     * {@link #BACKGROUND_KEEP_RATIO} 给出，故两级行为可被纯 JVM 单测直接验证。
+     *
+     * <p>结果恒 ≤ {@code budgetBytes}，且 {@code keepRatio == 0} 时恒为 0（即清空内存层）。
+     * 用 {@code double} 承载乘法：与 {@link #capBytes} 同理，float32 在 100MB 量级上会丢精度。
+     *
+     * @param budgetBytes 当前内存层预算（正数）
+     * @param keepRatio   保留比例，取值区间 {@code [0, 1]}
+     * @throws IllegalArgumentException 预算非正数、或比例越界/为 NaN——<b>显式暴露错误，不静默兜底</b>
+     */
+    public static long retainedBytesAfterTrim(long budgetBytes, float keepRatio) {
+        requirePositive("budgetBytes", budgetBytes);
+        if (Float.isNaN(keepRatio) || keepRatio < 0f || keepRatio > 1f) {
+            throw new IllegalArgumentException("keepRatio 必须在 [0, 1]: " + keepRatio);
+        }
+        if (keepRatio == 1f) {
+            return budgetBytes;
+        }
+        return (long) ((double) budgetBytes * (double) keepRatio);
     }
 
     private static void requirePositive(String name, long value) {
