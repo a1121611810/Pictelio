@@ -864,7 +864,19 @@ describe('缓存命中（spec §9.5 + ADR-0171 §6）', () => {
 
 // ─────────────────── 半成品策略 ───────────────────
 
-describe('半成品策略（ADR-0171 §5）', () => {
+/**
+ * 本块并入时序档（#995）：「不写缓存」这组**负向断言**此前只在正常档下成立。
+ * cache miss 是 provider 启动前最后一个 await，把它拉长即可让「固定墙钟 sleep 后断言」
+ * 确定性失败（诊断报告 `docs/research/flaky-novel-translate-store-diagnosis.md`）；
+ * 任何人再把等待写回固定墙钟，恶意档会确定性变红。
+ */
+describe.each(TIMING_PROFILES)('半成品策略（ADR-0171 §5）[$profile]', ({ cacheDelayMs }) => {
+  beforeEach(() => {
+    if (cacheDelayMs > 0) {
+      mocks.cacheGet.mockImplementation(() => slowCacheMiss(cacheDelayMs))
+    }
+  })
+
   it('status=completed 时 writeCacheIfNeeded 被调', async () => {
     const store = useNovelTranslateStore()
     await store.translateChapter(40, 40, ['p1', 'p2'], 0)
@@ -990,7 +1002,8 @@ describe('半成品策略（ADR-0171 §5）', () => {
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
-  it('status=aborted 时不写缓存（#656 薄点 1：此前完全无断言）', async () => {
+  // 本用例有 2 处条件等待 ⇒ 显式放宽单测超时（2 × 2500ms 预算恰好压在默认 5s 上）
+  it('status=aborted 时不写缓存（#656 薄点 1：此前完全无断言）', { timeout: 20_000 }, async () => {
     // 用挂起 iterator 让 pipeline 停在 in-flight，abort 才有确定作用点。
     // 生产侧 provider 的 iterator 会响应 signal（抛 AbortError），fake 必须同形。
     const ac = new AbortController()
@@ -998,14 +1011,34 @@ describe('半成品策略（ADR-0171 §5）', () => {
     mocks.providerIter.mockImplementation(() => d.iter)
     const store = useNovelTranslateStore()
     const p = store.translateChapter(50, 50, ['p1'], 0)
-    await new Promise((r) => setTimeout(r, 10))
-    d.push({ type: 'delta', paragraphIndex: 0, text: '半截' })
-    await new Promise((r) => setTimeout(r, 10))
-    store.abort() // store 内部 abort 会触发其 controller；这里同步触发 fake 的 signal
-    ac.abort()
-    await p
-    expect(store.status).toBe('aborted')
-    expect(mocks.cacheSet).not.toHaveBeenCalled()
+    try {
+      // 条件等待（#995）：等 pipeline **真的**停在 in-flight，而不是赌一个固定 10ms 墙钟
+      // （恶意档把 provider 前最后一次 await 拉长 250ms，固定墙钟在此确定性击穿）
+      await vi.waitFor(() => expect(store.status).toBe('translating'), WAIT_FOR_OPTS)
+
+      d.push({ type: 'delta', paragraphIndex: 0, text: '半截' })
+      // 同步点：等 delta **真的落到 store**（`translatedParagraphs[0] === '半截'`）。
+      // 这里不能只等 `getNextCallCount` 增长：`abort()` 会**同步**把 status 置 'aborted'
+      // （novelTranslateStore.ts:1228），且 cacheSet 此刻必然未被调 —— 若 delta 没落地，
+      // 下面两条负向断言会**空转通过**，用例退化成「什么都没发生就 abort」。等 store 的
+      // 可观测状态而非迭代器计数，才把负向断言钉在确定发生的事件之后（硬约束 #6）。
+      await vi.waitFor(
+        () => expect(store.translatedParagraphs[0]).toBe('半截'),
+        WAIT_FOR_OPTS,
+      )
+
+      store.abort() // store 内部 abort 会触发其 controller；这里同步触发 fake 的 signal
+      ac.abort()
+      await p
+      expect(store.status).toBe('aborted')
+      // 前置已钉死「有半截译文但未完成」：此时仍不得写缓存
+      expect(store.translatedParagraphs[0]).toBe('半截')
+      expect(mocks.cacheSet).not.toHaveBeenCalled()
+    } finally {
+      // 收尾：断言失败路径也必须结束 in-flight，避免悬挂 invocation 污染下一个用例
+      d.finish()
+      await p
+    }
   })
 })
 

@@ -143,13 +143,20 @@ describe("client.requestRaw web 模式（fetch + /pixiv-api 代理）", () => {
     })
     fetchMock.mockResolvedValue(new Response(NOVEL_HTML, { status: 200 }))
     const p = apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
-    // 恢复门未落定：请求必须仍在等待，不得提前发出
-    await Promise.resolve()
-    expect(fetchMock).not.toHaveBeenCalled()
-    release()
-    await p
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer restored-token")
+    try {
+      // 恢复门未落定：请求必须仍在等待，不得提前发出
+      await Promise.resolve()
+      expect(fetchMock).not.toHaveBeenCalled()
+      release()
+      await p
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer restored-token")
+    } finally {
+      // 收尾隔离（#995）：断言在此前失败时，恢复门永不会被放行 ⇒ `p` 悬挂、provider 跟着挂到
+      // 后续用例。`release()` 幂等（重复 resolve 同一 promise 无副作用），重复调用安全。
+      release()
+      await p.catch(() => {})
+    }
   })
 
   it("web 模式无 token + 恢复失败 → 仍抛未登录（不永久挂起）", async () => {
@@ -621,6 +628,25 @@ describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退�
   const fetchMock = vi.fn()
   let warnSpy: MockInstance
 
+  /**
+   * 按 **URL（业务标识）** 分发的 fetch mock：同一 URL 的多次网络尝试按登记的应答阶梯依次返回，
+   * 阶梯用尽后再来一次 = 「多发了一次」→ 直接抛错，不静默沿用最后一档
+   * （测试约定 §6「计数断言按标识映射」：序号映射会把多余的那次调用派给最后一个分支，
+   *  使「多发了一次」只表现为计数差、难以归因）。
+   *
+   * 步骤写成工厂而非 Response 实例：Response 的 body 只能消费一次，每次尝试各造一个新的。
+   */
+  function mockFetchLadder(ladders: Record<string, Array<() => Response>>) {
+    const queue = new Map(Object.entries(ladders).map(([url, steps]) => [url, [...steps]]))
+    fetchMock.mockImplementation((url: string) => {
+      const steps = queue.get(url)
+      if (!steps) throw new Error(`fetch 收到未登记的 URL：${url}`)
+      const step = steps.shift()
+      if (!step) throw new Error(`fetch 对同一 URL 多发了一次：${url}（登记的尝试已用尽）`)
+      return Promise.resolve(step())
+    })
+  }
+
   beforeEach(() => {
     fetchMock.mockReset()
     setOnUnauthorized(null)
@@ -638,9 +664,15 @@ describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退�
 
   it("无 signal 并发相同 GET：fetch 恒 429 一次后 200 → fetch 共 2 次（非 4），两调用同值 resolve", async () => {
     vi.useFakeTimers()
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    // 两次 get 无 signal → 共享同一 in-flight promise → 只有一条请求链，其两次网络尝试 URL 完全相同
+    // （重试不改 URL，故业务标识只能到 URL 为止，尝试序号由该 URL 的应答阶梯承载）：
+    // 第 1 次 429 → 退避 → 第 2 次 200；第 3 次即多发 ⇒ mock 抛错而非顺延。
+    mockFetchLadder({
+      "/pixiv-api/v1/illust/recommended": [
+        () => jsonResponse(429),
+        () => jsonResponse(200, { ok: true }),
+      ],
+    })
     // 同步发起两次相同 path+params 的 GET（无 signal → 参与去重，共享同一 in-flight promise）
     const p1 = apiClient.get<{ ok: boolean }>("/v1/illust/recommended")
     const p2 = apiClient.get<{ ok: boolean }>("/v1/illust/recommended")

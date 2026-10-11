@@ -79,17 +79,26 @@ describe('createBookmarkToggle（ADR-0112）', () => {
     const add = vi.fn(() => d.promise)
     const bm = createBookmarkToggle(1, false, 0, { add, remove: vi.fn() })
     const p = bm.toggle()
-    void bm.toggle() // busy 中：忽略
-    expect(add).toHaveBeenCalledTimes(1)
-    d.resolve()
-    await p
-    expect(bm.busy).toBe(false)
     const d2 = deferred<void>()
     const remove = vi.fn(() => d2.promise)
     const bm2 = createBookmarkToggle(1, true, 3, { add: vi.fn(), remove })
-    void bm2.toggle()
-    void bm2.toggle()
-    expect(remove).toHaveBeenCalledTimes(1)
+    const p2 = bm2.toggle()
+    try {
+      void bm.toggle() // busy 中：忽略
+      expect(add).toHaveBeenCalledTimes(1)
+      d.resolve()
+      await p
+      expect(bm.busy).toBe(false)
+      void bm2.toggle()
+      void bm2.toggle()
+      expect(remove).toHaveBeenCalledTimes(1)
+    } finally {
+      // 收尾：断言失败路径也必须释放两条在飞请求，否则悬挂 invocation 会在下一个用例的
+      // 窗口里继续跑（硬约束 #6）
+      d.resolve()
+      d2.resolve()
+      await Promise.all([p, p2])
+    }
   })
 
   it('成功后再次 toggle 前 errorMsg 清空', async () => {

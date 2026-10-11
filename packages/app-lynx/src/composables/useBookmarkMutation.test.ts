@@ -290,16 +290,23 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
       const { ret, postSpy } = setupComposable()
       postSpy.mockImplementation(() => gate)
       const pending = ret.saveWith('private', ['a'])
-      await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
-      expect(ret.busy.value).toBe(true)
-      await ret.toggle()
-      // busy no-op 不是成功：保守返回 false（面板据此不回滚也不关面板，保持打开态）
-      expect(await ret.saveWith('public', [])).toBe(false)
-      expect(postSpy).toHaveBeenCalledTimes(1) // 只有第一次 saveWith 发出请求
-      expect(ret.bookmarked.value).toBe(true) // toggle no-op，状态未被翻转
-      release()
-      await pending
-      expect(ret.busy.value).toBe(false)
+      try {
+        await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
+        expect(ret.busy.value).toBe(true)
+        await ret.toggle()
+        // busy no-op 不是成功：保守返回 false（面板据此不回滚也不关面板，保持打开态）
+        expect(await ret.saveWith('public', [])).toBe(false)
+        expect(postSpy).toHaveBeenCalledTimes(1) // 只有第一次 saveWith 发出请求
+        expect(ret.bookmarked.value).toBe(true) // toggle no-op，状态未被翻转
+        release()
+        await pending
+        expect(ret.busy.value).toBe(false)
+      } finally {
+        // 收尾：断言失败路径也必须释放这条在飞请求，否则悬挂 invocation 会在下一个用例的
+        // 窗口里继续跑（硬约束 #6）
+        release()
+        await pending
+      }
     })
 
     it('busy 互斥（反向）：toggle pending 期间 saveWith no-op', async () => {
@@ -310,13 +317,20 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
       const { ret, postSpy } = setupComposable({ initialBookmarked: true, initialCount: 1 })
       postSpy.mockImplementation(() => gate)
       const pending = ret.toggle()
-      await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
-      expect(ret.busy.value).toBe(true)
-      expect(await ret.saveWith('public', ['a'])).toBe(false)
-      expect(postSpy).toHaveBeenCalledTimes(1) // 只有 toggle 的 delete 发出
-      expect(postSpy).toHaveBeenCalledWith('/v1/illust/bookmark/delete', { illust_id: '42' })
-      release()
-      await pending
+      try {
+        await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
+        expect(ret.busy.value).toBe(true)
+        expect(await ret.saveWith('public', ['a'])).toBe(false)
+        expect(postSpy).toHaveBeenCalledTimes(1) // 只有 toggle 的 delete 发出
+        expect(postSpy).toHaveBeenCalledWith('/v1/illust/bookmark/delete', { illust_id: '42' })
+        release()
+        await pending
+      } finally {
+        // 收尾：断言失败路径也必须释放这条在飞请求，否则悬挂 invocation 会在下一个用例的
+        // 窗口里继续跑（硬约束 #6）
+        release()
+        await pending
+      }
     })
   })
 

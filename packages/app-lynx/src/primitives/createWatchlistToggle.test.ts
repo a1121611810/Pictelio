@@ -38,12 +38,19 @@ describe("createWatchlistToggle", () => {
     )
     const t = createWatchlistToggle(1, true, { add: vi.fn(), remove })
     const p1 = t.toggle()
-    expect(t.busy).toBe(true)
-    await t.toggle() // 应被 busy 锁吞掉
-    expect(remove).toHaveBeenCalledTimes(1)
-    resolveRemove()
-    await p1
-    expect(t.busy).toBe(false)
+    try {
+      expect(t.busy).toBe(true)
+      await t.toggle() // 应被 busy 锁吞掉
+      expect(remove).toHaveBeenCalledTimes(1)
+      resolveRemove()
+      await p1
+      expect(t.busy).toBe(false)
+    } finally {
+      // 收尾：断言失败路径也必须释放这条在飞请求，否则悬挂 invocation 会在下一个用例的
+      // 窗口里继续跑（硬约束 #6）
+      resolveRemove()
+      await p1
+    }
   })
 
   it("失败静息回滚：added 复位 + errorMsg 置「操作失败」+ warn 带模块前缀", async () => {

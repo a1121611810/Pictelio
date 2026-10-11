@@ -696,12 +696,30 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
     return ask;
   }
 
-  /** 记录调用的 summarize 端口（可指定每次的结果） */
-  function makeSummarize(results) {
+  /**
+   * 记录调用的 summarize 端口；**按业务标识分发**——标识 = 「第几版成稿」。
+   *
+   * 为什么标识是成稿轮次而不是入参：runSummaryStep 只把 rawNotes / config 交给 summarize，
+   * 且「e = 重新总结」的规格要求**每轮都以同一份原文重跑**，两轮入参逐字相同 ⇒ 入参无法区分轮次。
+   * 唯一可登记的业务事实就是「本用例期望第几版成稿、拿到什么」，故用键值表登记该事实。
+   *
+   * 表外的轮次即「模型被多调了一次」，直接抛错——不再静默落到最后一档
+   * （测试约定 §6 计数断言按标识映射：序号映射会把多余的那次调用派给最后一个分支，
+   *  使「多调一次」只表现为计数差、难以归因）。
+   */
+  function makeSummarize(byRound = {}) {
     const calls = [];
     const summarize = async (params) => {
+      const round = `第 ${calls.length + 1} 版成稿`;
       calls.push(params);
-      return results[calls.length - 1] ?? { ok: true, text: DRAFT };
+      const hit = byRound[round];
+      if (!hit) {
+        const registered = Object.keys(byRound);
+        throw new Error(
+          `summarize 被多调了一次：${round} 未登记（已登记：${registered.join("、") || "无"}）`,
+        );
+      }
+      return hit;
     };
     summarize.calls = calls;
     return summarize;
@@ -718,7 +736,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
   };
 
   it("答 n → 不调用模型，直接用原文案", async () => {
-    const summarize = makeSummarize([]);
+    const summarize = makeSummarize();
     const sink = collect();
     const ask = makeAsk(["n"]);
     const result = await runSummaryStep({
@@ -740,7 +758,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask: makeAsk(["", ""]),
-      summarize: makeSummarize([{ ok: true, text: DRAFT }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: true, text: DRAFT } }),
       ...collect().ports,
     });
 
@@ -753,7 +771,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask: makeAsk(["y", "y"]),
-      summarize: makeSummarize([{ ok: true, text: DRAFT }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: true, text: DRAFT } }),
       ...sink.ports,
     });
 
@@ -762,7 +780,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
   });
 
   it("成稿确认 n → 回退原文案，且不重复调用模型", async () => {
-    const summarize = makeSummarize([{ ok: true, text: DRAFT }]);
+    const summarize = makeSummarize({ "第 1 版成稿": { ok: true, text: DRAFT } });
     const result = await runSummaryStep({
       rawNotes: RAW,
       config: CONFIG,
@@ -776,10 +794,10 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
   });
 
   it("e → 重新总结，且每次都以**原始文案**为输入（不拿上一版成稿再喂一遍）", async () => {
-    const summarize = makeSummarize([
-      { ok: true, text: "第一版成稿" },
-      { ok: true, text: "第二版成稿" },
-    ]);
+    const summarize = makeSummarize({
+      "第 1 版成稿": { ok: true, text: "第一版成稿" },
+      "第 2 版成稿": { ok: true, text: "第二版成稿" },
+    });
     const result = await runSummaryStep({
       rawNotes: RAW,
       config: CONFIG,
@@ -800,7 +818,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask,
-      summarize: makeSummarize([{ ok: false, reason: "HTTP 429（请求被限流）" }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: false, reason: "HTTP 429（请求被限流）" } }),
       ...sink.ports,
     });
 
@@ -819,7 +837,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask,
-      summarize: makeSummarize([{ ok: true, text: DRAFT }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: true, text: DRAFT } }),
       ...collect().ports,
     });
 
@@ -831,7 +849,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask: makeAsk(["y", "n"]),
-      summarize: makeSummarize([{ ok: false, reason: "网络不可用" }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: false, reason: "网络不可用" } }),
       ...collect().ports,
     });
 
@@ -843,7 +861,7 @@ describe("runSummaryStep - 交互闭环（使用者逐问拍板的语义）", ()
       rawNotes: RAW,
       config: CONFIG,
       ask: makeAsk(["y", ""]),
-      summarize: makeSummarize([{ ok: false, reason: "超时" }]),
+      summarize: makeSummarize({ "第 1 版成稿": { ok: false, reason: "超时" } }),
       ...collect().ports,
     });
 
