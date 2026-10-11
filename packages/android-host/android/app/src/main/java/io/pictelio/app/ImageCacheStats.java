@@ -16,16 +16,22 @@ package io.pictelio.app;
  * </ul>
  *
  * <p><b>为什么两个命中数可以相加</b>：内存命中与磁盘命中在同一次请求里<b>互斥</b>——
- * 内存命中即当场交付，根本不会走磁盘层。{@link #memoryMisses()} 因此恒等于
- * 「进到磁盘层的请求数」。{@link #memoryMisses()} 与 {@link #diskHits()} + {@link #diskMisses()}
- * 的差额，来自**本次请求没能产出 Bitmap 的两条 NON_DISPLAY 回退路径**（Bitmap 已回收、
- * 解码抛异常——见 {@code PictelioImageService} 的 {@code isRecycled} 与 catch 分支）：
- * 二者都在内存层未命中后终止，既没拿到 Bitmap 可交付，也就不进磁盘层，
- * 但已按链路闸门以 NON_DISPLAY 归因、不计入命中率分子。
- * （2026-10-11 订正：#984 之前此处写的是「预取 / zip / 拦截」三条链路;#984 起
- * 分子分母只数显示链路，探测走 {@link ImageMemoryCache#probe} 不计数，非 DISPLAY 直接 return，
- * 故那三条链路的解释已不成立，勿再据本段旧注释推断差额来源。）
- * 这就是本快照<b>不</b>声称 {@code requests == memoryHits + diskHits} 的原因。
+ * 内存命中即当场交付，根本不会走磁盘层。
+ * <b>但 {@link #memoryMisses()} ≠ 「进到磁盘层的请求数」</b>，这是本快照<b>不</b>声称
+ * {@code memoryMisses == diskHits + diskMisses} 的唯一原因（2026-10-11 订正，此前此处的归因写反了）：
+ * <ul>
+ *   <li>内存层的计数发生在 {@code PictelioImageService.deliver} 里，<b>不看链路</b>——
+ *       每进入一次内存探测就记一次命中或未命中；</li>
+ *   <li>磁盘层的计数在 {@link ImageCacheStatsStore#recordDiskHit} / {@link #recordDiskMiss} 里
+ *       <b>只看链路</b>——只有 {@link ImageLoadChain#DISPLAY} 才计入分子。</li>
+ * </ul>
+ * 于是每次<b>内存命中后交付失败</b>（缓存项被外部 recycle、或交付抛异常）都会重入
+ * {@code deliver} 且带 {@link ImageLoadChain#NON_DISPLAY}：那次重入会<b>照记</b>一次
+ * {@link #memoryMisses()}（条目已被移除故必然未命中），而它后续的磁盘结果被闸门挡下、
+ * 一条都不计 ⇒ 该次请求凭空多出一个 {@code memoryMisses} 却没有配对的磁盘计数。
+ * 预取 / zip / 保存 / 导出四条链路<b>不</b>触碰内存层也<b>不</b>调 {@code recordRequest}，
+ * 故它们对本组计数<b>没有任何贡献</b>（此前归因为「预取 / zip / 拦截」是错的）。
+ * 闸门本身是刻意的：若让重试的磁盘命中也进分子，同一次用户请求会贡献两次分子、命中率突破 100%。
  *
  * <p><b>累计 vs 量表</b>：{@link #requests()} / {@link #memoryHits()} /
  * {@link #diskHits()} / {@link #diskMisses()} 是<b>跨进程累计量</b>（由
