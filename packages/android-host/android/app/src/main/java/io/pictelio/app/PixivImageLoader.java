@@ -93,8 +93,19 @@ public class PixivImageLoader {
     }
 
     private static final String TAG = "PixivImageLoader";
-    /** 缓存目录名（对齐 OAuthConfig.CACHE_DIR / PixivApiPlugin.CACHE_DIR_NAME） */
-    private static final String CACHE_DIR_NAME = "pictelio-images";
+    /**
+     * 缓存目录名——<b>直接引用唯一事实源</b> {@link OAuthConfig#CACHE_DIR}（由
+     * {@code app-lynx/credentials.json5} 的 {@code cacheDir} 生成）。
+     *
+     * <p>此前此处另写了一份字面量，与 {@code OAuthConfig.CACHE_DIR} 构成双事实源；
+     * #986 已以「保留写死常量只会留下第二事实源」为由从 credentials 退役 {@code cacheMaxBytes}，
+     * 同一问题此处只处理了一半（2026-10-11 code-review 订正）。
+     *
+     * <p><b>仍保留的机器防线</b>：两个测试类以<b>字面量</b>断言锚点
+     * （{@code ImageCacheClearScopeTest} / {@code ImageCacheUpgradePurgeTest} 的
+     * {@code *_anchor_isTheImageCacheDirItself}），故改动 credentials 会转红。
+     */
+    private static final String CACHE_DIR_NAME = OAuthConfig.CACHE_DIR;
 
     /**
      * 升级清空标记的持久化文件名（#985，<b>独立于存量格式契约</b>，理由与
