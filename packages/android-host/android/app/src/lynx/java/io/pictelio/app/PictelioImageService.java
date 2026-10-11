@@ -49,7 +49,12 @@ import java.util.concurrent.Executors;
  * （在 {@code PictelioApp.initLynx()}，须早于任何 LynxView 创建）。
  *
  * <p><b>测试缝（#977）</b>：包可见注入构造 {@link #PictelioImageService(ImageMemoryCache)}
- * 让测试造干净实例，使内存层与磁盘层可分别断言（单例路径的生产语义不变）。
+ * 让测试造干净实例，使内存层与磁盘层可分别断言。
+ *
+ * <p><b>内存层容量按设备算（#979）</b>：生产路径（单例）不再用写死的 64MB，
+ * 而是在 {@link #onInitialize} 拿到 Application context 后由 {@link ImageCacheBudgetResolver}
+ * 读取屏幕尺寸 / 内存等级 / 低内存设备判定，算出预算后注入 {@link ImageMemoryCache}。
+ * 系数与算法出处见 {@link ImageCacheBudget}（Glide {@code MemorySizeCalculator}）。
  *
  * <h3>交付副本为何可以撤掉（#147 → 2026-10-04 实测）</h3>
  * #147 曾让每次交付都带一份 {@code copy(ARGB_8888, false)}，理由是「引擎管理所收
@@ -74,13 +79,21 @@ public class PictelioImageService implements ILynxImageService {
 
     private static final String TAG = "PictelioImageService";
 
-    private static final PictelioImageService INSTANCE = new PictelioImageService(new ImageMemoryCache());
+    private static final PictelioImageService INSTANCE = new PictelioImageService(null);
 
     /** 下载/解码线程池（fetchImage 为阻塞 IO + Bitmap 解码，不占 JS/主线程） */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    /** 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存 */
-    private final ImageMemoryCache memoryCache;
+    /** 测试注入的内存层（#977）；null = 生产路径，内存层由本类按设备预算创建 */
+    private final ImageMemoryCache injectedMemoryCache;
+
+    /**
+     * 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存。
+     *
+     * <p>生产路径的容量不再写死 64MB（#979）：{@link #onInitialize} 拿到 Application
+     * context 后由 {@link ImageCacheBudgetResolver} 按设备算得并注入。
+     */
+    private volatile ImageMemoryCache memoryCache;
 
     /** onInitialize 注入的 Application context（loader 惰性初始化用；避免 decodeImage/prefetch 传 null） */
     private volatile Context appContext;
@@ -98,12 +111,34 @@ public class PictelioImageService implements ILynxImageService {
      * 磁盘层是否接通反而无机器防线。注入内存层后，测试可分别清空内存层 / 删除磁盘条目，
      * 用排除法各自证明一层。
      *
-     * <p>形态对齐 {@link ImageMemoryCache} 的包可见注入构造；<b>生产运行语义不变</b>——
-     * 单例 {@link #INSTANCE} 仍以默认 {@link ImageMemoryCache} 构造，与改动前等价。
+     * <p>形态对齐 {@link ImageMemoryCache} 的包可见注入构造；<b>生产运行语义随 #979 变化</b>——
+     * 单例 {@link #INSTANCE} 传 null，内存层改由 {@link #onInitialize} 按设备预算创建
+     * （此前是 64MB 写死常量）。
+     *
+     * @param memoryCache 注入的内存层；null = 生产路径，按设备算容量
      */
     PictelioImageService(ImageMemoryCache memoryCache) {
+        this.injectedMemoryCache = memoryCache;
         this.memoryCache = memoryCache;
         registerImageBehaviors();
+    }
+
+    /**
+     * 内存层访问口：生产路径若 {@link #onInitialize} 尚未跑过（拿不到 Application context），
+     * 退回 {@link ImageCacheBudgetResolver} 的保守末档预算——该降级由解析器自行
+     * {@code Log.w}（禁静默降级），此处不再重复告警。
+     */
+    private ImageMemoryCache memoryCache() {
+        ImageMemoryCache cache = memoryCache;
+        if (cache != null) {
+            return cache;
+        }
+        synchronized (this) {
+            if (memoryCache == null) {
+                memoryCache = new ImageMemoryCache(ImageCacheBudgetResolver.resolve(appContext));
+            }
+            return memoryCache;
+        }
     }
 
     /**
@@ -153,6 +188,11 @@ public class PictelioImageService implements ILynxImageService {
     public void onInitialize(Context context) {
         appContext = context.getApplicationContext();
         loader = new PixivImageLoader(appContext);
+        // #979：生产路径的内存层容量按设备算（屏幕尺寸 × 屏数，再以进程内存比例封顶取小）；
+        // 测试注入路径已自带内存层，此处不动，避免冲掉测试缝。
+        if (injectedMemoryCache == null) {
+            memoryCache = new ImageMemoryCache(ImageCacheBudgetResolver.resolve(appContext));
+        }
     }
 
     /** 返回已初始化的 loader；onInitialize 未调用时按 appContext 惰性创建；二者皆无返回 null */
@@ -201,7 +241,7 @@ public class PictelioImageService implements ILynxImageService {
         // lynx 引擎管理所收 Bitmap 的生命周期（渲染后可能 recycle），复用原图实例会导致
         // 二次显示空白/JS 异常（模拟器实测 2026-08-06）；副本交付后引擎可安全处理。
         // #147 内存缓存命中：跳过磁盘读 + 解码（隔离实验已排除非缓存因素）
-        final Bitmap cached = memoryCache.get(url);
+        final Bitmap cached = memoryCache().get(url);
         if (cached != null) {
             executor.execute(() -> {
                 try {
@@ -211,7 +251,7 @@ public class PictelioImageService implements ILynxImageService {
                     // 零成本的 isRecycled()——若缓存项真的被外部回收，仍走重取而非崩。
                     if (cached.isRecycled()) {
                         // 缓存项已失效（被外部 recycle/OOM）→ 移除条目并回退下载
-                        memoryCache.remove(url);
+                        memoryCache().remove(url);
                         loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                         return;
                     }
@@ -221,7 +261,7 @@ public class PictelioImageService implements ILynxImageService {
                             new ImageInfo(cached.getWidth(), cached.getHeight(), false));
                 } catch (Throwable t) {
                     Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
-                    memoryCache.remove(url);
+                    memoryCache().remove(url);
                     loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                 }
             });
@@ -254,7 +294,7 @@ public class PictelioImageService implements ILynxImageService {
             // 解码成功入内存缓存（缓存存原图）并**直接交付同一实例**。
             // #147 曾交付副本防「引擎回收所收 Bitmap」，2026-10-04 实测该前提不成立：
             // 见本类「交付副本为何可以撤掉」注释。
-            memoryCache.put(url, bitmap);
+            memoryCache().put(url, bitmap);
             loadListener.onSuccess(
                     new ImageContent(bitmap),
                     requestInfo,

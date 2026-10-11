@@ -6,22 +6,24 @@ import android.graphics.Bitmap;
  * 图片 Bitmap 内存缓存（#147）——Lynx 图片渲染的内存缓存层。
  *
  * <p>键为图片 URL（{@code fetchImage} 入参原始 URL），值为解码后的 ARGB_8888 Bitmap，
- * 字节占用按 {@code width * height * 4}（每像素 4 字节）估算；上限 64MB
- * （{@link #MAX_BYTES}）。基于 {@link LruCache}（LRU 淘汰 + 线程安全），命中免磁盘读 + 解码。
+ * 字节占用按 {@code width * height * 4}（每像素 4 字节）估算。基于 {@link LruCache}
+ * （LRU 淘汰 + 线程安全），命中免磁盘读 + 解码。
  *
- * <p>容量参考：{@code PictelioImageService.decodeSampled} 采样上限 2048×2048
- * （约 16MB/张），64MB 约可容纳 4 张大图，实际页面多为小图，容量更宽裕。
+ * <p><b>容量不再写死（#979）</b>：此前是 64MB 常量，与设备无关；现在容量由
+ * {@link ImageCacheBudgetResolver} 按设备事实算出后<b>注入</b>（本类不持有任何容量常量，
+ * 也不自行推断设备——那是策略类的职责，见 ADR-0222 §2.2 单一策略决策点）。
+ * 调用方拿不到设备事实时须显式给值（如单测用小上限触发淘汰），不给默认容量。
  */
 public final class ImageMemoryCache {
 
-    /** 内存缓存字节上限：64MB（ARGB_8888 每像素 4 字节） */
-    public static final long MAX_BYTES = 64L * 1024 * 1024;
-
     private final LruCache<String, Bitmap> cache;
 
-    /** 默认 64MB 上限实例 */
-    public ImageMemoryCache() {
-        this(new LruCache<>(MAX_BYTES, (url, bitmap) ->
+    /**
+     * @param maxBytes 字节上限（须 &gt; 0），由 {@link ImageCacheBudgetResolver}
+     *                 按设备算得后注入；越界交由 {@link LruCache} 抛错，不静默兜底
+     */
+    public ImageMemoryCache(long maxBytes) {
+        this(new LruCache<>(maxBytes, (url, bitmap) ->
                 (long) bitmap.getWidth() * bitmap.getHeight() * 4L));
     }
 
