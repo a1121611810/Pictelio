@@ -244,7 +244,7 @@ public class PictelioImageService implements ILynxImageService {
                 }
                 bytes = java.nio.file.Files.readAllBytes(f.toPath());
             } else {
-                bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+                bytes = l.loadBytesCachedFirst(PixivImageLoader.rewriteUrl(url));
             }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
@@ -332,7 +332,7 @@ public class PictelioImageService implements ILynxImageService {
         }
         executor.execute(() -> {
             try {
-                l.loadBytes(PixivImageLoader.rewriteUrl(uri));
+                l.loadBytesCachedFirst(PixivImageLoader.rewriteUrl(uri));
             } catch (Throwable t) {
                 Log.w(TAG, "prefetchImage 失败: " + uri, t);
             }

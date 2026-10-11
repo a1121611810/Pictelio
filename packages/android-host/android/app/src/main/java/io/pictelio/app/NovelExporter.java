@@ -576,7 +576,7 @@ public final class NovelExporter {
             if (cancelled.getAsBoolean()) {
                 throw new NovelExportCancelledException();
             }
-            byte[] bytes = loader.loadBytes(url);
+            byte[] bytes = loader.loadBytesCachedFirst(url);
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "图片为空，已跳过: " + url);
                 return null;

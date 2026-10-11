@@ -39,7 +39,7 @@ flowchart TD
 ### D1 原生深模块 `GallerySaver.java`（src/main，双引擎共享）
 
 - 入口：`static SaveResult save(Context, PixivImageLoader, String officialUrl, String fileName)`。
-- 字节获取：**缓存优先**——`PixivImageLoader.cachedFile(officialUrl)` 命中直接读文件（零下载）；未命中 `PixivImageLoader.download(officialUrl)`（图床 resolve + 镜像失败官方回退 + Referer/UA 注入全部复用，ADR-0143 语义不动）。字节在 Java 堆瞬时存在（与 `downloadZipOnce` / `loadBytes` 既有先例一致），不进 JS 堆。
+- 字节获取：**缓存优先**——`PixivImageLoader.cachedFile(officialUrl)` 命中直接读文件（零下载）；未命中 `PixivImageLoader.download(officialUrl)`（图床 resolve + 镜像失败官方回退 + Referer/UA 注入全部复用，ADR-0143 语义不动）。字节在 Java 堆瞬时存在（与 `downloadZipOnce` / `loadBytesCachedFirst` 既有先例一致），不进 JS 堆。
 - 落盘：
   - **API ≥ 29**：`MediaStore.Images` + `RELATIVE_PATH = Pictures/Pictelio`，`IS_PENDING` 两段式写入，返回 `content://` URI。
   - **API 28（minSdk）**：无权限方案——写应用专属外部目录 `getExternalFilesDir(Pictures)/Pictelio/`，`MediaScannerConnection.scanFile` 尽力入库（不给系统弹权限，避免两端各自实现权限管线；图库可见性在该 API 段为尽力而为，文档声明）。
