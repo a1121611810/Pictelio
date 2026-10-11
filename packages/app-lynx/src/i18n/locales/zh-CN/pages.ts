@@ -284,6 +284,7 @@ const zhPages = {
   "advanced.cache.hint": "占用与命中率只统计本机，不上传任何数据",
   "advanced.cache.usage": "磁盘占用",
   "advanced.cache.entries": "缓存条目",
+  "advanced.cache.entriesValue": "{{count}} 项",
   "advanced.cache.memory": "内存占用",
   "advanced.cache.hitRate": "命中率",
   "advanced.cache.noData": "暂无数据",

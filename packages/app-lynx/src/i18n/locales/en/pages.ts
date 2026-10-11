@@ -282,6 +282,7 @@ const enPages = {
   "advanced.cache.hint": "Usage and hit rate are counted on this device only; never uploaded",
   "advanced.cache.usage": "Disk usage",
   "advanced.cache.entries": "Cached items",
+  "advanced.cache.entriesValue": "{{count}} items",
   "advanced.cache.memory": "Memory usage",
   "advanced.cache.hitRate": "Hit rate",
   "advanced.cache.noData": "No data",

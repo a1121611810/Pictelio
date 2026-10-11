@@ -180,8 +180,16 @@ const canClearCache = computed(() => cacheStatsVisible.value && !clearing.value)
 const cacheUsageText = computed(() =>
   cacheStatsVisible.value ? formatBytes(cacheStats.value?.diskBytes ?? 0) : t('advanced.cache.noData'),
 )
+/**
+ * 条目数的**值**：走独立的 entriesValue key，**不复用**作为标签的 `advanced.cache.entries`。
+ * #988 真机走查抓到：两者曾共用同一 key，而该 key 的文案里没有 `{{count}}` 占位符
+ * ⇒ 值那侧传进来的 count 被静默丢弃，界面上「缓存条目」右侧一直显示「缓存条目」四个字，
+ * 条目数从未显示过。标签与值必须各自持有 key（见 usage 组的样本数行是正确做法）。
+ */
 const cacheEntriesText = computed(() =>
-  cacheStatsVisible.value ? t('advanced.cache.entries', { count: cacheStats.value?.diskEntries ?? 0 }) : t('advanced.cache.noData'),
+  cacheStatsVisible.value
+    ? t('advanced.cache.entriesValue', { count: cacheStats.value?.diskEntries ?? 0 })
+    : t('advanced.cache.noData'),
 )
 const cacheMemoryText = computed(() =>
   cacheStatsVisible.value ? formatBytes(cacheStats.value?.memoryBytes ?? 0) : t('advanced.cache.noData'),
