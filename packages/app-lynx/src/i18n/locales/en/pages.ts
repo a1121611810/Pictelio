@@ -277,6 +277,21 @@ const enPages = {
   "advanced.metrics.subShare": "Sub-tab share",
   "advanced.metrics.emptyRate": "Empty-section rate",
   "advanced.metrics.noData": "No data",
+  // ─── 图片缓存组（#984）───
+  "advanced.cache.title": "Image cache",
+  "advanced.cache.hint": "Usage and hit rate are counted on this device only; never uploaded",
+  "advanced.cache.usage": "Disk usage",
+  "advanced.cache.entries": "Cached items",
+  "advanced.cache.memory": "Memory usage",
+  "advanced.cache.hitRate": "Hit rate",
+  "advanced.cache.noData": "No data",
+  "advanced.cache.unavailable": "Cache management is unavailable in this environment",
+  "advanced.cache.readFailed": "Failed to read cache info: {{reason}}",
+  "advanced.cache.clear": "Clear image cache",
+  "advanced.cache.clearing": "Clearing…",
+  "advanced.cache.cleared": "Freed {{size}}",
+  "advanced.cache.clearPartial": "Freed {{size}}, but some items could not be cleared",
+  "advanced.cache.clearFailed": "Clear failed: {{reason}}",
 
   // Notifications.vue (ADR-0188 / #728)
   "notifications.title": "Notifications",

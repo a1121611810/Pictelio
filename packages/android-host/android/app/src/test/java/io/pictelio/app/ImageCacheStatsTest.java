@@ -43,6 +43,9 @@ import okhttp3.mockwebserver.MockWebServer;
  *   <li>分子 = <b>内存命中数 + 磁盘命中数</b>；</li>
  *   <li>累计量<b>跨进程重启累积</b>（不清零）。</li>
  * </ol>
+ * <p>⚠️ 分子分母的<b>链路归属</b>由 #984 收紧为「同数显示链路」（否则命中率可算出 &gt;100%），
+ * 该部分由 {@link ImageCacheHitRateScopeTest} 钉死；本类钉的是归属<b>之内</b>的口径
+ * （两层命中互斥、可相加、分母为 0 取 0 而非 NaN、跨进程累积）。
  * 口径若可被实现悄悄改动，这三类断言（{@code hitRate_*}、{@code persistence_*}）即失效——
  * 而命中率正是后续优化决策的唯一依据（ADR-0222 §3.3：先能观测，再谈策略是否够用），
  * 故这些断言是本票的核心产物，不是附属检查。
@@ -160,8 +163,8 @@ public class ImageCacheStatsTest {
         for (int i = 0; i < 3; i++) {
             firstProcess.recordRequest();
         }
-        firstProcess.recordDiskHit();
-        firstProcess.recordDiskMiss();
+        firstProcess.recordDiskHit(ImageLoadChain.DISPLAY);
+        firstProcess.recordDiskMiss(ImageLoadChain.DISPLAY);
         firstProcess.flush();
 
         // 第二个「进程」：同一份介质上的全新实例（构造即读存量）
@@ -278,9 +281,9 @@ public class ImageCacheStatsTest {
         String url = pngUrl("disk.png");
         enqueuePng();
 
-        loader.loadBytesCachedFirst(url); // 未命中 → 下载
-        loader.loadBytesCachedFirst(url); // 命中
-        loader.loadBytesCachedFirst(url); // 命中
+        loader.loadBytesCachedFirst(url, ImageLoadChain.DISPLAY); // 未命中 → 下载
+        loader.loadBytesCachedFirst(url, ImageLoadChain.DISPLAY); // 命中
+        loader.loadBytesCachedFirst(url, ImageLoadChain.DISPLAY); // 命中
 
         ImageCacheStats stats = service.cacheStats();
         assertEquals("磁盘层自计：1 次未命中 + 2 次命中", 1L, stats.diskMisses());

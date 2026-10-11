@@ -277,6 +277,23 @@ const zhPages = {
   "advanced.metrics.subShare": "二级使用占比",
   "advanced.metrics.emptyRate": "空段出现率",
   "advanced.metrics.noData": "暂无数据",
+  // ─── 图片缓存组（#984）——占用与命中率只统计本机；一键清理由用户显式触发 ───
+  //   ⚠️ noData 单列一键而非复用 advanced.metrics.noData：两处语义不同（度量「从未观察到」
+  //   vs 缓存「读不到/无样本」），共用一个键会让日后改文案时互相牵制。
+  "advanced.cache.title": "图片缓存",
+  "advanced.cache.hint": "占用与命中率只统计本机，不上传任何数据",
+  "advanced.cache.usage": "磁盘占用",
+  "advanced.cache.entries": "缓存条目",
+  "advanced.cache.memory": "内存占用",
+  "advanced.cache.hitRate": "命中率",
+  "advanced.cache.noData": "暂无数据",
+  "advanced.cache.unavailable": "当前环境不支持缓存管理",
+  "advanced.cache.readFailed": "读取缓存信息失败：{{reason}}",
+  "advanced.cache.clear": "清理图片缓存",
+  "advanced.cache.clearing": "清理中…",
+  "advanced.cache.cleared": "已释放 {{size}}",
+  "advanced.cache.clearPartial": "已释放 {{size}}，但仍有条目未能清理",
+  "advanced.cache.clearFailed": "清理失败：{{reason}}",
 
   // ─── Notifications.vue（通知中心页，ADR-0188 / #728） ───
   "notifications.title": "通知",
