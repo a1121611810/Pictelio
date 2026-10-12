@@ -310,15 +310,24 @@ public class PictelioImageServiceTest {
      * 钉死「{@code s.pximg.net} 与 {@code i.pximg.net} 同放行」（#734 订正的<b>行为锚</b>）。
      *
      * <p><b>为什么这条必须存在</b>：spec/ADR-0188 曾把 {@code s.pximg.net} 公共图标描述为
-     * 「沿用直通行为」，理由是「代理通道目标硬编码 {@code i.pximg.net}」——该理由已证伪：
-     * {@code OAuthConfig.IMAGE_CDN_URL} 只在 {@code rewriteUrl()} 里为 {@code /pixiv-img/{path}}
-     * 反查，<b>不是域名闸门</b>。本类的放行判据是 {@code url.startsWith("http")}，
-     * 任何 Pixiv 域名的绝对 URL 都进同一条交付链（两层缓存 / {@code ImageHostConfig} 换源 /
-     * Referer+UA 注入均照常生效）。
+     * 「沿用直通行为」，理由是「代理通道目标写死为 {@code i.pximg.net}」——该理由已证伪：
+     * {@code OAuthConfig.IMAGE_CDN_URL} 的两个生产消费点里<b>只有</b> {@code rewriteUrl()} 参与 URL 反查，
+     * 且仅对含 {@code /pixiv-img/} 的路径生效（另一个消费点是 {@code NetDiagProbe} 的网络自检探针
+     * baseUrl，与图片加载链路无关）——它<b>不是域名闸门</b>。本类的放行判据是
+     * {@code url.startsWith("http")}，任何 Pixiv 域名的绝对 URL 都进同一条交付链，
+     * 两层缓存与 Referer+UA 注入均照常生效。
+     *
+     * <p><b>⚠️ 图床换源不要在这里跟着一起声称</b>（Round 2 review 修正）：{@code ImageHostConfig.resolve}
+     * 确无域名闸门、换源判定确实覆盖 {@code s.pximg.net}，但<b>能否取到字节取决于镜像覆盖面</b>——
+     * 竞品 Pixiv-Shaft 实测镜像不服务该域（{@code ceui/lisa/http/ImageHostManager.kt}，
+     * {@code s.pixiv.*} 为 NXDOMAIN、{@code i.pixiv.*} 对 {@code /common/images/*} 返 404）。
+     * 本仓镜像覆盖面<b>未验证</b>（测试设备均未配置镜像）。故此处只声明缓存与防盗链，
+     * 不声明「图床换源照常生效」。
      *
      * <p><b>判别力</b>：把 {@link #canParseUrl} 的判据改回域名白名单（只放行 {@code i.pximg.net}）
-     * ⇒ 本条立刻转红，而上方 {@code canParseUrl_returnsTrue} 仍全绿。这正是「只有形态锚、没有行为锚」
-     * 会漏掉的那种变异。措辞侧的另一半锚在 {@code Notifications.iconProxyContract.test.ts}。
+     * 或彻底掏空（{@code return false;}）⇒ 本条立刻转红，而上方 {@code canParseUrl_returnsTrue}
+     * 在前者下仍全绿。这正是「只有形态锚、没有行为锚」会漏掉的那种变异。措辞侧的另一半锚在
+     * {@code Notifications.iconProxyContract.test.ts}。
      *
      * <p><b>oracle 溯源（测试硬约束 #2/#6）</b>：URL 取自 2026-09-26 真实抓包落库的 fixture
      * {@code packages/app-lynx/src/api/__fixtures__/notification-list.json} 的 {@code content.left_icon}，

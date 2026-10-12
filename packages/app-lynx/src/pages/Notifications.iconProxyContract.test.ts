@@ -15,8 +15,11 @@
 // ⚠️ 断言纪律（ADR-0163 (b)，本仓反复吃亏的成因）：
 //   ① 文档断言跑在 proseOnly() 之后的正文上——围栏代码块与引用块（`>`）先剥掉。
 //      **理由**：订正注必须允许**原样引用旧措辞**，否则作者只能写含糊的订正、读者无从比对。
-//      **已知边界（沿用本仓既有登记）**：把失真陈述藏进 `>` 或 ``` ``` 里能绕过本文件——
-//      那是 Markdown 的固有歧义，不是本检测器的缺陷；JVM 行为锚不依赖文本，仍会红。
+//      **已知边界（实测坐实，非推测）**：把失真陈述藏进 `>` 引用块能绕过本文件——
+//      Round 2 实测 M4「把 `IMAGE_CDN_URL` 只在 rewriteUrl() 里写回」时，第一次注入
+//      落在订正注内 ⇒ 门禁绿；改注入到正文同款句子才转红。即**引用块是确凿的盲区**。
+//      本仓约定引用块=订正/引述，故取舍成立；JVM 行为锚不依赖文本，收窄 `canParseUrl`
+//      时仍会红。另：关键词表封闭，只能拦住它认识的写法——换一种措辞重犯同一失真不会被抓。
 //   ② 跨端符号用「两侧**都**出现」而非单侧出现，单侧出现正是半接线形态。
 //   ③ 每个检测器带**夹具自检**（真实形态命中 / 误报形态不命中），证明检测器非恒真。
 import { readFileSync } from 'node:fs'
@@ -76,24 +79,60 @@ function proseOnly(md: string): string {
   return md.replace(/```[\s\S]*?```/g, '').replace(/^\s*>.*$/gm, '')
 }
 
-const SPEC_PROSE = proseOnly(readFileSync(new URL('docs/specs/notification-center.md', REPO_ROOT), 'utf8'))
-const ADR_PROSE = proseOnly(readFileSync(new URL('docs/adr/ADR-0188-notification-center.md', REPO_ROOT), 'utf8'))
+/**
+ * 受检文档 → 其散文正文。
+ * 三份都承载 s.pximg 相关的行为陈述，故都纳入：Round 1 的订正跨了三份文档，
+ * 只守其中两份会让第三份成为盲区（`imagehost-native-fix.md` 的 Out of Scope 里
+ * 就藏着一句「不经下载层」，是 Round 1 差点漏掉、靠 Spec 轴抓出来的阻塞项）。
+ */
+const DOC_PROSE: Record<string, string> = {
+  'notification-center.md': proseOnly(
+    readFileSync(new URL('docs/specs/notification-center.md', REPO_ROOT), 'utf8'),
+  ),
+  'ADR-0188': proseOnly(
+    readFileSync(new URL('docs/adr/ADR-0188-notification-center.md', REPO_ROOT), 'utf8'),
+  ),
+  'imagehost-native-fix.md': proseOnly(
+    readFileSync(new URL('docs/specs/imagehost-native-fix.md', REPO_ROOT), 'utf8'),
+  ),
+}
 
 /**
- * 已证伪的失真陈述片段（#734 订正前的原文措辞）。
+ * 已证伪的失真陈述片段。
  * 刻意取**长片段**而非关键词：短词（如「直通」）在合法语境里也出现，会误红。
- * 每条都逐字来自订正前的 spec / ADR 原文。
+ *
+ * ⚠️ 这张表必须随**每一次订正**增长（Round 2 review 抓到的自伤）：
+ *   本表初版收的是 #734 挂账时的旧措辞家族（直通 / 多域承载 / 硬编码），
+ *   但 Round 1 真正证伪并改掉的是另外两句——「不经下载层」与「IMAGE_CDN_URL 只在
+ *   rewriteUrl() 里」。二者**都不在初版词表里** ⇒ 文档门禁覆盖不到本轮真正被推翻的
+ *   那两句，将来谁把它们写回正文，门禁照样绿。**它当时只在拦它自己认识的那批老词。**
+ *   故新增订正时，两句都要同时加进本表。
  */
 const STALE_CLAIMS = [
+  // —— #734 挂账时期的旧措辞家族 ——
   '沿用仓库既有直通行为',
   '代理通道硬编码',
   '承载不了多域',
   '多域承载需 Java 改动',
   '多域代理扩展挂账',
+  // —— Round 1 订正时证伪并改掉的原句 ——
+  '不经下载层',
 ] as const
 
+/**
+ * 同上的正则形态（片段写法盖不住时用）。取**受限窗口**而非裸词，
+ * 避免「只有 / 只在」这类正常表述被误伤。
+ */
+const STALE_PATTERNS: readonly RegExp[] = [
+  // 「IMAGE_CDN_URL 只在 rewriteUrl() 里」——真相是两个生产消费点，其中只有 rewriteUrl 参与反查
+  /只在[^。\n]{0,16}rewriteUrl/,
+]
+
 function staleFoundIn(prose: string): string[] {
-  return STALE_CLAIMS.filter((c) => prose.includes(c))
+  return [
+    ...STALE_CLAIMS.filter((c) => prose.includes(c)),
+    ...STALE_PATTERNS.filter((re) => re.test(prose)).map((re) => re.source),
+  ]
 }
 
 describe('通知公共图标（s.pximg.net）· JS↔Java 契约（spec notification-center 边界 5 / ADR-0188）', () => {
@@ -179,18 +218,13 @@ describe('通知公共图标（s.pximg.net）· JS↔Java 契约（spec notifica
     })
   })
 
-  describe('文档不得复述已证伪的失真陈述（#734 订正的措辞锚）', () => {
-    it('spec 边界 5 正文里已无陈旧措辞', () => {
-      expect(staleFoundIn(SPEC_PROSE), 'spec 复述了已证伪的「s.pximg 走直通」主张').toEqual([])
+  describe('文档不得复述已证伪的失真陈述（#734 / Round 1 订正的措辞锚）', () => {
+    it.each(Object.entries(DOC_PROSE))('%s 正文里已无陈旧措辞', (_name, prose) => {
+      expect(staleFoundIn(prose), '复述了已证伪的「s.pximg 走直通 / 不经下载层」主张').toEqual([])
     })
 
-    it('ADR-0188 正文里已无陈旧措辞', () => {
-      expect(staleFoundIn(ADR_PROSE), 'ADR 复述了已证伪的「s.pximg 走直通」主张').toEqual([])
-    })
-
-    it('两份文档仍在讨论 s.pximg（防「整段删掉也算通过」）', () => {
-      expect(SPEC_PROSE).toContain('s.pximg.net')
-      expect(ADR_PROSE).toContain('s.pximg.net')
+    it.each(Object.entries(DOC_PROSE))('%s 仍在讨论 s.pximg（防「整段删掉也算通过」）', (_name, prose) => {
+      expect(prose).toContain('s.pximg.net')
     })
 
     it('本组能抓到「把措辞改回旧文」（变异自证）', () => {
@@ -200,6 +234,20 @@ describe('通知公共图标（s.pximg.net）· JS↔Java 契约（spec notifica
         '——代理通道硬编码 `i.pximg.net` 目标承载不了多域；多域代理扩展挂账（#734）。'
       expect(reverted).toContain('沿用仓库既有直通行为') // 朴素关键词查会命中
       expect(staleFoundIn(proseOnly(reverted)), '本组形态：拦不住 ⇒ 检测器已腐坏').not.toEqual([])
+    })
+
+    it('本组能抓到「把 Round 1 改掉的那两句原样写回」（变异自证 · Round 2 补）', () => {
+      // ⚠️ 这两条曾**缺席于词表**：初版只收 #734 挂账时的老词，而这才是 Round 1 真正
+      //   证伪并改掉的原句。缺了它们，门禁守的不是它该守的东西。
+      const notInTable = '`s.pximg.net` 静态资源（不经下载层）'
+      expect(staleFoundIn(notInTable)).not.toEqual([])
+
+      const cdnOverclaim = '`OAuthConfig.IMAGE_CDN_URL` 只在 `rewriteUrl()` 里为 `/pixiv-img/{path}` 反查。'
+      expect(staleFoundIn(cdnOverclaim)).not.toEqual([])
+
+      // 反向自检：订正后的正确表述**不得**被误判
+      const corrected = '两个生产消费点里只有 `rewriteUrl()` 参与 URL 反查（另一个是探针 baseUrl）。'
+      expect(staleFoundIn(corrected), '正确表述被误判 ⇒ 正则窗口太宽').toEqual([])
     })
   })
 })
