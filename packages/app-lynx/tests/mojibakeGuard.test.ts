@@ -38,8 +38,8 @@
 // 而**不是**把整个目录移出扫描面——后者正是「假装没这回事」，会让下一任读者
 // 再次只读散文、以为 docs/ 有防线。⚠️ 半成品清完后，对应条目会触发
 // 「登记豁免不得失效」那条断言（:379），**逼迫删除空壳条目**，噪声不会沉淀成永久白名单。
-import { readFileSync, readdirSync } from 'node:fs'
-import { extname, join, relative, sep } from 'node:path'
+import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { extname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -421,6 +421,35 @@ describe('U+FFFD 守门 · 检测器判别力自检（阳性/阴性对照：扫�
       scanFiles([{ path: rel, text: injected }]).filter((o) => !REGISTERED_PATHS.has(o.path)),
       '注入的 U+FFFD 必须落进 offenders()，即零容忍面会当场转红',
     ).toHaveLength(1)
+  })
+
+  it('阳性对照 D（检测器自身可信）：复核本门禁的读取链路必须真的认得 U+FFFD', () => {
+    // ⚠️ 本条针对的不是「仓内脏不脏」，而是「**复核本门禁的人手里那条命令可不可信**」。
+    // #897 复核期实测：用 `grep -rlP '\x{FFFD}' docs/` 复测得到「0 个文件、退出码 0」，
+    // 而该目录当时真实存在 4 个含 U+FFFD 的文件 —— **静默不匹配**，与「真的没有」完全同形，
+    // 那一轮据此得出了「docs/ 当前 0 处、无需扩面」的错误结论。
+    //
+    // ⇒ 纪律：**任何用于复核门禁的计数命令，必须先用已知含 U+FFFD 的样本自测它自己**。
+    //   本条把该纪律钉成机器断言，不靠下一位 reviewer 记得。
+    // ⚠️ 不用 `\x{FFFD}` 转义做判据：本仓环境里 `grep -P '\x{FFFD}'` 静默不匹配（退出码 0、
+    //   无输出），拿它当断言会把「命令坏了」伪装成「仓库干净」。此处走**门禁自己的读取链路**。
+    const probe = `const a = 'x${FFFD}y'`
+    expect(probe.includes(FFFD), '阳性对照自检：本条自己必须先认得 U+FFFD').toBe(true)
+
+    // 落盘一份含 U+FFFD 的样本，走 collectEntries 同一条读取+扫描链路。
+    const absProbe = resolve(REPO, 'packages/app-lynx/tests/.mojibake-probe.tmp')
+    writeFileSync(absProbe, probe, 'utf8')
+    try {
+      const buf = readFileSync(absProbe)
+      // collectEntries：含 NUL 才整份跳过 ⇒ 文本样本必被读入
+      expect(buf.includes(0), '探针文件被误判为二进制（含 NUL）').toBe(false)
+      expect(
+        scanText(buf.toString('utf8')),
+        '门禁自己的读取链路认不出探针里的 U+FFFD ⇒ 检测器已失效（这不是仓库干净）',
+      ).toHaveLength(1)
+    } finally {
+      rmSync(absProbe, { force: true })
+    }
   })
 })
 
