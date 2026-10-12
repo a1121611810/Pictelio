@@ -55,7 +55,7 @@
 - Web/dev 模式图床断裂（预取与显示缓存预热错位）——开发机有网无实际损害，另行澄清。
 - 并发请求模式的原生实现（N 路并发竞速）。
 - Pixiv 直连（免梯 IP 表）effort——独立挂起立项；其落地后「图床 × 直连优先级」另行决策。
-- 图床设置 UI 重构（仅加模式标注文案）；`ImageCachePlugin` 行为；`s.pximg.net` 静态资源（不经下载层）；iOS。
+- 图床设置 UI 重构（仅加模式标注文案）；`ImageCachePlugin` 行为；`s.pximg.net` 静态资源（**JS 层不改写**，但 2026-10-12 订正：它**仍进下载层**——`ImageHostConfig.resolve` 无域名闸门，图床开启时对它一视同仁；只是镜像是否服务 `/common/images/*` 路径取决于镜像自身覆盖面，未验证）；iOS。
 
 ## Further Notes
 

@@ -51,6 +51,18 @@ const IMAGE_SERVICE_CODE = readFileSync(
 )
 
 /**
+ * 文件缺失时返回空串而非抛 ENOENT——顶层 readFileSync 抛出会让 vitest 记「0 用例」
+ * 而不是逐条红，失去定位价值（同 deliveryProbeContract.test.ts 的先例）。
+ */
+function safeRead(url: URL): string {
+  try {
+    return readFileSync(url, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/**
  * 剥掉围栏代码块与引用块，只留正文散文。
  *
  * ⚠️ 引用行必须容忍**前导缩进**：Markdown 允许把块引用嵌进列表项，写作
@@ -124,19 +136,33 @@ describe('通知公共图标（s.pximg.net）· JS↔Java 契约（spec notifica
       // 收窄 canParseUrl 到域名白名单时，JS 交出的 s.pximg URL 将无人接管 ⇒ 图标静默消失。
       // JVM 侧行为由 PictelioImageServiceTest 钉死；本条钉的是**两侧接得上**这层，
       // 两侧各自的单测都证明不了它。
-      const predicate = /return\s+url\.startsWith\("http"\)\s*\|\|\s*url\.contains\("\/pixiv-img\/"\)/.test(
-        IMAGE_SERVICE_CODE,
-      )
-      expect(
-        predicate,
-        'canParseUrl 的放行判据已不是「任意 http 或代理路径」⇒ JS 侧交出的绝对 URL 可能无人接管',
-      ).toBe(true)
-
-      // 关键：Java 侧不得自带 Pixiv 域名白名单（那正是 #734 当初误以为存在的闸门）
+      //
+      // ⚠️ 判据只用「不含域名白名单」这一条**否定式**，不钉 `||` 两析取项的完整字面量：
+      //   早先钉了整条 return 表达式，等价重构（调换两析取项次序、提取局部变量）会误红，
+      //   而那不是契约变化（review Standards 轴判为「复述实现 + 更脆」）。肯定侧的
+      //   `startsWith("http")` 取**子串**而非整句，容忍次序与括号变化。
       const canParseBody = IMAGE_SERVICE_CODE.slice(
         IMAGE_SERVICE_CODE.indexOf('public boolean canParseUrl'),
       )
       expect(canParseBody.slice(0, canParseBody.indexOf('\n    }'))).not.toMatch(/pximg\.net|pixiv\.net/)
+      // 肯定侧：放行判据仍含 http 前缀（否则上一条会退化成「反正什么都没限制」）
+      expect(canParseBody).toContain('startsWith("http")')
+    })
+
+    it('⚠️ JVM 测试里的 s.pximg 字面量必须与真实 fixture 同源（跨语言双源守卫）', () => {
+      // JVM 侧读不到 app-lynx 的 fixture（模块边界），只能硬编码字面量 ⇒ 双源。
+      // 本条是两侧的**同步守卫**：fixture 换样本时本条转红，提醒同步 JVM 侧。
+      // 无此守卫时 fixture 与 JVM 字面量可各自漂移，而两边单测都会绿。
+      const serviceTest = safeRead(
+        new URL('test/java/io/pictelio/app/PictelioImageServiceTest.java', HOST_APP),
+      )
+      expect(serviceTest, '未读到 PictelioImageServiceTest.java').not.toBe('')
+      for (const sample of sPximgSamples()) {
+        expect(
+          serviceTest,
+          `JVM 侧没有引用 fixture 样本 ${sample} ⇒ 两侧样本漂移且无人报警`,
+        ).toContain(sample)
+      }
     })
   })
 
