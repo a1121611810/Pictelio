@@ -254,9 +254,17 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
             c,
             `${p.selector} / ${base.name}：inverse-on-surface on inverse-surface = ${c.toFixed(2)}`,
           ).toBeGreaterThanOrEqual(AA)
-          // 把「底色被完全盖掉」钉死：一旦有人把稳定底色改成半透明，
-          // 上面那条会因为 base 与结果无关而**不再**能证明覆盖全部底色。
-          expect(over(p.inverseOnSurface, 1, base.rgb)).toEqual(p.inverseOnSurface)
+          // ⚠️ 这里曾有一条 `expect(over(p.inverseOnSurface, 1, base.rgb)).toEqual(...)`，
+          //    注释声称「把『底色被完全盖掉』钉死」——**它是恒真的**（#897）：
+          //    `over` 的定义是 `fg*a + bg*(1-a)`，取 a=1 时 bg 被乘以 0、**完全消失**，
+          //    结果恒等于 fg，与 base 无关 ⇒ 对任意底色恒真，且 `base` 从未参与任何断言
+          //    （外层遍历形同虚设）。它拦不住任何回归，却一直冒充防线计入门禁台账。
+          //    已删除。「底色不许带 alpha 修饰符」的真防线在下方消费点 describe 里
+          //    （源级 class 形态断言）——纯数学断言在原理上做不到，因为「不透明」是
+          //    一个 class 形态的事实，不是颜色数值的事实。
+          //    ⚠️ base 仍用于上面那条对比度断言的错误信息（逐底色板的可读诊断），
+          //    但**判据本身与 base 无关**是事实：若要让 base 真正参与判据，
+          //    必须改为「把底色板实际合成进结果后仍达标」，那是另一种门禁形态（见 #897）。
         }
       })
     }
@@ -425,6 +433,34 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         expect(src, `${c.name} 出现 text-inverse-on-surface 的 alpha 变体（死类名）`).not.toMatch(
           /text-inverse-on-surface\/\d+/,
         )
+
+        // ── 稳定底色**不许带 alpha 修饰符**（#897 修法）────────────────────────
+        // 上一条只守住了 text- 侧的**死类名**；底色侧是完全不同的失效机制，且**恒绿**：
+        //  1. 上面的 `resolve()` 用 `bg-([\w-]+)` 提取令牌名，`\w` **不含 `/`**，
+        //     故 `bg-inverse-surface/70` 会被静默截成 `inverse-surface` ⇒ plateBg 不变
+        //     ⇒ 对比度数字**纹丝不动** ⇒ 上游所有断言照常全绿。
+        //  2. 与 text- 侧相反，底色的 `/70` **不是死类名**：Tailwind 对裸 var() 颜色档
+        //     同样接受 alpha 修饰符，会正常产出规则 ⇒ 真实渲染为半透明，无任何构建期报错。
+        //     即：这是**视觉静默回归**，不是死类名，运行时表现与意图一致地错。
+        //  为什么必须禁：绝对下界判据（上面 `for (const base of BASES)`）的全部有效性
+        //     建立在「文字不透明地压在**不透明**稳定底色上」这一前提上。底色一旦半透明，
+        //     作品图就会透过底色参与合成，`base` 重新变得相关，而门禁对 base 的实际影响
+        //     恒为零 ⇒ 整道门宣称覆盖的底色范围**从未被真正验证过**。
+        //
+        // 实测（变异验证）：把 RankingEntryCard.vue:141 的底色改成
+        // `bg-inverse-surface/70` 后，本文件 26 个用例**全绿**。
+        // 改动后同一变异会让本断言判红。
+        //
+        // 判据只针对**稳定底色块**（上面的 plates），不扫全文件：
+        // NovelIntro / Recommended 里另有与 scrim 无关的 inverse 元素，且本仓有
+        // 刻意使用 alpha 的状态层（bg-layer-pressed/16 等），全文件禁 `/` 会误伤。
+        for (const plate of plates) {
+          const bgClass = plate.match(/bg-inverse-surface(?:\/\S+)?/)?.[0]
+          expect(
+            bgClass,
+            `${c.name} 底色块的 bg-inverse-surface 提取异常：${plate}`,
+          ).toBe('bg-inverse-surface')
+        }
       })
     }
   })
