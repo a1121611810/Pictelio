@@ -37,7 +37,7 @@
 // （路径 + 条数 + 理由 + 原文证据，与 `hardcode-whitelist-colors.json` 同构），
 // 而**不是**把整个目录移出扫描面——后者正是「假装没这回事」，会让下一任读者
 // 再次只读散文、以为 docs/ 有防线。⚠️ 半成品清完后，对应条目会触发
-// 「登记豁免不得失效」那条断言（:379），**逼迫删除空壳条目**，噪声不会沉淀成永久白名单。
+// 「登记豁免不得失效」那条断言（:501），**逼迫删除空壳条目**，噪声不会沉淀成永久白名单。
 import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -147,39 +147,6 @@ const REGISTERED: { path: string; count: number; reason: string; evidence: strin
   //    缺的是「作者原本想写的那个字/词」，只能靠语义猜。把猜测写回文档等于 agent 替作者
   //    改写决策记录 —— 故按本门禁既有机制**登记**，由作者本人确认后清除。
   //    登记不是放过：`evidence` 逐处给出原文（U+FFFD 记作 `<FFFD>`），作者可一眼核对。
-  {
-    path: 'docs/adr/ADR-0215-fail-safe-aux-mechanisms.md',
-    count: 3,
-    reason:
-      '存量（#897 扩面暴露）：验收条件句尾「任何页面的内容必须**完全可<FFFD><FFFD><FFFD>**」。' +
-      '该文件自引入提交 e7282608 起即带此腐化（git show 当次即 3 个），从未有过干净原文可复原。' +
-      '截断处应为「见」或「见且可点」一类词，需作者确认。',
-    evidence: '…任何页面的内容必须**完全可<FFFD><FFFD><FFFD>**。',
-  },
-  {
-    path: 'docs/adr/glossary-top-inset-and-verification.md',
-    count: 2,
-    reason:
-      '存量（#897 扩面暴露）：「首页的视觉均衡性**依赖图片本身的宽高比分布，不<FFFD><FFFD>代码保证**」。' +
-      '该文件引入时（e7282608）**是干净的**（当次计数 0），属后续编辑引入；截断处疑为「由」。需作者确认。',
-    evidence: '…依赖图片本身的宽高比分布，不<FFFD><FFFD>代码保证**。',
-  },
-  {
-    path: 'docs/research/md3-visual-regression-2026-09.md',
-    count: 3,
-    reason:
-      '存量（#897 扩面暴露）：「分段控件的**已选<FFFD><FFFD><FFFD>实心段**」。' +
-      '研发表述，疑为「中的」或「态的」等；需作者确认。',
-    evidence: '按像素特征找出「外观模式」分段控件的**已选<FFFD><FFFD><FFFD>实心段**',
-  },
-  {
-    path: 'docs/specs/notification-delivery-probe.md',
-    count: 2,
-    reason:
-      '存量（#897 扩面暴露）：「通知是提醒我去<FFFD><FFFD>，已读是我真的看过」。' +
-      '规格文档，疑为「看」或「看一眼」等；需作者确认。',
-    evidence: '二者是不同语义：通知是提醒我去<FFFD><FFFD>，已读是我真的看过。',
-  },
 ]
 
 /**
@@ -196,12 +163,27 @@ const REGISTERED: { path: string; count: number; reason: string; evidence: strin
  *   **作者确认原字**（详见各条 reason：这 4 处是被截断的散文，缺的是作者想写的字词，
  *   agent 猜写等于替作者改写决策记录）。故登记，**不是放过**：
  *   - 每条附 `evidence` 原文，作者可一眼核对；
- *   - `docs/` 半成品一旦清掉，对应条目会触发「登记豁免不得失效」那条断言（:379）
+ *   - `docs/` 半成品一旦清掉，对应条目会触发「登记豁免不得失效」那条断言（:501）
  *     **强制删除空壳条目**，不会沉淀成永久白名单；
  *   - 本上限同步上调到 17，是为了让「上限」继续锚住**真实存量**，而非让它逼着人
  *     去改判据或删文件。任何人再加豁免，仍受同一上限约束。
+ *
+ * ── 2026-10-13 下调 17 → 6（#1000 清完 docs/ 存量）──
+ * 上述 4 条 docs/ 登记已删，余下前三条未变（2+3+1 = 6）。
+ *
+ * 四处原字**有镜像文档硬证据**，不是猜写（#1000 阻塞在作者确认原字；2026-10-13
+ * 作者答复「深入分析、自行决定」后据此定案）：
+ *   - 「完全可见」← `docs/specs/fail-safe-aux-mechanisms.md:65` 同句干净版；
+ *   - 「不由代码保证」← `ADR-0215:63` 与 `specs/fail-safe-aux-mechanisms.md:107`；
+ *   - 「已选中实心段」← `scripts/capture-md3-matrix.sh:24` 与 `find-ui-band.py:17`；
+ *   - 「提醒我去看」← 无逐字镜像；2 个替换符 = 1 个汉字（3 字节）锁死单字，
+ *     且与后半句「已读是我真的看过」构成语义对比（术语表用词亦为「真的看过」）。
+ *
+ * ⚠️ 下调不是「放松」，是**收紧**：上限回落意味着这 4 处再也不可能被登记豁免——
+ *   同样的腐化再出现在 docs/ 必须当场判红。反向代价：它们已不复原，若判红说明
+ *   有新腐化，不说明本上限可以随手调回去。
  */
-const MAX_REGISTERED_TOTAL = 17
+const MAX_REGISTERED_TOTAL = 6
 
 // ────────────────────────────── 判据（纯函数）──────────────────────────────
 
