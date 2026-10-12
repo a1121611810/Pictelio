@@ -139,14 +139,27 @@ describe('通知公共图标（s.pximg.net）· JS↔Java 契约（spec notifica
       //
       // ⚠️ 判据只用「不含域名白名单」这一条**否定式**，不钉 `||` 两析取项的完整字面量：
       //   早先钉了整条 return 表达式，等价重构（调换两析取项次序、提取局部变量）会误红，
-      //   而那不是契约变化（review Standards 轴判为「复述实现 + 更脆」）。肯定侧的
-      //   `startsWith("http")` 取**子串**而非整句，容忍次序与括号变化。
-      const canParseBody = IMAGE_SERVICE_CODE.slice(
-        IMAGE_SERVICE_CODE.indexOf('public boolean canParseUrl'),
-      )
-      expect(canParseBody.slice(0, canParseBody.indexOf('\n    }'))).not.toMatch(/pximg\.net|pixiv\.net/)
+      //   而那不是契约变化（review Standards 轴判为「复述实现 + 更脆」）。
+      // ⚠️ 否定侧与肯定侧**必须切同一段**（Round 2 发现）：肯定侧早先扫的是「canParseUrl
+      //   之后整份文件」，当下恰好等价，但若日后文件尾部新增含该串的方法、而 canParseUrl
+      //   被掏空，两条断言会一起绿——掏空即恒真。已验证 `return false;` 变异确实转红。
+      //
+      // ⚠️ 已知失效面（门禁纪律第 5 条，显式登记）：域名判据必须带 `.net` 后缀，
+      //   因为合法的代理路径标记 `/pixiv-img/` 本身就含子串 `pixiv`——短词正则会误伤它
+      //   （本轮实测踩过：`/pximg|pixiv/` 把门禁判成了红）。代价是
+      //   `url.contains("pixiv")` 这种**不带 `.net` 的宽松白名单**写法能溜过去。
+      //   本仓不写这种写法；JVM 侧 `canParseUrl_sPximgStaticCdn_acceptedSameAsPixivCdn`
+      //   兜住它的后果（真收窄了必然红），故不另加判据。
+      const canParseFrom = IMAGE_SERVICE_CODE.indexOf('public boolean canParseUrl')
+      const canParseRaw = IMAGE_SERVICE_CODE.slice(canParseFrom)
+      const methodBody = canParseRaw.slice(0, canParseRaw.indexOf('\n    }'))
+      expect(methodBody, '未能切出 canParseUrl 方法体').not.toBe('')
+      expect(
+        methodBody,
+        'canParseUrl 自带 Pixiv 域名白名单 ⇒ JS 交出的 s.pximg URL 可能无人接管',
+      ).not.toMatch(/pximg\.net|pixiv\.net/)
       // 肯定侧：放行判据仍含 http 前缀（否则上一条会退化成「反正什么都没限制」）
-      expect(canParseBody).toContain('startsWith("http")')
+      expect(methodBody).toContain('startsWith("http")')
     })
 
     it('⚠️ JVM 测试里的 s.pximg 字面量必须与真实 fixture 同源（跨语言双源守卫）', () => {
