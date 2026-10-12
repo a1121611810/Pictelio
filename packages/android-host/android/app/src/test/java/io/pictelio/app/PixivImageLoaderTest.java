@@ -3,6 +3,7 @@ package io.pictelio.app;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -105,6 +106,41 @@ public class PixivImageLoaderTest {
         // 对齐 MainActivity 既有 URI.normalize() 行为：dot-segment 折叠 → 单一缓存 key
         assertEquals(CDN + "/b.jpg", PixivImageLoader.rewriteUrl("/pixiv-img/a/../b.jpg"));
         assertEquals(CDN + "/x/y.jpg", PixivImageLoader.rewriteUrl("/pixiv-img/./x/y.jpg"));
+    }
+
+    /**
+     * 钉死「缓存键<b>天然按域名隔离</b>」（#734 订正的<b>键空间锚</b>）。
+     *
+     * <p>票面待办曾列「缓存键域隔离评估」，隐含担忧：{@code s.pximg.net} 的 key 会不会与
+     * {@code i.pximg.net} 撞进同一条目。结论是<b>不会</b>——{@link #rewriteUrl} 只对含
+     * {@code /pixiv-img/} 的路径做反查，其余 URL 原样返回，故键恒等于**含域名的官方 URL**。
+     * 两域同名路径也各占一条。
+     *
+     * <p><b>oracle 溯源（测试硬约束 #6）</b>：期望值是「URL 原样」这一契约，独立于
+     * {@code rewriteUrl} 的实现（同 {@link #rewriteUrl_nonProxyUrl_unchanged} 已立的先例）。
+     * <b>判别力</b>：若有人把 {@code rewriteUrl} 改成「凡 pximg 域一律归一到 {@code IMAGE_CDN_URL}」，
+     * 本条立刻转红——那会让所有 s.pximg 图标与同名 i.pximg 路径共享一条缓存条目。
+     *
+     * <p>URL 取自真实抓包 fixture（{@code notification-list.json} 的 {@code content.left_icon}），
+     * 非手写自洽串。
+     */
+    @Test
+    public void cacheKey_sPximgUrl_notCollapsedIntoCdnDomain() {
+        // 真实样本：通知公共图标（s.pximg.net 静态资源 CDN）
+        String sPximg = "https://s.pximg.net/common/images/no_profile.png";
+        // 对照：i.pximg.net 上的**同名路径**，用于证明两域不共用一条目
+        String iPximgSamePath = CDN + "/common/images/no_profile.png";
+
+        // ① 非代理 URL 原样成键（不被归一到 IMAGE_CDN_URL）
+        assertEquals("s.pximg.net 的键被归一到 i.pximg.net ⇒ 两域同名路径将互相顶掉缓存条目",
+                sPximg, PixivImageLoader.cacheKey(sPximg));
+        // ② 两域同名路径的键确实不同（不是「恰好不相等」，是按域名区分）
+        assertNotEquals("两个域名下的同一路径落进了同一条缓存条目",
+                PixivImageLoader.cacheKey(sPximg), PixivImageLoader.cacheKey(iPximgSamePath));
+        // ③ 文件名也分开（键 → 文件名是直译，键不同即文件名不同）
+        assertNotEquals("两域同名路径映射到同一缓存文件",
+                PixivImageLoader.keyToFilename(PixivImageLoader.cacheKey(sPximg)),
+                PixivImageLoader.keyToFilename(PixivImageLoader.cacheKey(iPximgSamePath)));
     }
 
     // ── 缓存文件名契约（与 ImageCachePlugin keyToFilename 同规则） ──

@@ -16,7 +16,9 @@
   - `NotificationItem = { id: number; created_datetime: string(+09:00 ISO); type: number; content: { text: string(含 <b> HTML); left_icon?: string; left_image?: string; right_icon?: string; right_image?: string } | null; view_more: { unread_exists: boolean; title: string } | null; target_url: string(pixiv:// scheme); is_read: boolean }`
   - `type` 实测样本：7（すき！/收藏类）、8（フォロー/关注类）；Shaft 注释证实渲染应完全依赖 `content.text`，`type` 仅作 hint
   - **无 mark-read 端点**；`is_read` 为服务端下发（view-more 展开后组头翻转为 true），客户端只读
-  - 图片字段 URL 形态：`s.pximg.net`（公共图标）与 `i.pximg.net`（内容缩略图）——`i.pximg.net` 按仓库硬约束必须走 `/pixiv-img/` 代理（webview）/图片服务重写（lynx），禁直连；`s.pximg.net` 公共图标 v1 沿用仓库既有直通行为（代理通道硬编码 `i.pximg.net` 目标，多域承载需 Java 改动，挂账 follow-up；s.pximg 无 Referer 防盗链，直连为本仓全线既有行为）
+  - 图片字段 URL 形态：`s.pximg.net`（公共图标）与 `i.pximg.net`（内容缩略图）——`i.pximg.net` 按仓库硬约束走 `/pixiv-img/` 代理（webview）/图片服务重写（lynx），禁直连；`s.pximg.net` 在 **JS 层不改写**（`proxyImageUrl` 信任白名单原样返回，URL 形态与 `i.pximg.net` 不同），**但同样进 lynx 图片服务**（`canParseUrl` 判据是 `url.startsWith("http")`），故两层缓存、`ImageHostConfig` 图床换源、Referer/UA 注入均照常生效——这是形态归一，不是绕过管道。
+
+    > ⚠️ 本行原文（2026-09-26）称 `s.pximg.net`「沿用仓库既有直通行为」，并把原因归给「代理通道硬编码 `i.pximg.net` 目标，多域承载需 Java 改动」。该归因已被证伪：`OAuthConfig.IMAGE_CDN_URL` 只在 `PixivImageLoader.rewriteUrl()` 里为 `/pixiv-img/{path}` 反查，**不是域名闸门**；`PictelioImageService.canParseUrl()` 对任意 `http` 开头 URL 放行。「s.pximg 无 Referer 防盗链」一节**属实**（2026-10-12 实测无 Referer 返 200，对照 `i.pximg.net` 无 Referer 返 403），但与「是否进管道」无关。2026-10-12 订正；挂账票 #734 随之按「已实现」关闭并改 `wontfix`。行为锚见 `PictelioImageServiceTest` 与 `packages/app-lynx/src/pages/Notifications.iconProxyContract.test.ts`。
 - Java 侧零改动可行：`PixivApiPlugin.request()`（webview flavor）与 `PictelioApiModule.request()`（lynx flavor）均为 path 直拼、无白名单。
 - 数据层：webview `createTQFeedStore` 的 `TItem extends { id; create_date }` 约束与 `created_datetime` 字段名不匹配，且单列表场景其 tab/merge 能力全部闲置；轻量先例是 `rankingStore`（`useInfiniteQuery` + queryKeys 工厂 + flatten）。
 - 导航挂点：webview `SideNavShell.tsx` 顶列（搜索按钮→四 tab→设置/我），有 `fluent-badge` 组件先例；lynx `Me.vue` 功能入口卡区（bookmarks/watchlist/downloads/networkCheck 四行先例），无 badge 先例、无前台恢复钩子（webview 有 `appStateChange` 先例 ×2：authStore、otaService）。
@@ -70,5 +72,5 @@ webview：`SideNavShell` 顶列搜索按钮下方加铃铛按钮（40×40 触控
 ## 后果
 
 - 正面：对齐 P1 差距；双端各一个页面 + 一个 API 模块，Java 零改动；fixture 真实样例满足契约测试硬约束。
-- 取舍（已接受）：未读跨设备不同步；日文通知文本不翻译；lynx 角标无前台自动刷新（挂账原生 onResume 通道）且刷新挂 Me `onActivated`（KeepAlive 重入触发，#728 Round 2 F3）；`type` 覆盖面仅 7/8 两样本（宽容解析兜底）；s.pximg 公共图标 v1 直连（多域代理扩展挂账 #734）；组头展开采用 ADR-0162 结构规避（子列表内嵌组头 item 内条件段），真机展开取证挂发版前批次（tracking #736）；行级 a11y 标签不消费服务端 is_read（与 D5 本地口径一致）。
+- 取舍（已接受）：未读跨设备不同步；日文通知文本不翻译；lynx 角标无前台自动刷新（挂账原生 onResume 通道）且刷新挂 Me `onActivated`（KeepAlive 重入触发，#728 Round 2 F3）；`type` 覆盖面仅 7/8 两样本（宽容解析兜底）；**`s.pximg` 公共图标的直连取舍已于 2026-10-12 撤销**——该取舍不成立，`s.pximg.net` 图标与 `i.pximg.net` 走同一条图片交付链（`canParseUrl` 对任意 `http` URL 放行），两层缓存 / 图床换源 / Referer 注入均生效，无需多域改造，原挂账票 #734 随之按「已实现」关闭；组头展开采用 ADR-0162 结构规避（子列表内嵌组头 item 内条件段），真机展开取证挂发版前批次（tracking #736）；行级 a11y 标签不消费服务端 is_read（与 D5 本地口径一致）。
 - 后续候选（不在本期）：系统通知（WorkManager 周期 + NotificationChannel + POST_NOTIFICATIONS）、富文本渲染、公告面（`/v1/info`）、运营活动型通知的深度链接微调、lynx 前台恢复事件通道。

@@ -306,6 +306,41 @@ public class PictelioImageServiceTest {
         assertTrue(service.canParseUrl("https://i.pximg.net/x.jpg"));
     }
 
+    /**
+     * 钉死「{@code s.pximg.net} 与 {@code i.pximg.net} 同放行」（#734 订正的<b>行为锚</b>）。
+     *
+     * <p><b>为什么这条必须存在</b>：spec/ADR-0188 曾把 {@code s.pximg.net} 公共图标描述为
+     * 「沿用直通行为」，理由是「代理通道目标硬编码 {@code i.pximg.net}」——该理由已证伪：
+     * {@code OAuthConfig.IMAGE_CDN_URL} 只在 {@code rewriteUrl()} 里为 {@code /pixiv-img/{path}}
+     * 反查，<b>不是域名闸门</b>。本类的放行判据是 {@code url.startsWith("http")}，
+     * 任何 Pixiv 域名的绝对 URL 都进同一条交付链（两层缓存 / {@code ImageHostConfig} 换源 /
+     * Referer+UA 注入均照常生效）。
+     *
+     * <p><b>判别力</b>：把 {@link #canParseUrl} 的判据改回域名白名单（只放行 {@code i.pximg.net}）
+     * ⇒ 本条立刻转红，而上方 {@code canParseUrl_returnsTrue} 仍全绿。这正是「只有形态锚、没有行为锚」
+     * 会漏掉的那种变异。措辞侧的另一半锚在 {@code Notifications.iconProxyContract.test.ts}。
+     *
+     * <p><b>oracle 溯源（测试硬约束 #2/#6）</b>：URL 取自 2026-09-26 真实抓包落库的 fixture
+     * {@code packages/app-lynx/src/api/__fixtures__/notification-list.json} 的 {@code content.left_icon}，
+     * <b>不是手写自洽串</b>；期望值 = 「与 i.pximg 同等放行」，独立于本方法实现。
+     */
+    @Test
+    public void canParseUrl_sPximgStaticCdn_acceptedSameAsPixivCdn() {
+        // 真实样本：通知里「フォローされた」等 user 目标条目的公共图标
+        String sPximg = "https://s.pximg.net/common/images/no_profile.png";
+
+        assertTrue(
+            "s.pximg.net 静态资源 CDN 必须与 i.pximg.net 同放行——否则通知图标绕过两层缓存与图床换源",
+            service.canParseUrl(sPximg));
+        // 回归对照：同一判据对两种形态给出同一结论（不是「恰好这个串通过」）
+        assertEquals(
+            "s.pximg 与 i.pximg 形态的放行判定必须一致",
+            service.canParseUrl("https://i.pximg.net/c/540x540_70/img-master/img/1.jpg"),
+            service.canParseUrl(sPximg));
+        // 且不是「凡 http 都放行」的退化——file:// 之外的协议仍应被拒
+        assertFalse("非 http(s) 仍须拒绝", service.canParseUrl("ftp://s.pximg.net/x.png"));
+    }
+
     /** 单例注册路径仍可用（生产语义未被包可见构造改动影响） */
     @Test
     public void getInstance_returnsInitializedSingleton() {

@@ -49,7 +49,11 @@ Pictelio 无任何通知能力（关注/收藏/评论等事件用户不可感知
 2. **content null / 字段缺失**：宽容解析（全 optional）；`content` 为 null 的行渲染为「（无内容通知）」占位文本，可点击路由（target_url 仍有效）。
 3. **next_url null**：列表尽头，加载更多 affordance 隐藏。view-more 的 `older_than` 游标同理。
 4. **HTML 剥离**：`<b>…</b>` 保留内文；其它标签剔除；实体（`&amp;` 等）解码；结果 trim。禁止把 HTML 注入 DOM（innerHTML 禁用）。
-5. **图片代理**：`content.left_image`/`right_image`（`i.pximg.net` 内容缩略图）必须经图片代理重写（webview `/pixiv-img/`、lynx 图片服务）；`content.*_icon`（`s.pximg.net` 公共图标）**v1 沿用仓库既有直通行为**——代理通道硬编码 `i.pximg.net` 目标承载不了多域（Java 零改动约束），且 s.pximg 无 Referer 防盗链；多域代理扩展挂账（#734）。加载失败 → 隐藏图区（不占位、不重试风暴）。
+5. **图片代理**：`content.left_image`/`right_image`（`i.pximg.net` 内容缩略图）**与** `content.*_icon`（`s.pximg.net` 公共图标）**经同一条图片交付链**（webview `/pixiv-img/`、lynx 图片服务）：lynx 侧判据是 `PictelioImageService.canParseUrl()` 的 `url.startsWith("http")`，任意 Pixiv 域名的绝对 URL 均放行，故 `s.pximg.net` 图标同样获得两层缓存、`ImageHostConfig` 图床换源与 Referer/UA 注入。两者的**差异只在 JS 层 URL 形态**：`proxyImageUrl` 把 `i.pximg.net` 改写成 `/pixiv-img/` 相对路径，而 `s.pximg.net` 命中信任白名单后原样返回——这是**形态归一**，不是绕过管道（见 `PixivImageLoader.cacheKey` 上方 #980 注释「形态归一 ≠ 换源」）。
+
+   > ⚠️ **本条曾有一句失真陈述，已于 2026-10-12 订正**（挂账票 #734 随之按「已实现」关闭、`wontfix`）：当时的措辞把 `s.pximg.net` 描述为「沿用直通行为」，并把原因归给「代理通道目标硬编码 `i.pximg.net`」。后者不成立——`OAuthConfig.IMAGE_CDN_URL` 只在 `rewriteUrl()` 里为 `/pixiv-img/{path}` 反查，**不是域名闸门**。「`s.pximg.net` 无 Referer 防盗链」属实（2026-10-12 实测：无 Referer 返 200；对照 `i.pximg.net` 无 Referer 返 403），但该事实与「是否进管道」无关。行为锚：`PictelioImageServiceTest`（JVM 行为）与 `Notifications.iconProxyContract.test.ts`（跨端 + 本文档措辞门禁）；任一侧漂移即红灯。
+
+   加载失败 → 隐藏图区（不占位、不重试风暴）。
 6. **未读时间比较**：`created_datetime`（+09:00 ISO）与本地时间戳比较统一转毫秒（`Date.parse`）；解析失败该条不计未读（warn）。
 7. **R18 内容缩略图**：通知缩略图不做 R18 遮罩（v1 简化，通知面非浏览面；挂账）。
 8. **401**：走 client 既有自动刷新 + 单飞重试，无新逻辑。
