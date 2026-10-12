@@ -3,9 +3,12 @@
 // 覆盖票 #851 的两条验收路径：
 //   ① composable 自身可测 —— 偏好开 / 关两条路径 + 运行中切换 + 无 matchMedia 降级（注入 matchMedia，
 //      node 环境无 window 也不阻塞；「注入点存在」本身就是被测契约，缺了就测不了）；
-//   ② 组件接入面 —— 全仓含动画组件是否都走统一能力（不靠 grep 人工核，靠断言钉死）。
-//      「全仓」的口径 = **src/ 全树**，不是 monorepo 全体：动画资产只可能落在 .vue 里，
-//      而 .vue 只存在于 src 下（android-host / website / scripts 无 .vue 动画资产）。
+//   ② 组件接入面 —— src/ 全树（含 .vue 与 .ts）是否都走统一能力（不靠 grep 人工核，靠断言钉死）。
+//      「全仓」的口径 = **src/ 全树**，不是 monorepo 全体（android-host / website / scripts 不出
+//      动画资产）。⚠️ 2026-10-12（#897）订正：此处原写「动画资产只可能落在 .vue 里」——
+//      **该说法经核实为假**，已删。`.ts` 同样会产出运行期动画（useSheetDismiss.ts:76 绑 :style
+//      下发 animation 简写；heroTransition / routeTransition / motion 同源），旧扫描面的
+//      `.vue` 过滤把它们整体排除，等于在自称要防的漏接形态上留了盲区。
 //      措辞与范围必须同口径（抬头即契约），范围本身由「组件接入面」describe 里的
 //      「扫描面证据」用例逐条钉住——不靠这段注释自称。
 //
@@ -175,23 +178,36 @@ function stripComments(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-/** 扫描面 = 门禁实际枚举的 .vue 候选集（**过滤动画之前**）。
+/** 扫描面 = 门禁实际枚举的候选集（**过滤动画之前**）。
  *  单独具名，是因为「扫描范围」这个契约必须有一条断言直接钉住，而今天**钉不住的是 pages/**：
  *  pages 下 24 个 .vue、含动画资产 0 个（实测 2026-09-30），过滤后的名单天然不含 pages，
  *  于是三个名字锚点全落在 components/ 与 src 根上——把扫描根改回 components/ 再单独补上
  *  App.vue，这几个锚点照样全绿，而抬头仍写着「含 pages/」⇒ pages 静默退回盲区。
- *  候选面（过滤前）才是「范围」的直接可观测物：它随扫描根变化，与动画资产有无无关。 */
+ *  候选面（过滤前）才是「范围」的直接可观测物：它随扫描根变化，与动画资产有无无关。
+ *
+ *  ⚠️ 2026-10-12（#897）：原先这里还有 `.filter((p) => p.endsWith('.vue'))`，头注理由是
+ *    「动画资产只可能落在 .vue 里」——**该理由经核实为假**，已删除。证据：
+ *      1. `src/` 下的 `.ts` 里有 22 个文件命中动画关键字；
+ *      2. 其中 4 个是**运行期真实动画**（去注释后仍命中）：
+ *         `heroTransition.ts`（`:14` transform 转场）、`routeTransition.ts`（`:50`
+ *         enter/inline 动画）、`useSheetDismiss.ts`（`:76` 「面板/卡片动画：绑 :style，
+ *         值恒为 { animation: <简写> }」）、`motion.ts`（动效唯一入口本身）。
+ *    这 4 个都 import `./motion` 或 `./useReducedMotion` ⇒ 扩面后**不会**把「未接入」
+ *    的假阳性制造出来，只是让它们进入判别范围（实测 12 个 .vue 命中 → 扩面后 16 个）。
+ *    ⚠️ 尤其 `useSheetDismiss.ts` 是**在 :style 里下发 animation 简写**的动态动画，
+ *       旧的 .vue-only 扫描面对它**完全无感**——而它正是本门禁自称要防的漏接形态。 */
 function animationCandidates(): Array<{ name: string; file: string }> {
   return listSources(SRC_ROOT)
-    .filter((p) => p.endsWith('.vue'))
     // 名字统一用 `/` 分隔：`pages/` 前缀断言不能依赖运行平台的路径分隔符
     .map((p) => ({ name: relative(SRC_ROOT, p).split(sep).join('/'), file: p }))
 }
 
-/** 声明了动画资产的 .vue 文件（animation 声明 / transition 声明 / @keyframes 定义）。
+/** 声明了动画资产的源文件（.vue 或 .ts：animation 声明 / transition 声明 / @keyframes 定义）。
  *  扫描面 = **src/ 全树**（经 animationCandidates，与「扫描面证据」用例同一个根），
  *  名字相对 SRC_ROOT 给出——`components/` 只是 src 下的一个子目录，收窄到它就是 fail-open：
- *  src 根的 App.vue 与 pages/** 全部落进盲区。 */
+ *  src 根的 App.vue 与 pages/** 全部落进盲区。
+ *  ⚠️ 含 `.ts`：动效不只活在模板里，composables 下多个 .ts 直接用 :style 下发
+ *     animation/transition 简写（见 animationCandidates 处的 #897 说明）。 */
 function animationComponents(): Array<{ name: string; file: string; code: string }> {
   return animationCandidates()
     .map((c) => ({ ...c, code: stripComments(readFileSync(c.file, 'utf8')) }))
@@ -241,6 +257,52 @@ describe('组件接入面：src/ 全树（含 pages/ 与 src 根 App.vue）的�
     expect(names, '扫描面没覆盖 src 根（抬头声称 src/ 全树，实际只扫 components/）').toContain(
       'App.vue',
     )
+    // ⚠️ .ts 层锚点（#897）：旧的 `.filter(p => p.endsWith('.vue'))` 把 composables 下
+    // 产出运行期动画的 .ts 整体排除，而抬头声称的是「全树」。点名 motion.ts / useSheetDismiss.ts
+    // ⇒ 那个过滤一旦被加回来，当场转红（否则「全树」仍只是抬头里的一句话）。
+    expect(names, '扫描面没覆盖 composables/*.ts（.ts 同样是动画产出面，见 #897 说明）').toContain(
+      'composables/useSheetDismiss.ts',
+    )
+    expect(names, '扫描面没覆盖 composables/motion.ts（动效唯一入口本身必须在视野内）').toContain(
+      'composables/motion.ts',
+    )
+  })
+
+  it('判别力自检：.ts 里的动画不是「只被枚举到」，而是真被判据覆盖（阳性对照，#897）', () => {
+    // 上一条只证明「候选面枚举得到 .ts」——**枚举到 ≠ 被动画正则命中 ≠ 被 isWired 判定**。
+    // 三者是三件事，少验一层就可能在中间某层悄悄退化回恒绿。
+    // 本条把这条链**逐段验完**：.ts 文件既在候选面里、又真的被判定为「含动画」、
+    // 且确实被判为已接入统一能力。
+    const tsNames = animationCandidates()
+      .map((c) => c.name)
+      .filter((n) => n.endsWith('.ts'))
+    expect(
+      tsNames.length,
+      '候选面里一个 .ts 都没有 ⇒ .ts 整体退回盲区（#897 的失效形态原样复现）',
+    ).toBeGreaterThanOrEqual(1)
+
+    const animated = new Set(animationComponents().map((c) => c.name))
+    // 用真实存在、且**去注释后仍命中**的 .ts 动画产出点做锚点。
+    // useSheetDismiss.ts:76 的「面板/卡片动画：绑 :style，值恒为 { animation: <简写> }」
+    // 正是旧 .vue-only 扫描面看不见、而真实在跑的动态动画。
+    for (const anchor of [
+      'composables/useSheetDismiss.ts',
+      'composables/heroTransition.ts',
+      'composables/routeTransition.ts',
+    ]) {
+      expect(tsNames, `候选面枚举不到 ${anchor}`).toContain(anchor)
+      expect(
+        animated,
+        `${anchor} 在候选面里但未被判定为「含动画」⇒ 动画正则或去注释把 .ts 漏掉了`,
+      ).toContain(anchor)
+    }
+
+    // 最后一环：它们必须**已被判为接入统一能力**，否则扩面只是把「未接入」清单拉长。
+    const unwiredTs = animationComponents()
+      .filter((c) => c.name.endsWith('.ts'))
+      .filter((c) => !isWired(c))
+      .map((c) => c.name)
+    expect(unwiredTs, `未接入统一能力的含动画 .ts：${unwiredTs.join(', ') || '（无）'}`).toEqual([])
   })
 
   it('扫描面证据：候选面覆盖 src 根与 pages/**（名字锚点钉不到 pages，只能钉过滤前的候选面）', () => {

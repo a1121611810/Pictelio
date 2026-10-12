@@ -44,6 +44,53 @@ function stripComments(src: string): string {
 
 // ── 抽取器（brace 平衡扫描：帧体是嵌套块，非贪婪正则会在第一层 `}` 就截断）───
 
+/**
+ * 抽出**包含 needle 的那个开标签的完整文本**（含 `<view` 与配对的 `>`）。
+ *
+ * ⚠️ 为什么不能「按行找」（#897）：Vue 模板的属性可以任意换行，class 与 :style 分处两行
+ * 是完全正常的写法。按行取会命中「只有 :style 没有 class」的那一行 ⇒ class 读成空串
+ * ⇒ 判据恒绿放行（实测：挂 translate-x-full 且跨行，16 用例全绿）。
+ * ⇒ 与 `extractKeyframes` 同一纪律：**结构按配对取，不按行取**。
+ *
+ * 同时支持双引号与单引号；未找到返回 undefined（由调用方断言处理）。
+ */
+function extractTagContaining(src: string, needle: string): string | undefined {
+  const code = stripComments(src)
+  let from = 0
+  for (;;) {
+    const at = code.indexOf(needle, from)
+    if (at < 0) return undefined
+    // 从 needle 往前回溯到最近的开标签尖括号（`<view` / `<transition` 等）
+    const open = code.lastIndexOf('<', at)
+    if (open < 0) return undefined
+    // 标签名到第一个空白或 `>` 为止
+    const nameEnd = code.slice(open + 1).search(/[\s/>]/)
+    const tagName = code.slice(open + 1, open + 1 + (nameEnd < 0 ? Infinity : nameEnd))
+    if (!/^[a-zA-Z][\w.-]*$/.test(tagName)) return undefined
+    // 从开标签起点扫描到配对的 `>`（开标签内无嵌套，但属性值里可能有 `>`，故跟引号）
+    let i = open + 1
+    let quote: string | null = null
+    for (; i < code.length; i++) {
+      const ch = code[i]
+      if (quote) {
+        if (ch === quote) quote = null
+        continue
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch
+        continue
+      }
+      if (ch === '>') return code.slice(open, i + 1)
+    }
+    from = at + needle.length
+  }
+}
+
+/** 从一个开标签文本里取 class 属性值（双引号 / 单引号都认；取不到返回空串） */
+function readClassAttr(tag: string): string {
+  return /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag)?.slice(1).find(Boolean) ?? ''
+}
+
 /** 抽出全部 `@keyframes <name> { … }` 的帧体，键 = 动画名 */
 function extractKeyframes(src: string): Record<string, string> {
   const code = stripComments(src)
@@ -64,8 +111,7 @@ function extractKeyframes(src: string): Record<string, string> {
 }
 
 /** 帧体里 `from { … }` 的内容（缺 from 时返回空串） */
-function fromFrame(body: string): string {
-  const m = /(?:^|\})\s*from\s*\{([^}]*)\}/.exec(body)
+function fromFrame(body: string): string {  const m = /(?:^|\})\s*from\s*\{([^}]*)\}/.exec(body)
   return m?.[1] ?? ''
 }
 
@@ -206,11 +252,17 @@ describe('C2 · 位移与时长只走已验证通道', () => {
   })
 
   it('转场容器不得挂 transform 族 Tailwind 工具类（死类名，ADR-0210 路径 E）', () => {
-    const line = appSrc
-      .split('\n')
-      .find((l) => l.includes(':style="routeTransition.style.value"'))
-    expect(line, 'App.vue 里找不到绑 routeTransition.style 的容器（转场接线断了）').toBeDefined()
-    const classAttr = /class="([^"]*)"/.exec(line!)?.[1] ?? ''
+    // ⚠️ 2026-10-12（#897）：原实现是「按行 find 含 :style 的那一行 + 取第一个双引号 class」，
+    // 有两个恒绿失效形态（实测：挂上 translate-x-full 且让 class 跨行，16 用例全绿）：
+    //   1. **跨行**：class 与 :style 分处两行时，命中行里根本没有 class ⇒ classAttr=''
+    //      ⇒ dead=[] 恒真，判据静默放行；
+    //   2. **引号形态**：只认双引号，单引号 / 无引号的 class 同样读不到。
+    // ⇒ 改为「按标签整体解析」：从 `<view` 起做括号平衡扫描，取到配对的 `>` 为止，
+    //    再从**整个开标签**里取 class（双/单引号都认）。这与本文件既有的
+    //    `extractKeyframes` brace 平衡扫描同一纪律：结构按配对取，不按行取。
+    const tag = extractTagContaining(appSrc, ':style="routeTransition.style.value"')
+    expect(tag, 'App.vue 里找不到绑 routeTransition.style 的容器（转场接线断了）').toBeDefined()
+    const classAttr = readClassAttr(tag!)
     const dead = classAttr.split(/\s+/).filter((t) => DEAD_TRANSFORM_CLASS.test(t))
     expect(
       dead,
