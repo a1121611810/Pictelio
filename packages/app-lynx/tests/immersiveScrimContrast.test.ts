@@ -19,7 +19,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 // #1003：底色块抽取改用结构化标签扫描（与 routeTransitionGate 共用一份实现）。
-import { extractOpeningTags, stripComments } from './helpers/vueTagScan'
+import {
+  extractOpeningTags,
+  extractTagContaining,
+  readClassAttr,
+  stripComments,
+  templateBlock,
+} from './helpers/vueTagScan'
 // #1006：遍历扫描面与列表交错契约门禁共用一份实现（防止两份扫描面各自漂移）；
 // 路径归一化同样共用一份，否则登记键与集合比对会漂成两种写法。
 import { srcKey, walkProductionVue } from './helpers/walkProductionVue'
@@ -298,6 +304,191 @@ function plateAlphaViolation(consumer: string, plate: string): string | undefine
 }
 
 /**
+ * **交互态**变体前缀（#1005 轮 review F6 实测后新增）。
+ *
+ * ⚠️ 它们**不改变静息颜色** —— 未激活时该元素上唯一生效的就是静态类。因此
+ *    `hover:text-primary` **不构成**「叠了两种颜色」的歧义；改动前把它计入，会让诊断
+ *    宣称「谁胜出取决于 Tailwind 产物顺序」而**该说法不成立**，且 AGENTS.md「有意偏离 MD3」
+ *    第 4 条已拍板「`hover` 在纯触屏判定为不适用」⇒ 纯触屏设备上更是纯粹误诊。
+ *    实测改动前：标题追加 `hover:text-primary` ⇒ 判红，文案却是「无法取任一个」。属
+ *    **本票新引入的 fail-closed 误诊面**，与 `missingPlateMessage` / `shadowNotState` 同族。
+ *
+ * ⚠️ **模式类前缀（`dark:` / `md:` 等）故意不在此列、仍要计入**：它们在某个条件下
+ *    **确实**改变静息颜色，而本门禁的判据是**绝对下界**（逐 14 套色板算）⇒ 跨模式换色
+ *    会让该下界失效。这类形态是**真**违规，不该被本条豁免。
+ */
+const STATE_VARIANT_CHAIN =
+  /^(?:(?:hover|focus|focus-visible|focus-within|active|visited|disabled|checked):)+/
+
+/**
+ * **模式 / 响应式**变体前缀（`dark:` `md:` …）—— 与上面的交互态**相反**：
+ * 它们在某个条件下**确实改变静息颜色**（`text-inverse-on-surface dark:text-primary`
+ * 在暗色下就是 `primary`），而本门禁的判据是**逐 14 套色板算的绝对下界** ⇒ 漏判会产出
+ * **假绿**（按亮色那对颜色算完就宣布暗色也达标）。故剥掉前缀后**照常计入**歧义判定。
+ *
+ * ⚠️ 宁可误判红也不可漏判红：前者会被人看一眼就改，后者是本仓反复消灭的那类**静默绿**。
+ */
+const MODE_VARIANT_PREFIX = /^(?:(?:dark|light|sm|md|lg|xl|2xl):)+/
+
+/**
+ * 从类串里筛出「**确实是颜色令牌**」的 `<prefix>-*` 名字（#1005/#1012 提成的共享内核）。
+ *
+ * ⚠️ 为什么必须按**令牌存在性**筛，而不是直接取第一个匹配：
+ *    `text-title-large` 是**排版**档位（tailwind.config.ts 里注册的字面字号 `44rpx`，
+ *    不是 `var(--md-*)` 令牌），不筛的话首个命中会是排版档位而非 `text-inverse-on-surface`。
+ *
+ * ⚠️ 这里**只筛、不选**（返回数组）：选哪一个由调用方按「恰好一个」的判据决定，
+ *    理由见 `colourTokenViolation`。分开是为了让「筛选」这一步也能被验收组直接复用。
+ *
+ * ⚠️ `/<alpha>` 修饰符必须在**切分时截掉**：`bg-inverse-surface/70` 若整串当令牌名去查，
+ *    `inverse-surface/70` 不是令牌 ⇒ 会被**整块滤掉** ⇒ 「零个」判红会抢在 #897 的
+ *    `plateAlphaViolation` 之前触发，诊断指错根因（旧正则 `[\w-]+` 天然在 `/` 处截断）。
+ */
+function colourTokenNames(cls: string, prefix: 'bg' | 'text', ref: Palette): string[] {
+  const names: string[] = []
+  for (const raw of cls.split(/\s+/)) {
+    if (raw === '') continue
+    // 顺序要紧：**先**剥模式类前缀，**再**判交互态 —— 否则 `dark:hover:text-primary`
+    // 这类混合链会因为 STATE 的 `^` 锚点匹配不上而被整体跳过。
+    const bare = raw.replace(MODE_VARIANT_PREFIX, '')
+    // ⚠️ 带**交互态**变体前缀的（`hover:text-primary` 等）**整体跳过**、不计入歧义：
+    //    未激活时该元素上唯一生效的就是静态类，它们不构成「叠了两种颜色」。
+    //    ⚠️ 不是「剥掉前缀后计入」—— 那等于把同一个歧义换个名字重新数一遍。
+    if (STATE_VARIANT_CHAIN.test(bare)) continue
+    if (!bare.startsWith(`${prefix}-`)) continue
+    const name = bare.slice(prefix.length + 1).replace(/\/.*$/, '')
+    if (ref.tokens.has(name) && !names.includes(name)) names.push(name)
+  }
+  return names
+}
+
+/**
+ * 单个元素的颜色令牌**歧义**判定（#1012 洞 1）。
+ *
+ * **返回** undefined = 合规（恰好一个颜色令牌）；返回字符串 = 违规描述（含实际类串与
+ * 全部命中），vitest 直接打印，无需自己拼消息。形状与 `plateAlphaViolation` 一致。
+ *
+ * ⚠️ 为什么判据是「**恰好一个**」而不是「取第一个」（本仓反复消灭的那类**恒真**）：
+ *    一个元素上叠了**两个**颜色 utility 时，谁在真实渲染里胜出取决于 **Tailwind 产物的
+ *    样式表顺序**，**不取决于**属性里的书写顺序 ⇒ 取任意一个，都是在算一个**未必被渲染**
+ *    的对比度数字，而判据还会**照常全绿**。
+ *    实测（#1012，两侧各一）：往 NovelIntro 标题追加 `text-primary`、往稳定底色块追加
+ *    `bg-surface-container`，本文件 **50 个用例全部照样绿**，对比度数字纹丝不动。
+ *    ⇒ 正确处置是**报歧义判红**，不是「挑一个算」。渲染顺序不可判定这一点，
+ *      正是判红的理由，而不是放过它的理由。
+ *
+ * ⚠️ 提成共享函数而不内联正则，原因与 `plateAlphaViolation` 同：验收组若自己抄一份
+ *    正则，被验的就成了**副本** —— 真门禁那条判据删掉也不影响验收组变红。
+ */
+function colourTokenViolation(
+  consumer: string,
+  role: string,
+  cls: string,
+  prefix: 'bg' | 'text',
+  ref: Palette,
+): string | undefined {
+  const names = colourTokenNames(cls, prefix, ref)
+  if (names.length === 1) return undefined
+  const found = names.length === 0 ? '零个' : `${names.length} 个（${names.join('、')}）`
+
+  return (
+    `${consumer} ${role}的 ${prefix}-* 颜色令牌必须**恰好一个**` +
+    `（渲染时哪个胜出取决于 Tailwind 产物顺序、不取决于书写顺序，故无法取任一个），` +
+    `实际抽到 ${found}：${cls}`
+  )
+}
+
+/**
+ * 标题标签的**实写** class（#1012 洞 2；提成共享函数）。
+ *
+ * `titleMarker` 在此**只用于定位**，不作解析输入 —— 它是 `CONSUMERS` 里的**期望值**，
+ * 而非源文件实写内容。此前 `resolve(c.titleMarker, 'text')` 把它直接当输入 ⇒ 文字色一侧
+ * 对源文件改动**零反应**：needle 只要还是连续子串，追加在它后面的任何类名都判不到。
+ *
+ * **返回** undefined = needle 未能定位到一个开标签（调用方据此判红）。
+ * 返回空串 = 标签在、但没有 class 属性 ⇒ 下游 `colourTokenViolation` 会以「零个」判红。
+ *
+ * ⚠️ 提成函数而不让调用方各自拼 `extractTagContaining` + `readClassAttr`：验收组要验的
+ *    正是这条**组合路径**，两处各拼一遍的话，真门禁把其中一步删掉验收组仍会绿。
+ *
+ * ⚠️⚠️ **必须先 `templateBlock` 收窄到 `<template>` 块**（#1005 轮 review 实测，S5）：
+ *    `extractTagContaining` 内部只 `stripComments`，**不剥 `<script>` 块**。三个消费点的
+ *    SFC 布局都是 `<script>` 在第 1 行、`<template>` 在后（NovelIntro 1 / 337、
+ *    Recommended 1 / 360、RankingEntryCard 1 / 109）⇒ **script 里的同 needle 字面量必然排在
+ *    真标签之前**。
+ *    实测：往 `<script setup>` 里塞一行同 needle 的标签字面量，再给真标题追加第二个颜色类
+ *    ⇒ **本函数返回 script 字面量里那个标签**，两条颜色判据**一条都没红**，唯一红的是旧顺序
+ *    断言且**根因指错**（`idx 58` = script 内的 needle）。
+ *    ⇒ 这正是 #1003 已经踩死并修好的那一族（`templateBlock` 注释里逐条记着「两种配对方式
+ *      都错在没先把 script 摘出去」）。**新路径不得绕开它。**
+ */
+function titleTagClassOf(src: string, titleMarker: string): string | undefined {
+  const tag = extractTagContaining(templateBlock(src), titleMarker)
+  return tag === undefined ? undefined : readClassAttr(tag)
+}
+
+/** `CONSUMERS` 单项的类型（该常量是 `as const`，故由 typeof 派生而非手写一份）。 */
+type Consumer = (typeof CONSUMERS)[number]
+
+/** 单个消费点的颜色判定结果（#1012）。 */
+interface ConsumerColours {
+  /** 标题标签的实写 class（needle 定位失败时为空串）。 */
+  titleClass: string
+  /**
+   * 标题 needle 在 **`templateBlock(src)` 作用域内**的下标。
+   * ⚠️ 必须与底色块下标**同一坐标系**（都取自 `templateBlock(src)`）—— 否则 `<script>`
+   *    里的同 needle 字面量会让标题下标指到 script 内、结构断言误诊（#1005 轮 review F7）。
+   */
+  titleIdx: number
+  /** 标题的颜色令牌（判定合规时恰有一个）。 */
+  titleToken: string | undefined
+  /** 与 `extractPlates(src)` 逐块对齐的底色令牌。 */
+  plateTokens: (string | undefined)[]
+  /** 全部违规描述以「；」拼接；**空串 = 合规**。 */
+  violation: string
+}
+
+/**
+ * 判定一个消费点的「标题 + 各底色块，颜色令牌是否恰好一个」（#1012 洞 1 + 洞 2）。
+ *
+ * ⚠️⚠️ **提成函数的全部理由**（#1005 轮 code-review 实测，阻塞项 F1）：此前真门禁在
+ *    describe 内**内联**调 `colourTokenViolation`，验收组也**直接**调它 ⇒ 两者共享的只是
+ *    **函数**、不是**接线**。实测三种破坏性变异 —— ① 删掉真门禁两处颜色判定的
+ *    `expect(...).toBeUndefined()`；② 只删 bg 侧那处；③ 把标题退回读 `CONSUMERS` 常量
+ *    （即 #1012 洞 2 的**修复前**行为）—— **全部 57/57 照样全绿**。即「洞 1 / 洞 2 已修复」
+ *    这件事**没有任何机器防线**，与本文件 `:337-339`、`:730-731` 自己立的规矩直接冲突。
+ *    ⇒ 现在真门禁**只经由本函数**取得颜色判定，验收组也调本函数；再由验收组一条
+ *      **接线自检**（source-scan 断言真门禁 describe 真的调用了它）堵住「函数还在、接线被删」。
+ */
+function judgeConsumerColours(src: string, c: Consumer): ConsumerColours {
+  const ref = PALETTES[0]
+  const violations: string[] = []
+
+  const foundTitleClass = titleTagClassOf(src, c.titleMarker)
+  if (foundTitleClass === undefined) {
+    violations.push(`${c.name} needle 未能定位到标题标签的 class`)
+  }
+  const titleClass = foundTitleClass ?? ''
+
+  const titleViolation = colourTokenViolation(c.name, '标题', titleClass, 'text', ref)
+  if (titleViolation !== undefined) violations.push(titleViolation)
+
+  const plates = extractPlates(src)
+  for (const [i, plate] of plates.entries()) {
+    const v = colourTokenViolation(c.name, `底色块 #${i + 1}`, plate, 'bg', ref)
+    if (v !== undefined) violations.push(v)
+  }
+
+  return {
+    titleClass,
+    titleIdx: templateBlock(src).indexOf(c.titleMarker),
+    titleToken: colourTokenNames(titleClass, 'text', ref)[0],
+    plateTokens: plates.map((p) => colourTokenNames(p, 'bg', ref)[0]),
+    violation: violations.join('；'),
+  }
+}
+
+/**
  * 剥掉 HTML 注释与整行 `//` 注释（**不剥** CSS 块注释）。
  *
  * ⚠️ **底色块抽取路径刻意不用 `vueTagScan.stripComments`**（code-review 建议项后的显式登记）：
@@ -568,11 +759,20 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         const plates = extractPlates(src)
 
         expect(plates, missingPlateMessage(c.name, src, plates)).not.toHaveLength(0)
-        const plateIdx = src.indexOf(plates[0]!)
 
-        const titleIdx = src.indexOf(c.titleMarker)
-        expect(titleIdx, `${c.name} 标题元素未使用 text-inverse-on-surface`).toBeGreaterThan(-1)
+        // 颜色判定**只经由共享接线 `judgeConsumerColours`**（#1012 洞 1 + 洞 2）。
+        // ⚠️ 禁止在本 describe 内再直接调 `colourTokenViolation` / `colourTokenNames`：
+        //    此前正是「真门禁内联调、验收组也直接调」导致共享的只是**函数**、不是**接线**，
+        //    拔掉真门禁那两处判红或退回读常量，验收组 57/57 照样全绿（code-review 阻塞 F1）。
+        //    验收组的「接线自检」用 source-scan 钉住本行确实存在。
+        const colours = judgeConsumerColours(src, c)
+        expect(colours.violation || undefined, '颜色令牌判定（#1012 洞 1 / 洞 2）').toBeUndefined()
+
         // 结构性判据：底色块必须**开在标题之前**——否则标题又落回渐变上。
+        // ⚠️ 两个下标必须取自**同一作用域**（都走 templateBlock），否则 `<script>` 里的同
+        //    needle 字面量会让标题下标指到 script 内、本断言以「底色块在标题之后」误诊。
+        const plateIdx = templateBlock(src).indexOf(plates[0]!)
+        const titleIdx = colours.titleIdx
         expect(
           plateIdx,
           `${c.name}：底色块出现在标题之后（idx ${plateIdx} >= ${titleIdx}），文字没被底色兜住`,
@@ -583,20 +783,20 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         // 把底色换成任意一个别的深色 class 也能过「有底色块」，而对比度数字纹丝不动。
         // 这一步让门禁真正咬住标记本身。
         //
-        // ⚠️ 不能直接 `text-([\w-]+)` 取第一个：`text-title-large` 是**排版**档位、
-        //    `text-inverse-on-surface` 才是颜色，前者会先命中。办法是**按令牌是否存在**来筛，
-        //    再取最后一个（本仓类串约定颜色在末尾）。
-        const ref = PALETTES[0]
-        const resolve = (cls: string, prefix: 'bg' | 'text') => {
-          const names = [...cls.matchAll(new RegExp(`${prefix}-([\\w-]+)`, 'g'))]
-            .map((m) => m[1])
-            .filter((n) => ref.tokens.has(n))
-          return names[0] // bg 只有一个；text 取**第一个**命中的令牌（颜色在前、排版档位也会命中，取首个更安全）
-        }
-        const plateBg = resolve(plates[0], 'bg')
-        const plateFg = resolve(c.titleMarker, 'text')
-        expect(plateBg, `${c.name} 底色块的 bg-* 解析不到令牌：${plates[0]}`).toBeDefined()
-        expect(plateFg, `${c.name} 标题的 text-* 解析不到令牌：${c.titleMarker}`).toBeDefined()
+        // ⚠️ 两侧的输入**必须同源**（#1012 洞 2）：底色块读 `extractPlates(src)` 的实写
+        //    类串，标题读标题标签的实写 class。**不得**再拿 `CONSUMERS` 里的 `titleMarker`
+        //    常量当解析输入 —— 它是**期望值**，needle 之后追加的任何类名对它不可见，
+        //    文字色一侧对源文件改动等于零反应（实测：追加 `text-primary` 后 50 用例全绿）。
+        //
+        // ⚠️ 颜色令牌必须**恰好一个**（#1012 洞 1，判据与理由见 `colourTokenViolation`）：
+        //    叠了多个颜色 utility 时，真实渲染里哪个胜出取决于 Tailwind 产物顺序，
+        //    取任一个都是在算一个**未必被渲染**的数字 ⇒ **判歧义，不挑一个算**。
+        //
+        // ⚠️ 「本仓类串约定颜色在末尾」是**错误的不变式**，已随 #1005 从注释里删除。
+        //    三个消费点当前恰好颜色在末尾，那是巧合不是保证。正确理由是「排版档位不是
+        //    颜色令牌、被令牌存在性滤掉，故剩下那唯一一个命中才是颜色」。
+        const plateBg = colours.plateTokens[0]!
+        const plateFg = colours.titleToken!
         for (const p of PALETTES) {
           const bg = p.tokens.get(plateBg!)
           const fg = p.tokens.get(plateFg!)
@@ -620,7 +820,7 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
 
         // ── 稳定底色**不许带 alpha 修饰符**（#897 修法）────────────────────────
         // 上一条只守住了 text- 侧的**死类名**；底色侧是完全不同的失效机制，且**恒绿**：
-        //  1. 上面的 `resolve()` 用 `bg-([\w-]+)` 提取令牌名，`\w` **不含 `/`**，
+        //  1. 上面的 `colourTokenNames()` 用 `bg-([\w-]+)` 提取令牌名，`\w` **不含 `/`**，
         //     故 `bg-inverse-surface/70` 会被静默截成 `inverse-surface` ⇒ plateBg 不变
         //     ⇒ 对比度数字**纹丝不动** ⇒ 上游所有断言照常全绿。
         //  2. 与 text- 侧相反，底色的 `/70` **不是死类名**：Tailwind 对裸 var() 颜色档
@@ -638,13 +838,190 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         // 判据只针对**稳定底色块**（上面的 plates），不扫全文件：
         // NovelIntro / Recommended 里另有与 scrim 无关的 inverse 元素，且本仓有
         // 刻意使用 alpha 的状态层（bg-layer-pressed/16 等），全文件禁 `/` 会误伤。
-        for (const plate of plates) {
+        for (const [plateIdxInPlates, plate] of plates.entries()) {
           // 判定走**共享函数**，不内联复制正则 —— 验收组必须打到与真门禁同一份判据，
           // 否则删掉这个循环（#897 的判红能力）新增用例仍全绿（code-review 阻塞项）。
           expect(plateAlphaViolation(c.name, plate)).toBeUndefined()
         }
       })
     }
+  })
+
+  // ── #1005/#1012 验收：颜色令牌解析面（变异注入，不落盘）──────────────────
+  //
+  // ⚠️ 与 #1003 那一组同纪律：反事实必须**编码进产物**，不能只写在注释里。若只写「旧实现会
+  //    取错」，谁都无法复核。旧解析内核原样落成 `OLD_RESOLVE`，下方逐形态断言它**一律返回
+  //    看似合理的 token 名**（即恒真），而新判定会点名。双侧从此永久可复核。
+  describe('#1005/#1012 验收：颜色令牌解析面（变异注入，不落盘）', () => {
+    const ref = PALETTES[0]
+    /**
+     * 标题 needle 形态。**从 `CONSUMERS` 派生而非手抄**（测试硬约束 #2）：
+     * 手抄一份的后果是 `CONSUMERS` 改了夹具不跟，两边悄悄不同形而**无人发现** ——
+     * 那正是本文件头自己写着的「不能手写『自洽』的 class/style 串」。
+     */
+    const NEEDLE = CONSUMERS[0].titleMarker
+    /**
+     * 合法底色块：**取自真实源文件**（同上，硬约束 #2 的真实样例要求）。
+     * 叠了第二个颜色类的形态由它派生，保证两者只差一个类。
+     */
+    const PLATE_OK = extractPlates(
+      stripVueComments(fs.readFileSync(path.resolve(__dirname, CONSUMERS[0].rel), 'utf-8')),
+    )[0]!
+    const PLATE_BAD = `${PLATE_OK} bg-surface-container`
+
+    /**
+     * #1012 修复前的解析内核，原样保留（`git show HEAD:…` 可核对）：
+     * 按令牌存在性筛出命中项后**取第一个**。
+     *
+     * ⚠️ 它对「叠第二个颜色类」「元素换色」一律**不报错**，都吐得出一个 token 名 ——
+     *    这就是它的恒真性所在。下面对三种形态逐条把这个「不报错」钉死。
+     */
+    const OLD_RESOLVE = (cls: string, prefix: 'bg' | 'text'): string | undefined => {
+      const names = [...cls.matchAll(new RegExp(`${prefix}-([\\w-]+)`, 'g'))]
+        .map((m) => m[1])
+        .filter((n) => ref.tokens.has(n))
+      return names[0]
+    }
+
+    /** 把 .vue 源码 + needle 送进**真门禁那条组合路径**（共享函数，非副本）。 */
+    const judgeTitle = (src: string, needle = NEEDLE): string | undefined =>
+      colourTokenViolation('夹具', '标题', titleTagClassOf(src, needle) ?? '', 'text', ref)
+
+    const judgePlate = (plate: string): string | undefined =>
+      colourTokenViolation('夹具', '底色块', plate, 'bg', ref)
+
+    it('接线自检：真门禁的**消费点 describe 必须真的调用**共享判定（F1 闭合）', () => {
+      // 为什么需要这条（#1005 轮 review 实测的阻塞项）：共享**函数**挡不住「调用点被删」。
+      // 实测三种变异 —— ① 删掉真门禁两处颜色判定；② 只删 bg 侧那处；③ 把标题退回读
+      // `CONSUMERS` 常量（#1012 洞 2 的修复前行为）—— 验收组 **57/57 照样全绿**。
+      // 本条用 source-scan 把「真门禁真的接上了」变成产物自证的断言。
+      const file = fs.readFileSync(path.resolve(__dirname, 'immersiveScrimContrast.test.ts'), 'utf-8')
+      const gateStart = file.indexOf("describe('三个消费点确实用上了稳定底色")
+      expect(gateStart, '消费点 describe 必须存在').toBeGreaterThan(-1)
+      // 本验收组的 describe 排在真门禁**之后**，用它当右边界 ⇒ 切出的正是真门禁那段。
+      const gateEnd = file.indexOf("describe('#1005/#1012 验收", gateStart)
+      expect(gateEnd, '验收组 describe 必须排在真门禁之后').toBeGreaterThan(gateStart)
+      const gateBody = file.slice(gateStart, gateEnd)
+      expect(
+        gateBody,
+        '真门禁必须经由共享接线 judgeConsumerColours 取颜色判定（不得内联调 colourTokenViolation）',
+      ).toContain('judgeConsumerColours(')
+      expect(
+        gateBody,
+        '真门禁**禁止**再内联调 colourTokenViolation（否则「接线」又退回各自一份）',
+      ).not.toContain('colourTokenViolation(')
+    })
+
+    it('洞 1 的**判红文案**点名两个令牌（不是只报「有歧义」）', () => {
+      const src = `<template><text class="${NEEDLE} text-primary">标题</text></template>`
+      expect(judgeTitle(src)).toContain('2 个（inverse-on-surface、primary）')
+    })
+
+    it('洞 2 的「定位不到」是产物自证的（不是只活在注释里）', () => {
+      // #1005 轮 review F10：此前这条「正是定位不到暴露了旧路径没读过源文件」只写在注释里。
+      expect(
+        titleTagClassOf(NEEDLE, NEEDLE),
+        'needle 在**裸类串**（非源码）里定位不到标签 —— 这正是旧路径压根没读源文件的证据',
+      ).toBeUndefined()
+    })
+
+    it('交互态变体前缀**不计入**颜色歧义（F6：hover 不改变静息颜色）', () => {
+      // 改动前这一格会判红，且文案宣称「谁胜出取决于产物顺序」—— 该说法对 hover **不成立**，
+      // 且 AGENTS.md「有意偏离 MD3」第 4 条已拍板 hover 在纯触屏判定为不适用。
+      for (const variant of ['hover:', 'active:', 'focus-visible:']) {
+        const src = `<template><text class="${NEEDLE} ${variant}text-primary">标题</text></template>`
+        expect(judgeTitle(src), `${variant}text-primary 不应被判为第二个颜色令牌`).toBeUndefined()
+      }
+      // ⚠️ 模式类前缀**仍要计入**：`dark:` 在某条件下确实改变静息颜色，而本判据是绝对下界。
+      const dark = `<template><text class="${NEEDLE} dark:text-primary">标题</text></template>`
+      expect(judgeTitle(dark), 'dark:text-primary 确实改变静息颜色，必须计入').toContain('2 个')
+    })
+
+    it('`/alpha` 修饰符不会让底色块被判成「零个」（#897 判红能力不得被抢跑）', () => {
+      // `colourTokenNames` 改成按空白切分后，`<alpha>` 必须仍被截掉 ——
+      // 否则 `inverse-surface/70` 查不到令牌 ⇒ 「零个」判红会抢在 `plateAlphaViolation` 之前。
+      const v = judgePlate('bg-inverse-surface/70 rounded-lg')
+      expect(v, '带 /alpha 的底色块仍抽得到唯一令牌，不该报「零个」').toBeUndefined()
+    })
+
+    it('反事实：旧内核对三类叠加形态**一律不报错**（它的恒真性在此被钉死）', () => {
+      // ① text 侧、needle **之后**追加第二个颜色类
+      expect(OLD_RESOLVE(`${NEEDLE} text-primary`, 'text')).toBe('inverse-on-surface')
+      // ② bg 侧、合法底色**之后**追加
+      expect(OLD_RESOLVE(PLATE_BAD, 'bg')).toBe('inverse-surface')
+      // ③ bg 侧、合法底色**之前**插入
+      expect(OLD_RESOLVE(`bg-surface-container ${PLATE_OK}`, 'bg')).toBe('surface-container')
+      // ⚠️ ② 与 ③ 的结论**不同，但都不是「歧义判红」** —— 这一点务必分清（#1005 轮 review 实测）：
+      //    ② 改前**静默全绿**（fail-open 漏过）：`resolve` 取首个命中的 `inverse-surface`，
+      //      数字纹丝不动。
+      //    ③ 改前**判红，但报的是错根因**（fail-closed 误诊）：bg 侧读的是**源文件**，
+      //      `resolve` 取到了新插入的 `surface-container` ⇒ 对比度按错底色算成 1.03，
+      //      诊断指向「底色不达标」而非「底色块上叠了两个颜色类」。
+      //    ⇒ 两侧都需要「恰好一个」判据，但**病因不同**：text 侧是**读常量**（看不见源文件），
+      //      bg 侧是**取首个**（看得见但挑错）。⚠️ 曾把 ③ 误记为「改前也全绿」并据此推出
+      //      「与读不读源文件无关」—— 该推论**已被实测否掉**（③ 正是 bg 侧读源文件才会红）。
+    })
+
+    it('洞 1 · text 侧：needle 之后叠加第二个颜色类 ⇒ 判红并点名两个令牌', () => {
+      const src = `<template><text class="${NEEDLE} text-primary">标题</text></template>`
+      expect(judgeTitle(src)).toContain('2 个')
+      expect(judgeTitle(src)).toContain('inverse-on-surface、primary')
+    })
+
+    it('洞 1 · bg 侧：**前置与后置**叠加第二个颜色类都判红（只验一种会漏掉另一种）', () => {
+      expect(judgePlate(PLATE_BAD), '后置').toContain('2 个')
+      expect(judgePlate(`bg-surface-container ${PLATE_OK}`), '前置').toContain('2 个')
+    })
+
+    it('洞 2 · 文字色必须从**源文件实写**解析：常量合规而源文件违规时必须判红', () => {
+      const src = `<template><text class="${NEEDLE} text-primary">标题</text></template>`
+      // 旧实现的喂法 = **直接把 `CONSUMERS` 里的期望常量当类串判**。该常量本身恰好一个颜色
+      // 令牌 ⇒ 合规 ⇒ 旧路径对同一处源文件违规**判不出任何东西**。
+      // ⚠️ 此处刻意**不走** `titleTagClassOf`：常量不是源码，needle 在其中定位不到标签。
+      //    正是这一「定位不到」暴露了旧路径压根没读过源文件。
+      expect(
+        colourTokenViolation('夹具', '标题', NEEDLE, 'text', ref),
+        '期望常量本身应判为合规',
+      ).toBeUndefined()
+      expect(OLD_RESOLVE(NEEDLE, 'text'), '旧内核对常量照常吐得出值').toBe('inverse-on-surface')
+      // 新实现的输入是源文件实写 class。**同一份 needle**，源文件违规 ⇒ 必须判红。
+      expect(judgeTitle(src), '源文件实写 class 违规时必须判红').toContain('2 个')
+    })
+
+    it('零个颜色令牌同样判红（不是「取不到就跳过」）', () => {
+      const src = '<template><text class="text-title-large">标题</text></template>'
+      expect(judgeTitle(src, 'text-title-large')).toContain('零个')
+    })
+
+    it('反向对照：合法形态不得判红（含 needle 定位抽取的三格形态）', () => {
+      for (const tag of [
+        `<text class="${NEEDLE}">标题</text>`,
+        `<text :aria-label="t" class="${NEEDLE}">标题</text>`,
+        `<text class='${NEEDLE}'>标题</text>`,
+        `<text\n  class="${NEEDLE}">标题</text>`,
+      ]) {
+        const src = `<template>${tag}</template>`
+        expect(titleTagClassOf(src, NEEDLE), `needle 应定位到标签：${tag}`).toBe(NEEDLE)
+        expect(judgeTitle(src), `合法形态不应判红：${tag}`).toBeUndefined()
+      }
+      expect(judgePlate(PLATE_OK), '合法底色块不应判红').toBeUndefined()
+    })
+
+    it('三个真消费点的标题与底色块**恰好各一个**颜色令牌（真门禁的输入本身合规）', () => {
+      for (const c of CONSUMERS) {
+        const src = stripVueComments(fs.readFileSync(path.resolve(__dirname, c.rel), 'utf-8'))
+        const titleClass = titleTagClassOf(src, c.titleMarker) ?? ''
+        expect(colourTokenNames(titleClass, 'text', ref), `${c.name} 标题的颜色令牌`).toHaveLength(
+          1,
+        )
+        for (const plate of extractPlates(src)) {
+          expect(
+            colourTokenNames(plate, 'bg', ref),
+            `${c.name} 底色块的 bg- 颜色令牌：${plate}`,
+          ).toHaveLength(1)
+        }
+      }
+    })
   })
 
   // ── #1004：全仓候选集合与登记清单双向相等 ──────────────────────────────
