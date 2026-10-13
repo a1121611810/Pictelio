@@ -341,15 +341,22 @@ function missingPlateMessage(name: string, src: string, plates: readonly string[
 // ── #1004：沉浸卡自发现 ──────────────────────────────────────────────────
 
 /**
- * 沉浸卡的发现判据：源码（**已剥全部三种注释**）里用了 scrim 渐变令牌。
+ * 沉浸卡的发现判据：源码（**已剥注释**）里用了 scrim 渐变令牌。
  *
- * ⚠️ 这里用 `vueTagScan.stripComments`（HTML + `//` + **CSS 块注释**），而不是本文件
- *    自己的 `stripVueComments`。后者刻意**不剥** CSS 块注释，理由是「本文件的判据只跑在
- *    .vue 源上，没有 CSS 块」——而本判据恰恰是扫**整个文件**做纯文本搜索，`.vue` 里带
- *    `<style>` 是常态。实测：`<style>` + slash-star + ` 旧写法：var(--md-scrim-overlay) ` + star-slash + `</style>` 会被
- *    判成候选 ⇒ 集合相等判红并点名一个根本没写沉浸卡的文件（fail-closed 误诊）。
- *    两份剥法语义不同、各司其职，不合并——底色块抽取依赖 `src.indexOf` 与剥后文本同源，
- *    故必须保留替换成 `''` 的那份。
+ * ⚠️ 用的是 `vueTagScan.stripComments`，不是本文件自己的 `stripVueComments`。后者
+ *    **只剥 HTML 与 `//`、不剥 CSS 块注释**，其理由原是「本文件的判据只跑在 .vue 源上，
+ *    没有 CSS 块」——而本判据恰恰是扫**整个文件**做纯文本搜索，`.vue` 带 `<style>` 是
+ *    常态，该理由已失效。实测：`<style>` 里提一句令牌会被算成候选 ⇒ 集合相等判红并点名
+ *    一个根本没写沉浸卡的文件。底色块抽取仍用本文件那份（依赖 `src.indexOf` 与剥后文本
+ *    同源），两条路径语义不同，各取所需，不合并。
+ *
+ * ⚠️ **已知失效面：行尾 `//` 注释仍会被误判为候选。** `stripComments` 的行注释正则是
+ *    `^[ \t]*\/\/.*$`，只吃**行首**（含缩进）；`const a = 1 // var(--md-scrim-overlay)`
+ *    ⇒ 判为候选。方向是 fail-closed 误诊（假红），仓内零例。
+ *    **刻意不修**：改成 `//.*$` 会连带剥掉字符串字面量里的内容（如 `"http://…"`），
+ *    把误诊换成**静默漏判**（假绿）——而假绿正是本门禁（#1004）要消灭的东西。
+ *    要彻底解决需真正的 JS 词法分析，代价与收益不成比例。该失效面由下方
+ *    「行尾注释」characterization 用例钉住，使它可执行、可见，而非只写在散文里。
  */
 function isImmersiveCardSource(src: string): boolean {
   return stripComments(src).includes('var(--md-scrim-overlay)')
@@ -906,6 +913,18 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
       ]) {
         expect(isImmersiveCardSource(src), `注释形态不该入候选：${src.slice(0, 40)}`).toBe(false)
       }
+    })
+
+    // ⚠️ characterization（钉住**已知失效面**，不是 specification）：下面断言的是
+    //    「当前**会**误判」这一事实，不是「应该这样」。它存在的意义是让
+    //    「行尾 // 注释不被识别」这条登记**可执行、可观察**，而不是只躺在散文里；
+    //    将来有人扩了剥法，这条会红 —— 那正是应该发生的事（届时请同步删掉上方
+    //    的失效面登记并说明新判据为何不再 fail-closed）。
+    //    断言方向写死为 true，故只描述现状、不隐含改进承诺。
+    it('【characterization·已知失效面】行尾 // 注释仍会被误判为候选', () => {
+      expect(isImmersiveCardSource('const a = 1 // var(--md-scrim-overlay)\n<view />')).toBe(
+        true,
+      )
     })
   })
 
