@@ -128,6 +128,16 @@ _Avoid_: 纯文字加载态、依赖 loading 标志的显隐时机、刷新时�
 推荐轮播的 scrim 是**页面级固定遮罩**（`absolute bottom-0`，位于 CarouselSwiper 之后、按当前页 index 显示当前条目的标签/标题/作者/收藏），**而非**每 slide 内各渲染一份——真机 LynxView 对被 `translateX` 平移的 flex-row **非首 slide** 内的 `<text>` **永不渲染**（仅图片/`<view>` 正常；重挂载换 key、改 `display:linear`、改绝对→流内布局均无效；绿像素检测证实第 2+ 页 title 全屏无渲染；web-core 正常）。抽为页面级遮罩后文字不再落入被平移的 flex-row，各页均可渲染、随 index 更新。**权衡**：遮罩覆盖底部，底部 scrim 区不响应滑动（真机 `pointer-events` 对触摸不生效），滑动需从上部图片区发起；点卡进详情由遮罩 `@tap` 承担（收藏按钮 `@tap.stop`）。
 _Avoid_: 在轮播 slide 内渲染 `<text>` 承载的 scrim（真机非首 slide 文字不渲染）、依赖 `pointer-events` 让遮罩穿透滑动（真机无效）
 
+### 沉浸卡（Immersive card）【2026-10-13 新增，#1004】
+
+**沉浸卡（immersive card）**：
+把信息（标题 / 作者 / 徽章 / 操作）叠在**作品图**上的大图卡，底部一道渐变 scrim 承载文字。三个消费点：推荐页作品卡（`Recommended.vue`）、排行榜入口卡（`RankingEntryCard.vue`）、小说介绍页（`NovelIntro.vue`）。
+判据必须**绝对**：文字压在不可预测的作品图上，「渐变在该处有多深」不可能对所有图同时成立，所以相对断言（比当前底色深多少）在底色接近某值时退化成恒真。正确口径是文字色与一块**稳定底色**（`bg-inverse-surface` + `rounded-lg`，须开在标题元素**之前**）组成 ≥ AA 4.5 的对比度。常驻门禁 `tests/immersiveScrimContrast.test.ts`；台账见 `docs/adr/glossary-md3-alignment.md` §13.8.1。
+**发现判据 = 该 `.vue` 用了 `var(--md-scrim-overlay)`**（#1004）：门禁自己遍历源码树，与登记清单做**双向相等**断言（漏网与过期都暴露），新增即入判。
+_Avoid_：拿底色块形状（`bg-inverse-surface` + `rounded-lg`）当**发现**判据——形状是约定不是定义，全仓在用 5 种 `rounded-*`，换档位就会失效 · 把「列表卡」「受限卡」「轮播 scrim 页面级遮罩」当成沉浸卡（形态相近但不是同一物）· 只写注释说「新增要手动登记」而不做集合夹逼
+
+**有意窄覆盖**：一张压在作品图上、却**没有** scrim 渐变的卡不会被自动发现。按本门禁的既定定义，没有渐变就不算「与作品图融合」的沉浸卡，故**不补**兜底发现判据——「压在作品图上」是布局属性，类串层面表达不了，补了只会引入误抓。此项为已登记的决定，不是疏漏。
+
 ### 追更（Series watchlist）
 
 **追更询问（watchlist prompt）**：

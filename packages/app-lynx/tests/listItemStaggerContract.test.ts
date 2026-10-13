@@ -23,10 +23,11 @@
 //   再与 RefreshableList 既有 `.item-rise-2` 的 60ms 对齐（沿用实现值，非新拍）。
 // - 上限 STAGGER_MAX_ITEMS 的行为契约（>= 上限归 0）写在 motion.ts 的 JSDoc 里。
 import { describe, expect, it } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as motion from '../src/composables/motion'
+import { srcKey, walkProductionVue } from './helpers/walkProductionVue'
 
 // ⚠️ 本文件在 `tests/` 下（与 tests/motionContract.test.ts 同级）。
 // `new URL('..', import.meta.url)` 解析到**包根** `packages/app-lynx/`（已实测：
@@ -62,9 +63,11 @@ function readIfExists(p: string): string | null {
   }
 }
 
-/** src 相对、正斜杠分隔（登记键与集合比对都用这个，避免各处 relative 写法漂移）。 */
+/** src 相对、正斜杠分隔（登记键与集合比对都用这个，避免各处 relative 写法漂移）。
+ *  ⚠️ 实现下沉到共享 helper（#1006）：归一化与遍历同属「路径形态」这一份承诺，
+ *    各写各的会漂成两种键写法，而两边的比对各自绿。 */
 function srcRelative(abs: string): string {
-  return relative(SRC_ROOT, abs).split(sep).join('/')
+  return srcKey(SRC_ROOT, abs)
 }
 
 /** 去注释：约束说明本身会提到目标串，判据必须落在代码本文上。 */
@@ -75,25 +78,10 @@ function stripComments(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-/** 全仓生产 .vue（排测试与原型页），返回 src 相对的正斜杠路径。 */
-function* walkVue(root: string): Generator<string> {
-  let entries: ReturnType<typeof readdirSync>
-  try {
-    entries = readdirSync(root, { withFileTypes: true })
-  } catch (err) {
-    // 降级必须出声（禁静默降级）：路径写错时若默默返回空数组，
-    // 「扫到 0 个文件」与「仓里真的没有 .vue」同形 ⇒ 门禁恒真。
-    console.warn(`[listItemStaggerGate] 目录不可读，已跳过：${root}（${(err as Error).message}）`)
-    return
-  }
-  for (const entry of entries) {
-    if (entry.name === 'errorPrototype') continue
-    const p = join(root, entry.name)
-    if (entry.isDirectory()) yield* walkVue(p)
-    else if (entry.name.endsWith('.vue') && !entry.name.includes('.test.')) yield p
-  }
-}
-const ALL_VUE = [...walkVue(SRC_ROOT)].sort()
+// 扫描面与沉浸卡 scrim 门禁共用一份实现（#1006）：两份扫描面各自漂移时，
+// 其中一道会静默扫到另一道扫不到的文件，而两边的测试都不会响。
+// 该 helper 产出绝对路径；登记键仍走本文件的 srcRelative（正斜杠、src 相对）。
+const ALL_VUE = [...walkProductionVue(SRC_ROOT, '[listItemStaggerGate]')].sort()
 
 /** 判据内核：某文件是否已接入统一入场出口。**只认绑定形态**，
  *  不认「import 了 useMotion」这种弱信号（import 了但没用 = 没接入）。 */
