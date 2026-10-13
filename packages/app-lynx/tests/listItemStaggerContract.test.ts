@@ -24,10 +24,10 @@
 // - 上限 STAGGER_MAX_ITEMS 的行为契约（>= 上限归 0）写在 motion.ts 的 JSDoc 里。
 import { describe, expect, it } from 'vitest'
 import { readFileSync, statSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as motion from '../src/composables/motion'
-import { walkProductionVue } from './helpers/walkProductionVue'
+import { srcKey, walkProductionVue } from './helpers/walkProductionVue'
 
 // ⚠️ 本文件在 `tests/` 下（与 tests/motionContract.test.ts 同级）。
 // `new URL('..', import.meta.url)` 解析到**包根** `packages/app-lynx/`（已实测：
@@ -63,9 +63,11 @@ function readIfExists(p: string): string | null {
   }
 }
 
-/** src 相对、正斜杠分隔（登记键与集合比对都用这个，避免各处 relative 写法漂移）。 */
+/** src 相对、正斜杠分隔（登记键与集合比对都用这个，避免各处 relative 写法漂移）。
+ *  ⚠️ 实现下沉到共享 helper（#1006）：归一化与遍历同属「路径形态」这一份承诺，
+ *    各写各的会漂成两种键写法，而两边的比对各自绿。 */
 function srcRelative(abs: string): string {
-  return relative(SRC_ROOT, abs).split(sep).join('/')
+  return srcKey(SRC_ROOT, abs)
 }
 
 /** 去注释：约束说明本身会提到目标串，判据必须落在代码本文上。 */

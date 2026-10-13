@@ -19,9 +19,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 // #1003：底色块抽取改用结构化标签扫描（与 routeTransitionGate 共用一份实现）。
-import { extractOpeningTags } from './helpers/vueTagScan'
-// #1006：遍历扫描面与列表交错契约门禁共用一份实现（防止两份扫描面各自漂移）。
-import { walkProductionVue } from './helpers/walkProductionVue'
+import { extractOpeningTags, stripComments } from './helpers/vueTagScan'
+// #1006：遍历扫描面与列表交错契约门禁共用一份实现（防止两份扫描面各自漂移）；
+// 路径归一化同样共用一份，否则登记键与集合比对会漂成两种写法。
+import { srcKey, walkProductionVue } from './helpers/walkProductionVue'
 
 /** 沉浸卡源码树根（#1004 全仓发现的扫描根）。 */
 const SRC_ROOT = path.resolve(__dirname, '../src')
@@ -297,15 +298,18 @@ function plateAlphaViolation(consumer: string, plate: string): string | undefine
 }
 
 /**
- * 剥掉 HTML 注释与整行 `//` 注释。
+ * 剥掉 HTML 注释与整行 `//` 注释（**不剥** CSS 块注释）。
  *
- * ⚠️ **刻意不复用 `vueTagScan.stripComments`**（code-review 建议项后的显式登记）：
+ * ⚠️ **底色块抽取路径刻意不用 `vueTagScan.stripComments`**（code-review 建议项后的显式登记）：
  *    两处语义不同，混用会出错 ——
- *    ① 本文件**不剥** CSS 块注释（`slash-star` … `star-slash`）；② 本文件替换成 `''` 而非 `' '`，
- *    是为了让后面 `src.indexOf(...)` 的 idx 与剥注释后的 `src` **同一来源、自洽**；
- *    ③ 本文件的判据只跑在 `.vue` 源上，没有 CSS 块。
+ *    ① 本函数**不剥** CSS 块注释（`slash-star` … `star-slash`）；② 替换成 `''` 而非 `' '`，
+ *    是为了让后面 `src.indexOf(...)` 的 idx 与剥注释后的 `src` **同一来源、自洽**。
  *    共享模块那份服务于「跟引号扫描标签」，需要保行号、且必须先剥 CSS 注释。
  *    ⇒ 属**语义不同**，不是「同族不同源」；收拢成一个函数会让其中一处判据变形。
+ *
+ * ⚠️ 但**发现判据**（`isImmersiveCardSource`）用的是 `stripComments` 那份，与本函数
+ *    分道扬镳：它做纯文本搜索、不依赖 idx 对齐，因而要剥全三种注释（含 CSS 块），
+ *    否则 `.vue` 的 `<style>` 里提一句令牌就被算成候选。两条路径各取所需，不是重复。
  *
  * 理由（剥注释的必要性）：这几个 .vue 写了大量解释「为什么不用 /85」的注释，
  * 注释里出现的 `text-inverse-on-surface/85` 会让死类名守卫**自己打自己**。
@@ -336,9 +340,19 @@ function missingPlateMessage(name: string, src: string, plates: readonly string[
 
 // ── #1004：沉浸卡自发现 ──────────────────────────────────────────────────
 
-/** 沉浸卡的发现判据：源码（**已剥注释**）里用了 scrim 渐变令牌。 */
+/**
+ * 沉浸卡的发现判据：源码（**已剥全部三种注释**）里用了 scrim 渐变令牌。
+ *
+ * ⚠️ 这里用 `vueTagScan.stripComments`（HTML + `//` + **CSS 块注释**），而不是本文件
+ *    自己的 `stripVueComments`。后者刻意**不剥** CSS 块注释，理由是「本文件的判据只跑在
+ *    .vue 源上，没有 CSS 块」——而本判据恰恰是扫**整个文件**做纯文本搜索，`.vue` 里带
+ *    `<style>` 是常态。实测：`<style>` + slash-star + ` 旧写法：var(--md-scrim-overlay) ` + star-slash + `</style>` 会被
+ *    判成候选 ⇒ 集合相等判红并点名一个根本没写沉浸卡的文件（fail-closed 误诊）。
+ *    两份剥法语义不同、各司其职，不合并——底色块抽取依赖 `src.indexOf` 与剥后文本同源，
+ *    故必须保留替换成 `''` 的那份。
+ */
 function isImmersiveCardSource(src: string): boolean {
-  return stripVueComments(src).includes('var(--md-scrim-overlay)')
+  return stripComments(src).includes('var(--md-scrim-overlay)')
 }
 
 /**
@@ -378,6 +392,25 @@ function consumerSetDiagnosis(
     parts.push(`登记里已失效（文件不存在，或不再使用 scrim 渐变）：${missing.join('、')}`)
   }
   return `沉浸卡候选集合与登记清单不相等 ⇒ ${parts.join('；')}`
+}
+
+/**
+ * 「遍历 + 发现」流水线（#1004）：遍历 `root` 下的生产 `.vue`，返回其中使用
+ * scrim 渐变的候选键，已排序。
+ *
+ * ⚠️ 真实门禁与合成树验收组**共用这一份**。写两遍的话，两侧的扫描面与键
+ *    归一化会各自漂移，而两边的测试各自绿——漂移只在其中一侧真正生效时才暴露。
+ */
+function discoverImmersiveCards(root: string): string[] {
+  return [...walkProductionVue(root, '[immersiveScrimGate]')]
+    .filter((abs) => isImmersiveCardSource(fs.readFileSync(abs, 'utf-8')))
+    .map((abs) => srcKey(root, abs))
+    .sort()
+}
+
+/** 登记清单归一为与候选同构的键。 */
+function registeredKeys(): string[] {
+  return CONSUMERS.map((c) => srcKey(SRC_ROOT, path.resolve(__dirname, c.rel))).sort()
 }
 
 describe('#891 沉浸卡 scrim 文字对比度判据', () => {
@@ -616,19 +649,8 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
   // 遍历面与列表交错契约门禁共用一份实现（#1006）：扫描面是隐含的范围承诺，
   // 两道门禁各写各的就会漂。
   describe('沉浸卡自发现：全仓候选与登记清单双向相等（防「新卡静默漏判」）', () => {
-    /** src 相对、正斜杠分隔 —— 与遍历 helper 的产出对齐，避免各处写法漂移。 */
-    function srcKey(abs: string): string {
-      return path.relative(SRC_ROOT, abs).split(path.sep).join('/')
-    }
-
-    const DISCOVERED = [...walkProductionVue(SRC_ROOT, '[immersiveScrimGate]')]
-      .filter((abs) => isImmersiveCardSource(fs.readFileSync(abs, 'utf-8')))
-      .map((abs) => srcKey(abs))
-      .sort()
-
-    const REGISTERED = CONSUMERS.map((c) =>
-      srcKey(path.resolve(__dirname, c.rel)),
-    ).sort()
+    const DISCOVERED = discoverImmersiveCards(SRC_ROOT)
+    const REGISTERED = registeredKeys()
 
     it('扫描结果与登记清单相等（漏网与过期双向暴露）', () => {
       expect(consumerSetDiagnosis(DISCOVERED, REGISTERED)).toBeUndefined()
@@ -638,12 +660,22 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
       expect(REGISTERED.length, '登记被清空时集合相等会空对空通过，必须单独拦').toBeGreaterThan(0)
     })
 
-    // ⚠️ 有意窄覆盖（不得默默不覆盖）：本判据认的是「用了 scrim 渐变」。
-    //    一张压在作品图上、却**没有**渐变的卡（纯硬边色块）不会被自动发现 ——
-    //    而按本门禁的既定定义，没有渐变就不算「与作品图融合」的沉浸卡，
-    //    它本就该被现有断言（渐变不可删）在**已登记**的消费点上拦住。
-    //    之所以不补兜底发现判据：要在类串层面表达「压在作品图上」需要读布局属性，
-    //    机器数不出来，只会引入误抓。此处写明，使它成为已登记的决定而非疏漏。
+    // ⚠️ 有意窄覆盖（不得默默不覆盖）：本判据认的是**纯文本**里出现
+    //    `var(--md-scrim-overlay)` 字面量。已登记**两处**抓不到什么：
+    //
+    //    ① 一张压在作品图上、却**没有**渐变的卡（纯硬边色块）不会被自动发现 ——
+    //       而按本门禁的既定定义，没有渐变就不算「与作品图融合」的沉浸卡，
+    //       它本就该被现有断言（渐变不可删）在**已登记**的消费点上拦住。
+    //    ② **判据看不见经 `:style` / composable 间接注入的渐变**。若新卡写成
+    //       `:style="{ background: scrimGradient }"`、渐变常量定义在 composable 里，
+    //       该 `.vue` 内没有令牌字面量 ⇒ 不入候选 ⇒ 集合相等恒绿。**② 与 ① 是不同
+    //       的情形**：① 是「根本没有渐变」，② 是「有渐变但判据看不见」，后者更隐蔽。
+    //       登记若只写 ①，读的人会误以为没有缺口。实测当前仓**零例**（全仓含该字面量
+    //       的仅三个消费点 `.vue` 与两个 `.ts` 夹具），属**潜伏**而非现存漏判。
+    //
+    //    为何两处都不补兜底判据：① 要在类串层面表达「压在作品图上」需读布局属性，
+    //    机器数不出来；② 要追 composable 的间接引用，等于把发现判据从「与概念同义」
+    //    退化成「追数据流」，只会引入误抓。写明是为了让它们成为**已登记的决定**而非疏漏。
   })
 
   // ── #1003 验收：抽取面真实失效面 = 三格，全部按变异验证 ──────────────────
@@ -860,9 +892,20 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
     })
 
     it('注释里提到 scrim 令牌 ⇒ 不是候选（判据必须落在代码本文上）', () => {
-      expect(
-        isImmersiveCardSource('<!-- 这里记得写 var(--md-scrim-overlay) -->\n<view />'),
-      ).toBe(false)
+      // 三种注释形态都要剥：HTML 注释、`//` 行注释、**CSS 块注释**。
+      // ⚠️ CSS 块注释是 code-review 实测补上的：原来的剥法不剥块注释，而 `.vue`
+      //    的 `<style>` 里只要提一句「旧写法：var(--md-scrim-overlay)」，该文件就会
+      //    被算成候选 ⇒ 集合相等判红并点名一个**根本没写沉浸卡**的文件（fail-closed 误诊）。
+      const SLASH_STAR = '/' + '*'
+      const STAR_SLASH = '*' + '/'
+      for (const src of [
+        '<!-- 这里记得写 var(--md-scrim-overlay) -->\n<view />',
+        '// var(--md-scrim-overlay)\n<view />',
+        `<style>${SLASH_STAR} 旧写法：var(--md-scrim-overlay) ${STAR_SLASH}</style>\n<template><view /></template>`,
+        `<style scoped>\n${SLASH_STAR} var(--md-scrim-overlay) ${STAR_SLASH}\n.x { color: red }\n</style>`,
+      ]) {
+        expect(isImmersiveCardSource(src), `注释形态不该入候选：${src.slice(0, 40)}`).toBe(false)
+      }
     })
   })
 
@@ -913,10 +956,7 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         fs.mkdirSync(path.dirname(abs), { recursive: true })
         fs.writeFileSync(abs, content, 'utf-8')
       }
-      return [...walkProductionVue(root, '[immersiveScrimGate]')]
-        .filter((abs) => isImmersiveCardSource(fs.readFileSync(abs, 'utf-8')))
-        .map((abs) => path.relative(root, abs).split(path.sep).join('/'))
-        .sort()
+      return discoverImmersiveCards(root)
     }
 
     it('新卡被发现；.ts 夹具与 errorPrototype 原型页不入候选', () => {
@@ -933,12 +973,9 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
     })
 
     it('合成树里出现的新卡 ⇒ 端到端判红并点名（判别力自检）', () => {
-      const registered = CONSUMERS.map((c) =>
-        path.relative(SRC_ROOT, path.resolve(__dirname, c.rel)).split(path.sep).join('/'),
-      ).sort()
       const msg = consumerSetDiagnosis(
         candidatesOf({ 'pages/NewCard.vue': REAL_CARD_SRC }),
-        registered,
+        registeredKeys(),
       )
       expect(msg, '新卡不入判 ⇒ 门禁必须判红，否则本组与整个 #1004 都是恒真的').toBeDefined()
       expect(msg).toContain('pages/NewCard.vue')

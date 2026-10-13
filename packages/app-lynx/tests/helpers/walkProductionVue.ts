@@ -17,7 +17,18 @@
 //    ④ 目录不可读**必须出声** —— 「扫到 0 个文件」与「仓里真的没有」在输出上
 //       完全同形，静默降级会让门禁伪装成通过（本仓测试硬约束：禁止静默降级）。
 import { readdirSync, type Dirent } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
+
+/**
+ * 归一化为「相对 `root` 的正斜杠路径」。
+ *
+ * ⚠️ 与遍历放同一个模块，是为了让「路径形态」和「扫描面」一样只有一份：
+ *    登记键、集合比对、验收断言全走它。归一化若各写各的（`relative().split(sep)
+ *    .join('/')` 抄两遍），就会漂成两种键写法，而两边的比对各自绿。
+ */
+export function srcKey(root: string, abs: string): string {
+  return relative(root, abs).split(sep).join('/')
+}
 
 /**
  * 遍历 `root` 下全部生产 `.vue`，产出**绝对路径**。
