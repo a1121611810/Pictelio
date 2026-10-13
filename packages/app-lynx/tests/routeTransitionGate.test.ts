@@ -28,70 +28,25 @@ import {
   ROUTE_TRANSITION_DURATION,
   ROUTE_TRANSITION_EASING,
 } from '../src/composables/routeTransition'
+// #1003：抽取器提到 tests/helpers/vueTagScan.ts 与沉浸卡那道门禁共用
+// （同一纪律的第二个消费方；本文件**不保留**私有副本，避免两份实现各自漂移）。
+import { extractTagContaining, readClassAttr, stripComments } from './helpers/vueTagScan'
 
 const APP_VUE = fileURLToPath(new URL('../src/App.vue', import.meta.url))
 const ROUTER_TS = fileURLToPath(new URL('../src/router.ts', import.meta.url))
 const appSrc = readFileSync(APP_VUE, 'utf8')
 const routerSrc = readFileSync(ROUTER_TS, 'utf8')
 
-/** 去注释（约束说明本身会画出反面示例，判据必须落在代码本文上） */
-function stripComments(src: string): string {
-  return src
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-}
-
 // ── 抽取器（brace 平衡扫描：帧体是嵌套块，非贪婪正则会在第一层 `}` 就截断）───
+//
+// ⚠️ `stripComments` / `extractTagContaining` / `readClassAttr` 已于 #1003 提到
+//    `./helpers/vueTagScan.ts`：沉浸卡那道门禁栽在完全同族的缺陷上，共用一份实现。
+//    本文件另有两个**本门禁专用**的扫描器（`extractKeyframes` / 其下数个
+//    frame 级解析器）——它们读的是 CSS 而非标签，留在本文件。
 
 /**
- * 抽出**包含 needle 的那个开标签的完整文本**（含 `<view` 与配对的 `>`）。
- *
- * ⚠️ 为什么不能「按行找」（#897）：Vue 模板的属性可以任意换行，class 与 :style 分处两行
- * 是完全正常的写法。按行取会命中「只有 :style 没有 class」的那一行 ⇒ class 读成空串
- * ⇒ 判据恒绿放行（实测：挂 translate-x-full 且跨行，16 用例全绿）。
- * ⇒ 与 `extractKeyframes` 同一纪律：**结构按配对取，不按行取**。
- *
- * 同时支持双引号与单引号；未找到返回 undefined（由调用方断言处理）。
+ * 抽出全部 `@keyframes <name> { … }` 的帧体，键 = 动画名
  */
-function extractTagContaining(src: string, needle: string): string | undefined {
-  const code = stripComments(src)
-  let from = 0
-  for (;;) {
-    const at = code.indexOf(needle, from)
-    if (at < 0) return undefined
-    // 从 needle 往前回溯到最近的开标签尖括号（`<view` / `<transition` 等）
-    const open = code.lastIndexOf('<', at)
-    if (open < 0) return undefined
-    // 标签名到第一个空白或 `>` 为止
-    const nameEnd = code.slice(open + 1).search(/[\s/>]/)
-    const tagName = code.slice(open + 1, open + 1 + (nameEnd < 0 ? Infinity : nameEnd))
-    if (!/^[a-zA-Z][\w.-]*$/.test(tagName)) return undefined
-    // 从开标签起点扫描到配对的 `>`（开标签内无嵌套，但属性值里可能有 `>`，故跟引号）
-    let i = open + 1
-    let quote: string | null = null
-    for (; i < code.length; i++) {
-      const ch = code[i]
-      if (quote) {
-        if (ch === quote) quote = null
-        continue
-      }
-      if (ch === '"' || ch === "'") {
-        quote = ch
-        continue
-      }
-      if (ch === '>') return code.slice(open, i + 1)
-    }
-    from = at + needle.length
-  }
-}
-
-/** 从一个开标签文本里取 class 属性值（双引号 / 单引号都认；取不到返回空串） */
-function readClassAttr(tag: string): string {
-  return /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag)?.slice(1).find(Boolean) ?? ''
-}
-
-/** 抽出全部 `@keyframes <name> { … }` 的帧体，键 = 动画名 */
 function extractKeyframes(src: string): Record<string, string> {
   const code = stripComments(src)
   const out: Record<string, string> = {}

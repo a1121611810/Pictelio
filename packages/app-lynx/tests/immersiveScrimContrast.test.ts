@@ -17,6 +17,8 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+// #1003：底色块抽取改用结构化标签扫描（与 routeTransitionGate 共用一份实现）。
+import { extractOpeningTags } from './helpers/vueTagScan'
 
 /** WCAG 2.1 AA 通用门槛（取严的正文 4.5，而非大字 3.0）。 */
 const AA = 4.5
@@ -229,6 +231,93 @@ const CONSUMERS = [
   },
 ] as const
 
+/**
+ * 抽出全部「稳定底色块」的 class 值（#1003）。
+ *
+ * ⚠️ 按标签整体解析，**不按行取**。旧实现是 `<view\s+class="([^"]*)"`，它同时要求
+ *    三条成立：标签名是 `<view` / class 是**第一个属性** / 引号是双引号。任一不成立
+ *    ⇒ 底色块抽不到 ⇒ 报「找不到稳定底色块」，**报错指向错误根因**（底色块明明在，
+ *    只是写法没被认出来）。三格真实失效面（已实测）：
+ *      ① 单引号 `class='…'`；② `class` 前有其它属性；③ 非 `<view>` 标签。
+ *    危害是 **fail-closed 误诊**，不是静默漏过：抽不到时消费点断言必红。
+ *
+ * 底色块的形状约定（**不可放宽**）：**同一个元素**的 class 里同时出现
+ * `bg-inverse-surface` 与 `rounded-lg`。
+ * ⚠️ 不能只找 bg-inverse-surface：三个消费点里都还有**别的**、与 scrim 无关的
+ *    inverse 元素（NovelIntro 的导出面板就带 rounded-[var(--md-shape-medium)] +
+ *    bg-inverse-surface），只找颜色会被那些无关命中满足掉 —— 删掉 scrim 底色照样绿。
+ *    rounded-lg 是引入底色块时一并落的形状，正好把两者区分开。
+ *
+ * 形参暴露成「任意源码 → 抽到的 class 数组」，验收用例据此注入变异，不落盘、不改真文件。
+ */
+function extractPlates(src: string): string[] {
+  return extractOpeningTags(src)
+    .map((t) => t.class)
+    .filter((cls) => cls.includes('bg-inverse-surface') && cls.includes('rounded-lg'))
+}
+
+/**
+ * 单块底色块的 alpha 违规判定（#897 的真防线；#1003 提成共享函数）。
+ *
+ * **返回**违规描述；**没有违规返回 undefined** —— 用 `toBeUndefined()` 断言，
+ * 失败时 vitest 直接打印违规描述（含实际类串），无需自己拼消息。
+ *
+ * ⚠️ 提成函数而不是内联正则的原因：验收组要验「三格写法抽到的底色块**能被点名 `/70`**」，
+ *    若验收组自己抄一份正则，被验的就成了**副本**——真门禁那条判据删掉也不影响验收组变红
+ *    （code-review 阻塞项）。共用一份 ⇒ 改坏哪边两边都红。
+ */
+function plateAlphaViolation(consumer: string, plate: string): string | undefined {
+  const bgClass = plate.match(/bg-inverse-surface(?:\/\S+)?/)?.[0]
+  if (bgClass === undefined) {
+    return `${consumer} 底色块的 bg-inverse-surface 提取异常：${plate}`
+  }
+  if (bgClass !== 'bg-inverse-surface') {
+    return (
+      `${consumer}：底色块带了 alpha 修饰符 ${bgClass}（提取到的类串：${plate}）` +
+      ` ⇒ 绝对下界判据的前提失效，须写成不带 /alpha 的 bg-inverse-surface`
+    )
+  }
+  return undefined
+}
+
+/**
+ * 剥掉 HTML 注释与整行 `//` 注释。
+ *
+ * ⚠️ **刻意不复用 `vueTagScan.stripComments`**（code-review 建议项后的显式登记）：
+ *    两处语义不同，混用会出错 ——
+ *    ① 本文件**不剥** CSS 块注释（`slash-star` … `star-slash`）；② 本文件替换成 `''` 而非 `' '`，
+ *    是为了让后面 `src.indexOf(...)` 的 idx 与剥注释后的 `src` **同一来源、自洽**；
+ *    ③ 本文件的判据只跑在 `.vue` 源上，没有 CSS 块。
+ *    共享模块那份服务于「跟引号扫描标签」，需要保行号、且必须先剥 CSS 注释。
+ *    ⇒ 属**语义不同**，不是「同族不同源」；收拢成一个函数会让其中一处判据变形。
+ *
+ * 理由（剥注释的必要性）：这几个 .vue 写了大量解释「为什么不用 /85」的注释，
+ * 注释里出现的 `text-inverse-on-surface/85` 会让死类名守卫**自己打自己**。
+ */
+function stripVueComments(src: string): string {
+  return src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
+/**
+ * 底色块抽不到时的判红消息（#1003）。
+ *
+ * ⚠️ 提成具名函数不是为了好看，而是为了让**诊断区分本身可测**：
+ *    此前这段三元写在 `expect(...)` 里，验收用例只能重算一遍同样的 `&&` 表达式
+ *    来"验证"它 —— 断言对象与被测实现零耦合，把真门禁整段删掉该用例仍绿
+ *    （code-review 阻塞项）。提成函数后，用例可以直接断言**消息文本**，改坏分支必红。
+ *
+ * 区分两种原因：真的没写底色块，还是写了但认不出来。只报前者 ⇒ 解析器自身的退化
+ * 会永远伪装成「设计违规」，把下一个人引向错误的排查方向。
+ */
+function missingPlateMessage(name: string, src: string, plates: readonly string[]): string {
+  if (plates.length > 0) return `${name}：底色块已找到（不应走到本分支）`
+  const bothClassesPresent = src.includes('bg-inverse-surface') && src.includes('rounded-lg')
+  return bothClassesPresent
+    ? `${name}：源文件里 bg-inverse-surface 与 rounded-lg 都出现了，但没有任何一个元素同时带这两个类` +
+        ` ⇒ 底色块存在却被抽取器漏读（抽取器退化），不是「没写底色块」`
+    : `${name} 找不到稳定底色块（rounded-lg + bg-inverse-surface）`
+}
+
 describe('#891 沉浸卡 scrim 文字对比度判据', () => {
   it('tokens.css 里 7 亮 + 7 暗 = 14 套色板全部自带 inverse 配对（门禁自身的前置条件）', () => {
     expect(PALETTES).toHaveLength(14)
@@ -368,23 +457,16 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
     for (const c of CONSUMERS) {
       it(`${c.name}：标题落在 stable 底色块之内，且渐变仍在`, () => {
         const raw = fs.readFileSync(path.resolve(__dirname, c.rel), 'utf-8')
-        // ⚠️ 必须先剥注释再断言：这几个文件写了大量解释「为什么不用 /85」的注释，
-        //    注释里出现的 `text-inverse-on-surface/85` 会让下面的死类名守卫**自己打自己**。
-        const src = raw.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+        // ⚠️ 必须先剥注释再断言（理由见 stripVueComments）
+        const src = stripVueComments(raw)
 
         // 渐变**不能**被顺手删掉：它是「与作品图融合」的唯一手段，删了会变成硬边色块。
         expect(src, `${c.name} 丢了渐变 var(--md-scrim-overlay)`).toContain('var(--md-scrim-overlay)')
 
-        // 稳定底色块 = **同一个 view** 的 class 里同时出现 `bg-inverse-surface` 与 `rounded-lg`。
-        // ⚠️ 不能只找 bg-inverse-surface：三个文件里都还有**别的**、与 scrim 无关的
-        //    inverse 元素（NovelIntro 的导出面板就带 rounded-[var(--md-shape-medium)] +
-        //    bg-inverse-surface），只找颜色会被那些无关命中满足掉 —— 删掉 scrim 底色照样绿。
-        //    rounded-lg 是本票引入的底色块形状，正好把两者区分开。
-        const plates = [...src.matchAll(/<view\s+class="([^"]*)"/g)]
-          .map((m) => m[1])
-          .filter((cls) => cls.includes('bg-inverse-surface') && cls.includes('rounded-lg'))
-        expect(plates, `${c.name} 找不到稳定底色块（rounded-lg + bg-inverse-surface）`).not.toHaveLength(0)
-        const plateIdx = src.indexOf(plates[0])
+        const plates = extractPlates(src)
+
+        expect(plates, missingPlateMessage(c.name, src, plates)).not.toHaveLength(0)
+        const plateIdx = src.indexOf(plates[0]!)
 
         const titleIdx = src.indexOf(c.titleMarker)
         expect(titleIdx, `${c.name} 标题元素未使用 text-inverse-on-surface`).toBeGreaterThan(-1)
@@ -455,13 +537,203 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
         // NovelIntro / Recommended 里另有与 scrim 无关的 inverse 元素，且本仓有
         // 刻意使用 alpha 的状态层（bg-layer-pressed/16 等），全文件禁 `/` 会误伤。
         for (const plate of plates) {
-          const bgClass = plate.match(/bg-inverse-surface(?:\/\S+)?/)?.[0]
-          expect(
-            bgClass,
-            `${c.name} 底色块的 bg-inverse-surface 提取异常：${plate}`,
-          ).toBe('bg-inverse-surface')
+          // 判定走**共享函数**，不内联复制正则 —— 验收组必须打到与真门禁同一份判据，
+          // 否则删掉这个循环（#897 的判红能力）新增用例仍全绿（code-review 阻塞项）。
+          expect(plateAlphaViolation(c.name, plate)).toBeUndefined()
         }
       })
     }
+  })
+
+  // ── #1003 验收：抽取面真实失效面 = 三格，全部按变异验证 ──────────────────
+  //
+  // 纪律：**不接受「读代码觉得没问题」**。每一格都把违规写法**喂进同一个抽取器**，
+  // 要求它抽到那个带 `/70` 的底色块；抽不到即判红。
+  //
+  // ⚠️ 为什么这组与 #1001 的方向相反：#1001 要求「跨行写法要能抽到」，
+  //    那是**基于一个被否掉的前提**（实测：旧正则的 `\s` 与 `[^"]` 都匹配换行，
+  //    跨行今天就能抽到）。照 #1001 写会得到一条**恒真的判别力自检**——
+  //    它在改动前也绿、抓不到任何东西。本组把跨行写成**回归守卫**（钉住
+  //    「重写没把这个本来能过的形态弄丢」），而不是新的判红能力。
+  //
+  // 期望值出处（oracle 溯源）：三格形态来自 #1003 票面逐条实测的变异矩阵。
+  //
+  // ⚠️「反事实」必须**编码进产物**，不能只写在注释里（code-review 发现）：此前本组声称
+  //    「在旧实现上复现旧 0 / 新 1 的双向对照」，但旧正则只作为字符串出现在注释中，
+  //    **产物不自证** —— 谁都无法复核那个 0。于是 `OLD_PLATE_RE` 把旧实现原样落成常量，
+  //    下方「反事实」一条对它逐形态断言 0 命中：反事实从此永久可复核。
+  describe('#1003 验收：底色块抽取面（变异注入，不落盘）', () => {
+    /**
+     * #1003 修复前的抽取器，原样保留（`git show HEAD:…` 可核对）。
+     *
+     * 它的存在只为让「旧实现抽不到、新实现抽得到」这个反事实**可复核** ——
+     * 三格形态各断言它 0 命中、跨行形态断言它 1 命中（后者是 #1001 错误前提的实证）。
+     */
+    const OLD_PLATE_RE = /<view\s+class="([^"]*)"/g
+    /** 用旧抽取器抽底色块（与 `extractPlates` 的过滤条件保持一致） */
+    const oldPlates = (src: string): string[] =>
+      [...src.matchAll(OLD_PLATE_RE)]
+        .map((m) => m[1]!)
+        .filter((cls) => cls.includes('bg-inverse-surface') && cls.includes('rounded-lg'))
+
+    /** 底色块的**违规**形态：带 alpha 修饰符，`/70` 必须能被下游断言点名 */
+    const PLATE_BAD = 'bg-inverse-surface/70 rounded-lg'
+    /** 底色块的**合法**形态（反向对照用） */
+    const PLATE_OK = 'bg-inverse-surface rounded-lg'
+
+    it('反事实：旧抽取器对三格形态**一律抽不到**（#1001 的错误前提在此被否）', () => {
+      // 这条是本组「判别力」的地基：没有它，下面三格「旧 0 / 新 1」只是注释里的说法。
+      for (const src of [
+        `<view class='${PLATE_BAD}'>x</view>`,
+        `<view v-if="visible" class="${PLATE_BAD}">x</view>`,
+        `<text class="${PLATE_BAD}">x</text>`,
+      ]) {
+        expect(oldPlates(src), `旧实现应抽不到：${JSON.stringify(src)}`).toHaveLength(0)
+        expect(extractPlates(src), `新实现应抽得到：${JSON.stringify(src)}`).toHaveLength(1)
+      }
+      // ⚠️ 跨行是**唯一**旧实现也能过的形态 —— #1001 把「跨行抽不到」当核心前提是错的。
+      //    这条同时钉住跨行是回归守卫、不是新判红能力（见下方「回归守卫」用例）。
+      const multiline = `<view\n  class="${PLATE_BAD}">x</view>`
+      expect(oldPlates(multiline), '旧实现对跨行**抽得到** ⇒ #1001 前提被否').toHaveLength(1)
+      expect(extractPlates(multiline), '新实现对跨行也应抽得到').toHaveLength(1)
+    })
+
+    it('失效面 ①：单引号 class 抽得到，且能被真门禁点名 /70', () => {
+      const src = `<view class='${PLATE_BAD}'>标题</view>`
+      expect(extractPlates(src), '单引号写法的底色块应被抽出').toHaveLength(1)
+      // 验收 1 的完整要求是「判红且**点名 /70**」⇒ 走真门禁那条共享判定，
+      // 不是自己抄一份正则（抄副本 = 验的不是真门禁，见 plateAlphaViolation 注释）。
+      expect(plateAlphaViolation('单引号', extractPlates(src)[0]!)).toContain('/70')
+      // 反向对照：同一形态但合法底色（无 /70）时，**下游 alpha 断言不得判红**
+      const ok = extractPlates(`<view class='${PLATE_OK}'>标题</view>`)
+      expect(ok).toHaveLength(1)
+      expect(plateAlphaViolation('单引号合法', ok[0]!)).toBeUndefined()
+    })
+
+    it('失效面 ②：class 不是第一个属性 抽得到，且能被真门禁点名 /70', () => {
+      // 背景类刻意**不放在标签首位**，避免新实现「见标签就红」的假阳性混进来
+      const src = `<view v-if="visible" class="${PLATE_BAD}">标题</view>`
+      expect(extractPlates(src), 'class 前有属性时底色块应被抽出').toHaveLength(1)
+      expect(plateAlphaViolation('class 非首属性', extractPlates(src)[0]!)).toContain('/70')
+      // v-for / :key 形态（runner 卡就是这种顺序）
+      const keyed = extractPlates(
+        `<view v-for="x in list" :key="x.id" class="${PLATE_BAD}">标题</view>`,
+      )
+      expect(keyed, 'v-for + :key + class 形态应被抽出').toHaveLength(1)
+      expect(plateAlphaViolation('v-for+key', keyed[0]!)).toContain('/70')
+    })
+
+    it('失效面 ③：非 <view> 标签 抽得到，且能被真门禁点名 /70', () => {
+      for (const tag of ['text', 'image']) {
+        const plates = extractPlates(
+          `<${tag} class="${PLATE_BAD}"${tag === 'image' ? ' /' : ''}>标题</${tag}>`,
+        )
+        expect(plates, `${tag} 标签应被抽出`).toHaveLength(1)
+        expect(plateAlphaViolation(tag, plates[0]!), `${tag} 标签应点名 /70`).toContain('/70')
+      }
+    })
+
+    it('反向对照：以上三格的**合法**写法（无 /70）不得被当成违规', () => {
+      // 证明新抽取器不是「见标签就红」的假阳性源：不含 /70 时下游断言必须放过。
+      for (const src of [
+        `<view class='${PLATE_OK}'>标题</view>`,
+        `<view v-if="visible" class="${PLATE_OK}">标题</view>`,
+        `<text class="${PLATE_OK}">标题</text>`,
+      ]) {
+        const plates = extractPlates(src)
+        expect(plates, `合法写法应被抽出：${src}`).toHaveLength(1)
+        expect(plateAlphaViolation('合法写法', plates[0]!), `合法写法不应判红：${src}`).toBeUndefined()
+      }
+    })
+
+    it('反向对照：只有颜色没有圆角的元素不算底色块（形状约定未被放宽）', () => {
+      // ⚠️ 这是**刻意不放宽**的一条：NovelIntro 的导出面板带 bg-inverse-surface
+      //    + rounded-[var(--md-shape-medium)]，若只按颜色抽会被它满足掉。
+      expect(
+        extractPlates('<view class="bg-inverse-surface rounded-[var(--md-shape-medium)]">x</view>'),
+        '无 rounded-lg 的 inverse 元素不应算底色块',
+      ).toHaveLength(0)
+    })
+
+    it('回归守卫：跨行 class 本来就能抽到，重写**不能**把它弄丢', () => {
+      // 这一格旧实现也过（`\s` 与 `[^"]` 都匹配换行）。它的作用是钉住「重写无退化」，
+      // 断言它不是新的判红能力 —— 若哪天有人改回按行取，这里会红。
+      //
+      // ⚠️ brief checkbox 5 要求的不止「still extract」，还有「**still name `/70`**」
+      //    ⇒ 两条都断言：抽到，且真门禁那条判定点名 `/70`。
+      const cases = [
+        `<view\n  class="${PLATE_BAD}">标题</view>`,
+        `<view class="bg-inverse-surface/70\n  rounded-lg">标题</view>`,
+      ]
+      for (const src of cases) {
+        const plates = extractPlates(src)
+        expect(plates, `跨行写法应被抽出：${JSON.stringify(src)}`).toHaveLength(1)
+        expect(
+          plateAlphaViolation('跨行', plates[0]!),
+          `跨行写法应仍被点名 /70：${JSON.stringify(src)}`,
+        ).toContain('/70')
+      }
+    })
+
+    it('HTML 注释里的底色块不算（负向：剥注释必须生效）', () => {
+      // 这几个 .vue 写了大量解释「为什么不用 /85」的注释，注释里的命中会让
+      // 死类名守卫自己打自己 ⇒ 抽取必须先剥注释。
+      expect(
+        extractPlates(`<!-- <view class="${PLATE_BAD}">注释里的反面示例</view> -->`),
+        'HTML 注释里的底色块不应被抽出',
+      ).toHaveLength(0)
+    })
+
+    it('<script> 块里的字符串字面量不算标签（只扫 template 块）', () => {
+      // ⚠️ #1003 实施期自查发现的**新引入**失效面：`<script setup>` 里常有字符串字面量
+      //    含尖括号（泛型 / 比较运算 / 测试夹具里的反例）。全文件扫标签会把它们当成
+      //    真标签 ⇒ **凭空多出一块底色块**（方向 fail-open：误判红，不是漏过）。
+      //    实测反例：`const s = "<view class='bg-inverse-surface/70 rounded-lg'>"`。
+      const src = [
+        `<script setup lang="ts">`,
+        `const m = new Map<string, number>()`,
+        `if (a < b && c > d) {}`,
+        `const s = "<view class='${PLATE_BAD}'>"`,
+        `</script>`,
+        `<template><view class="${PLATE_OK}">真底板</view></template>`,
+      ].join('\n')
+      const plates = extractPlates(src)
+      expect(plates, 'script 里的字面量不应被抽成底色块').toHaveLength(1)
+      expect(plates[0], '只应抽到 template 块里那块').toBe(PLATE_OK)
+      // 反向对照：script 里有字面量但 template 块里**真没有**底色块 ⇒ 抽不到
+      const onlyScript = `<script>const s = "<view class='${PLATE_BAD}'>"</script><template><view>x</view></template>`
+      expect(extractPlates(onlyScript), 'script 里的假底色块不应满足判据').toHaveLength(0)
+    })
+
+    it('诊断必须区分「压根没写底色块」与「写了但抽取器认不出」', () => {
+      // ⚠️ 这条曾是个**恒真**用例：它重算一遍与被测实现同形的 `&&` 表达式来"验证"
+      //    自己，而输入恰好不含 bg-inverse-surface ⇒ 无论真门禁怎么改都绿。
+      //    现在 `missingPlateMessage` 已提成具名函数，用例直接断言**消息文本**。
+      const noPlateAtAll = '<view class="rounded-lg">标题</view>'
+      expect(extractPlates(noPlateAtAll)).toHaveLength(0)
+      expect(missingPlateMessage('X', noPlateAtAll, [])).toContain('找不到稳定底色块')
+
+      // 底色块存在、但两个类**分处两个元素**（抽取器认不出「同一个元素」的约定）⇒ 走「抽取器漏读」
+      const splitAcross = `<view class="bg-inverse-surface"><view class="rounded-lg">标题</view>`
+      expect(extractPlates(splitAcross)).toHaveLength(0)
+      expect(missingPlateMessage('X', splitAcross, [])).toContain('被抽取器漏读')
+      expect(missingPlateMessage('X', splitAcross, [])).not.toContain('找不到稳定底色块')
+    })
+
+    it('<script> 内含 <template> 字面量时也不能把 script 尾部扫进来', () => {
+      // ⚠️ code-review 阻塞项：`templateBlock` 若用「首个开标签 + lastIndexOf 闭合」，
+      //    起点会落在 script 内的 `"<template>…"` 字面量上、终点是真 template 闭合
+      //    ⇒ script 尾部整段被并进扫描面，假底色块重现（实测抽出 2 块）。
+      const src = [
+        `<script setup lang="ts">`,
+        `const doc = "<template>片段</template>"`,
+        `const t = "<view class='${PLATE_BAD}'>"`,
+        `</script>`,
+        `<template><view class="${PLATE_OK}">真底板</view></template>`,
+      ].join('\n')
+      const plates = extractPlates(src)
+      expect(plates, 'script 内的 <template> 字面量不得把 script 尾部并进扫描面').toHaveLength(1)
+      expect(plates[0], '只应抽到 template 块里那块').toBe(PLATE_OK)
+    })
   })
 })
