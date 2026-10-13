@@ -32,8 +32,25 @@ function git(args, cwd) {
 
 const tempDirs = [];
 
+/**
+ * 本文件每个用例都要**真建 git 双仓库**（`git init` / `commit` / `clone` / `push` /
+ * `fetch`），单用例约 8 次子进程调用。隔离跑单个用例 ~600ms，但在本包**并行**跑时
+ * 机器争抢 CPU，实测文件级耗时 23.5s / 18.9s、最慢单用例超过 5s。
+ * ⇒ 默认的 5000ms 超时在并行下**必然踩线**，且踩线后产生**级联失败**（见 GIT_FIXTURE_TIMEOUT）。
+ */
+const GIT_FIXTURE_TIMEOUT = 20000;
+
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+  // ⚠️ `maxRetries`/`retryDelay` 不是可选的洁癖：fs.rm 的默认 `maxRetries` 是 **0**，
+  //    目录一旦被外部进程短暂占用就直接失败。
+  //    用例超时被中断时，夹具里的 git 子进程可能仍在写盘 ⇒ `rm` 撞上 ENOTEMPTY，
+  //    于是**一个超时**表现为**两个**失败（超时 + 清理报错），把真正根因淹没在噪声里。
+  //    加重试后，清理要么成功、要么报出可归因的错。
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((d) => rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })),
+  );
 });
 
 async function commitFile(repo, name, content, msg) {
@@ -70,7 +87,7 @@ async function advanceRemote(fixture, name = "b.txt", content = "B") {
   return shaB;
 }
 
-describe("hasCommitObject", () => {
+describe("hasCommitObject", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("本地已有的 commit 返回 true", async () => {
     const f = await makeFixture();
     expect(await hasCommitObject(f.shaA, f.local)).toBe(true);
@@ -85,7 +102,7 @@ describe("hasCommitObject", () => {
   });
 });
 
-describe("fetchRemoteRef", () => {
+describe("fetchRemoteRef", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("成功路径：精准 fetch 后 origin/main 更新为远端新提交", async () => {
     const f = await makeFixture();
     const shaB = await advanceRemote(f);
@@ -119,7 +136,7 @@ describe("fetchRemoteRef", () => {
   });
 });
 
-describe("isAncestor", () => {
+describe("isAncestor", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("本地领先远端（fast-forward 态）：远端 tip 是本地 HEAD 的祖先 → true", async () => {
     const f = await makeFixture();
     const shaC = await commitFile(f.local, "c.txt", "C", "commit C");
@@ -142,7 +159,7 @@ describe("isAncestor", () => {
   });
 });
 
-describe("resolveRef", () => {
+describe("resolveRef", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("成功路径：解析分支到 commit sha", async () => {
     const f = await makeFixture();
     expect(await resolveRef("main", f.local)).toBe(f.shaA);
@@ -154,7 +171,7 @@ describe("resolveRef", () => {
   });
 });
 
-describe("trackingRefFor（纯函数映射）", () => {
+describe("trackingRefFor（纯函数映射）", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("分支引用映射到 remote-tracking 引用", () => {
     expect(trackingRefFor("refs/heads/main")).toBe("refs/remotes/origin/main");
     expect(trackingRefFor("refs/heads/feat", "upstream")).toBe("refs/remotes/upstream/feat");
@@ -165,7 +182,7 @@ describe("trackingRefFor（纯函数映射）", () => {
   });
 });
 
-describe("diffNames / mergeBase / diffTreeNames（编排器 diff 原语）", () => {
+describe("diffNames / mergeBase / diffTreeNames（编排器 diff 原语）", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("diffNames 返回两点间变更文件名列表", async () => {
     const f = await makeFixture();
     await mkdir(join(f.local, "packages/app/src"), { recursive: true });

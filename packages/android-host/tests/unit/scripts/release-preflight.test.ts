@@ -21,8 +21,25 @@ function git(args, cwd) {
 
 const tempDirs = [];
 
+/**
+ * 本文件每个用例都要**真建 git 双仓库**（`git init` / `commit` / `clone` / `push` /
+ * `fetch`），单用例约 8 次子进程调用。隔离跑单个用例 ~600ms，但在本包**并行**跑时
+ * 机器争抢 CPU，实测文件级耗时 23.5s / 18.9s、最慢单用例超过 5s。
+ * ⇒ 默认的 5000ms 超时在并行下**必然踩线**，且踩线后产生**级联失败**（见 GIT_FIXTURE_TIMEOUT）。
+ */
+const GIT_FIXTURE_TIMEOUT = 20000;
+
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+  // ⚠️ `maxRetries`/`retryDelay` 不是可选的洁癖：fs.rm 的默认 `maxRetries` 是 **0**，
+  //    目录一旦被外部进程短暂占用就直接失败。
+  //    用例超时被中断时，夹具里的 git 子进程可能仍在写盘 ⇒ `rm` 撞上 ENOTEMPTY，
+  //    于是**一个超时**表现为**两个**失败（超时 + 清理报错），把真正根因淹没在噪声里。
+  //    加重试后，清理要么成功、要么报出可归因的错。
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((d) => rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })),
+  );
 });
 
 async function commitFile(repo, name, content, msg) {
@@ -56,7 +73,7 @@ async function advanceRemote(f) {
   await git(["push", "origin", "main"], other);
 }
 
-describe("assertReleaseBranchNotDiverged（缺省 main）", () => {
+describe("assertReleaseBranchNotDiverged（缺省 main）", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("干净（本地领先远端）→ 放行并打通过日志", async () => {
     const f = await makeFixture();
     await commitFile(f.local, "c.txt", "C", "commit C"); // 本地领先 1 个提交
@@ -117,7 +134,7 @@ async function advanceRemoteBranch(f, branch, name) {
   await git(["push", "origin", branch], other);
 }
 
-describe("assertReleaseBranchNotDiverged（branch 覆盖，#816）", () => {
+describe("assertReleaseBranchNotDiverged（branch 覆盖，#816）", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
   it("指定分支分叉 → throw，且指引里的 rebase 目标就是该分支（不是 main）", async () => {
     const f = await makeBranchFixture("release/transition-6.2.0");
     await advanceRemoteBranch(f, "release/transition-6.2.0", "openwiki.md");
