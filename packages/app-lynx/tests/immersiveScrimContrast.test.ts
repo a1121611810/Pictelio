@@ -17,8 +17,24 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { tmpdir } from 'node:os'
 // #1003：底色块抽取改用结构化标签扫描（与 routeTransitionGate 共用一份实现）。
 import { extractOpeningTags } from './helpers/vueTagScan'
+// #1006：遍历扫描面与列表交错契约门禁共用一份实现（防止两份扫描面各自漂移）。
+import { walkProductionVue } from './helpers/walkProductionVue'
+
+/** 沉浸卡源码树根（#1004 全仓发现的扫描根）。 */
+const SRC_ROOT = path.resolve(__dirname, '../src')
+
+/**
+ * 真实沉浸卡的源码，原样读自实际消费点，用作 #1004 合成夹具的素材。
+ *
+ * ⚠️ 必须用**真实样例**，不能手写「自洽」的 class/style 串（测试硬约束 #2）。
+ *    手写串会自洽地满足判据，却不代表仓里真有人这么写 —— 那样的夹具证明不了
+ *    发现逻辑认的是真实形态。真实写法是 `style="background: var(--md-scrim-overlay)"`
+ *    （渐变定义在令牌里，页面侧不套 linear-gradient），与手写猜测的形状并不相同。
+ */
+const REAL_CARD_SRC = fs.readFileSync(path.join(SRC_ROOT, 'pages/Recommended.vue'), 'utf-8')
 
 /** WCAG 2.1 AA 通用门槛（取严的正文 4.5，而非大字 3.0）。 */
 const AA = 4.5
@@ -318,6 +334,52 @@ function missingPlateMessage(name: string, src: string, plates: readonly string[
     : `${name} 找不到稳定底色块（rounded-lg + bg-inverse-surface）`
 }
 
+// ── #1004：沉浸卡自发现 ──────────────────────────────────────────────────
+
+/** 沉浸卡的发现判据：源码（**已剥注释**）里用了 scrim 渐变令牌。 */
+function isImmersiveCardSource(src: string): boolean {
+  return stripVueComments(src).includes('var(--md-scrim-overlay)')
+}
+
+/**
+ * 全仓扫描结果 vs 登记清单的**双向**相等诊断（#1004）。
+ *
+ * 相等返回 undefined；不等返回一条点名具体文件的消息。用 toBeUndefined() 断言，
+ * 失败时 vitest 直接打印消息，无需再拼。
+ *
+ * 提成具名函数而非内联表达式，原因同 missingPlateMessage：判据的**诊断区分本身
+ * 必须可测**，否则验收组只能重算一遍同样的表达式来「验证」它——断言对象与被测
+ * 实现零耦合，把真断言整段删掉用例仍绿。
+ *
+ * ⚠️ 退化分支必须排在集合比较**之前**：扫到 0 个时，若先做集合差，
+ *    得到的诊断是「登记项都不存在了」，会把人引向「清单过期」这个错误根因——
+ *    而真因是扫描面塌了。两者在输出上同形，必须先分流。
+ */
+function consumerSetDiagnosis(
+  discovered: readonly string[],
+  registered: readonly string[],
+): string | undefined {
+  if (discovered.length === 0) {
+    return (
+      `沉浸卡候选扫描到 0 个 ⇒ 扫描面退化（遍历路径写错，或遍历策略被收窄）。` +
+      `「什么都没扫到」与「仓里真的没有」在输出上完全同形，本断言不得在此状态下通过。`
+    )
+  }
+  const found = new Set(discovered)
+  const known = new Set(registered)
+  const unregistered = discovered.filter((f) => !known.has(f)).sort()
+  const missing = registered.filter((r) => !found.has(r)).sort()
+  if (unregistered.length === 0 && missing.length === 0) return undefined
+  const parts: string[] = []
+  if (unregistered.length > 0) {
+    parts.push(`未入判（用了 scrim 渐变但不在登记里）：${unregistered.join('、')}`)
+  }
+  if (missing.length > 0) {
+    parts.push(`登记里已失效（文件不存在，或不再使用 scrim 渐变）：${missing.join('、')}`)
+  }
+  return `沉浸卡候选集合与登记清单不相等 ⇒ ${parts.join('；')}`
+}
+
 describe('#891 沉浸卡 scrim 文字对比度判据', () => {
   it('tokens.css 里 7 亮 + 7 暗 = 14 套色板全部自带 inverse 配对（门禁自身的前置条件）', () => {
     expect(PALETTES).toHaveLength(14)
@@ -545,6 +607,45 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
     }
   })
 
+  // ── #1004：全仓候选集合与登记清单双向相等 ──────────────────────────────
+  //
+  // 此前本文件只对三个硬编码文件名断言，**不扫描发现、也无集合相等夹逼**：
+  // 新增第 4 个沉浸卡时这条断言恒绿地不覆盖它，也不报任何提示。本组把
+  // 「新增即入判」交给机器。
+  //
+  // 遍历面与列表交错契约门禁共用一份实现（#1006）：扫描面是隐含的范围承诺，
+  // 两道门禁各写各的就会漂。
+  describe('沉浸卡自发现：全仓候选与登记清单双向相等（防「新卡静默漏判」）', () => {
+    /** src 相对、正斜杠分隔 —— 与遍历 helper 的产出对齐，避免各处写法漂移。 */
+    function srcKey(abs: string): string {
+      return path.relative(SRC_ROOT, abs).split(path.sep).join('/')
+    }
+
+    const DISCOVERED = [...walkProductionVue(SRC_ROOT, '[immersiveScrimGate]')]
+      .filter((abs) => isImmersiveCardSource(fs.readFileSync(abs, 'utf-8')))
+      .map((abs) => srcKey(abs))
+      .sort()
+
+    const REGISTERED = CONSUMERS.map((c) =>
+      srcKey(path.resolve(__dirname, c.rel)),
+    ).sort()
+
+    it('扫描结果与登记清单相等（漏网与过期双向暴露）', () => {
+      expect(consumerSetDiagnosis(DISCOVERED, REGISTERED)).toBeUndefined()
+    })
+
+    it('登记清单非空（防「清单被清空 ⇒ 全称断言恒真」）', () => {
+      expect(REGISTERED.length, '登记被清空时集合相等会空对空通过，必须单独拦').toBeGreaterThan(0)
+    })
+
+    // ⚠️ 有意窄覆盖（不得默默不覆盖）：本判据认的是「用了 scrim 渐变」。
+    //    一张压在作品图上、却**没有**渐变的卡（纯硬边色块）不会被自动发现 ——
+    //    而按本门禁的既定定义，没有渐变就不算「与作品图融合」的沉浸卡，
+    //    它本就该被现有断言（渐变不可删）在**已登记**的消费点上拦住。
+    //    之所以不补兜底发现判据：要在类串层面表达「压在作品图上」需要读布局属性，
+    //    机器数不出来，只会引入误抓。此处写明，使它成为已登记的决定而非疏漏。
+  })
+
   // ── #1003 验收：抽取面真实失效面 = 三格，全部按变异验证 ──────────────────
   //
   // 纪律：**不接受「读代码觉得没问题」**。每一格都把违规写法**喂进同一个抽取器**，
@@ -734,6 +835,113 @@ describe('#891 沉浸卡 scrim 文字对比度判据', () => {
       const plates = extractPlates(src)
       expect(plates, 'script 内的 <template> 字面量不得把 script 尾部并进扫描面').toHaveLength(1)
       expect(plates[0], '只应抽到 template 块里那块').toBe(PLATE_OK)
+    })
+  })
+
+  // ── #1004：沉浸卡自发现（原「只认三个硬编码文件名」） ────────────────────
+  //
+  // 本组验的是**发现判据**与**双向集合夹逼**两件事的纯函数形态（缝二）。
+  // 遍历层（哪些文件会被喂进来）在 walkProductionVue 自身的测试里下针（缝一）。
+  //
+  // ⚠️ 发现判据为什么认「用了 scrim 渐变令牌」而不是底色块形状
+  //    （bg-inverse-surface + rounded-lg）：形状档位会变，全仓在用 5 种
+  //    rounded-*，而 scrim 令牌的既定用途就是「与作品图融合」——它与
+  //    「什么算一张沉浸卡」同源，与门禁自身「渐变不能被删」的断言也不会打架。
+  describe('沉浸卡自发现：发现判据认的是 scrim 渐变，不是底色块形状', () => {
+    it('真实沉浸卡源码 ⇒ 是候选（oracle：样例本身确实带该令牌）', () => {
+      expect(REAL_CARD_SRC, '真实样例必须自带该令牌，否则夹具证明不了任何事').toContain(
+        'var(--md-scrim-overlay)',
+      )
+      expect(isImmersiveCardSource(REAL_CARD_SRC)).toBe(true)
+    })
+
+    it('只有底色块形状、无 scrim 渐变 ⇒ 不是候选（形状档位会变，不能当发现判据）', () => {
+      expect(isImmersiveCardSource('<view class="bg-inverse-surface rounded-lg">标题</view>')).toBe(false)
+    })
+
+    it('注释里提到 scrim 令牌 ⇒ 不是候选（判据必须落在代码本文上）', () => {
+      expect(
+        isImmersiveCardSource('<!-- 这里记得写 var(--md-scrim-overlay) -->\n<view />'),
+      ).toBe(false)
+    })
+  })
+
+  describe('沉浸卡自发现：清单与扫描结果双向相等（漏网 / 过期都暴露）', () => {
+    const REGISTERED = ['pages/Recommended.vue', 'pages/NovelIntro.vue']
+    const REAL = '<view style="background:linear-gradient(var(--md-scrim-overlay))" />'
+
+    it('两侧相等 ⇒ 无诊断', () => {
+      expect(consumerSetDiagnosis(REGISTERED, REGISTERED)).toBeUndefined()
+    })
+
+    it('漏网侧：扫描出的文件不在清单里 ⇒ 点名该文件', () => {
+      const msg = consumerSetDiagnosis([...REGISTERED, 'pages/NewCard.vue'], REGISTERED)
+      expect(msg, '漏网必须判红').toBeDefined()
+      expect(msg).toContain('pages/NewCard.vue')
+      expect(msg).toContain('未入判')
+    })
+
+    it('过期侧：清单里的文件扫描不到 ⇒ 点名该清单项', () => {
+      const msg = consumerSetDiagnosis(['pages/Recommended.vue'], REGISTERED)
+      expect(msg, '清单过期必须判红').toBeDefined()
+      expect(msg).toContain('pages/NovelIntro.vue')
+      expect(msg).toContain('清单')
+    })
+
+    it('扫描到 0 个候选 ⇒ 报「扫描面退化」而不是谎报「清单过期」', () => {
+      const msg = consumerSetDiagnosis([], REGISTERED)
+      expect(msg).toBeDefined()
+      expect(msg).toContain('退化')
+      expect(msg).not.toContain('清单')
+    })
+
+    it('两侧同时为空 ⇒ 仍判红（「什么都没扫到」与「仓里真的没有」同形）', () => {
+      const msg = consumerSetDiagnosis([], [])
+      expect(msg, '空对空是最典型的恒真陷阱，必须拦').toBeDefined()
+      expect(msg).toContain('退化')
+    })
+  })
+
+  // ── 缝一：遍历层（合成树）。纯函数缝证得了逻辑，证不了「真实遍历有没有把
+  //    对的文件喂进来」——而后者正是 #1004 的失效面本身。合成树用真实卡源码。
+  describe('沉浸卡自发现：遍历层（合成树，#1004）', () => {
+    /** 在临时目录造一棵源码树，返回「遍历 + 发现」给出的候选键。 */
+    function candidatesOf(files: Record<string, string>): string[] {
+      const root = fs.mkdtempSync(path.join(tmpdir(), 'immersive-discovery-'))
+      for (const [rel, content] of Object.entries(files)) {
+        const abs = path.join(root, rel)
+        fs.mkdirSync(path.dirname(abs), { recursive: true })
+        fs.writeFileSync(abs, content, 'utf-8')
+      }
+      return [...walkProductionVue(root, '[immersiveScrimGate]')]
+        .filter((abs) => isImmersiveCardSource(fs.readFileSync(abs, 'utf-8')))
+        .map((abs) => path.relative(root, abs).split(path.sep).join('/'))
+        .sort()
+    }
+
+    it('新卡被发现；.ts 夹具与 errorPrototype 原型页不入候选', () => {
+      expect(
+        candidatesOf({
+          'pages/NewCard.vue': REAL_CARD_SRC,
+          // src 下真实存在这类夹具（*.template.test.ts），它们也含该令牌。
+          // 遍历不过滤扩展名 ⇒ 凭空多出候选，集合相等当场判红。实测曾真会如此。
+          'pages/NewCard.template.test.ts': REAL_CARD_SRC,
+          'errorPrototype/ErrorPagePreview.vue': REAL_CARD_SRC,
+          'components/Plain.vue': '<template><view /></template>',
+        }),
+      ).toEqual(['pages/NewCard.vue'])
+    })
+
+    it('合成树里出现的新卡 ⇒ 端到端判红并点名（判别力自检）', () => {
+      const registered = CONSUMERS.map((c) =>
+        path.relative(SRC_ROOT, path.resolve(__dirname, c.rel)).split(path.sep).join('/'),
+      ).sort()
+      const msg = consumerSetDiagnosis(
+        candidatesOf({ 'pages/NewCard.vue': REAL_CARD_SRC }),
+        registered,
+      )
+      expect(msg, '新卡不入判 ⇒ 门禁必须判红，否则本组与整个 #1004 都是恒真的').toBeDefined()
+      expect(msg).toContain('pages/NewCard.vue')
     })
   })
 })
