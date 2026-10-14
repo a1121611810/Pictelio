@@ -127,6 +127,10 @@ const NAV_LITERAL = /(?:navigate|replace)\(\s*(['"`])(\/[a-z0-9\-\/:]*)\1/g
 function stripComments(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    // ⚠️ Vue 模板的 `<!-- -->` 也必须剥：`.vue` 里它是一等注释语法（Shelf.vue 有 8 处），
+    //   不剥会让「声明写在 HTML 注释里」被当成活代码报红 —— 假红会诱发「改门禁让它过」，
+    //   那正是门禁冻结线 #1 要防的下场（review #1013 轮 B3 实测）。同样不吞换行。
+    .replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/(^|\s)\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "))
 }
 
@@ -195,6 +199,19 @@ describe("路由字面量漂移门禁（S-1 机器防线）", () => {
     expect(off, "注释里的路径被当成了活代码").toEqual(["/discover"])
   })
 
+  it("HTML 注释分支自检：<!-- --> 必须被剥、且不吞换行（#1013 轮 S1）", () => {
+    // ⚠️ 本分支此前**零自检**：把它换成空操作，全部用例照样全绿（review 实测）——
+    //    违反本文件头「正则若因改写而失配，本门禁会自己报红」的自述原则。
+    const raw = "<!--\nnavigate(\"/old\")\n-->\nconst a = 1"
+    const closed = stripComments(raw)
+    expect(closed, "闭合的 <!-- --> 未被剥除").not.toContain("navigate")
+    expect(closed, "剥 HTML 注释把注释后的活代码误删了").toContain("const a = 1")
+    expect(closed.split("\n").length).toBe(raw.split("\n").length)
+    // 反例：未闭合的 <!-- 不得把后续**全部**内容吃掉（否则整文件被判空）
+    const unclosed = stripComments("<!-- 没闭合\nconst b = 2")
+    expect(unclosed, "未闭合 <!-- 把后续代码也吃掉了 ⇒ 会把活代码误判成注释").toContain("const b")
+  })
+
   it("剥注释不得误伤 URL 里的 //，也不得改变行号（否则报错行号会指错地方）", () => {
     expect(stripComments('const u = "https://x.dev/a"'), "URL 的 // 被误剥").toContain("https://x.dev/a")
     const three = 'a\n// c\nb'
@@ -223,5 +240,71 @@ describe("路由字面量漂移门禁（S-1 机器防线）", () => {
     expect(ROUTE_PATHS.has(DISCOVER_PATH)).toBe(true)
     expect(loginVue).toMatch(/navigate\(\s*DISCOVER_PATH\s*,\s*\{\s*replace:\s*true\s*\}\s*\)/)
     expect(loginVue).not.toMatch(/navigate\(\s*'\/recommended'/)
+  })
+})
+
+// ─── 否定式声明守卫（#1013 逐条变异实测补录） ───────────────────────────────
+// ⚠️ 本条**不是**通用「注释↔代码一致性」门禁（#1013 实测：该类真真空率仅 3/17，
+//    朴素机检假阳率 71%，成本收益不支持常设门禁）。它只机器化**一条**自足声明。
+//
+// 【声明原文 · 逐字引用】src/pages/Shelf.vue:35-36
+//   「⚠️ **下载队列刻意不在本页**：`/downloads` 是任务队列控制面（start/pause/stop/toggle），
+//     不是内容列表 —— 留在「我的」。把控制面混进内容面会让两者的操作预期冲突。」
+//
+// 【主语收窄到具体文件】标题不写成「内容聚合面」这种一般规则：别的内容页**合法**带
+//   /downloads 跳转（IllustDetail.vue:677 `navigate('/downloads')`，其 :671 注释
+//   明写「入队后附「查看下载」跳转」）。按一般规则套到它身上必假红 ⇒ 诱发改门禁。
+describe("Shelf.vue 不得承载 /downloads 控制面（声明 Shelf.vue:35，#1013）", () => {
+  it("Shelf.vue 剥注释后不得出现 /downloads", () => {
+    // ⚠️ **必须剥注释**：该声明本身就写着 /downloads，不剥必然自证红。
+    const abs = join(SRC, "pages/Shelf.vue")
+    const text = stripComments(readFileSync(abs, "utf8"))
+    // ⚠️ 否定前瞻不可省：`/downloads-history` 这类**前缀不同的**路由不是控制面本体
+    //    （review #1013 轮 S4 实测：裸子串会把它们误判红）。
+    //    ⚠️ 字符类必须含**大小写与下划线**：只写 `[a-z0-9-]` 时 `/downloadsQueue`
+    //    （驼峰）仍被判红（review 第 2 轮 S-4 实测）。本仓现网路由全是 kebab 小写，
+    //    但门禁不能靠「现在恰好没有驼峰」成立。
+    const hits = [...text.matchAll(/\/downloads(?![A-Za-z0-9_-])/g)].map((m) =>
+      text.slice(0, m.index).split("\n").length,
+    )
+    expect(
+      hits,
+      `Shelf.vue 把下载队列控制面（/downloads）混进了内容面 —— 行 ${hits.join(", ")}；` +
+        "声明见 src/pages/Shelf.vue:35。控制面留在「我的」页",
+    ).toEqual([])
+  })
+
+  it("阳性对照：判据必须能抓到（否则上一条恒真）", () => {
+    // 反向证明：同一判据作用在真含 /downloads 的页面上必须报出命中
+    const text = stripComments(readFileSync(join(SRC, "pages/Me.vue"), "utf8"))
+    expect(
+      [...text.matchAll(/\/downloads(?![A-Za-z0-9_-])/g)].length,
+      "Me.vue（控制面所在页）应当含 /downloads —— 若为 0 说明抽取器失配，上一条即恒真",
+    ).toBeGreaterThan(0)
+  })
+
+  // 【已知失效面 · 显式登记（冻结线 #5：只记抓到什么、不记抓不到什么等于没登记）】
+  //   本判据只认**字面量子串**，以下形态**全部静默放行**（review 实测）：
+  //     ① `navigate(DOWNLOADS_PATH)` —— 走路由常量。`src/router.ts:35` 的
+  //        `export const DISCOVER_PATH = '/discover'` 说明「路径抽常量」是本仓已发生的
+  //        重构方向，一次常规重构就能把本门禁静默废掉。
+  //     ② `navigate("/down" + "loads")` —— 字符串拼接。
+  //     ③ `navigate({ name: "downloads" })` —— 按名导航。
+  //   ⇒ 要覆盖这三类，须把判据从「字面量」升级为「解析后的导航目标」，属另一道门禁的活；
+  //     本条**刻意不**越界。发现这三类绕过时，按 #1013 的三步流程补断言，不改本条。
+  it("已知失效面登记条存在（防后人误以为本门禁覆盖全部形态）", () => {
+    // 三条绕过形态逐条钉住现状 ⇒ 将来任一条被实现覆盖时，本条转红提醒同步删注释。
+    // ⚠️ 用**引号无关**的正则钉（review 第 3 轮 S4）：app-lynx 被 fmt 双排除、生产面
+    //    纯人工单引号；若只钉双引号字面量，按 house style 写的 '/down'+'loads' 不触发本钉，
+    //    登记承诺落空。
+    const src = stripComments(readFileSync(join(SRC, "pages/Shelf.vue"), "utf8"))
+    const shapes: [string, RegExp][] = [
+      ["字符串拼接", /\/down['"]?\s*\+\s*['"]?loads/],
+      ["按名导航", /name\s*:\s*['"]downloads['"]/],
+      ["路由常量", /DOWNLOADS_PATH/],
+    ]
+    for (const [label, re] of shapes) {
+      expect(re.test(src), `Shelf.vue 出现了绕过形态（${label}）—— 失效面已变化，请同步更新上方登记`).toBe(false)
+    }
   })
 })

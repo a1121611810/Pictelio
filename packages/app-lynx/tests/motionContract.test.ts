@@ -325,6 +325,99 @@ function findDeadTransformClass(): string[] {
   return out
 }
 
+describe('M7 · 弹层时序唯一入口：字面量不得旁路 motion.ts（#1013 / #7）', () => {
+  /** 时长 / 曲线字面量命中：真门禁与阳性对照**共用这一个判据**（避免「验的是副本」）。 */
+  /** 裸曲线关键字（`ease-in-out` 这类不带 `(` 的）：MD3 约定曲线必须走 `--motion-*`，
+   *  裸关键字同样是曲线字面量（review 第 3 轮 S2 实测：`200ms ease-in-out` 旧判据只命中 200ms）。
+   *  ⚠️ 基线已实测 useSheetDismiss.ts 活代码零命中；`linear-gradient` 这类带后缀的 token
+   *    不会误配（整词匹配）。 */
+  const BARE_CURVE = /^(?:ease|ease-in|ease-out|ease-in-out|linear)$/
+  const durationOrCurveHits = (line: string): string[] => {
+    // ⚠️ 分词器**必须保留 `(`**（review 第 2 轮 B1）：用 `/[^\w.-]+/` 会把 `(` 当分隔符，
+    //    token 永远不含 `(` ⇒ `CURVE_LITERAL`（要求结尾紧跟 `(`）**结构性永不可达** ——
+    //    那是一条假绿：标题与文案都承诺覆盖曲线，实际写 cubic-bezier 全绿通过。
+    return line
+      .split(/[^\w.()-]+/)
+      .filter((t) => DURATION_LITERAL.test(t) || CURVE_LITERAL.test(t) || BARE_CURVE.test(t))
+  }
+
+  // 声明出处：src/composables/useSheetDismiss.ts:5
+  //   「组件内**禁止**出现时长 / 曲线 / 计时器字面量（唯一入口是 `composables/motion.ts`）。」
+  //
+  // 【已知失效面 · 显式登记（冻结线 #5；review 第 2 轮 S-8 要求按事实写，已实测核对）】
+  //   声明的主语是「组件内」（:2-3 指 7 个弹层组件），本条只覆盖 useSheetDismiss.ts 一个文件。
+  //   ⚠️ 「扩到全部 12 个消费文件」为什么不做的真实理由（全部点位已逐一 grep 核实，非转述）：
+  //   · 计时器字面量半边 —— 扩了会误判 **5 处已核实合法**的调用：SearchSheet.vue:364 focus 延时
+  //     `50`、heroTransition.ts:498 rAF 兜底 tick `0`、UgoiraViewer.vue:55/60 帧节流 `50`、
+  //     ugoira.ts:266 轮询 `30`。它们不是弹层动效时长，不该判红。
+  //   · 时长/曲线字面量半边 —— 扩了**今天**不会误判（全 src 活代码零时长字面量，已剥注释实测），
+  //     但那是巧合不是判据正确；将来任一处写入 `1.5s` 这类字面量就会立刻需要同样的豁免清单。
+  //   ⇒ 「扩到全消费者」需要先把「弹层动效时长」与「合法节流/骨架动画」区分开，属另一道门禁的活；
+  //     本条**刻意不扩**。
+  it('useSheetDismiss.ts 内不得出现时长 / 曲线字面量（#7）', () => {
+    const abs = join(SRC_ROOT, 'composables', 'useSheetDismiss.ts')
+    // 复用本文件既有的 stripComments（:87）：它是**塌缩**语义，与本条无行号需求相符。
+  //    ⚠️ 不另写一份 —— 全仓已有 20 份私有副本且语义各异（vueTagScan.ts:9-18 已登记为独立票），
+    //    本轮刻意不收拢；但**本块不得再加一份**（review 第 2 轮 S9-2）。
+    const lines = stripComments(readFileSync(abs, 'utf-8')).split('\n')
+    // ⚠️ 扫描面非空下界（review-fix-loop.md:111「扫描面非空 + 命中数下界」）：
+    //    本判据的期望结果是**空集**，若文件读空/剥空就会**恒真空转**。
+    expect(lines.length, `扫描到 ${lines.length} 行 —— 判据可能恒真空转`).toBeGreaterThan(50)
+    const offenders: string[] = []
+    lines.forEach((line, i) => {
+      for (const token of durationOrCurveHits(line)) {
+        // ⚠️ 不报「第 N 行」精确行号：本块用塌缩剥注释（:87 起，吞块注释换行），
+        //    useSheetDismiss.ts 有 5 处多行块注释共 28 行，行号最多漂 28（review 第 3 轮 S1）。
+        //    报 token + 所在**剥后行**的内容，人 grep 即得真身。
+        offenders.push(`时长/曲线字面量 ${token}（剥后第 ${i + 1} 行：${line.trim().slice(0, 60)}）`)
+      }
+    })
+    expect(
+      offenders,
+      'useSheetDismiss.ts 出现时长/曲线字面量（唯一入口应是 composables/motion.ts）：\n' +
+        offenders.join('\n') +
+        ' —— 声明见 src/composables/useSheetDismiss.ts:5',
+    ).toEqual([])
+  })
+
+  // 【已知失效面 · 显式登记（冻结线 #5）】
+  it('已知失效面：计时器实参**不由本条覆盖**（#1013 轮 S-1）', () => {
+    // 声明里的「计时器字面量」原本也由本条覆盖，现已**删除**，理由是它与既有行为测试
+    // **完全重复且更弱**（review 第 2 轮 S-1 实测）：把 `}, holdMs)` 改成 `}, 300)`，
+    // `src/composables/useSheetDismiss.test.ts` 报 **4 条红**（fake timers 行为级断言，
+    // oracle `EXIT_HOLD_MS = exit({...}).holdMs` 取自预设而非抄数字），本条只报 1 条
+    // 源码扫描红 ⇒ 冻结线 #1「给回归创造就业」，删。
+    // ⚠️ 残留：源码扫描面对「别名化计时器」（`const schedule = setTimeout; schedule(cb, holdMs)`）
+    //    会静默失效；行为测试不受影响（它看的是真的调用结果）。
+    expect(
+      readFileSync(join(SRC_ROOT, 'composables', 'useSheetDismiss.test.ts'), 'utf-8'),
+      '计时器时长由 src/composables/useSheetDismiss.test.ts 的行为级断言负责（冻结线 #1）；它若被删除，计时器这一半将无任何防线 —— 那时本条须重新承担。',
+    ).toContain('EXIT_HOLD_MS')
+  })
+
+  it('阳性对照：上面的判据必须能抓到（否则上一条恒绿）', () => {
+    // ⚠️ 必须打**共用判据** `durationOrCurveHits`，不能另写一套 —— 否则阳性对照
+    //    验的是副本，证明不了真门禁那条路径（第 2 轮 B1 的教训：曲线那半边正是
+    //    在「自己一套匹配」里静默失效的）。
+    expect(durationOrCurveHits(`const a = '250ms'`), '时长字面量判据对合成行失配 —— 上一条是恒绿').toEqual([
+      '250ms',
+    ])
+    expect(
+      durationOrCurveHits("const e = 'opacity cubic-bezier(0.4, 0, 0.2, 1)'"),
+      '曲线字面量判据失配 —— 分词器又把 `(` 吃掉了（review 第 2 轮 B1 的死代码）',
+    ).toEqual(['cubic-bezier(0.4'])
+    expect(
+      durationOrCurveHits('animation: sheet-in 200ms ease-in-out'),
+      '裸曲线关键字判据失配 —— 曲线半边只认函数形态（review 第 3 轮 S2）',
+    ).toEqual(['200ms', 'ease-in-out'])
+    // 合法形态不得误报
+    expect(
+      durationOrCurveHits("const d = exit({ animationName: 'x' }).holdMs"),
+      '误报标识符',
+    ).toEqual([])
+  })
+})
+
 describe('M3 · 无死 transform 工具类（构建全绿、渲染为空那一格）', () => {
   it('扫描面非空（文件数下界 + 递归锚点，防 walk 塌陷）', () => {
     expect(VUE_FILES.length, `扫到的生产 .vue：${VUE_FILES.length}`).toBeGreaterThanOrEqual(60)

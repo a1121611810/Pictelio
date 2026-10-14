@@ -41,7 +41,7 @@
  * 复现命令：`cd packages/app-lynx && pnpm vitest run tests/scriptExitCodes.test.ts`
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -355,3 +355,133 @@ describe('find-palette-swatches.py --selected · 「没找到」与「判据失�
     expect(r.stderr, '拒因必须是「本页没有色板行」').toContain('本页没有色板行')
   }, TIMEOUT)
 })
+
+// ─── 否定式声明守卫（#1013 逐条变异实测补录） ───────────────────────────────
+// 声明出处（逐字）：
+//   scripts/find-palette-swatches.py:110 与 scripts/find-ui-band.py:95 各有一行
+//   「⚠️ **刻意不含 `ValueError`**」—— 在本仓库这两个脚本里 `ValueError` 是
+//   NOTFOUND 的哨兵，并进兜底捕获集合会把 rc 1 吞成 rc 3（设备/线缆故障被报成
+//   「页面布局变了」）。
+//
+// ⚠️ **主语是 `DECODE_ERRORS` 那个元组，不是整个脚本文件**（#1013 实测教训）：
+//    朴素探针按「文件里有没有 ValueError」判会误判 71% —— 两个脚本里
+//    `raise ValueError(...)` 出现在 `decode()` 内部是**正常**的（随后被归一成
+//    `UnreadableInput`）。声明约束的是**兜底捕获集合**，不是出现次数。
+// ⚠️ **成对检验**：#1013 实测把 `DECODE_ERRORS` 加 ValueError —— 改
+//    find-palette-swatches.py 被本文件抓住，改 find-ui-band.py 则 4214 条全绿。
+//    同族声明只测一个必然漏一个。
+describe('DECODE_ERRORS 刻意不含 ValueError（#1013）', () => {
+  /** 抽取 `DECODE_ERRORS = (...)` 的成员。失配返回 null（**不**静默当成空集合）。 */
+  const decodeErrorsOf = (src: string): string[] | null => {
+    const m = src.match(/^DECODE_ERRORS[^=\n]*=\s*\(([^)]*)\)/m)
+    if (!m) return null
+    return m[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)
+  }
+
+  /** 成员名比较**取最后一段**：`fib.UnreadableInput` 是本文件既有写法，限定名同样要能识别。 */
+  const isValueError = (member: string) => member.split('.').pop() === 'ValueError'
+
+  it('两个脚本的 DECODE_ERRORS 元组都不得含 ValueError', () => {
+    const offenders: string[] = []
+    for (const [name, s] of Object.entries(SCRIPTS)) {
+      const src = readFileSync(resolve(rootDir, s.rel), 'utf-8')
+      // `SCRIPTS` 是退出码 describe 的共用登记表，scripts/ 下 9 个 .py 只 2 个带这条声明。
+      // 不带 DECODE_ERRORS 的脚本**不属于本 describe 的覆盖面**（与 it3 的单向包含一致）——
+      // 否则「为退出码测试正常登记一个新探针」会被误判成「判据失配」（review 轮 B2/S1 实测）。
+      if (!src.includes('DECODE_ERRORS')) continue
+      const members = decodeErrorsOf(src)
+      // S2：元组被剥空（`()）时 [].some(...) 恒 false ⇒ 门禁静默通过。必须有下界。
+      if (members !== null && members.length < 3) {
+        offenders.push(`${name}: DECODE_ERRORS 只剩 ${members.length} 个成员（应 ≥ 3）—— 判据恒真空转`)
+        continue
+      }
+      if (members === null) {
+        // 判据自身失配 ⇒ 报出来，绝不静默当成通过（ArchUnit failOnEmptyShould 教训）
+        offenders.push(`${name}: 未匹配到 DECODE_ERRORS 元组 —— 判据已失配或脚本被改名`)
+        continue
+      }
+      if (members.some(isValueError)) {
+        // S5：两个脚本里 ValueError 的含义**不同**，共用一条文案会把下一个人引向错根因：
+        //   find-palette-swatches.py：ValueError 是 selected_index 的 NOTFOUND 哨兵（rc 1）
+        //   find-ui-band.py：它的 NOTFOUND 是「band is None」，ValueError 只是未捕获异常（rc 1）
+        const story =
+          name === 'find-palette-swatches'
+            ? 'ValueError 是本脚本 NOTFOUND 的哨兵 ⇒ 并进来会把 rc 1 吞成 rc 3'
+            : '本脚本的 NOTFOUND 是「band is None」；ValueError 只是未捕获异常，并进来会把设备/线缆故障改判成 rc 3'
+        offenders.push(`${name}: DECODE_ERRORS 含 ValueError ⇒ ${story}`)
+      }
+    }
+    expect(offenders, `DECODE_ERRORS 含 ValueError：\n${offenders.join('\n')}`).toEqual([])
+  })
+
+  // 【已知失效面 · 显式登记（冻结线 #5；review 第 2 轮 S-6 实测两条绕过形态）】
+  //   ① `DECODE_ERRORS = BASE + (ValueError,)` —— 拼接式元组：抽取器把 `BASE + (ValueError`
+  //      当成**一个成员**，`split('.').pop()` 不等于 `ValueError` ⇒ 静默绿。
+  //   ② 定义不变、使用点扩写 `except (*DECODE_ERRORS, ValueError):` ⇒ 抽取器只看定义处，绿。
+  //   ⇒ 要覆盖须解析 AST 级别的元组构造与 except 展开，超出本条的文本扫描口径；
+  //     发现这两类绕过时按 #1013 的三步流程补断言，不改本条。
+
+  it('阳性对照：同一判据对含 ValueError 的元组必须报出命中（否则上一条恒真）', () => {
+    // 用**合成**元组喂同一抽取器 —— 证明判据能产出非空结果集，而不只是「没匹配到就红」。
+    const members = decodeErrorsOf('DECODE_ERRORS = (UnreadableInput, ValueError)\n')
+    expect(members, '抽取器对合成元组失配 —— 阳性对照本身失效').not.toBeNull()
+    expect(
+      members!.filter(isValueError),
+      '判据认不出元组里的 ValueError —— 上一条是恒绿',
+    ).toEqual(['ValueError'])
+    // 限定名形态同样要能识别（姊妹脚本本就写 `fib.UnreadableInput`）
+    const qualified = decodeErrorsOf('DECODE_ERRORS = (builtins.ValueError,)\n')
+    expect(
+      qualified!.filter(isValueError),
+      '判据认不出限定名 `builtins.ValueError` —— 上一条会被限定名绕过',
+    ).toEqual(['builtins.ValueError'])
+  })
+
+  it('判覆盖面：每个含 DECODE_ERRORS 的脚本都必须登记进 SCRIPTS（#1013 轮 S9/B2）', () => {
+    // ⚠️ 这是本条门禁**唯一**的静默失效路径（#1004 CONSUMERS 漏网的同型）：
+    //    将来新增探针脚本、它也有 DECODE_ERRORS，却没登记进 `SCRIPTS` ⇒
+    //    本 describe 全部 it 对它**一无所知**，仍全绿。
+    // ⚠️ 判**单向包含**（含 DECODE_ERRORS ⊆ SCRIPTS），不是两集合相等（review 轮 B2/S1）：
+    //    `SCRIPTS` 是退出码 describe 共用的登记表，scripts/ 下 9 个 .py 只 2 个入册。
+    //    要求「相等」会让「为退出码测试新增一个不带 DECODE_ERRORS 的探针并正常登记」
+    //    这类**完全正当**的增长必假红 ⇒ 假红诱发改门禁（冻结线 #1）。
+    const scriptsDir = resolve(rootDir, 'scripts')
+    const withTuple = readdirSync(scriptsDir)
+      .filter((f) => f.endsWith('.py'))
+      .filter((f) => readFileSync(join(scriptsDir, f), 'utf-8').includes('DECODE_ERRORS'))
+      .map((f) => f.replace(/\.py$/, ''))
+      .sort()
+    const registered = Object.keys(SCRIPTS)
+    const unregistered = withTuple.filter((f) => !registered.includes(f))
+    expect(
+      unregistered,
+      `含 DECODE_ERRORS 却未登记进 SCRIPTS 的脚本：${unregistered.join(', ')} —— ` +
+        '本 describe 对它们零覆盖。请登记进 SCRIPTS，或删掉它们的 DECODE_ERRORS。',
+    ).toEqual([])
+  })
+
+  it('声明出处仍在（#1013 要防的正是注释被删/被改而门禁不响）', () => {
+    // ⚠️ 「成对覆盖」由**上一条的单向包含**承担，不再在这里钉条数（review 轮 B2）：
+    //    原先的 `toHaveLength(2)` 与上一条的补救指引**互斥** —— 照上一条的指引
+    //    （新增第三个脚本并登记）会让这一条转红，且红的原因文案说「少了一个脚本」，
+    //    与实际「多了一个」相反。指错根因的门禁比没有更糟。
+    for (const [name, s] of Object.entries(SCRIPTS)) {
+      const src = readFileSync(resolve(rootDir, s.rel), 'utf-8')
+      if (!src.includes('DECODE_ERRORS')) continue
+      expect(src, `${name}: 声明出处那行 ⚠️「刻意不含 ValueError」不见了`).toContain(
+        '刻意不含 `ValueError`',
+      )
+    }
+  })
+})
+
+// ⚠️ **规模线过线登记**（review-fix-loop.md:124 · 冻结线 #1）：
+//   本文件 487 行 ÷ 被测对象（两个脚本 1053 行）= **46.2%**，**已越 30%**。
+//   越线前 357 行 = 33.9%，本轮把它推得更深。处置按标准是「先问」，账如下：
+//   · 本轮 +130 行**全部有实测判别力**（变异注入 5 组全部判红，见 #1013 票面），
+//     不是「给回归创造就业」；
+//   · 但**停止加码**：本文件已达上限。下同族声明（#1013 的其余真真空）**不得**再往这里塞，
+//     必须另立文件或先拆本文件。下一位加码者请先读这一行。
