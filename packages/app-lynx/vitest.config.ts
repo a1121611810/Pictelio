@@ -41,6 +41,14 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // ⚠️ 15000 不是拍脑袋：13 个测试文件会 spawn python 子进程（findPaletteSwatches /
+    // pngLuma / metricsParse …），隔离跑单条约 600ms，但全包并行时争 CPU，实测
+    // findPaletteSwatches 文件级 62s、pngLuma 77s，默认 5000ms 必然踩线（干净工作区
+    // 全量实测 9 文件 / 18 用例失败，隔离 31/31 绿；提到 15s 后（拆分前实测）
+    // 293/293 文件、4214/4214 用例全绿，#1009 拆分后 295/295 仍为真。改动前请先看
+    // tests/metricsParse.test.ts 头注释的同理修法
+    // （android-host 的 git 夹具已用「逐 describe 超时」修过同病，见 78c63a3f）。
+    testTimeout: 15000,
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     // 排除而非改文件名：fallback 用例含「宏必须为 false」的自检，误跑会立刻转红，
     // 不会静默把两条路径当同一条测。两条路径的真值由
