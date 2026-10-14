@@ -134,59 +134,63 @@ async function advanceRemoteBranch(f, branch, name) {
   await git(["push", "origin", branch], other);
 }
 
-describe("assertReleaseBranchNotDiverged（branch 覆盖，#816）", { timeout: GIT_FIXTURE_TIMEOUT }, () => {
-  it("指定分支分叉 → throw，且指引里的 rebase 目标就是该分支（不是 main）", async () => {
-    const f = await makeBranchFixture("release/transition-6.2.0");
-    await advanceRemoteBranch(f, "release/transition-6.2.0", "openwiki.md");
-    await commitFile(f.local, "c.txt", "C", "diverged on release branch");
-    await expect(
-      assertReleaseBranchNotDiverged({
+describe(
+  "assertReleaseBranchNotDiverged（branch 覆盖，#816）",
+  { timeout: GIT_FIXTURE_TIMEOUT },
+  () => {
+    it("指定分支分叉 → throw，且指引里的 rebase 目标就是该分支（不是 main）", async () => {
+      const f = await makeBranchFixture("release/transition-6.2.0");
+      await advanceRemoteBranch(f, "release/transition-6.2.0", "openwiki.md");
+      await commitFile(f.local, "c.txt", "C", "diverged on release branch");
+      await expect(
+        assertReleaseBranchNotDiverged({
+          cwd: f.local,
+          branch: "release/transition-6.2.0",
+          log: () => {},
+          warn: () => {},
+        }),
+      ).rejects.toThrow(/git fetch origin && git rebase origin\/release\/transition-6\.2\.0/);
+    });
+
+    it("指定分支分叉时，main 是干净的 → 默认（main）放行、分支版报错 ⇒ 参数确实换了被检引用", async () => {
+      // 阳性/阴性对照：同一个仓库、同一时刻，只有 branch 不同结果就不同
+      const f = await makeBranchFixture("release/transition-6.2.0");
+      await advanceRemoteBranch(f, "release/transition-6.2.0", "openwiki.md");
+      await commitFile(f.local, "c.txt", "C", "diverged on release branch");
+
+      const logs = [];
+      await assertReleaseBranchNotDiverged({
+        cwd: f.local,
+        log: (m) => logs.push(m),
+        warn: () => {},
+      });
+      expect(logs.join("\n")).toContain("origin/main 是本地 main 的祖先");
+
+      await expect(
+        assertReleaseBranchNotDiverged({
+          cwd: f.local,
+          branch: "release/transition-6.2.0",
+          log: () => {},
+          warn: () => {},
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("指定分支干净 → 放行并打「该分支的祖先」通过日志", async () => {
+      const f = await makeBranchFixture("release/transition-6.2.0");
+      await commitFile(f.local, "c.txt", "C", "local ahead on release branch");
+      const logs = [];
+      const warns = [];
+      await assertReleaseBranchNotDiverged({
         cwd: f.local,
         branch: "release/transition-6.2.0",
-        log: () => {},
-        warn: () => {},
-      }),
-    ).rejects.toThrow(/git fetch origin && git rebase origin\/release\/transition-6\.2\.0/);
-  });
-
-  it("指定分支分叉时，main 是干净的 → 默认（main）放行、分支版报错 ⇒ 参数确实换了被检引用", async () => {
-    // 阳性/阴性对照：同一个仓库、同一时刻，只有 branch 不同结果就不同
-    const f = await makeBranchFixture("release/transition-6.2.0");
-    await advanceRemoteBranch(f, "release/transition-6.2.0", "openwiki.md");
-    await commitFile(f.local, "c.txt", "C", "diverged on release branch");
-
-    const logs = [];
-    await assertReleaseBranchNotDiverged({
-      cwd: f.local,
-      log: (m) => logs.push(m),
-      warn: () => {},
+        log: (m) => logs.push(m),
+        warn: (m) => warns.push(m),
+      });
+      expect(logs.join("\n")).toContain(
+        "origin/release/transition-6.2.0 是本地 release/transition-6.2.0 的祖先",
+      );
+      expect(warns).toEqual([]);
     });
-    expect(logs.join("\n")).toContain("origin/main 是本地 main 的祖先");
-
-    await expect(
-      assertReleaseBranchNotDiverged({
-        cwd: f.local,
-        branch: "release/transition-6.2.0",
-        log: () => {},
-        warn: () => {},
-      }),
-    ).rejects.toThrow();
-  });
-
-  it("指定分支干净 → 放行并打「该分支的祖先」通过日志", async () => {
-    const f = await makeBranchFixture("release/transition-6.2.0");
-    await commitFile(f.local, "c.txt", "C", "local ahead on release branch");
-    const logs = [];
-    const warns = [];
-    await assertReleaseBranchNotDiverged({
-      cwd: f.local,
-      branch: "release/transition-6.2.0",
-      log: (m) => logs.push(m),
-      warn: (m) => warns.push(m),
-    });
-    expect(logs.join("\n")).toContain(
-      "origin/release/transition-6.2.0 是本地 release/transition-6.2.0 的祖先",
-    );
-    expect(warns).toEqual([]);
-  });
-});
+  },
+);
