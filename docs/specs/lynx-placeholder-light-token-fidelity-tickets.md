@@ -18,6 +18,25 @@
 - 像素验收：**不在 CI**（ADR-0084）。本票 3 帧抽样自立（spec §4.6），全主题覆盖归 #1014 T2
 - 值 oracle：tokens.css 亮色段生成产物（非实现反推，测试硬约束 #6）
 
+## review 修复轮（2026-10-16，提交前双轴 review）
+
+双轴并行（Standards + Spec，仓库版 `.agents/skills/code-review/`）。**全程 0 blocking / 0 major**。
+
+**轮 1**：7 条 minor（Standards 3 / Spec 4）。其中 5 条便宜闭合于 `28fbcecc`：
+- 两张表 docstring 的 `console.warn` 归因修正（`isThemeColorId` 是纯谓词，告警实体在 store 读取路径）
+- 接线守门标题还原暗色专属口径（扫描面只覆盖暗色表，冻结线禁止加码）
+- spec §4.7 spec/tickets 落库时序措辞修正
+- spec §5「暗色守值测试零 diff」→「断语音义不变」（消除与 §4.5 的条款张力）
+- ADR-0180 #1015 行「实测 4.54」→「实算」（真机实测归 T2）
+
+登记不改 2 条（两轴一致结论）：亮色表直引绕过接线守卫的面（本票遵守「接线组不动」门禁冻结线，留未来门禁迭代）；#693 spec §4.3 历史口径无就地标注（有意保留，新 spec 已定位其为前身）。
+
+**轮 2**：2 条 minor（纯文档，双轴同指）。闭合于本轮 commit：
+- spec §5 括注「详见 tickets  review 修复轮」悬空——即本节，补登
+- spec §4.4「暗色守值测试全部原样」残留绝对措辞——与本节登记的结构性适配事实对齐放宽
+
+**结构性适配登记**（回应 spec §5 括注；T0 守值测试的 describe 合并、变量 `actual→darkActual`、暗色用例标题加前缀，断言对象与语义不变，属 spec §4.5 守值组改造的结构必需，非加码）。
+
 ## 备注
 
 - **测试硬约束 #4（行为不变声明）**：`INPUT_PLACEHOLDER_COLOR` 删除 + 亮色表新增属契约面变更，commit message 需标注。
