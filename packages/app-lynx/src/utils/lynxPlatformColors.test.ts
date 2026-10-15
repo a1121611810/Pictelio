@@ -229,7 +229,7 @@ describe('② 全部带 placeholder 的 input 都绑 composable（issue #693）'
     }
   })
 
-  it('没有组件绕过 composable 直接用暗色表（取值只能经 composable 的三态归一）', () => {
+  it('没有组件绕过 composable 直接用暗色表（暗色值只能经 composable 的三态归一）', () => {
     for (const file of vueFiles(SRC_DIR)) {
       const source = readFileSync(file, 'utf8')
       expect(source, `${file.slice(SRC_DIR.length)} 直接引用了 INPUT_PLACEHOLDER_DARK_COLOR`).not.toContain(

@@ -130,11 +130,11 @@ settingsStore.resolvedDark ┘        │
 | `docs/adr/ADR-0180-lynx-dark-mode.md` 实施记录表 | **追加**一行（#1015：亮色表 + clamp + 防线改造；历史行逐字保留） |
 | `docs/specs/lynx-placeholder-theme-color.md` §5 | 排除项「亮色侧令牌保真」条目追加「→ 已由 #1015 承接（2026-10-16）」（原文保留） |
 | `src/utils/lynxPlatformColors.ts` 文件头 + docstring | 随 T0 代码同步重写（「亮色不逐主题化」旧理由 → clamp 规则；平台升级风险注释**保留**） |
-| 本文件 + tickets 文件 | T0 开工前已存在（即本文档） |
+| 本文件 + tickets 文件 | 随 T0 commit `3e008dcd` 首次落库（spec 先行定稿、同 commit 提交） |
 
 ## 5. Out of Scope
 
-- **暗色侧任何改动**——暗色表 / 暗色分支 / 暗色守值测试零 diff。
+- **暗色侧任何语义改动**——暗色表 / 暗色分支断言语义不变（守值测试的 describe 合并、变量重命名等结构性适配属 §4.5 授权范围，详见 tickets「review 修复轮」）
 - **#1014 走查矩阵的执行**——T2 六主题×亮暗全矩阵归 #1014（发版 gate）；本票 3 帧自立闭环，两票互不阻塞。
 - **placeholder 专属 CSS 令牌**——平台属性不解析 `var()`（#537），CSS 令牌无真值载体，Grill 已否决（§2）。
 - **`Login.vue` / `CommentInputBar.vue`**——同 #693，早已撤下 placeholder，天然脱敏。

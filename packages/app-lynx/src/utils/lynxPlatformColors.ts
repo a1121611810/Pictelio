@@ -35,7 +35,7 @@ import type { ThemeColorId } from './themeColor'
  *
  * 用 `Record<ThemeColorId, string>` 而非查表 + 兜底：主题 id 的新增/改名会在这里**编译期报错**，
  * 而兜底分支会静默吞掉（测试硬约束 #3：禁静默降级）。
- * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` + console.warn），
+ * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` 谓词，非法告警在 store 读取路径），
  * 故本表不做运行时兜底。
  */
 export const INPUT_PLACEHOLDER_LIGHT_COLOR: Record<ThemeColorId, string> = {
@@ -56,7 +56,7 @@ export const INPUT_PLACEHOLDER_LIGHT_COLOR: Record<ThemeColorId, string> = {
  *
  * 用 `Record<ThemeColorId, string>` 而非查表 + 兜底：主题 id 的新增/改名会在这里**编译期报错**，
  * 而兜底分支会静默吞掉（测试硬约束 #3：禁静默降级）。
- * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` + console.warn），
+ * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` 谓词，非法告警在 store 读取路径），
  * 故本表不做运行时兜底。
  */
 export const INPUT_PLACEHOLDER_DARK_COLOR: Record<ThemeColorId, string> = {
