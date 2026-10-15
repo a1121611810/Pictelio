@@ -5,6 +5,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useNovelTranslateStore } from "../stores/novelTranslateStore"
 import { useSettingsStore } from "../stores/settingsStore"
+import { useInputPlaceholderColor } from "../composables/useInputPlaceholderColor"
 import { A11Y_ELEMENT_ENABLED } from "../utils/accessibility"
 import M3Switch from "./M3Switch.vue"
 import { t } from "../i18n"
@@ -20,6 +21,10 @@ const { pressColor } = useMotion()
 
 const store = useNovelTranslateStore()
 const settings = useSettingsStore()
+
+/** 占位符颜色随主题色/明暗切换（#693）。此前这 6 处从未绑 placeholder-color，
+ *  暗色下走平台默认灰（实测 1.24:1），比 #693 认定的 1.31:1 更差。 */
+const { placeholderColor } = useInputPlaceholderColor()
 
 // ── 表单 state（与 store 解耦：编辑中不入 store，提交时一次性写入） ──
 const baseURL = ref<string>("")
@@ -416,6 +421,7 @@ async function onClear(): Promise<void> {
             isFloated('baseURL', baseURL) ? t('novelTranslate.endpoint.baseUrl.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.baseUrl.label')"
           @input="scheduleCompatibilityProbe"
@@ -470,6 +476,7 @@ async function onClear(): Promise<void> {
             isFloated('apiKey', apiKey) ? t('novelTranslate.endpoint.apiKey.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
           @focus="onFieldFocus('apiKey')"
@@ -484,6 +491,7 @@ async function onClear(): Promise<void> {
             isFloated('apiKey', apiKey) ? t('novelTranslate.endpoint.apiKey.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
           @focus="onFieldFocus('apiKey')"
@@ -556,6 +564,7 @@ async function onClear(): Promise<void> {
             isFloated('model', model) ? t('novelTranslate.endpoint.model.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.model.label')"
           @focus="onFieldFocus('model')"
@@ -591,6 +600,7 @@ async function onClear(): Promise<void> {
             isFloated('targetLang', targetLang) ? t('novelTranslate.endpoint.targetLang.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.targetLang.label')"
           @focus="onFieldFocus('targetLang')"
@@ -623,6 +633,7 @@ async function onClear(): Promise<void> {
             isFloated('sourceLang', sourceLang) ? t('novelTranslate.endpoint.sourceLang.hint') : ''
           "
           placeholder-class="text-outline"
+          :placeholder-color="placeholderColor"
           accessibility-element
           :accessibility-label="t('novelTranslate.endpoint.sourceLang.label')"
           @focus="onFieldFocus('sourceLang')"

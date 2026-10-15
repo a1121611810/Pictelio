@@ -21,10 +21,11 @@
  * 2. **① 只验字面量一致**：不验「on-surface-variant 是语义上正确的角色」——口径选错照样绿。
  * 3. **① 亮色侧不在守值范围**：亮色基座在 `page, .theme-sky` 段（非 `.dark`），抽取路径不同；
  *    亮色单值由 `expect(INPUT_PLACEHOLDER_COLOR).toBe('#41474e')` 守住。
- * 4. **② 只扫 `placeholder-color` 这个属性名**：若将来改用别的写法（如 `<input>` 上写
- *    `placeholderColor` prop 或经子组件透传），本扫描会扫空集。
- *    ⇒ 用 `expect(消费点数).toBe(9)` 把扫描面钉死，空集必红。
- *    扫描只认带 `=` 的绑定行，`.vue` 注释里对该属性名的说明性提及不计入。
+ * 4. **② 只扫 `<input ...>` + `placeholder` 这个组合**：若将来改用别的元素或属性写法
+ *    （`<textarea>`、`placeholderClass` prop、子组件透传），本扫描会扫空集。
+ *    ⇒ 用「绑定数 ≡ 带 placeholder 的 input 数 ≡ 15」把两侧口径钉死，任一为空即红。
+ *    枚举基准取**行为口径**（带 placeholder 的 input）而非**引用口径**（谁 import 了常量）：
+ *    后者会把「从未接线」的站点当成不存在 —— 首版就是这么漏掉 6 处的。
  * 5. **② 不验运行时**：只看源码文本，不证明原生输入框真按此色渲染 —— 像素验收走 #1014 走查矩阵。
  */
 import { readdirSync, readFileSync } from 'node:fs'
@@ -35,8 +36,9 @@ import { INPUT_PLACEHOLDER_COLOR, INPUT_PLACEHOLDER_DARK_COLOR } from './lynxPla
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url))
 
-/** 消费点声明式清单：主题化后每一处 `placeholder-color` 绑定都必须是它。 */
-const EXPECTED_PLACEHOLDER_BINDINGS = 9
+/** 消费点声明式清单：带 placeholder 的 `<input>` 总数（每处都必须是 `:placeholder-color="placeholderColor"`）。
+ *  当前 = 9（原 #693 清单）+ 6（`SettingsEndpoint.vue` 六个从未绑定的 field）= 15。 */
+const EXPECTED_PLACEHOLDER_BINDINGS = 15
 
 /** tokens.css 自动生成段里每个暗色色板的选择器形态（`.theme-sky.dark {` … `.theme-bili.dark {`）。 */
 const DARK_PANEL_RE = /\.theme-([a-z]+)\.dark\s*\{([^}]*)\}/g
@@ -103,56 +105,100 @@ describe('① INPUT_PLACEHOLDER_DARK_COLOR ≡ tokens.css 暗色段（issue #693
   })
 })
 
-describe('② 9 处消费点全部绑 composable（issue #693）', () => {
-  /** 每处 `placeholder-color` **属性绑定**的相对路径 + 行号（新增/移除消费点须同步本清单）。
+describe('② 全部带 placeholder 的 input 都绑 composable（issue #693）', () => {
+  /**
+   * 枚举基准 = **带 `placeholder` 的 `<input>`**（行为口径），
+   * 而不是「谁引用了 `INPUT_PLACEHOLDER_*`」（引用口径）。
    *
-   * 只认带 `=` 的绑定行：`.vue` 注释里多处提到该属性名（如 `Login.vue` / `CommentInputBar.vue`
-   * 记录“placeholder-color 已撤下”、`BookmarkPanel.vue` 记录平台约束），
-   * 那些是**说明性文字**不是消费点，计入会把清单撑成假数。
+   * 为什么要这样：首版枚举用的是引用口径，于是漏掉了 `SettingsEndpoint.vue` 的 6 个 input
+   * —— 它们**从未绑定过** `placeholder-color`，按引用扫根本扫不到，
+   * 真机实测暗色对比度 **1.24:1**，比 #693 原本认定的缺陷值 1.31:1 更差。
+   * ⇒ 引用口径的清单会把「根本没接线」的站点当成不存在。
    */
-  const bindings = vueFiles(SRC_DIR)
+  const inputs = vueFiles(SRC_DIR)
     .flatMap((file) => {
-      const lines = readFileSync(file, 'utf8').split('\n')
-      return lines.flatMap((line, i) =>
-        line.includes('placeholder-color=')
-          ? [{ file: file.slice(SRC_DIR.length), line: i + 1, text: line.trim() }]
-          : [],
-      )
+      const src = readFileSync(file, 'utf8')
+      const rel = file.slice(SRC_DIR.length)
+      // `<input>` 标签**跨多行**，必须对整文件做多行正则；逐行扫描会只捕到属性恰好
+      // 写在 `<input` 那一行的那几个（实测只捕到 4 个，共 15 个）。
+      return [...src.matchAll(/<input\b[^>]*?>/gs)].flatMap((m) => {
+        const tag = m[0]
+        // 必须匹配 `placeholder=` 而非子串 `placeholder`：
+        // `CommentInputBar.vue` 的 input **没有** placeholder 属性（静止态文案由 `<text>` label 承担，
+        // a11y 走 `accessibility-label`），但它的 i18n key 里含 `commentInputBar.placeholder` 字样，
+        // 用子串匹配会把它误计为一个缺绑定的消费点。
+        if (!/placeholder=/.test(tag)) return []
+        return [
+          {
+            file: rel,
+            line: src.slice(0, m.index).split('\n').length,
+            text: tag.replace(/\s+/g, ' '),
+          },
+        ]
+      })
     })
 
-  it('扫描面本身有效：`placeholder-color` 一处都没扫到时必须红', () => {
-    expect(bindings.length).toBe(EXPECTED_PLACEHOLDER_BINDINGS)
+  it('扫描面本身有效：扫不到任何 input 时必须红', () => {
+    expect(inputs.length).toBeGreaterThan(0)
   })
 
-  it('每一处都绑 placeholderColor（挡「改回静态常量」的静默回退）', () => {
-    for (const b of bindings) {
+  it('每个带 placeholder 的 input 都在同一标签上声明了 placeholder-color', () => {
+    const missing = inputs.filter((i) => !i.text.includes('placeholder-color'))
+    expect(
+      missing.map((i) => `${i.file}:${i.line}`),
+      '这些 input 有 placeholder 却没有 placeholder-color，暗色下走平台默认灰（实测 1.24:1）',
+    ).toEqual([])
+  })
+
+  it('placeholder-color 一律绑 placeholderColor（没有裸字面量、没有直取常量）', () => {
+    const bindingLines = vueFiles(SRC_DIR)
+      .flatMap((file) => {
+        const lines = readFileSync(file, 'utf8').split('\n')
+        return lines.flatMap((line, i) =>
+          line.includes('placeholder-color=')
+            ? [{ file: file.slice(SRC_DIR.length), line: i + 1, text: line.trim() }]
+            : [],
+        )
+      })
+    expect(bindingLines.length).toBeGreaterThan(0)
+    for (const b of bindingLines) {
       expect(b.text, `${b.file}:${b.line} 未绑 composable：${b.text}`).toContain(
         ':placeholder-color="placeholderColor"',
       )
-    }
-  })
-
-  it('模板内零裸字面量（`placeholder-color="#..."` 一律红）', () => {
-    for (const b of bindings) {
       expect(b.text, `${b.file}:${b.line} 散写了十六进制字面量`).not.toContain('placeholder-color="#')
     }
   })
 
+  it('消费点数量 ≡ 带 placeholder 的 input 数（防止两侧口径再次分叉）', () => {
+    const bindingCount = vueFiles(SRC_DIR).reduce((n, file) => {
+      const src = readFileSync(file, 'utf8')
+      return n + (src.match(/placeholder-color=/g) ?? []).length
+    }, 0)
+    expect(bindingCount).toBe(inputs.length)
+    expect(bindingCount).toBe(EXPECTED_PLACEHOLDER_BINDINGS)
+  })
+
   it('每个含绑定的文件都真的引入了 composable（避免「绑了但没引」的运行期未定义）', () => {
-    const files = [...new Set(bindings.map((b) => b.file))]
+    const files = [
+      ...new Set(
+        vueFiles(SRC_DIR).filter((f) =>
+          readFileSync(f, 'utf8').includes('placeholder-color='),
+        ),
+      ),
+    ]
     expect(files.length).toBeGreaterThan(0)
-    for (const rel of files) {
-      const source = readFileSync(`${SRC_DIR}${rel}`, 'utf8')
-      expect(source, `${rel} 用了 placeholderColor 但未引入 useInputPlaceholderColor`).toContain(
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8')
+      expect(source, `${file.slice(SRC_DIR.length)} 用了 placeholderColor 但未引入 useInputPlaceholderColor`).toContain(
         'useInputPlaceholderColor',
       )
     }
   })
 
   it('没有组件绕过 composable 直接用暗色表（暗色值只能经 composable 的三态归一）', () => {
-    for (const rel of vueFiles(SRC_DIR)) {
-      const source = readFileSync(rel, 'utf8')
-      expect(source, `${rel.slice(SRC_DIR.length)} 直接引用了 INPUT_PLACEHOLDER_DARK_COLOR`).not.toContain(
+    for (const file of vueFiles(SRC_DIR)) {
+      const source = readFileSync(file, 'utf8')
+      expect(source, `${file.slice(SRC_DIR.length)} 直接引用了 INPUT_PLACEHOLDER_DARK_COLOR`).not.toContain(
         'INPUT_PLACEHOLDER_DARK_COLOR',
       )
     }
