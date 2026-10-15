@@ -19,18 +19,34 @@
 import type { ThemeColorId } from './themeColor'
 
 /**
- * input 占位符颜色（**亮色**：单值）。
+ * input 占位符颜色（**亮色**：按主题色取，issue #1015 亮色令牌保真）。
  *
- * 值契约：= tokens.css 亮色基座 `page, .theme-sky` 段的 `--md-on-surface-variant`（#41474e）。
+ * 值契约：逐项 = tokens.css `.theme-{id}` 亮色段的 `--md-on-surface-variant`；
+ * **唯一例外 bili = `#5a5f66`（clamp，见下）**。
  *
- * **为何亮色不逐主题化**（issue #693 / spec §4.3）：M3 的 `--md-on-surface-variant` 是对
- * `surface` 定义的，不是对本组件实际背景 `--md-surface-container-highest` 定义的。
- * 逐主题化会让 bili 亮色取到 `#61666d`，在 `#d6d9dc` 上仅 **4.08:1**，低于 WCAG AA 4.5，
- * **比现状（7.32:1）更差**；其余 6 档主题 7.20~7.32。⇒ 亮色维持单值。
- * 遗留的「7 档主题亮色 placeholder 与其 token 不符」属令牌保真问题（**非对比度问题**），
- * 修它需引入 placeholder 专属令牌 + bili clamp，是独立决策，已作显式排除项登记。
+ * **bili clamp 规则**（spec §4.2）：该档 on-surface-variant（`#61666d`）在其亮底
+ * `--md-surface-container-highest`（`#d6d9dc`）上仅 **4.08:1**，低于 WCAG AA 4.5；
+ * clamp = 「令牌值向深色方向加深至 ≥4.5 的最小步」⇒ `#5a5f66` = 4.54。若像素实测 <4.5，
+ * 升档 `#53585f`（5.0）重测。值守由 `lynxPlatformColors.test.ts` 钉死（锁输出值不锁规则）。
+ *
+ * 决策依据留档（#1015 Grill Round 1）：亮色逐主题化后 6 档对比度持平或微降
+ * （on-surface-variant 对 `surface` 定义，输入框实际坐 `surface-container-highest`），
+ * 全部仍在 AAA；本表交付的是语义对齐与可审计性，不是对比度提升。
+ *
+ * 用 `Record<ThemeColorId, string>` 而非查表 + 兜底：主题 id 的新增/改名会在这里**编译期报错**，
+ * 而兜底分支会静默吞掉（测试硬约束 #3：禁静默降级）。
+ * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` + console.warn），
+ * 故本表不做运行时兜底。
  */
-export const INPUT_PLACEHOLDER_COLOR = '#41474e'
+export const INPUT_PLACEHOLDER_LIGHT_COLOR: Record<ThemeColorId, string> = {
+  sky: '#41474e',
+  violet: '#49454e',
+  pink: '#514347',
+  green: '#424940',
+  orange: '#50453a',
+  teal: '#3f4949',
+  bili: '#5a5f66',
+}
 
 /**
  * input 占位符颜色（**暗色**：按主题色取）。

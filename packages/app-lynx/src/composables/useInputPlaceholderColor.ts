@@ -1,9 +1,9 @@
-// ─── input 占位符颜色的主题化（issue #693 / spec docs/specs/lynx-placeholder-theme-color.md）───
+// ─── input 占位符颜色的主题化（#693 暗色 · #1015 亮色令牌保真 / spec docs/specs/lynx-placeholder-*.md）───
 //
 // `placeholder-color` 是 Lynx **平台属性**，不解析 `var()`（FIX-5 实测，见 ADR-0180 代价段），
 // 所以它取不到 `--md-on-surface-variant`，只能绑一个字面量。暗色若沿用亮色基线值，
 // 在 `--md-surface-container-highest` 上对比度仅 **1.31:1**（远低于 WCAG AA 4.5）。
-// ⇒ 本 composable 把「当前主题色 + 当前明暗」翻成该字面量，9 处消费点统一从这里取。
+// ⇒ 本 composable 把「当前主题色 + 当前明暗」翻成该字面量，15 处消费点统一从这里取。
 //
 // ── 为什么读 `resolvedDark` 而**不是** `currentDarkMode` ──
 // `currentDarkMode` 只在 `system` 分支被消费；手动切 `light`/`dark` 时它**不动**
@@ -19,15 +19,16 @@
 import { computed, type ComputedRef } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import {
-  INPUT_PLACEHOLDER_COLOR,
   INPUT_PLACEHOLDER_DARK_COLOR,
+  INPUT_PLACEHOLDER_LIGHT_COLOR,
 } from '../utils/lynxPlatformColors'
 
 export interface UseInputPlaceholderColorReturn {
   /**
    * 当前生效的 `placeholder-color` 字面量。
    *
-   * 亮色：单值 `INPUT_PLACEHOLDER_COLOR`（不逐主题，理由见该常量注释 / spec §4.3）。
+   * 亮色：按 `themeColor` 取 `INPUT_PLACEHOLDER_LIGHT_COLOR`（#1015 亮色令牌保真；
+   *   bili 为 clamp 值 `#5a5f66`，规则见该常量注释 / spec §4.2）。
    * 暗色：按 `themeColor` 取 `INPUT_PLACEHOLDER_DARK_COLOR`（对比度 7.20~7.29）。
    */
   placeholderColor: ComputedRef<string>
@@ -39,7 +40,7 @@ export function useInputPlaceholderColor(): UseInputPlaceholderColorReturn {
   const placeholderColor = computed<string>(() =>
     settings.resolvedDark === 'dark'
       ? INPUT_PLACEHOLDER_DARK_COLOR[settings.themeColor]
-      : INPUT_PLACEHOLDER_COLOR,
+      : INPUT_PLACEHOLDER_LIGHT_COLOR[settings.themeColor],
   )
 
   return { placeholderColor }

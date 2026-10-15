@@ -1,5 +1,5 @@
 /**
- * `placeholder-color` 平台约束的两道机器防线（issue #693）。
+ * `placeholder-color` 平台约束的两道机器防线（暗色 issue #693 · 亮色 issue #1015）。
  *
  * ## 为什么需要这个文件
  *
@@ -10,29 +10,31 @@
  * 对本文件是**文件级豁免**（直接 `continue`），文件内任何 hex 都不进 offenders。
  *
  * ⇒ 本文件同时守两件事：
- *   ① **取值正确性** —— 暗色表逐项 ≡ tokens.css 生成产物（oracle 溯源，禁实现反推）；
- *   ② **接线完整性** —— 9 处消费点全都绑 composable（挡住「改回静态常量」这类静默回退）。
+ *   ① **取值正确性** —— 暗色表 / 亮色表逐项 ≡ tokens.css 生成产物（oracle 溯源，禁实现反推）；
+ *   ② **接线完整性** —— 15 处消费点全都绑 composable（挡住「改回静态常量」这类静默回退）。
  *
  * ## 已知失效面（门禁纪律：必须显式登记）
  *
- * 1. **① 扫空集 ⇒ 静默恒真**：若 tokens.css 选择器形态改动（`.theme-x.dark {` → 别写法），
+ * 1. **① 扫空集 ⇒ 静默恒真**：若 tokens.css 选择器形态改动（`.theme-x {` / `.theme-x.dark {` → 别写法），
  *    正则可能一条抽不到，而「逐项相等」会因两侧同时为空而通过。
- *    ⇒ 用 `expect(实际抽到.size).toBe(7)` 把抽取面钉死。
+ *    ⇒ 用 `expect(实际抽到.size).toBe(7)` 把抽取面钉死（暗 / 亮两个抽取器各自断言）。
  * 2. **① 只验字面量一致**：不验「on-surface-variant 是语义上正确的角色」——口径选错照样绿。
- * 3. **① 亮色侧不在守值范围**：亮色基座在 `page, .theme-sky` 段（非 `.dark`），抽取路径不同；
- *    亮色单值由 `expect(INPUT_PLACEHOLDER_COLOR).toBe('#41474e')` 守住。
+ * 3. **① bili 亮色是 clamp 人工值守例外**（#1015）：亮色表 bili 项锁的是**输出值** `#5a5f66`
+ *    （规则 = 「令牌值向深至 ≥4.5 的最小步」，见 spec §4.2），**不锁规则本身**——
+ *    bili 令牌或底色变更时值守值不会自动跟进，须人工按规则重算。
  * 4. **② 只扫 `<input ...>` + `placeholder` 这个组合**：若将来改用别的元素或属性写法
  *    （`<textarea>`、`placeholderClass` prop、子组件透传），本扫描会扫空集。
  *    ⇒ 用「绑定数 ≡ 带 placeholder 的 input 数 ≡ 15」把两侧口径钉死，任一为空即红。
  *    枚举基准取**行为口径**（带 placeholder 的 input）而非**引用口径**（谁 import 了常量）：
  *    后者会把「从未接线」的站点当成不存在 —— 首版就是这么漏掉 6 处的。
- * 5. **② 不验运行时**：只看源码文本，不证明原生输入框真按此色渲染 —— 像素验收走 #1014 走查矩阵。
+ * 5. **② 不验运行时**：只看源码文本，不证明原生输入框真按此色渲染 —— 像素验收走本票 T2
+ *    抽样 3 帧（#1015）/ #1014 走查矩阵 T4-6（暗色）。
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { THEME_COLOR_IDS } from './themeColor'
-import { INPUT_PLACEHOLDER_COLOR, INPUT_PLACEHOLDER_DARK_COLOR } from './lynxPlatformColors'
+import { INPUT_PLACEHOLDER_DARK_COLOR, INPUT_PLACEHOLDER_LIGHT_COLOR } from './lynxPlatformColors'
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url))
 
@@ -42,9 +44,12 @@ const EXPECTED_PLACEHOLDER_BINDINGS = 15
 
 /** tokens.css 自动生成段里每个暗色色板的选择器形态（`.theme-sky.dark {` … `.theme-bili.dark {`）。 */
 const DARK_PANEL_RE = /\.theme-([a-z]+)\.dark\s*\{([^}]*)\}/g
+/** tokens.css 亮色色板的选择器形态（`.theme-sky {` :12 … `.theme-bili {` :650）。
+ *  不会误中暗段：`.theme-x.dark {` 在 `[a-z]+` 之后是 `.`，`\s*\{` 匹配失败。 */
+const LIGHT_PANEL_RE = /\.theme-([a-z]+)\s*\{([^}]*)\}/g
 const ON_SURFACE_VARIANT_RE = /--md-on-surface-variant:\s*(#[0-9a-fA-F]{3,8})/
 
-/** 从 tokens.css 抽出「主题 id → 暗色 --md-on-surface-variant」。不取 `page, .theme-sky` 亮色基座段。 */
+/** 从 tokens.css 抽出「主题 id → 暗色 --md-on-surface-variant」。 */
 function readDarkOnSurfaceVariant(): Map<string, string> {
   const css = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8')
   const out = new Map<string, string>()
@@ -57,51 +62,80 @@ function readDarkOnSurfaceVariant(): Map<string, string> {
   return out
 }
 
-/** 递归收集 `src/**` 下的 `.vue` 文件。 */
-function vueFiles(dir: string): string[] {
-  const out: string[] = []
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = `${dir}/${entry.name}`
-    if (entry.isDirectory()) out.push(...vueFiles(full))
-    else if (entry.name.endsWith('.vue')) out.push(full)
+/** 从 tokens.css 抽出「主题 id → 亮色 --md-on-surface-variant」。不取 `:root` / `.dark` 段。 */
+function readLightOnSurfaceVariant(): Map<string, string> {
+  const css = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8')
+  const out = new Map<string, string>()
+  for (const m of css.matchAll(LIGHT_PANEL_RE)) {
+    const themeId = m[1]
+    if (themeId === undefined) continue
+    const token = ON_SURFACE_VARIANT_RE.exec(m[2] ?? '')?.[1]
+    if (token !== undefined) out.set(themeId, token.toLowerCase())
   }
   return out
 }
 
-describe('① INPUT_PLACEHOLDER_DARK_COLOR ≡ tokens.css 暗色段（issue #693）', () => {
-  const actual = readDarkOnSurfaceVariant()
+/** bili 亮色 clamp 值守值（#1015 spec §4.2：令牌值 #61666d 向深至 ≥4.5 的最小步）。
+ *  若被改回纯令牌值 #61666d（4.08:1，低于 AA），下方守值用例必红 —— 这就是「clamp 存在」的变异守卫。 */
+const BILI_LIGHT_CLAMP = '#5a5f66'
 
-  it('抽取面本身有效：一条都没抽到时必须红（下界 = 主题档数）', () => {
+describe('① 取值表 ≡ tokens.css 生成产物（暗色 #693 · 亮色 #1015）', () => {
+  const darkActual = readDarkOnSurfaceVariant()
+  const lightActual = readLightOnSurfaceVariant()
+
+  it('抽取面本身有效：暗 / 亮一条都没抽到时必须红（下界 = 主题档数）', () => {
     // 写死 7（= THEME_COLOR_IDS.length）而非字面量，加主题时是「抽取面跟着长」，
     // 而不是「抽取器静默失效」。
-    expect(actual.size).toBe(THEME_COLOR_IDS.length)
+    expect(darkActual.size).toBe(THEME_COLOR_IDS.length)
+    expect(lightActual.size).toBe(THEME_COLOR_IDS.length)
     expect(THEME_COLOR_IDS.length).toBe(7)
   })
 
-  it('抽取器不会漏主题：tokens.css 抽到的 id 集合 ≡ THEME_COLOR_IDS', () => {
-    expect([...actual.keys()].sort()).toEqual([...THEME_COLOR_IDS].sort())
+  it('抽取器不会漏主题：tokens.css 抽到的 id 集合 ≡ THEME_COLOR_IDS（暗 / 亮各自）', () => {
+    expect([...darkActual.keys()].sort()).toEqual([...THEME_COLOR_IDS].sort())
+    expect([...lightActual.keys()].sort()).toEqual([...THEME_COLOR_IDS].sort())
   })
 
-  it('逐主题守值：常量表 ≡ tokens.css `.theme-*.dark --md-on-surface-variant`', () => {
+  it('暗色逐主题守值：暗色表 ≡ tokens.css `.theme-*.dark --md-on-surface-variant`', () => {
     for (const themeId of THEME_COLOR_IDS) {
-      const fromTokens = actual.get(themeId)
+      const fromTokens = darkActual.get(themeId)
       expect(fromTokens, `tokens.css 缺少 .theme-${themeId}.dark 的 --md-on-surface-variant`).toBeDefined()
-      expect(INPUT_PLACEHOLDER_DARK_COLOR[themeId], `主题 ${themeId} 的占位符常量与 tokens.css 漂移`).toBe(fromTokens)
+      expect(INPUT_PLACEHOLDER_DARK_COLOR[themeId], `主题 ${themeId} 的暗色占位符常量与 tokens.css 漂移`).toBe(fromTokens)
     }
   })
 
-  it('常量表的 key 集合 ≡ THEME_COLOR_IDS（多一项 / 少一项都要红）', () => {
+  it('亮色逐主题守值：亮色表 ≡ tokens.css 亮色段 `--md-on-surface-variant`（bili 为 clamp 值守例外）', () => {
+    for (const themeId of THEME_COLOR_IDS) {
+      const fromTokens = lightActual.get(themeId)
+      expect(fromTokens, `tokens.css 缺少 .theme-${themeId} 亮段的 --md-on-surface-variant`).toBeDefined()
+      if (themeId === 'bili') {
+        // clamp 锁输出值不锁规则（失效面 #3）：bili 纯令牌值 #61666d 在其亮底 #d6d9dc 上
+        // 仅 4.08:1（< AA 4.5），必须保持 clamp 值；改回令牌值此条必红。
+        expect(INPUT_PLACEHOLDER_LIGHT_COLOR.bili).toBe(BILI_LIGHT_CLAMP)
+        expect(INPUT_PLACEHOLDER_LIGHT_COLOR.bili).not.toBe(fromTokens)
+      } else {
+        expect(INPUT_PLACEHOLDER_LIGHT_COLOR[themeId], `主题 ${themeId} 的亮色占位符常量与 tokens.css 漂移`).toBe(fromTokens)
+      }
+    }
+  })
+
+  it('暗色表的 key 集合 ≡ THEME_COLOR_IDS（多一项 / 少一项都要红）', () => {
     expect(Object.keys(INPUT_PLACEHOLDER_DARK_COLOR).sort()).toEqual([...THEME_COLOR_IDS].sort())
   })
 
-  it('暗色值不得复用亮色基线值（否则等于没修：#41474e 在暗底上仅 1.31:1）', () => {
+  it('亮色表的 key 集合 ≡ THEME_COLOR_IDS（多一项 / 少一项都要红）', () => {
+    expect(Object.keys(INPUT_PLACEHOLDER_LIGHT_COLOR).sort()).toEqual([...THEME_COLOR_IDS].sort())
+  })
+
+  it('暗色值不得等于亮色表同档值（否则等于没修：亮色值在暗底上仅 ~1.3:1）', () => {
     for (const themeId of THEME_COLOR_IDS) {
-      expect(INPUT_PLACEHOLDER_DARK_COLOR[themeId]).not.toBe(INPUT_PLACEHOLDER_COLOR)
+      expect(INPUT_PLACEHOLDER_DARK_COLOR[themeId]).not.toBe(INPUT_PLACEHOLDER_LIGHT_COLOR[themeId])
     }
   })
 
-  it('亮色维持单值 #41474e（不逐主题化的理由见 lynxPlatformColors.ts 注释 / spec §4.3）', () => {
-    expect(INPUT_PLACEHOLDER_COLOR).toBe('#41474e')
+  it('亮色 7 档互不相同（防止亮色表被填成同一个值而守值测试仍绿）', () => {
+    const values = THEME_COLOR_IDS.map((id) => INPUT_PLACEHOLDER_LIGHT_COLOR[id])
+    expect(new Set(values).size).toBe(THEME_COLOR_IDS.length)
   })
 })
 
@@ -195,7 +229,7 @@ describe('② 全部带 placeholder 的 input 都绑 composable（issue #693）'
     }
   })
 
-  it('没有组件绕过 composable 直接用暗色表（暗色值只能经 composable 的三态归一）', () => {
+  it('没有组件绕过 composable 直接用暗色表（取值只能经 composable 的三态归一）', () => {
     for (const file of vueFiles(SRC_DIR)) {
       const source = readFileSync(file, 'utf8')
       expect(source, `${file.slice(SRC_DIR.length)} 直接引用了 INPUT_PLACEHOLDER_DARK_COLOR`).not.toContain(
@@ -204,3 +238,14 @@ describe('② 全部带 placeholder 的 input 都绑 composable（issue #693）'
     }
   })
 })
+
+/** 递归收集 `src/**` 下的 `.vue` 文件。 */
+function vueFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = `${dir}/${entry.name}`
+    if (entry.isDirectory()) out.push(...vueFiles(full))
+    else if (entry.name.endsWith('.vue')) out.push(full)
+  }
+  return out
+}

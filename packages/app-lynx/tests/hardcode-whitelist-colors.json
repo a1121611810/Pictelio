@@ -5,7 +5,7 @@
   },
   {
     "path": "utils/lynxPlatformColors.ts",
-    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；本文件集中承载该属性的字面量。亮色单值 = tokens.css 亮色基座段 --md-on-surface-variant（#41474e）；暗色表 INPUT_PLACEHOLDER_DARK_COLOR 逐主题 = .theme-*.dark 段同令牌（#693）。改色只需改 tokens.css——utils/lynxPlatformColors.test.ts 把本文件取值钉到该生成产物。亮色刻意不逐主题化：on-surface-variant 是对 surface 定义的，逐主题会让 bili 亮色仅 4.08:1，低于 AA。平台约束登记载体，随本文件保留，删除条件 = 本文件被移除。"
+    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；本文件集中承载该属性的字面量。亮色表 INPUT_PLACEHOLDER_LIGHT_COLOR 逐主题 = .theme-* 亮段 --md-on-surface-variant（bili 为 clamp 值 #5a5f66：令牌值向深至 ≥4.5 的最小步，#1015）；暗色表 = .theme-*.dark 同令牌（#693）。改色只需改 tokens.css——utils/lynxPlatformColors.test.ts 把两张表钉到该生成产物（bili clamp 为人工值守例外）。平台约束登记载体，随本文件保留，删除条件 = 本文件被移除。"
   },
   {
     "path": "components/RankingEntryCard.vue",

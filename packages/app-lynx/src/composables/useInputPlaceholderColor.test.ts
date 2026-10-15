@@ -5,28 +5,30 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { THEME_COLOR_IDS, type ThemeColorId } from '../utils/themeColor'
 import { currentDarkMode, DEFAULT_DARK_MODE } from '../utils/darkMode'
 import {
-  INPUT_PLACEHOLDER_COLOR,
   INPUT_PLACEHOLDER_DARK_COLOR,
+  INPUT_PLACEHOLDER_LIGHT_COLOR,
 } from '../utils/lynxPlatformColors'
 
-describe('useInputPlaceholderColor（issue #693）', () => {
+describe('useInputPlaceholderColor（#693 暗色主题化 · #1015 亮色令牌保真）', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     // `currentDarkMode` 是模块级 ref（跨用例共享），显式复位避免用例间串味。
     currentDarkMode.value = 'light'
   })
 
-  it('亮色：7 档主题一律取单值基线（亮色不逐主题化的理由见 spec §4.3）', () => {
+  it('亮色：7 档主题逐一取亮色表值（#1015：亮色令牌保真，bili 为 clamp 值）', () => {
     const settings = useSettingsStore()
     settings.setDarkMode('light')
     const { placeholderColor } = useInputPlaceholderColor()
 
     for (const themeId of THEME_COLOR_IDS) {
       settings.setThemeColor(themeId)
-      expect(placeholderColor.value, `主题 ${themeId} 亮色下不应逐主题取色`).toBe(
-        INPUT_PLACEHOLDER_COLOR,
+      expect(placeholderColor.value, `主题 ${themeId} 亮色下应取亮色表该档值`).toBe(
+        INPUT_PLACEHOLDER_LIGHT_COLOR[themeId],
       )
     }
+    // 变异守卫：若亮色分支退回单值（7 档同值），上面的逐档断言必红
+    // （亮色表 7 档互异由 lynxPlatformColors.test.ts 锁定）。
   })
 
   it('暗色：7 档主题逐一取到自己的暗色值（14 组取值矩阵的一半）', () => {
@@ -40,14 +42,14 @@ describe('useInputPlaceholderColor（issue #693）', () => {
     }
   })
 
-  it('暗色值不得等于亮色基线值（若相等，则该主题的暗色项无效）', () => {
+  it('暗色值不得等于亮色表同档值（若相等，则该主题的暗色项无效）', () => {
     const settings = useSettingsStore()
     settings.setDarkMode('dark')
     const { placeholderColor } = useInputPlaceholderColor()
 
     for (const themeId of THEME_COLOR_IDS) {
       settings.setThemeColor(themeId)
-      expect(placeholderColor.value).not.toBe(INPUT_PLACEHOLDER_COLOR)
+      expect(placeholderColor.value).not.toBe(INPUT_PLACEHOLDER_LIGHT_COLOR[themeId])
     }
   })
 
@@ -56,7 +58,7 @@ describe('useInputPlaceholderColor（issue #693）', () => {
     settings.setDarkMode('light')
     settings.setThemeColor('sky')
     const { placeholderColor } = useInputPlaceholderColor()
-    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_COLOR)
+    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_LIGHT_COLOR.sky)
 
     // 手动切暗色
     settings.setDarkMode('dark')
@@ -66,14 +68,27 @@ describe('useInputPlaceholderColor（issue #693）', () => {
     settings.setThemeColor('bili')
     expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_DARK_COLOR.bili)
 
-    // 切回亮色
+    // 切回亮色（bili 亮色 = clamp 值 #5a5f66）
     settings.setDarkMode('light')
-    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_COLOR)
+    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_LIGHT_COLOR.bili)
   })
 
   it('主题色逐一切换时暗色取值各不相同（防止表被填成同一个值而测试仍绿）', () => {
     const settings = useSettingsStore()
     settings.setDarkMode('dark')
+    const { placeholderColor } = useInputPlaceholderColor()
+
+    const seen: string[] = []
+    for (const themeId of THEME_COLOR_IDS) {
+      settings.setThemeColor(themeId)
+      seen.push(placeholderColor.value)
+    }
+    expect(new Set(seen).size).toBe(THEME_COLOR_IDS.length)
+  })
+
+  it('主题色逐一切换时亮色取值各不相同（#1015：亮色表 7 档互异的 composable 级镜像守卫）', () => {
+    const settings = useSettingsStore()
+    settings.setDarkMode('light')
     const { placeholderColor } = useInputPlaceholderColor()
 
     const seen: string[] = []
@@ -131,14 +146,14 @@ describe('useInputPlaceholderColor · system 三态归一（#693 blocking 防线
     expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_DARK_COLOR.sky)
   })
 
-  it('三态键为 system、系统为亮色时，取亮色单值', () => {
+  it('三态键为 system、系统为亮色时，取亮色表该档值（#1015 后亮色也按主题查表）', () => {
     const settings = useSettingsStore()
     settings.setDarkMode('system')
     currentDarkMode.value = 'light'
     settings.setThemeColor('sky')
 
     const { placeholderColor } = useInputPlaceholderColor()
-    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_COLOR)
+    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_LIGHT_COLOR.sky)
   })
 
   it('手动切到 dark 后，系统态再变不影响取值（手动分支不读 currentDarkMode）', () => {
@@ -157,10 +172,12 @@ describe('useInputPlaceholderColor · system 三态归一（#693 blocking 防线
     const settings = useSettingsStore()
     settings.setDarkMode('light')
     const { placeholderColor } = useInputPlaceholderColor()
-    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_COLOR)
+    expect(placeholderColor.value).toBe(INPUT_PLACEHOLDER_LIGHT_COLOR.sky)
 
     currentDarkMode.value = 'dark'
-    expect(placeholderColor.value, '手动 light 不该被系统态翻成暗色').toBe(INPUT_PLACEHOLDER_COLOR)
+    expect(placeholderColor.value, '手动 light 不该被系统态翻成暗色').toBe(
+      INPUT_PLACEHOLDER_LIGHT_COLOR.sky,
+    )
   })
 
   it('7 档主题在缺省 system 路径下都取到暗色值（缺省路径不能只验一档）', () => {
@@ -173,6 +190,20 @@ describe('useInputPlaceholderColor · system 三态归一（#693 blocking 防线
       settings.setThemeColor(themeId)
       expect(placeholderColor.value, `缺省 system 路径下主题 ${themeId} 取值错`).toBe(
         INPUT_PLACEHOLDER_DARK_COLOR[themeId],
+      )
+    }
+  })
+
+  it('7 档主题在缺省 system + 亮色系统路径下都取到亮色表值（#1015）', () => {
+    const settings = useSettingsStore()
+    settings.setDarkMode(DEFAULT_DARK_MODE)
+    currentDarkMode.value = 'light'
+    const { placeholderColor } = useInputPlaceholderColor()
+
+    for (const themeId of THEME_COLOR_IDS) {
+      settings.setThemeColor(themeId)
+      expect(placeholderColor.value, `缺省 system 路径下主题 ${themeId} 亮色取值错`).toBe(
+        INPUT_PLACEHOLDER_LIGHT_COLOR[themeId],
       )
     }
   })
