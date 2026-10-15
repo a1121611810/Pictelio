@@ -160,7 +160,7 @@
 
 ## 5. Out of Scope
 
-- **亮色侧令牌保真**（7 套主题的 placeholder 与其 `on-surface-variant` 不符）—— 修它需新增 placeholder 专属令牌，且 bili 需 clamp，是独立决策（§4.3）
+- **亮色侧令牌保真**（7 套主题的 placeholder 与其 `on-surface-variant` 不符）—— 修它需新增 placeholder 专属令牌，且 bili 需 clamp，是独立决策（§4.3）—— **已由 [#1015](https://github.com/a1121611810/Pictelio/issues/1015) 承接并实施（2026-10-16）**：亮色取值表逐主题化 + bili clamp `#5a5f66`（spec [`lynx-placeholder-light-token-fidelity.md`](./lynx-placeholder-light-token-fidelity.md)）
 - **`Login.vue` / `CommentInputBar.vue`** —— 早已改用 label 承载静止态文案、`placeholder-color` 平台属性一并撤下，天然脱敏
 - **新增 android-e2e spec** —— `ADR-0084` 定 e2e 不进 CI；像素验收由 #1014 走查矩阵承载（已是该链路的既有载体，再开 spec 属重复载体而非补覆盖）
 - **历史订正的独立记账** —— #693 正文的「≈1.7:1」在 T4 文档收口时一并订正为实测 1.31:1 + 口径说明

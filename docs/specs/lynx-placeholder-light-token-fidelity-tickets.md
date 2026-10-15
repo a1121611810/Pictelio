@@ -5,7 +5,7 @@
 | # | 标题 | 依赖 | 交付物 | 验收 | 状态 |
 |---|------|------|--------|------|------|
 | T0 | 亮色取值表 + composable 亮色查表（防线红→绿） | — | `src/utils/lynxPlatformColors.ts`、`src/composables/useInputPlaceholderColor.ts`、`src/utils/lynxPlatformColors.test.ts`、`src/composables/useInputPlaceholderColor.test.ts`、`tests/hardcode-whitelist-colors.json` | ① 新增 `INPUT_PLACEHOLDER_LIGHT_COLOR` 7 项（6 档 ≡ tokens.css 亮段 `--md-on-surface-variant`；bili = `#5a5f66` clamp，docstring 写明 §4.2 规则）；② 亮色单值常量 `INPUT_PLACEHOLDER_COLOR` **删除**；③ composable 亮/暗皆查表，**禁读 `currentDarkMode`**、不做非法值兜底；④ 守值测试：亮色表单项 ≡ 亮段抽取产物 + bili clamp 值守 + 抽取下界扩 dark+light 两段（各 ≥7）；⑤ 接线组 15 处断言原样保留；⑥ 白名单 reason 改写为 clamp 规则摘要；⑦ **变异推演三发全红**：亮色分支换回单值 / bili 改回 `#61666d` / 抽取器扫空集；⑧ `check:app-lynx` + `test:app-lynx` + `fmt:check` 绿 | done |
-| T1 | 文档收口 | T0 | `docs/adr/ADR-0180-lynx-dark-mode.md`、`docs/specs/lynx-placeholder-theme-color.md` §5 | ADR 实施记录表**追加**一行（#1015：亮色表 + clamp + 防线改造要点；历史行逐字保留）；#693 spec §5 排除项条目追加「→ 已由 #1015 承接（2026-10-16）」；`CONTEXT-MAP.md` / ADR README 无结构变化（不动作，核对即可） | todo |
+| T1 | 文档收口 | T0 | `docs/adr/ADR-0180-lynx-dark-mode.md`、`docs/specs/lynx-placeholder-theme-color.md` §5 | ADR 实施记录表**追加**一行（#1015：亮色表 + clamp + 防线改造要点；历史行逐字保留）；#693 spec §5 排除项条目追加「→ 已由 #1015 承接（2026-10-16）」；`CONTEXT-MAP.md` / ADR README 无结构变化（不动作，核对即可） | done |
 | T2 | 像素验收 3 帧 + 落档 + #1015 关闭 | T0、T1 | `docs/research/placeholder-light-token-acceptance.md`、#1015 评论 | 亮色态（`night no`）模拟器跑 bili / sky / teal 三主题：probe 自检 → 采样（WebDAV 字段「聚焦+空」，坑见 spec §4.6）→ 实测对比度 bili ≥4.5（理论 4.54；<4.5 按 spec §4.4 升档 `#53585f` 重测并记明）/ sky = 7.3x 不变 / teal = 7.2x；三帧 PASS 落档 acceptance md（帧路径 + 实测值 + 与理论偏差）；`gh issue close 1015 --comment`（关闭评论含证据坐标 + 未覆盖声明：violet/pink/green/orange 四档留 #1014 T2 全矩阵） | todo |
 
 ## 关键路径
