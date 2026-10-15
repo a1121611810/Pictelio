@@ -41,8 +41,8 @@ import {
   type SearchFilters,
 } from '@pictelio/search-core'
 import type { SearchScope, SearchSort } from '../api/types'
-import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 import { safeBottom } from '../utils/safeArea'
+import { useInputPlaceholderColor } from '../composables/useInputPlaceholderColor'
 import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
 import { useMotion } from '../composables/motion'
 
@@ -53,6 +53,9 @@ const { pressColor } = useMotion()
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
+
+/** 占位符颜色随主题色/明暗切换（#693）——平台属性不吃 var()，只能由 composable 翻成字面量。 */
+const { placeholderColor } = useInputPlaceholderColor()
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 
@@ -398,7 +401,7 @@ onBeforeUnmount(() => {
           confirm-type="search"
           class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
           :placeholder="t('searchSheet.placeholder')"
-          :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+          :placeholder-color="placeholderColor"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="SEARCH_A11Y_LABELS.input"
           @input="onInput"

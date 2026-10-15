@@ -24,8 +24,8 @@ import { useBookmarkPanel } from '../composables/useBookmarkPanel'
 import { useAuthStore } from '../stores/authStore'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
-import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 import { safeBottom } from '../utils/safeArea'
+import { useInputPlaceholderColor } from '../composables/useInputPlaceholderColor'
 import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
 import { useMotion } from '../composables/motion'
 
@@ -57,6 +57,9 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
+
+/** 占位符颜色随主题色/明暗切换（#693）——平台属性不吃 var()，只能由 composable 翻成字面量。 */
+const { placeholderColor } = useInputPlaceholderColor()
 
 const panel = useBookmarkPanel({
   getIllustId: () => props.illustId,
@@ -294,7 +297,7 @@ onBeforeUnmount(() => {
               class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-5"
               :class="inputCls"
               :placeholder="t('bookmarkPanel.newTagPlaceholder')"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="t('bookmarkPanel.newTagLabel')"
               @focus="onFocus"

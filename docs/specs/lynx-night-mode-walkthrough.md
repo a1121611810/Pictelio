@@ -114,7 +114,7 @@ adb shell dumpsys window | grep -i appearance
 | T3-5b | 手动亮 + 系统暗 | UI 切亮 → force-stop → 冷启动 | 最早帧按系统解析（残留深色帧）后进入亮色界面 | ⚠️ 接受 |
 | T3-5c | 跟随系统 | 系统亮 / 暗各一次 | 与系统一致（主轨全 API 覆盖） | ✅ 必须通过 |
 
-## 4. T4 矩阵 —— 硬编码浅色值修复的设备端确认（5 项，暗色截图）
+## 4. T4 矩阵 —— 硬编码浅色值修复的设备端确认（6 项，暗色截图）
 
 | # | 区域 | 落点 | 操作 | 期望 | 截图 |
 |---|---|---|---|---|---|
@@ -123,9 +123,10 @@ adb shell dumpsys window | grep -i appearance
 | T4-3 | 小说正文 | `NovelDetail` 正文页 | 暗色下打开小说正文 → 滚动若干屏 | 正文/标题/分隔线/翻译面板走暗色 token，无亮色残留 | `t4-novel-dark.png` |
 | T4-4 | skeleton | 页级首载骨架（列表/详情 shimmer） | 暗色 + 冷缓存（清数据或首访页面）抓首载瞬间 | 骨架块在暗色 surface 上可见且不刺眼（亮色 shimmer 直接闪白 = ❌） | `t4-skeleton-dark.png` |
 | T4-5 | 滚动指示条 | `ScrollIndicator` | 暗色下滚动长列表并抓帧 | 指示条为该主题 `.theme-X.dark` 的 `--md-outline` + 35% alpha（sky ≈ `rgba(140,145,152,0.35)`，其余读 `tokens.css`） | `t4-scrollbar-dark.png` |
+| T4-6 | 输入框占位符 | `SearchSheet` · `BookmarkPanel` · `Me`（命名模板 + WebDAV 六字段） | 暗色下打开上述输入框并聚焦；**WebDAV 六字段必须「聚焦 + 空」**（空态时被浮层 label 覆盖，按 label 采样会得到假结论） | placeholder 对比度 **≥ 4.5:1**（WCAG AA）。修复前 **1.31:1**；修复后取 `.theme-X.dark --md-on-surface-variant`，实测 **7.20–7.29**。不达标即 ❌ | `t4-placeholder-dark.png` |
 
 - 冷缓存技巧：`adb shell pm clear io.pictelio.app` 会清登录态——优先改用 force-stop + 未缓存页面（例如首访的分类页）或先记录后清理。
-- 已知**接受项**（不在本轮修复范围，见 [#693](https://github.com/a1121611810/Pictelio/issues/693)）：暗色下输入框 placeholder 仍为亮色基线值（Lynx 平台属性 `placeholder-color` 不解析 `var()`）——走查时目检记录对比度即可，**不判 ❌**。
+- **T4-6 判据来自 [#693](https://github.com/a1121611810/Pictelio/issues/693)**：该票原将本项登记为「已知接受项 · 走查不判 ❌」，2026-10-15 改判实施后转为**硬判据**（实现取 `.theme-X.dark --md-on-surface-variant`）。机制与取值见 [ADR-0180](../adr/ADR-0180-lynx-dark-mode.md) 代价段与 `docs/specs/lynx-placeholder-theme-color.md`。
 
 ## 5. 收口
 

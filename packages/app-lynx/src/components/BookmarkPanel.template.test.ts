@@ -19,7 +19,6 @@ import { fileURLToPath } from 'node:url'
 import zhMisc from '../i18n/locales/zh-CN/misc'
 import enMisc from '../i18n/locales/en/misc'
 import { BOOKMARK_TAG_LIMIT } from '../utils/bookmarkTags'
-import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const src = readFileSync(fileURLToPath(new URL('./BookmarkPanel.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与整行行注释（约束说明本身会提到被禁止的串，负向断言必须在代码本文上做） */
@@ -199,12 +198,17 @@ describe('BookmarkPanel 交互接线（spec D5/D6/D11 + D2/D9）', () => {
     expect(code).toContain('v-for="name in workTags"')
   })
 
-  it('placeholder-color 绑定 lynxPlatformColors 常量（Lynx 平台属性不解析 var()；FIX-5 实测结论，#537 令牌化）', () => {
+  it('placeholder-color 走 composable、不散写字面量（#693：平台属性不解析 var()，暗色取主题色）', () => {
     // 实测（FIX-5）：编译产物中 placeholder-color 原样落入平台属性通道（var() 仅出现在 CSS/style 通道），
-    // 故以 TS 常量字面量承载（lynxPlatformColors.ts 单点定义 = tokens.css --md-on-surface-variant），
-    // 模板禁止散写十六进制；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
-    expect(code).toContain(':placeholder-color="INPUT_PLACEHOLDER_COLOR"')
+    // 故只能以字面量承载；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
+    //
+    // #693 后接入主题化：模板绑 composable 的 computed，字面量由
+    // `useInputPlaceholderColor` 按 (themeColor × resolvedDark) 选出。
+    // 下方两条模板断言守的是**接线形状**（禁裸字面量回流），
+    // **取值正确性由 `lynxPlatformColors.test.ts` 守**（它逐项对 tokens.css 生成产物）。
+    // 两者刻意分开：模板测试读 .vue 源文本，证明不了「这个值对不对」。
+    expect(code).toContain(':placeholder-color="placeholderColor"')
+    expect(code).toContain('useInputPlaceholderColor')
     expect(code).not.toContain('placeholder-color="#')
-    expect(INPUT_PLACEHOLDER_COLOR).toBe('#41474e')
   })
 })

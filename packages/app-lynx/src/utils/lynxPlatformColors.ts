@@ -4,12 +4,51 @@
  * 平台约束（FIX-5 实测，BookmarkPanel.template.test.ts 锁定）：placeholder-color 是
  * Lynx **平台属性**（非 CSS）——编译产物把它原样落入属性通道，var() 只在 CSS/style
  * 通道解析，平台属性不解析；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
+ *
+ * ⚠️ 这条约束使下表**只能承载字面量**，取不到 `var(--md-on-surface-variant)`。
+ *   代价是 tokens.css 与本文件之间没有任何编译期联系，因此
+ *   `lynxPlatformColors.test.ts` 承担「表 ≡ tokens.css」的守值职责（issue #693）。
+ *
+ * ⚠️ **平台升级风险（#537 结论，本轮登记）**：`placeholder-color` 已不在 Lynx 当前官方文档的
+ *   input 属性表里——它是 elements 插件随客户端分发的**遗留属性**，本仓 runtime（LynxView 4.0.1）
+ *   实测仍接受。升级 LynxView / elements 后该属性**可能无声移除**，表现是 placeholder 回落平台默认灰：
+ *   无类型报错、无文档预警、构建与单测**全绿**。
+ *   ⇒ 升级 SDK 时**必须**复跑走查矩阵 T4-6（对比度判据），不能只看 CI 绿。
  */
 
+import type { ThemeColorId } from './themeColor'
+
 /**
- * input 占位符颜色。
+ * input 占位符颜色（**亮色**：单值）。
  *
- * 值契约：= tokens.css 亮色段 `--md-on-surface-variant`（#41474e）。
- * 改色时同步更新 tokens.css 对应变量与本常量（模板测试守值）。
+ * 值契约：= tokens.css 亮色基座 `page, .theme-sky` 段的 `--md-on-surface-variant`（#41474e）。
+ *
+ * **为何亮色不逐主题化**（issue #693 / spec §4.3）：M3 的 `--md-on-surface-variant` 是对
+ * `surface` 定义的，不是对本组件实际背景 `--md-surface-container-highest` 定义的。
+ * 逐主题化会让 bili 亮色取到 `#61666d`，在 `#d6d9dc` 上仅 **4.08:1**，低于 WCAG AA 4.5，
+ * **比现状（7.32:1）更差**；其余 6 档主题 7.20~7.32。⇒ 亮色维持单值。
+ * 遗留的「7 档主题亮色 placeholder 与其 token 不符」属令牌保真问题（**非对比度问题**），
+ * 修它需引入 placeholder 专属令牌 + bili clamp，是独立决策，已作显式排除项登记。
  */
 export const INPUT_PLACEHOLDER_COLOR = '#41474e'
+
+/**
+ * input 占位符颜色（**暗色**：按主题色取）。
+ *
+ * 值契约：逐项 = tokens.css `.theme-{id}.dark` 段的 `--md-on-surface-variant`。
+ * 对 `--md-surface-container-highest` 的实测对比度 7.20~7.29（修复前为 1.31，见 issue #693）。
+ *
+ * 用 `Record<ThemeColorId, string>` 而非查表 + 兜底：主题 id 的新增/改名会在这里**编译期报错**，
+ * 而兜底分支会静默吞掉（测试硬约束 #3：禁静默降级）。
+ * 运行时非法 id 由 settingsStore 写入侧校验拦下（`themeColor.ts` 的 `isThemeColorId` + console.warn），
+ * 故本表不做运行时兜底。
+ */
+export const INPUT_PLACEHOLDER_DARK_COLOR: Record<ThemeColorId, string> = {
+  sky: '#c2c7cf',
+  violet: '#cac4cf',
+  pink: '#d5c2c6',
+  green: '#c2c8bd',
+  orange: '#d5c3b5',
+  teal: '#bec8c9',
+  bili: '#d6c2c5',
+}

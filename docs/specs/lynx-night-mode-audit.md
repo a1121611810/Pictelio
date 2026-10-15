@@ -85,7 +85,7 @@ P1-1 / P1-2：替换 `rgba(...)` 字面量为 `var(--md-scroll-indicator)` / `va
 - 检测三类硬编码色：hex（3/4/6/8 位）/ `rgb(...)` / `rgba(...)` / Tailwind 命名色（`text-white`、`text-black`、`bg-white/NN` 等）；CSS / JS / Vue 注释豁免（取证与 ADR 引用可写具体色值）
 - 白名单：`tests/hardcode-whitelist-colors.json`——**6 条，文件级豁免语义**（每条登记 `path` + 非空 `reason`；登记路径下的**全部**命中一律豁免，不做行级/上下文级细分）：
   - `errorPrototype/ErrorPagePreview.vue`（web-core 预览 token 不解析）
-  - `utils/lynxPlatformColors.ts`（Lynx 平台属性 `placeholder-color` 不解析 `var()`；暗色对比度受限 → [#693](https://github.com/a1121611810/Pictelio/issues/693)）
+  - `utils/lynxPlatformColors.ts`（Lynx 平台属性 `placeholder-color` 不解析 `var()`；本文件集中承载其字面量。暗色已逐主题化（#693，实测 7.20–7.29，修复前 1.31）；`utils/lynxPlatformColors.test.ts` 把取值钉到 tokens.css 生成产物。本豁免为该平台约束的登记载体，随文件保留）
   - `components/RankingEntryCard.vue` / `pages/IllustDetail.vue` / `pages/NovelIntro.vue` / `pages/Recommended.vue`（P2 §3.3：白字叠 scrim，明暗通用）
 - 条件：白名单外零命中，违例即失败（CI 红 → review block）
 - **空集与覆盖面防护（#692 review 轮补入）**：① 白名单非空 + 每条登记路径在磁盘存在 + `reason` 非空——防「陈旧豁免掩盖新违规」与「白名单被清空导致豁免语义反转」；② `walk(src)` 文件数下界 + 关键文件在集内——防遍历失效 → offenders 恒空 → 门禁恒真通过

@@ -49,7 +49,7 @@ import {
   saveWebdavPassword,
 } from '../utils/webdavCredentials'
 import { t, locale } from '../i18n'
-import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
+import { useInputPlaceholderColor } from '../composables/useInputPlaceholderColor'
 import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { useMotion } from '../composables/motion'
 
@@ -73,6 +73,11 @@ const { listItemStyle } = useMotion()
 // 数值来源唯一：utils/topInset.ts 按当前路由 meta 裁决，公共入口 = composables/useTopInsetSpacer。
 // 'bleed'（内容铺到状态栏底下）下恒 0 ⇒ 模板里的 spacer 是 0 高，正确行为，不特判。
 const topInsetSpacer = useTopInsetSpacer()
+
+/** 占位符颜色随主题色/明暗切换（#693）——平台属性不吃 var()，只能由 composable 翻成字面量。
+ *  Me.vue 的 6 处 WebDAV 字段被浮层 label 覆盖，placeholder 仅「聚焦 + 空」时露出；
+ *  :1105（命名模板）无覆盖层，空字段直接可见。接线形状一致，故 7 处统一改绑。 */
+const { placeholderColor } = useInputPlaceholderColor()
 
 // ─── 一次性迁移提示（spec §7「老用户找不到收藏/追更」的第 2 条缓解）──────────
 // 【为什么落在「我的」而不是全局弹层】①「发现」页是 full-bleed 渗色流（ADR-0216/
@@ -1102,7 +1107,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('template', templateInput)"
               :placeholder="t('me.download.templatePlaceholder')"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('template', true)"
               @blur="setFieldFocus('template', false)"
               @input="commitTemplate(false)"
@@ -1330,7 +1335,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('webdavUrl', settings.webdavUrl)"
               :placeholder="isPlaceholderShown('webdavUrl') ? 'https://dav.example.com/remote.php/dav/files/me/' : ''"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('webdavUrl', true)"
               @blur="setFieldFocus('webdavUrl', false)"
               @input="onWebdavFieldInput('url', $event)"
@@ -1358,7 +1363,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('webdavUsername', settings.webdavUsername)"
               :placeholder="isPlaceholderShown('webdavUsername') ? t('me.webdav.usernamePlaceholder') : ''"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('webdavUsername', true)"
               @blur="setFieldFocus('webdavUsername', false)"
               @input="onWebdavFieldInput('username', $event)"
@@ -1384,7 +1389,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('webdavPassword', webdavLoginPassword)"
               :placeholder="isPlaceholderShown('webdavPassword') ? t('me.webdav.passwordPlaceholder') : ''"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('webdavPassword', true)"
               @blur="setFieldFocus('webdavPassword', false)"
             />
@@ -1407,7 +1412,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('webdavDir', settings.webdavDir)"
               :placeholder="isPlaceholderShown('webdavDir') ? t('me.webdav.dirPlaceholder') : ''"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('webdavDir', true)"
               @blur="setFieldFocus('webdavDir', false)"
               @input="onWebdavFieldInput('dir', $event)"
@@ -1429,7 +1434,7 @@ function pickAppearanceMode(mode: DarkModeId) {
               class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
               :class="fieldInputPadClass('webdavBackupPassword', webdavBackupPassword)"
               :placeholder="isPlaceholderShown('webdavBackupPassword') ? t('me.webdav.backupPasswordPlaceholder') : ''"
-              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+              :placeholder-color="placeholderColor"
               @focus="setFieldFocus('webdavBackupPassword', true)"
               @blur="setFieldFocus('webdavBackupPassword', false)"
             />
@@ -1563,7 +1568,7 @@ function pickAppearanceMode(mode: DarkModeId) {
                   class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-surface-on-variant text-body-large text-surface-on px-4"
                   :class="fieldInputPadClass('webdavPromptPassword', webdavPromptPassword)"
                   :placeholder="isPlaceholderShown('webdavPromptPassword') ? t('me.webdav.restorePromptPlaceholder') : ''"
-                  :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+                  :placeholder-color="placeholderColor"
                   @focus="setFieldFocus('webdavPromptPassword', true)"
                   @blur="setFieldFocus('webdavPromptPassword', false)"
                 />
