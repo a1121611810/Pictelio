@@ -1,6 +1,6 @@
 # ADR-0132: app-lynx 全局搜索（底部弹层 + FAB 双形态入口）（底部弹层命令面板 + FAB 双形态入口）
 
-- 状态：accepted（编号修订 2026-09-01：原 ADR-0131 与内容区尺寸契约撞号，改 0132）
+- 状态：accepted（编号修订 2026-09-01：原 ADR-0131 与内容区尺寸契约撞号，改 0132；决策 4 修订 2026-10-16：搜索范围新增「用户」第四档，推翻「无用户搜索」，见文末「修订（2026-10-16）」）
 - 日期：2026-09-01
 - 关联：ADR-0120（放射导航 FAB）、ADR-0123（FAB hit-testing，（0,0）锚点）、ADR-0066（系统返回 + modalStack 扩展）、ADR-0103（账号级设置 / SharedPreferences 契约）、ADR-0111（RefreshableList FAB menu）、研究 `docs/research/global-search-patterns.md`、术语 `docs/adr/glossary-app-lynx-global-search.md`、spec `docs/specs/app-lynx-global-search.md`、issue #60（差距 #1）
 - 来源：issue #60 差距清单 #1（搜索页未实现，最大缺口）；用户要求「更灵活、全局方便调用」而非固定搜索页 → 三变体原型（throwaway 分支 `prototype/lynx-global-search` f07f3fd）A 底部弹层 / B 全屏页 / C 半屏速览 → **用户拍板变体 A** + 全员 FAB 入口（2026-09-01），触发方式按推荐（即输即搜）。
@@ -23,7 +23,7 @@ app-lynx 与 webview client 的功能差距中，**搜索**是剩余最大缺口
 
 3. **触发方式 = 即输即搜**：输入变化 **300ms debounce** 自动搜索，弹层内就地出结果；**防竞态 = AbortController 轮换**（abort 上一在途请求，`useComments.ts` 同款范式，lynx 全路径已验证可用）；屏蔽 `AbortError` 不报错。搜索结果**全局 LRU 缓存**不做——弹层生命周期短、每次打开关键词通常不同，简洁胜出（webview 的 searchCache 是页面常驻场景的优化，不迁移）。
 
-4. **搜索范围与排序 = 对齐 webview 蓝本**：scope **全部 / 插画 / 小说**（全部 = `mergeSearchResults` 混合时间线）；排序 **最新 / 最早 / 热门**（热门走 `/v1/search/popular-preview/{illust,novel}` 端点，不分页）。**无用户搜索**（差距清单定义 + webview 无先例）。搜索目标 `search_target` 沿用 `partial_match_for_tags` / 含空格转 `exact_match_for_tags` 派生规则（复用 webview 语义）。
+4. **搜索范围与排序 = 对齐 webview 蓝本**：scope **全部 / 插画 / 小说 / 用户**（全部 = `mergeSearchResults` 混合时间线；用户 = `/v1/search/user` 独立端点，单类型不混排）；排序 **最新 / 最早 / 热门**（热门走 `/v1/search/popular-preview/{illust,novel}` 端点，不分页）。~~**无用户搜索**（差距清单定义 + webview 无先例）~~ —— **2026-10-16 推翻**（原句原样保留划线，推翻理由与一手证据见文末「修订（2026-10-16）」）。搜索目标 `search_target` 沿用 `partial_match_for_tags` / 含空格转 `exact_match_for_tags` 派生规则（复用 webview 语义；**用户端点不发该参数**）。
 
 5. **结果呈现 = 弹层内行式列表 + next_url 分页**：list-item 行（缩略图 + 标题 + 作者 + 类型/字数），`scrolltolower` 自动分页 + 「没有更多了」footer；分页失败保留已加载结果 + 内联重试（复用 glossary-search-pagination 的 paginationError / 内联重试模式语义）。R18/R18G 行按 `isRestricted()` 遮罩（不预过滤，与既有列表页策略一致）。空态 = 换词提示（dead-end 规避）；错误态 = 保留关键词 + 重试，不静默清空。
 
@@ -67,3 +67,13 @@ app-lynx 与 webview client 的功能差距中，**搜索**是剩余最大缺口
 - **第 8 条修订**：lynx `src/api/search.ts` 与 webview 的「逐字对齐」契约升级为**参数构建单点共享**——新增共享包 `@pictelio/search-core`（筛选状态 → 请求参数 / URL 编解码 / 缓存键的零 IO 纯函数，先例 `@pictelio/update-check` 双端共用），两端 `api/search.ts` 降级为同构薄传输层（fetch/代理 + `next_url` 域名断言）。逐字镜像约定对该文件不再适用；仓库其余镜像/差分约定不变。
 - **第 4 条行为更新**：`search_target` 派生规则以 spec §6.1 为准（illust 端 partial 场景**不传**该参数以并入标题命中（Shaft #906）；novel 端恒显式传；含空格多标签仍传 `exact_match_for_tags`），并恒发 `merge_plain_keyword_results=true` / `include_translated_tag_results=true`。
 - 依据：双端搜索高级筛选 spec（用户终审通过 2026-09-12，#475~#480 全闭）。
+
+## 修订（2026-10-16，issue #1023 → spec `docs/specs/search-user-scope.md`）
+
+- **第 4 条推翻**：「**无用户搜索**」作废，搜索范围由三档改为四档 **全部 / 插画 / 小说 / 用户**（用户 = `/v1/search/user` 独立端点，单类型不混排）。原句在 §4 中划线保留，不抹改。
+- **原理由已不成立**：原文写的「差距清单定义 + webview 无先例」是**内部对齐**（issue #60 差距清单未列该项 + 被参照的 webview 蓝本没有），**不是官方能力边界**。拿内部对齐结论当「不做」的理由，本身就是这次推翻的根因。
+- **官方产品面确有用户搜索**：pixiv 官方帮助中心 article `235646387`「pixivで作品を検索する方法を知りたい」的【ユーザー検索】节原文「検索結果のページ内にある、[ユーザー]のタブを選択してください。」。2026-10-16 经 Zendesk HC API v2 复核（`https://www.pixiv.help/api/v2/help_center/ja/articles/235646387.json`，注意网页版 `/hc/ja/articles/...` 在本环境被 Cloudflare 403 拦，API 路径可用）。
+- **第三方共识**：spec §1 记录的六个第三方客户端（Pixiv-Shaft / Mako / PixivBiu / pixez / Pixiv-SwiftUI / pixivpy）全部实现用户搜索；其中 pixez `getSearchUser` 与 Mako `UserSearchEngine` **只发 `filter` + `word`**，与本仓 `buildUserSearchRequest` 的参数口径同款。
+- **端点响应面已一手实测**（2026-10-16，脚本 `docs/research/verify-search-user-api.sh` + fixture `packages/app-lynx/src/api/__fixtures__/search-users.json`）：顶层键只有 `user_previews` / `next_url`；`PixivUser`（4 必填）/ `PixivIllust`（15）/ `PixivNovel`（11）在实测样例中**零必填字段缺失**，故不新造这三种类型。`user` 是**轻量对象无 `profile`**，术语与坑见 `docs/adr/glossary-search-pagination.md`「用户搜索范围」。
+- **第 4 条其余部分不变**：三档排序、三个既有端点、`mergeSearchResults` 混排、`search_target` 派生规则原样保留；**用户端点不消费 `search_target` 与任何筛选参数**（见 `docs/specs/search-advanced-filters.md` §3.2）。
+- 配套：术语 `docs/adr/glossary-search-pagination.md` / `packages/app-lynx/CONTEXT.md` §搜索「用户搜索范围」。

@@ -86,6 +86,7 @@ const enMisc = {
   "searchSheet.scope.all": "All",
   "searchSheet.scope.illust": "Illustrations",
   "searchSheet.scope.novel": "Novels",
+  "searchSheet.scope.user": "Users",
   "searchSheet.sort.newest": "Newest",
   "searchSheet.sort.oldest": "Oldest",
   "searchSheet.sort.popular": "Popular",

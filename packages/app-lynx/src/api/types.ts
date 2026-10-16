@@ -202,11 +202,18 @@ export interface PixivUserPreview {
   user: PixivUser;
   illusts: PixivIllust[];
   /**
-   * 仅好P友端点 /v1/user/mypixiv 响应含该字段（UserPreview 形状 = { user, illusts, novels,
-   * is_muted }）；following/follower 响应**无**该字段——必需声明会类型失真，故可选。
-   * 本批不消费（ADR-0193 D1）。
+   * 好P友端点 /v1/user/mypixiv 与用户搜索 /v1/search/user 响应含该字段（UserPreview 形状 =
+   * { user, illusts, novels, is_muted }）；following/follower 响应**无**该字段——必需声明会
+   * 类型失真，故可选（该可选性是 user.test.ts「无 novels 也要能构造」的编译期防线，勿收紧）。
+   *
+   * ⚠️ 元素形状的证据边界：`/v1/search/user` 侧为**一手实测**——spec
+   * docs/specs/search-user-scope.md §3.1 零缺失、§3.3 实测 image_urls 只有
+   * square_medium/medium/large（无 original）。`/v1/user/mypixiv` 侧**未独立验证**：
+   * 该端点 fixture（__fixtures__/mypixiv-users.json）里 novels 是空数组，无元素可查。
+   * 两端点同属 UserPreview 形状，故按 search/user 的实测收窄；若将来 mypixiv 形状分叉，
+   * 以本类型为准的调用点会由 tsc 暴露。
    */
-  novels?: unknown[];
+  novels?: PixivNovel[];
   is_muted: boolean;
 }
 
@@ -366,4 +373,14 @@ export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
 
 export type SearchTarget = "partial_match_for_tags" | "exact_match_for_tags" | "title_and_caption";
 
-export type SearchScope = "all" | "illust" | "novel";
+/** 与 search-core 的同名联合是既有镜像（packages/search-core/src/buildParams.ts），增删档位两处都要改 */
+export type SearchScope = "all" | "illust" | "novel" | "user";
+
+/**
+ * GET /v1/search/user 响应（spec docs/specs/search-user-scope.md §3/§4）。
+ * 顶层实测键恰为 next_url + user_previews；分页走该端点自身 next_url（单游标）。
+ */
+export interface PixivUserSearchResponse {
+  user_previews: PixivUserPreview[];
+  next_url: string | null;
+}

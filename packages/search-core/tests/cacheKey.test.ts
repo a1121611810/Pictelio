@@ -48,4 +48,18 @@ describe("buildCacheKey", () => {
     });
     expect(a).not.toBe(b);
   });
+
+  // oracle：docs/specs/search-user-scope.md §5.1「cacheKey.ts 无需改动：
+  // ${word}_${scope}_${sort} 对 "user" 天然成立」+ §8.1 验收项 1。
+  it("scope=user 天然成立（base 键，无需改 cacheKey）", () => {
+    expect(buildCacheKey("水上", "user", "date_desc", DEFAULT_SEARCH_FILTERS)).toBe(
+      "水上_user_date_desc",
+    );
+    expect(buildCacheKey("水上", "user", "date_asc", DEFAULT_SEARCH_FILTERS)).toBe(
+      "水上_user_date_asc",
+    );
+    expect(buildCacheKey("水上", "user", "popular_desc", DEFAULT_SEARCH_FILTERS)).toBe(
+      "水上_user_popular_desc",
+    );
+  });
 });

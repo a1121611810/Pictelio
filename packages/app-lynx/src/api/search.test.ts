@@ -6,6 +6,8 @@
 // 响应 mock 数据结构来自真实契约：字段形状逐字对齐 lynx api/types.ts
 // 。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import {
   setAccessToken,
   setOnUnauthorized,
@@ -16,11 +18,13 @@ import {
   searchNovel,
   searchIllustNext,
   searchNovelNext,
+  searchUser,
+  searchUserNext,
   searchTransport,
 } from "./search"
 import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core"
 import { toIllustId, toNovelId, toSeriesId, toUserId } from "./id"
-import { ApiErrorType, type PixivIllust, type PixivIllustListResponse, type PixivNovel, type PixivNovelListResponse } from "./types"
+import { ApiErrorType, type PixivIllust, type PixivIllustListResponse, type PixivNovel, type PixivNovelListResponse, type PixivUser, type PixivUserSearchResponse } from "./types"
 
 // ─── 真实契约样例 —— 字段形状来自 api/types.ts ───
 
@@ -106,6 +110,13 @@ const NOVEL_RESPONSE: PixivNovelListResponse = {
 }
 
 const ABS_NEXT_URL = "https://app-api.pixiv.net/v1/search/illust?word=test&offset=30"
+
+/** 用户搜索一手实测样例（spec docs/specs/search-user-scope.md §3；脚本 docs/research/verify-search-user-api.sh 产出） */
+function loadUserSearchFixture(): PixivUserSearchResponse {
+  return JSON.parse(
+    readFileSync(fileURLToPath(new URL("./__fixtures__/search-users.json", import.meta.url)), "utf8"),
+  ) as PixivUserSearchResponse
+}
 
 describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
   const fetchMock = vi.fn()
@@ -259,6 +270,62 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     warnSpy.mockRestore()
   })
 
+  it("searchUser 默认参数 → /v1/search/user 且只有 word/filter/sort（spec §5.1 参数表：端点不消费筛选与 search_target）", async () => {
+    const fixture = loadUserSearchFixture()
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(fixture), { status: 200 }))
+    const result = await searchUser("水上")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/v1/search/user?word=%E6%B0%B4%E4%B8%8A&filter=for_ios&sort=date_desc",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({ Authorization: "Bearer web-token" }),
+      }),
+    )
+    expect(result).toEqual(fixture)
+  })
+
+  it("searchUser sort 透传且不换端点（用户端点无 popular-preview 对应物，三档 sort 一律直发，spec §5.1）", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(loadUserSearchFixture()), { status: 200 }))
+    await searchUser("水上", "popular_desc")
+    const url = fetchMock.mock.calls[0]![0] as string
+    expect(url).toBe("/pixiv-api/v1/search/user?word=%E6%B0%B4%E4%B8%8A&filter=for_ios&sort=popular_desc")
+    expect(url).not.toContain("popular-preview")
+  })
+
+  it("searchUserNext 放行 fixture 实测 next_url → 剥域名成代理路径 + 原样透传（transport 零加工）", async () => {
+    const fixture = loadUserSearchFixture()
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(fixture), { status: 200 }))
+    const result = await searchUserNext(fixture.next_url!)
+    // 参数顺序与形态取自 fixture 里的真实 next_url（word/filter/sort/offset）
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/v1/search/user?word=%E6%B0%B4%E4%B8%8A&filter=for_ios&sort=date_desc&offset=30",
+      expect.anything(),
+    )
+    expect(result).toEqual(fixture)
+    expect(result.user_previews).toHaveLength(4)
+  })
+
+  it("searchUserNext 域外 URL → 抛错 + warn 可见且不发请求（复用 assertPixivUrl，禁止静默降级）", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    expect(() => searchUserNext("https://evil.example.com/steal")).toThrow(
+      "[api/search] searchUserNext: invalid next_url",
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[api/search] searchUserNext: invalid next_url"),
+      "https://evil.example.com/steal",
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("失败路径：searchUser 服务端 400 → ApiError（热门排序若不被接受，走既有错误态而非降级）", async () => {
+    fetchMock.mockResolvedValue(new Response("bad request", { status: 400 }))
+    await expect(searchUser("水上", "popular_desc")).rejects.toMatchObject({
+      type: ApiErrorType.UNKNOWN,
+      status: 400,
+    })
+  })
+
   it("signal 透传：AbortController.signal 原样传给 fetch", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     const controller = new AbortController()
@@ -284,11 +351,13 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     })
   })
 
-  it("searchTransport 默认实例绑定四个真实导出函数（seam 同构，useSearch 可注入替身）", () => {
+  it("searchTransport 默认实例绑定六个真实导出函数（seam 同构，useSearch 可注入替身）", () => {
     expect(searchTransport.searchIllust).toBe(searchIllust)
     expect(searchTransport.searchNovel).toBe(searchNovel)
     expect(searchTransport.searchIllustNext).toBe(searchIllustNext)
     expect(searchTransport.searchNovelNext).toBe(searchNovelNext)
+    expect(searchTransport.searchUser).toBe(searchUser)
+    expect(searchTransport.searchUserNext).toBe(searchUserNext)
   })
 })
 
@@ -338,5 +407,87 @@ describe("api/search（原生模式：PictelioApi.request 转发）", () => {
       type: ApiErrorType.UNKNOWN,
       status: 404,
     })
+  })
+})
+
+// ─── 用户搜索契约测试（测试硬约束 2：真实 fixture 反序列化，锁死 spec §3 一手实测结论）───
+// oracle 出处：spec docs/specs/search-user-scope.md §3（2026-10-16 一手实测，脚本
+// docs/research/verify-search-user-api.sh 可复跑）+ fixture 本体，非从本仓实现反推。
+// 必填清单与 api/types.ts 的类型定义绑死（§3.1 实测必填 4/15/11 零缺失）：将来谁误删
+// 类型必填字段而清单仍列着，`pnpm check`（tsc）阶段即红，不必等运行时。
+describe("用户搜索真实契约（GET /v1/search/user fixture，spec §3）", () => {
+  type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K }[keyof T]
+
+  const USER_REQUIRED: readonly RequiredKeys<PixivUser>[] = [
+    "id",
+    "name",
+    "account",
+    "profile_image_urls",
+  ]
+  const ILLUST_REQUIRED: readonly RequiredKeys<PixivIllust>[] = [
+    "id",
+    "title",
+    "type",
+    "user",
+    "image_urls",
+    "width",
+    "height",
+    "page_count",
+    "is_bookmarked",
+    "total_bookmarks",
+    "tags",
+    "x_restrict",
+    "create_date",
+    "meta_pages",
+    "meta_single_page",
+  ]
+  const NOVEL_REQUIRED: readonly RequiredKeys<PixivNovel>[] = [
+    "id",
+    "title",
+    "user",
+    "image_urls",
+    "tags",
+    "page_count",
+    "text_length",
+    "is_bookmarked",
+    "total_bookmarks",
+    "x_restrict",
+    "create_date",
+  ]
+
+  it("零缺失覆盖：PixivUser(4) / PixivIllust(15) / PixivNovel(11) 必填字段全部实测到齐", () => {
+    const { user_previews } = loadUserSearchFixture()
+    const first = user_previews[0]!
+    // 顶层实测：预览元素键恰为 user/illusts/novels/is_muted
+    expect(Object.keys(first).sort()).toEqual(["illusts", "is_muted", "novels", "user"])
+    expect(Object.keys(first.user)).toEqual(expect.arrayContaining([...USER_REQUIRED]))
+    expect(Object.keys(first.illusts[0]!)).toEqual(expect.arrayContaining([...ILLUST_REQUIRED]))
+    // fixture 实测前两条预览只有插画、novels 为空数组；小说预览落在第 3/4 条
+    const novelPreview = user_previews.find((p) => (p.novels ?? []).length > 0)!
+    expect(Object.keys(novelPreview.novels![0]!)).toEqual(expect.arrayContaining([...NOVEL_REQUIRED]))
+    // 四条预览逐条覆盖：只测首条会漏检
+    for (const preview of user_previews) {
+      expect(Object.keys(preview.user)).toEqual(expect.arrayContaining([...USER_REQUIRED]))
+      expect(typeof preview.is_muted).toBe("boolean")
+      for (const illust of preview.illusts) {
+        expect(Object.keys(illust)).toEqual(expect.arrayContaining([...ILLUST_REQUIRED]))
+      }
+      for (const novel of preview.novels ?? []) {
+        expect(Object.keys(novel)).toEqual(expect.arrayContaining([...NOVEL_REQUIRED]))
+      }
+    }
+  })
+
+  it("user 是轻量对象：无 profile（取不到粉丝数/作品数），头像只有 medium（spec §3.2）", () => {
+    const user = loadUserSearchFixture().user_previews[0]!.user
+    expect(user).not.toHaveProperty("profile")
+    expect(Object.keys(user.profile_image_urls).sort()).toEqual(["medium"])
+  })
+
+  it("预览小说 image_urls 无 original：只有 large/medium/square_medium，缩略图走 square_medium（spec §3.3）", () => {
+    const { user_previews } = loadUserSearchFixture()
+    const novel = user_previews.find((p) => (p.novels ?? []).length > 0)!.novels![0]!
+    expect(Object.keys(novel.image_urls).sort()).toEqual(["large", "medium", "square_medium"])
+    expect(novel.image_urls).not.toHaveProperty("original")
   })
 })

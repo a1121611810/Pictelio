@@ -51,12 +51,14 @@ export interface SearchFilters {
 
 ### 3.2 维度适用矩阵（scope × 维度）
 
-| 维度 | scope=all | scope=illust | scope=novel |
-|---|---|---|---|
-| 期间 | ✅ 双路携带 | ✅ | ✅ |
-| 收藏数 | ✅ 双路携带（参数+客户端兜底） | ✅ | ✅ |
-| 比例 / 分辨率 | ✅ **仅传插画路**，控件标「仅插画」 | ✅ | **置灰禁用，值保留** |
-| AI 覆盖 | ✅（客户端，scope 无关） | ✅ | ✅ |
+| 维度 | scope=all | scope=illust | scope=novel | scope=user |
+|---|---|---|---|---|
+| 期间 | ✅ 双路携带 | ✅ | ✅ | ❌ 不适用 |
+| 收藏数 | ✅ 双路携带（参数+客户端兜底） | ✅ | ✅ | ❌ 不适用 |
+| 比例 / 分辨率 | ✅ **仅传插画路**，控件标「仅插画」 | ✅ | **置灰禁用，值保留** | ❌ 不适用 |
+| AI 覆盖 | ✅（客户端，scope 无关） | ✅ | ✅ | ❌ 不适用 |
+
+**scope=user**（`/v1/search/user`，搜索范围第四档；ADR-0132 §4 于 2026-10-16 推翻「无用户搜索」）：**上表全部维度不适用**——该端点请求只带 `word` / `filter=for_ios` / `sort`，不消费 `search_target` 与任何筛选参数（spec `docs/specs/search-user-scope.md` §5.1；一手实测 2026-10-16 + pixez `getSearchUser` / Mako `UserSearchEngine` 同款）。UI 侧 scope=user 时**同时隐藏筛选折叠区与 sort 段**（spec §5.4）：实测该端点**完全忽略** `sort`——三档在 4 个检索词下返回逐位相同的 ID 序列（spec `docs/specs/search-user-scope.md` §3.4），留着 chip 就是给用户一个点了没反应的控件。
 
 ### 3.3 筛选状态 → 请求参数映射（由 search-core 单点实现）
 

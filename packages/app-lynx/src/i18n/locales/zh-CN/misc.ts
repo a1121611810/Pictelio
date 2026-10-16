@@ -87,6 +87,7 @@ const zhMisc = {
   "searchSheet.scope.all": "全部",
   "searchSheet.scope.illust": "插画",
   "searchSheet.scope.novel": "小说",
+  "searchSheet.scope.user": "用户",
   "searchSheet.sort.newest": "最新",
   "searchSheet.sort.oldest": "最早",
   "searchSheet.sort.popular": "热门",

@@ -14,16 +14,20 @@
  *   **不携带收藏数区间**（服务端忽略），期间/比例/分辨率照常透传。
  * - scope 适用性（#476 Q4）：比例/分辨率仅进插画路（scope=novel 时即使状态残留也不发）；
  *   期间/收藏数双路携带（收藏数受热门排除约束）。
+ * - 用户搜索（#1019 / spec docs/specs/search-user-scope.md §5.1）：`/v1/search/user` 一手实测，
+ *   参数只有 word + filter + sort 三项——merge/include 两 bool 与 search_target 均**未发**且
+ *   第三方实现（pixez / Mako）同款；该端点无 popular-preview 对应物，三档 sort 一律直发。
  */
 import { resolvePeriodRange } from "./period";
 import type { SearchFilters } from "./filters";
 
-export type SearchScope = "all" | "illust" | "novel";
+export type SearchScope = "all" | "illust" | "novel" | "user";
 export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
 
 export type SearchEndpointPath =
   | "/v1/search/illust"
   | "/v1/search/novel"
+  | "/v1/search/user"
   | "/v1/search/popular-preview/illust"
   | "/v1/search/popular-preview/novel";
 
@@ -117,4 +121,19 @@ export function buildNovelSearchRequest(input: BuildSearchRequestInput): BuiltSe
   applyBookmark(params, filters, popular);
   // 比例/分辨率是插画专属维度：小说路**永不携带**（即使状态残留——#476 置灰不清值 + #475 §2）
   return { endpoint, params };
+}
+
+/**
+ * 用户搜索（#1019）。不走 `baseParams`：merge/include 两 bool 与 `search_target` 实测未发，
+ * 端点亦不消费期间/收藏数/比例/分辨率/AI 类型（spec §5.1）。
+ * 用户端点无 popular-preview 对应物，`popular_desc` 同样直发 `/v1/search/user`。
+ */
+export function buildUserSearchRequest(input: {
+  word: string;
+  sort: SearchSort;
+}): BuiltSearchRequest {
+  return {
+    endpoint: "/v1/search/user",
+    params: { word: input.word, filter: "for_ios", sort: input.sort },
+  };
 }

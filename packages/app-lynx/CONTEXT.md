@@ -725,6 +725,14 @@ _Avoid_: 用 `navigator.clipboard`（运行时不存在的对象，可选链会�
 2. **标签与画师名不可混搜，二者是互斥通路。** `/v1/search/illust` 的 `word` 只认标签：实测 `原神 <画师名>` = **0 条**（画师名被当标签筛），纯画师名亦 0 条。画师名必须走**独立端点** `/v1/search/user`（实测 `ソーダ豆汁` 在 user 端点命中 1 个用户）。要「看某画师的其他作品」应走 `/v2/illust/related` 或用户主页作品列表，**不是往作品搜索里掺画师名**。
 _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `word`、为含空格标签自造引号语法
 
+**用户搜索范围（User search scope）**【2026-10-16 新增，#1023，spec `docs/specs/search-user-scope.md`，ADR-0132 §4 修订】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
+搜索范围的**第四档**，端点 `GET /v1/search/user`——这是上面「画师名必须走独立端点」在产品面的落地。请求**只带 `word` / `filter=for_ios` / `sort` 三个参数**：用户端点不消费 `search_target`，也不消费任何筛选参数（期间/收藏数/比例/分辨率/AI 覆盖全部不适用，UI 上隐藏整个筛选折叠区）。响应顶层只有两个键：`user_previews`（每条 = `user` + `illusts` + `novels` + `is_muted`，即**用户行 + 少量作品预览**）与 `next_url`（该端点自己的游标，单游标推进）。
+两个响应面的坑（一手实测 2026-10-16，脚本 `docs/research/verify-search-user-api.sh`，fixture `packages/app-lynx/src/api/__fixtures__/search-users.json`）：
+1. **`user` 是轻量对象、无 `profile`**——没有 `total_follow_users` / `total_illusts` / `total_followers`（那些只在 `/v1/user/detail`）⇒ **用户行不得渲染粉丝数/作品数**；要显示须二次请求 `getUserDetail`。
+2. **`profile_image_urls` 只有 `medium`**（无 `px_16x16` / `px_50x50` / `px_170x170`）⇒ 头像只取 `medium`；`UserRow.vue` 既有 `medium || px_170x170` 回退分支在这条路径上走不到 `medium` 之外（无害冗余）。
+用户没有 `create_date`（`SearchResultItem.date` 恒 `null`），**不参与混排**——scope=user 是单一类型，无需 `mergeSearchResults`。同理 AI 覆盖 / 标签静音两个客户端过滤器对它不适用（无 `illust_ai_type` / `tags`）。
+_Avoid_: 从 user 行读粉丝/作品数（字段不存在）、用 `word` 端点找画师名（标签与画师名互斥，见上）
+
 ### 图床缓存契约（Image host cache contract）
 
 > 本节自 `packages/app/CONTEXT.md`「图床」节**逐字搬运**（同上，WebView 客户端源码随 ADR-0203 删除）。

@@ -22,13 +22,20 @@
 // scope=all 混排：两类请求 **并行** 发起（同一 signal），settle 后按 create_date 降序
 //   混排为单一时间线；一类失败一类成功 = 部分降级（console.warn 可见，
 //   失败侧清空，结果 = 成功类）—— 双类失败 = status='error'。
-//   scope=illust/novel：保留服务端顺序。
+//   scope=illust/novel/user：保留服务端顺序；user 单路失败即 status='error'
+//   （无同类可降级，不新增部分成功分支）。
 //
 // 关注点分离：不写搜索历史（提交点由 SearchSheet 组件负责）；不做记忆化缓存（spec D2）。
 import { computed, ref } from "vue"
 import { searchTransport } from "../api/search"
 import type { SearchTransport } from "../api/search"
-import type { PixivIllust, PixivNovel, SearchScope, SearchSort } from "../api/types"
+import type {
+  PixivIllust,
+  PixivNovel,
+  PixivUserPreview,
+  SearchScope,
+  SearchSort,
+} from "../api/types"
 import { toApiError } from "../utils/errors"
 import { t, apiErrorMessage } from "../i18n"
 import {
@@ -41,10 +48,16 @@ import {
 
 export type SearchStatus = "idle" | "loading" | "ready" | "error"
 
-/** 结果行类型：type/entity/date 三元组，字段取 Pixiv 搜索响应形状 */
+/** 结果行类型：type/entity/date 三元组，字段取 Pixiv 搜索响应形状。
+ *  user 行的 date 恒 null（用户无 create_date，该字段只为 mergeSearchResults 排序存在）。 */
 export type SearchResultItem =
   | { type: "illust"; entity: PixivIllust; date: string }
   | { type: "novel"; entity: PixivNovel; date: string }
+  | { type: "user"; entity: PixivUserPreview; date: null }
+
+/** 内容行 = 插画 + 小说（用户行不含：单一类型无需混排，故不进时间线混排与行内遮罩渲染）。
+ *  控制器与 SearchSheet 共用这一个定义，别在组件里再声明同义别名。 */
+export type ContentResultItem = Exclude<SearchResultItem, { type: "user" }>
 
 export interface SearchState {
   status: SearchStatus
@@ -101,7 +114,7 @@ export function mergeSearchResults(
   illusts: PixivIllust[],
   novels: PixivNovel[],
 ): SearchResultItem[] {
-  const items: SearchResultItem[] = [
+  const items: ContentResultItem[] = [
     ...illusts.map((i) => ({ type: "illust" as const, entity: i, date: i.create_date })),
     ...novels.map((n) => ({ type: "novel" as const, entity: n, date: n.create_date })),
   ]
@@ -121,9 +134,11 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
   const statusRef = ref<SearchStatus>("idle")
   const illustsRef = ref<PixivIllust[]>([])
   const novelsRef = ref<PixivNovel[]>([])
+  const usersRef = ref<PixivUserPreview[]>([])
   const errorRef = ref<string | null>(null)
   const nextIllustUrlRef = ref<string | null>(null) // hasMore 镜像来源（双游标）
   const nextNovelUrlRef = ref<string | null>(null)
+  const nextUserUrlRef = ref<string | null>(null) // scope=user 的单游标
   const scopeRef = ref<SearchScope>("all")
   const sortRef = ref<SearchSort>("date_desc")
   const filtersRef = ref<SearchFilters>(DEFAULT_SEARCH_FILTERS)
@@ -168,8 +183,10 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     paginationErrorRef.value = false
     illustsRef.value = []
     novelsRef.value = []
+    usersRef.value = []
     nextIllustUrlRef.value = null
     nextNovelUrlRef.value = null
+    nextUserUrlRef.value = null
   }
 
   /**
@@ -197,6 +214,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     // 局部暂存（失败侧保持空——「失败侧清空」语义与既有实现一致）
     const illustData = { items: [] as PixivIllust[], next: null as string | null }
     const novelData = { items: [] as PixivNovel[], next: null as string | null }
+    const userData = { items: [] as PixivUserPreview[], next: null as string | null }
 
     const fetchIllust = async (): Promise<void> => {
       try {
@@ -220,11 +238,25 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       }
     }
 
+    const fetchUser = async (): Promise<void> => {
+      try {
+        const res = await transport.searchUser(word, sort, signal)
+        if (isStale(signal)) return
+        userData.items = res.user_previews
+        userData.next = res.next_url
+      } catch (e) {
+        if (!isStale(signal)) failures.push(e)
+      }
+    }
+
     // scope=all → 并行发起（spec D2：按 create_date 降序混排）；单 scope → 单路
+    // scope=user 是**取代**而非加一路：插画/小说请求零发出（用户端点不消费筛选参数）
     if (scope === "all") {
       await Promise.all([fetchIllust(), fetchNovel()])
     } else if (scope === "illust") {
       await fetchIllust()
+    } else if (scope === "user") {
+      await fetchUser()
     } else {
       await fetchNovel()
     }
@@ -237,6 +269,8 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     nextIllustUrlRef.value = illustData.next
     novelsRef.value = novelData.items
     nextNovelUrlRef.value = novelData.next
+    usersRef.value = userData.items
+    nextUserUrlRef.value = userData.next
 
     if (scope === "all") {
       if (failures.length === 2) {
@@ -324,9 +358,10 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     if (disposed) return
     if (statusRef.value !== "ready" || loadingMore) return
     const scope = scopeRef.value
-    const hasIllust = scope !== "novel" && nextIllustUrlRef.value != null
-    const hasNovel = scope !== "illust" && nextNovelUrlRef.value != null
-    if (!hasIllust && !hasNovel) return
+    const hasIllust = scope !== "novel" && scope !== "user" && nextIllustUrlRef.value != null
+    const hasNovel = scope !== "illust" && scope !== "user" && nextNovelUrlRef.value != null
+    const hasUser = scope === "user" && nextUserUrlRef.value != null
+    if (!hasIllust && !hasNovel && !hasUser) return
     loadingMore = true
     const signal = ac.signal
     // 重试/新分页前清除上次分页错误（成功即复位 banner）
@@ -336,6 +371,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       const tasks: Promise<void>[] = []
       if (hasIllust) tasks.push(loadIllustNext(signal))
       if (hasNovel) tasks.push(loadNovelNext(signal))
+      if (hasUser) tasks.push(loadUserNext(signal))
       await Promise.all(tasks)
     } finally {
       loadingMore = false
@@ -376,6 +412,23 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     }
   }
 
+  /** 用户游标推进（语义同上）：用户端点自身 next_url，单游标 */
+  async function loadUserNext(signal: AbortSignal): Promise<void> {
+    const url = nextUserUrlRef.value
+    if (!url) return
+    try {
+      const res = await transport.searchUserNext(url, signal)
+      if (isStale(signal)) return
+      usersRef.value = [...usersRef.value, ...res.user_previews]
+      nextUserUrlRef.value = res.next_url
+    } catch (e) {
+      if (!isStale(signal)) {
+        errorRef.value = toErrorText(e, t("searchSheet.loadMoreFailed"))
+        paginationErrorRef.value = true
+      }
+    }
+  }
+
   /** 首载错误态重试：仅 status='error' 生效（loading/ready 均 no-op，加载态门控） */
   async function refresh(): Promise<void> {
     if (disposed) return
@@ -407,14 +460,17 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
 
   /** 按 scope 组装结果：all = 时间线混排；单 scope = 服务端顺序（不被混排器重排）。
    * 收藏数客户端兜底（spec §7）：非热门路径按 total_bookmarks 本地过滤（服务端对
-   * 免费账号静默忽略区间参数）；热门路径不兜底（#478 置灰语义）。 */
+   * 免费账号静默忽略区间参数）；热门路径不兜底（#478 置灰语义）。
+   * scope=user 原样映射、**不经收藏数兜底**（用户预览无 total_bookmarks，spec §5.3）。 */
   function buildResults(
     illusts: PixivIllust[],
     novels: PixivNovel[],
+    users: PixivUserPreview[],
     scope: SearchScope,
     sort: SearchSort,
     filters: SearchFilters,
   ): SearchResultItem[] {
+    if (scope === "user") return users.map((u) => ({ type: "user" as const, entity: u, date: null }))
     const band = sort === "popular_desc" ? null : filters.bookmark
     const fIllusts = filterByBookmarkBand(illusts, band, (i) => i.total_bookmarks)
     const fNovels = filterByBookmarkBand(novels, band, (n) => n.total_bookmarks)
@@ -431,12 +487,13 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     results: buildResults(
       illustsRef.value,
       novelsRef.value,
+      usersRef.value,
       scopeRef.value,
       sortRef.value,
       filtersRef.value,
     ),
     error: errorRef.value,
-    hasMore: nextIllustUrlRef.value != null || nextNovelUrlRef.value != null,
+    hasMore: nextIllustUrlRef.value != null || nextNovelUrlRef.value != null || nextUserUrlRef.value != null,
     scope: scopeRef.value,
     sort: sortRef.value,
     filters: filtersRef.value,

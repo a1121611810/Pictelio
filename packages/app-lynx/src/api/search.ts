@@ -6,6 +6,7 @@ import { apiClient } from "./client"
 import {
   buildIllustSearchRequest,
   buildNovelSearchRequest,
+  buildUserSearchRequest,
   DEFAULT_SEARCH_FILTERS,
   type SearchFilters,
 } from "@pictelio/search-core"
@@ -16,6 +17,7 @@ import { extractHostname } from "../utils/safeParseUrl"
 import type {
   PixivIllustListResponse,
   PixivNovelListResponse,
+  PixivUserSearchResponse,
   SearchSort,
 } from "./types"
 
@@ -77,6 +79,24 @@ export function searchNovelNext(
   return apiClient.get<PixivNovelListResponse>(url, undefined, signal)
 }
 
+/** 用户搜索（#1020）：无筛选维度，参数只有 word + filter + sort（端点不消费期间/收藏数/比例/分辨率） */
+export function searchUser(
+  word: string,
+  sort: SearchSort = "date_desc",
+  signal?: AbortSignal,
+): Promise<PixivUserSearchResponse> {
+  const req = buildUserSearchRequest({ word, sort })
+  return apiClient.get<PixivUserSearchResponse>(req.endpoint, req.params, signal)
+}
+
+export function searchUserNext(
+  url: string,
+  signal?: AbortSignal,
+): Promise<PixivUserSearchResponse> {
+  assertPixivUrl(url, "searchUserNext")
+  return apiClient.get<PixivUserSearchResponse>(url, undefined, signal)
+}
+
 // ── 传输接口：useSearch 通过它取数，测试可注入内存替身（与 CommentsTransport 同构） ──
 
 export interface SearchTransport {
@@ -94,6 +114,8 @@ export interface SearchTransport {
   ): Promise<PixivNovelListResponse>
   searchIllustNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse>
   searchNovelNext(url: string, signal?: AbortSignal): Promise<PixivNovelListResponse>
+  searchUser(word: string, sort: SearchSort, signal?: AbortSignal): Promise<PixivUserSearchResponse>
+  searchUserNext(url: string, signal?: AbortSignal): Promise<PixivUserSearchResponse>
 }
 
 // ── 默认传输实现（真实端点绑定） ──
@@ -103,4 +125,6 @@ export const searchTransport: SearchTransport = {
   searchNovel,
   searchIllustNext,
   searchNovelNext,
+  searchUser,
+  searchUserNext,
 }

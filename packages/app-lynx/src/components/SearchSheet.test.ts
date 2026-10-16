@@ -29,6 +29,7 @@ const LEGACY_ZH: Record<string, string> = {
   'searchSheet.scope.all': '全部',
   'searchSheet.scope.illust': '插画',
   'searchSheet.scope.novel': '小说',
+  'searchSheet.scope.user': '用户',
   'searchSheet.sort.newest': '最新',
   'searchSheet.sort.oldest': '最早',
   'searchSheet.sort.popular': '热门',
@@ -325,5 +326,69 @@ describe('SearchSheet 筛选折叠区（#474/#477：SearchSheet 内折叠筛选�
   it('变更入口走 controller.setFilters（450ms debounce 在控制器内层，spec §5.2）', () => {
     expect(source).toContain('function onFilterChange(next: SearchFilters): void {')
     expect(source).toContain('controller.setFilters(next)')
+  })
+})
+
+// ─── 搜索范围「用户」（issue #1019-#1022 / spec docs/specs/search-user-scope.md §5.4）───
+// 这些是 spec 给出的**行为契约**，此前只有实现没有任何断言（code-review Spec 轴 BLOCK-1/BLOCK-2）。
+// 本仓无 .vue 渲染测试基建，故沿用本文件既有的模板源码断言形态。oracle = spec §3.2/§5.4 条款原文。
+describe('SearchSheet 用户搜索范围（spec search-user-scope §5.4）', () => {
+  it('scope 段静态写出第 4 档「用户」（沿用本文件既有的静态 chip 约定，禁 v-for）', () => {
+    expect(source).toContain("@tap=\"onScopeTap('user')\"")
+    expect(source).toContain(">{{ t('searchSheet.scope.user') }}</text>")
+    // 三档既有 chip 仍在（静态断言，防重构时被 v-for 收编）
+    expect(source).toContain(">{{ t('searchSheet.scope.illust') }}</text>")
+    expect(source).toContain(">{{ t('searchSheet.scope.novel') }}</text>")
+  })
+
+  it('头像只取 medium（spec §3.2 实测：该响应 profile_image_urls 只有 medium 一个键）', () => {
+    // 只看 userAvatar 函数体：文件头注释里「不写 px_170x170 回退」这句会污染全文正则
+    const avatarFn = source.match(/function userAvatar\([\s\S]*?\n\}/)?.[0] ?? ''
+    expect(avatarFn).toContain('profile_image_urls.medium')
+    // 无 px_170x170 / px_50x50 / px_16x16 回退——实测键不存在，写了也是永不命中的死分支
+    expect(avatarFn).not.toMatch(/px_/)
+  })
+
+  it('R18 预览项不渲染图：scrim 占位包住 SkeletonImage（spec §5.4 安全承诺）', () => {
+    expect(source).toContain('function isPreviewRestricted(item: PixivIllust | PixivNovel): boolean {')
+    expect(source).toContain('return item.x_restrict > 0')
+    expect(source).toContain("isPreviewRestricted(item) ? 'bg-scrim'")
+    expect(source).toContain('v-if="!isPreviewRestricted(item)"')
+  })
+
+  it('预览缩略图：illusts 优先补 novels、截断到 USER_PREVIEW_MAX', () => {
+    expect(source).toContain('const USER_PREVIEW_MAX = 3')
+    expect(source).toContain('[...entity.illusts, ...(entity.novels ?? [])].slice(0, USER_PREVIEW_MAX)')
+  })
+
+  it('scope=user 隐藏筛选折叠区与 sort 段（用户端点两样都不消费）', () => {
+    // 两段各一处，共 2 处。数出现次数才能区分「只藏了筛选」与「两段都藏」——
+    // 两段 class 串相同，只 toContain 无法判别。
+    const hiddenRows = source.match(/v-if="state\.scope !== 'user'"/g) ?? []
+    expect(hiddenRows).toHaveLength(2)
+    // sort chip 本体（另两个 scope 仍要用）必须在
+    expect(source).toContain(">{{ t('searchSheet.sort.popular') }}</text>")
+  })
+
+  it('用户行点按跳作者主页且不进 heroTransition（无插画 id 可测矩形）', () => {
+    expect(source).toContain('void navigate(`/user/${row.entity.user.id}`)')
+    // heroTransition.begin 仍在同一分支之后的内容行路径上（未把用户行也接进转场）
+    expect(source).toContain('heroTransition.begin(row.entity.id)')
+  })
+
+  it('用户行跳过 AI 遮罩与标签静音过滤（PixivUserPreview 无 illust_ai_type / tags）', () => {
+    expect(source).toContain("if (r.type === 'user') return true")
+  })
+
+  it('两条渲染降级路径都经 warnRenderFallback，且告警查 proxyImageUrl 的返回值', () => {
+    // 查返回值而非入参：非信任域绝对 URL 被 proxyImageUrl 拒载返回空串，只查入参会静默变空白
+    expect(source).toContain('const url = proxyImageUrl(entity.user.profile_image_urls.medium')
+    expect(source).toContain('if (!url) warnRenderFallback(`avatar-')
+    expect(source).toContain('if (!url) warnRenderFallback(`preview-')
+  })
+
+  it('渲染降级告警去重集存在（同一 key 只报一次，防列表重渲染刷屏）', () => {
+    expect(source).toContain('const warnedRenderFallbacks = new Set<string>()')
+    expect(source).toContain('if (warnedRenderFallbacks.has(key)) return')
   })
 })

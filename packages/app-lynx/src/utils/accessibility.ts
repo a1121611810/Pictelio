@@ -217,6 +217,7 @@ export const SEARCH_A11Y_LABELS = {
   scopeAll: '搜索范围全部',
   scopeIllust: '搜索范围插画',
   scopeNovel: '搜索范围小说',
+  scopeUser: '搜索范围用户',
   sortNewest: '排序最新',
   sortOldest: '排序最早',
   sortPopular: '排序热门',

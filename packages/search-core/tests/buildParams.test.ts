@@ -6,7 +6,11 @@
  *   #1038（novel 不传退化为纯字面匹配→恒显式 partial）
  */
 import { describe, expect, it } from "vitest";
-import { buildIllustSearchRequest, buildNovelSearchRequest } from "../src/buildParams";
+import {
+  buildIllustSearchRequest,
+  buildNovelSearchRequest,
+  buildUserSearchRequest,
+} from "../src/buildParams";
 import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "../src/filters";
 
 const NOW = new Date("2026-09-12T15:00:00Z");
@@ -152,5 +156,57 @@ describe("buildNovelSearchRequest", () => {
     expect(r.params.bookmark_num_min).toBeUndefined();
     expect(r.params.sort).toBeUndefined();
     expect(r.params.search_target).toBe("partial_match_for_tags");
+  });
+});
+
+/**
+ * 用户搜索参数构建。oracle：
+ * - docs/specs/search-user-scope.md §3 一手实测（2026-10-16，`docs/research/verify-search-user-api.sh`）：
+ *   `GET /v1/search/user?word=水上&filter=for_ios&sort=date_desc` 响应正常
+ * - 同 spec §5.1 参数口径表：`filter` 与另两端一致用 `baseParams` 同款 `for_ios`；
+ *   `sort` 直发（pixivpy3/aapi.py L576-596 `search_user` 带 `sort` 形参）
+ * - 不发其余参数的佐证（spec §5.1 证据强度）：pixez `getSearchUser` 只发 `word`；
+ *   Mako `UserSearchEngine` 只发 `filter` + `word`。⚠️ 未做「发了是否报错」反向实验
+ */
+describe("buildUserSearchRequest", () => {
+  const user = (sort: "date_desc" | "date_asc" | "popular_desc") =>
+    buildUserSearchRequest({ word: "水上", sort });
+
+  it("参数集合恰好三项 {word, filter, sort}——精确键集断言，防将来误加筛选参数", () => {
+    const r = user("date_desc");
+    expect(r.endpoint).toBe("/v1/search/user");
+    expect(Object.keys(r.params).toSorted()).toEqual(["filter", "sort", "word"]);
+    expect(r.params).toEqual({ word: "水上", filter: "for_ios", sort: "date_desc" });
+  });
+
+  it("不发 search_target / bookmark_num_* / 期间 / 比例 / 分辨率 / search_ai_type", () => {
+    const keys = Object.keys(user("date_desc").params);
+    for (const absent of [
+      "search_target",
+      "bookmark_num_min",
+      "bookmark_num_max",
+      "start_date",
+      "end_date",
+      "ratio_pattern",
+      "width_min",
+      "height_min",
+      "search_ai_type",
+    ]) {
+      expect(keys).not.toContain(absent);
+    }
+  });
+
+  it("不复用 baseParams 的两个恒发 bool（实测未发且用户端点不消费）", () => {
+    const keys = Object.keys(user("date_desc").params);
+    expect(keys).not.toContain("merge_plain_keyword_results");
+    expect(keys).not.toContain("include_translated_tag_results");
+  });
+
+  it("三档 sort 全部直发 /v1/search/user——无 popular-preview 对应端点，sort 恒透传", () => {
+    for (const sort of ["date_desc", "date_asc", "popular_desc"] as const) {
+      const r = user(sort);
+      expect(r.endpoint).toBe("/v1/search/user");
+      expect(r.params.sort).toBe(sort);
+    }
   });
 });
