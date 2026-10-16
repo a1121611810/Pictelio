@@ -661,6 +661,14 @@ describe('主题色契约（themeColor ↔ tokens.css）', () => {
     expect(appVue).toContain(':class="appearanceClasses(settings.themeColor, settings.resolvedDark)"')
   })
 
+  it('App.vue 路由出口按「明暗 epoch : 路由名」重挂载（#1016 防线：KeepAlive 复用的原生子树样式冻结，切暗后存活页不重绘）', () => {
+    const appVue = readFileSync(resolve(rootDir, 'src/App.vue'), 'utf-8')
+    // 复合键逐字锁定：单 resolvedDark 会让全部白名单页共享 2 个全局缓存桶、跨页导航实例错配
+    // （review 轮 1 blocking）；含 fullPath 则破坏 ADR-0049 导航复用语义（同路由参数变化会重建）
+    expect(appVue).toContain(':key="`${settings.resolvedDark}:${String($route.name)}`"')
+    expect(appVue).not.toContain('$route.fullPath')
+  })
+
   it('Me.vue 外观卡片为每个色板提供入口且 class 走 appearanceClasses（防 class 双写漂移，T2：暗色 resolved 下色块联动）', () => {
     const meVue = readFileSync(resolve(rootDir, 'src/pages/Me.vue'), 'utf-8')
     for (const option of THEME_COLOR_OPTIONS) {

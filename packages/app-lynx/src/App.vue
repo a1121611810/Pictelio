@@ -268,8 +268,17 @@ const routeTransition = useRouteTransition()
            坑的同族正解见 `utils/topInset.ts` 约束 2（让位用零内容 spacer，不用父容器 padding）。 -->
       <view class="w-full h-full" :style="routeTransition.style.value">
         <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
+        <!-- #1016：key = 「明暗 epoch : 路由名」——vue-lynx 的 KeepAlive 复用原生子树，根 <page> 类翻转
+             不会重算已创建元素上的 CSS 变量（存活页「半吊子渲染」：组件级绑定更新、页面级底色冻结）。
+             明暗切换须整页原生重建，样式按当前根类重新解析。
+             ⚠️ 键粒度必须是「页 × epoch」复合：KeepAlive 缓存键 = vnode.key（name 只做 include 门禁），
+             单 resolvedDark 会让全部白名单页共享 2 个全局桶、跨页导航实例错配崩坏（review 轮 1
+             blocking 实证）。$route.name 不含 fullPath：同路由参数变化不重建，ADR-0049 导航复用语义不变。
+             代价（登记）：切换明暗会重置各页滚动位/页内瞬态；缓存桶 = 页 ×2 epoch（默认无 max，
+             静态 6 页可接受）。挂账：切换时已打开的常驻弹层（SearchSheet 等，不经 RouterView）
+             样式冻结未定性——见走查落档 round-2。设备实证：docs/research/lynx-night-mode-walkthrough-acceptance.md -->
         <KeepAlive :include="['discover', 'updates', 'shelf', 'me', 'ranking', 'mypixiv']">
-          <component :is="Component" />
+          <component :is="Component" :key="`${settings.resolvedDark}:${String($route.name)}`" />
         </KeepAlive>
       </view>
     </RouterView>
