@@ -44,6 +44,12 @@
 | **差分基准** | `packages/app-lynx/tests/differential/**` | 同上              | 原「双端差分」，webview 侧删除后退化为 **Lynx 单端行为基准**（见下方警告） |
 | **原生单测** | `packages/app-lynx/android/**`（随宿主迁移至 `packages/android-host`） | CI `android-unit-test` job | Robolectric / JVM |
 
+> **单文件 / 子集怎么跑**：`pnpm test:app-lynx` 是复合命令
+> （`vitest run && vitest run --config vitest.fallback.config.ts`），位置参数只会被后半段吃到、
+> 报「No test files found」假错。单文件正确姿势：
+> `cd packages/app-lynx && pnpm exec vitest run <路径模式>`（#1015 retro 实证）。
+> 全量仍以 `pnpm test:app-lynx` 为准（两段都要绿）。
+
 > ⚠️ **差分测试语义退化**（ADR-0203 §决策 5）：`packages/app/tests/unit/differential/`
 > 的文件多数断言「webview 与 Lynx 逐字一致」。删除一侧后**不得**表述为「差分测试继续覆盖两端」——
 > 差分的对侧消失，语义不复存在。迁移后的合法形态只有两种：
