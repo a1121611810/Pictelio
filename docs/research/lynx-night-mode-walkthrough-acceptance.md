@@ -30,7 +30,7 @@
 
 - ✅ = 像素精确匹配（12/13 组合逐字节级一致，偏差 0）。
 - ⚠️ **bili 亮帧接受项**：状态栏条带像素 `#f8faff` = sky 亮面，而 bili 亮面应为 `#ffffff`（页面本身底色采样为纯白 ✓，仅系统状态栏条带偏色，ΔRGB(7,5,0) 用户不可见）。原生 res 无任何 bili 条目（grep 实证），疑似原生侧亮色资源缺 bili 档。登记接受，不修。
-- ❌ **T2 判定：不通过**——实时切换暗色后，存活首页「半吊子渲染」（底栏/FAB 已暗、状态栏/tab 栏/页面底色仍亮），持久层与冷启动渲染均正确。证据：`t2-bili-dark-liveswitch-repro.png`（等 3s 复现）vs `t2-bili-dark-coldstart-contrast.png`（冷启动正确）。→ **[#1016](https://github.com/a1121611810/Pictelio/issues/1016)**。
+- ✅→❌→✅ **T2 判定：通过（两轮）**——第 1 轮抓到实时切换半吊子渲染（证据：`t2-bili-dark-liveswitch-repro.png` vs `t2-bili-dark-coldstart-contrast.png`）→ **[#1016](https://github.com/a1121611810/Pictelio/issues/1016)**；修复后 round-2 复跑全过（见文末「Round-2」节）。
 
 ## T3 · 状态栏 / splash / plate / 滞后
 
@@ -43,7 +43,7 @@
 | c **手动暗+系统亮** | 浅色图标（#692 核心） | `t3-statusbar-manual-dark.png` 浅色图标 ✓ | ✅ |
 | d 手动亮+系统暗 | 深色图标 | `t3-statusbar-manual-light.png` 深色图标 ✓ | ✅ |
 
-- 即时性：原生图标通道即时（`cmd uimode` 翻转后图标当拍换极性，截图实证）；**页面重绘即时性 ❌（=#1016）**。
+- 即时性：原生图标通道即时（`cmd uimode` 翻转后图标当拍换极性，截图实证）；页面重绘即时性第 1 轮 ❌（=#1016），修复后 round-2 ✅（存活页原地全树重绘，双向）。
 
 ### T3-2 splash 冷启动 4 组合 —— ✅（附 1 观察）
 
@@ -82,10 +82,26 @@ splash 显示窗口 <400ms，设备侧 screencap 轮询（~350ms/帧）只能稳
 
 - **待设计裁定发现**：`NovelIntro` 信息卡（标题/作者/标签区）在暗色下使用亮色表面（浅色底 + 深色字）。可读性无问题，但是否符合「无亮色残留面板」口径需设计裁定——登记于此，不建票（如需处理由设计巡检消化）。
 
+## Round-2 · #1016 修复复跑（2026-10-16 当日）
+
+**修复**：`App.vue` 路由出口 `<component :is>` 加 `:key="`${settings.resolvedDark}:${String($route.name)}`"`——vue-lynx KeepAlive 复用原生子树、根类翻转不重算已创建元素的 CSS 变量（第 1 轮确诊机制），明暗切换 = 整页原生重建。键粒度「页 × epoch」复合（KeepAlive 缓存键 = vnode.key；单值 resolvedDark 会让全部白名单页共享 2 个全局桶、跨页导航实例错配——review 轮 1 blocking 实证，轮 2 已修）。
+
+**设备复验**（APK 重建含修复，`pm clear` + dev hook）：
+
+| 断言 | 帧 | 实测 | 判定 |
+|---|---|---|---|
+| 实时切暗：存活首页原地全树重绘 | `t2-liveswitch-round2-dark.png` | strip ≡ #101418、tab/FAB 暗 | ✅ |
+| 实时翻回亮：对称重绘 | `t2-liveswitch-round2-light.png` | strip ≡ #f8faff | ✅ |
+| **切暗后跨 tab 导航**（blocking 场景：发现→更新→书架→我的） | `t2-nav-updates-dark.png` / `t2-nav-shelf-dark.png` / `t2-nav-me-dark.png` | 四页 strip 全 ≡ #101418，我的页内容目检正确（导航语义无损） | ✅ |
+| 重绘像素与冷启动基准一致性 | 对拍 `t2-sky-dark.png` | 状态栏像素逐字节一致 | ✅ |
+
+**机器防线**：`tests/unit.test.ts` 契约断言（复合键逐字锁定 + 禁 fullPath）；变异三形态全红（无键 / 单值键 / 拼 fullPath）。全套 297 文件 / 4254 用例绿；`vue-tsc` 绿。
+
+**挂账（显式）**：切换**时已打开**的常驻弹层（SearchSheet 等，不经 RouterView，样式冻结同机制未定性）→ [#1018](https://github.com/a1121611810/Pictelio/issues/1018)。非发版阻断（切暗路径上弹层一般已关闭；GlobalFab 已实证会更新）。
+
 ## 结论
 
-1. **gate 保持**（矩阵 §5 条款）：T2 ❌ → [#1016](https://github.com/a1121611810/Pictelio/issues/1016)（用户可见，手动切暗主路径）；修复后需复跑 T2 实时切换面。
-2. **#1014 不关闭**：progress 已更新；解除判据未达成（落档文件✓ 但矩阵未全绿）。
-3. **矩阵订正票**：[#1017](https://github.com/a1121611810/Pictelio/issues/1017)——T2 补 bili 行 / `.MainActivity` → `.LynxActivity` / T3-4b 预期按实测改写 / splash 取证配方。
-4. ADR-0180 状态行保持「真机走查 gate」，指向 #1014（+#1016 阻塞）。
-5. release-checklist 第 6 条**不勾**。
+1. ~~gate 保持~~ → **gate 解除（2026-10-16，第 1 轮 + round-2 同日）**：唯一 ❌ 项 #1016 已修复并设备复验；其余全部 ✅ 或 ⚠️ 接受项（判定列口径：⚠️ = 记录即可）。
+2. **[#1016](https://github.com/a1121611810/Pictelio/issues/1016) 关闭**（修复 + 复验证据如上）；**[#1014](https://github.com/a1121611810/Pictelio/issues/1014) 关闭**（解除判据逐条达成：矩阵全勾 + 落档存在 + ADR 对齐 + checklist 勾选）。
+3. 非阻断遗留：[#1017](https://github.com/a1121611810/Pictelio/issues/1017)（矩阵文本订正）/ [#1018](https://github.com/a1121611810/Pictelio/issues/1018)（弹层定性）——不影响发版。
+4. ADR-0180 状态行改为「真机走查 gate 已执行并解除」；release-checklist 第 6 条已勾。
