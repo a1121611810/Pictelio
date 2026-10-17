@@ -840,6 +840,33 @@ function classifyProvider(
     let lastErrorMessage = ""
     let lastErrorRetryable = false
     let result: Awaited<ReturnType<typeof translator.translate>>
+
+    /**
+     * 收敛到 partial 终态：未译段渲染为〔未翻译〕占位（ADR-0178 D4），不写缓存（ADR-0171 §5）。
+     * 流式结果与整批回退共用（#948：回退只译出部分段落时终态同样是 partial）。
+     */
+    function convergePartial(): void {
+      status.value = "partial"
+      // code-review P10 / issue #651 范围补充：partial 不得虚报 100%。
+      // 进度 = 实际有译文的段落数（缺失段用 〔未翻译〕 占位，见 refreshDisplay）。
+      progress.value = {
+        chapterId: args.chapterId,
+        done: translatedParagraphs.value.filter((p) => p !== undefined && p !== "").length,
+        total: args.paragraphs.length,
+      }
+      error.value = {
+        code: lastErrorCode ?? "PARTIAL_FAILED",
+        message: lastErrorMessage || t("novelTranslate.error.partialFailed"),
+      }
+      // ADR-0178 D4：partial 必须切到译文模式 —— `refreshDisplay` 的渲染源由
+      // `showTranslation && translatedParagraphs.length > 0` 决定；此前该分支不置
+      // showTranslation，渲染源恒为**原文**切片，占位符与已译段都不可见
+      // （P13 覆盖补强时由测试连续暴露的第二层缺陷）。
+      showTranslation.value = true
+      // 且必须重算渲染源 —— `refreshDisplay` 的占位分支依赖 `status === 'partial'`，
+      // 而此前该分支**不调用** refreshDisplay，占位符永不出现在 displayParagraphs。
+      refreshDisplay()
+    }
     try {
       result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
       if (chunk.type === "delta") {
@@ -931,14 +958,22 @@ function classifyProvider(
         status.value = "aborted"
         return
       }
-      // fallbackOk === "partial" | "failed"：继续走原收敛逻辑（保留 lastErrorCode）
-      // 不修改 status，让下方原流程收敛到 partial/failed（终态与 spec §7.2 一致）
       //
       // 补审 P2：整批回退是 **await**（可数秒），期间用户可能切章节（`reset()` bump gen）
       // 或已发起新章节翻译（`translateChapter` 亦 bump gen）。此时若继续走下方收敛逻辑，
       // 会用**旧章节的 result** 给**新章节**写 status/progress/error（陈旧红色横幅 + 污染在飞状态）。
       // ⇒ 收敛前必须重新过 generation-gate。
       if (gen !== genNow) return
+      // fallbackOk === "partial"：整批回退本身成功但只译出部分段落（#948）。
+      // 已译段已由 runWholeBatchFallback 写进 translatedParagraphs；终态按 partial 收敛
+      // （占位渲染 + 不写缓存），不能落回 result.status —— 那是被回退掉的流式结果，
+      // 对本章而言是 failed，会把「有译文」这一事实整个抹掉。
+      if (fallbackOk === "partial") {
+        convergePartial()
+        return
+      }
+      // fallbackOk === "failed"：继续走原收敛逻辑（保留 lastErrorCode）
+      // 不修改 status，让下方原流程收敛到 partial/failed（终态与 spec §7.2 一致）
     }
 
     if (result.status === "completed") {
@@ -959,26 +994,7 @@ function classifyProvider(
       showTranslation.value = true
       refreshDisplay()
     } else if (result.status === "partial") {
-      status.value = "partial"
-      // code-review P10 / issue #651 范围补充：partial 不得虚报 100%。
-      // 进度 = 实际有译文的段落数（缺失段用 〔未翻译〕 占位，见 refreshDisplay）。
-      progress.value = {
-        chapterId: args.chapterId,
-        done: translatedParagraphs.value.filter((p) => p !== undefined && p !== "").length,
-        total: args.paragraphs.length,
-      }
-      error.value = {
-        code: lastErrorCode ?? "PARTIAL_FAILED",
-        message: lastErrorMessage || t("novelTranslate.error.partialFailed"),
-      }
-      // ADR-0178 D4：partial 必须切到译文模式 —— `refreshDisplay` 的渲染源由
-      // `showTranslation && translatedParagraphs.length > 0` 决定；此前该分支不置
-      // showTranslation，渲染源恒为**原文**切片，占位符与已译段都不可见
-      // （P13 覆盖补强时由测试连续暴露的第二层缺陷）。
-      showTranslation.value = true
-      // 且必须重算渲染源 —— `refreshDisplay` 的占位分支依赖 `status === 'partial'`，
-      // 而此前该分支**不调用** refreshDisplay，占位符永不出现在 displayParagraphs。
-      refreshDisplay()
+      convergePartial()
     } else if (result.status === "aborted") {
       status.value = "aborted"
     } else {
@@ -1088,8 +1104,10 @@ function classifyProvider(
       // 收敛前再次 gate
       if (gen !== genNow) return "failed"
       if (signalArg.aborted) return "aborted"
-      if (success && lastError === null && paragraphTexts.some((p) => p.length > 0)) {
-        // 全部成功 → completed
+      const hasAnyText = paragraphTexts.some((p) => p !== undefined && p !== "")
+      const hasAllText = paragraphTexts.every((p) => p !== undefined && p !== "")
+      if (success && lastError === null && hasAllText) {
+        // 每段都有译文 → completed（spec §7.1：completed = 已写入缓存）
         translatedParagraphs.value = paragraphTexts.slice()
         progress.value = {
           chapterId: args.chapterId,
@@ -1104,6 +1122,13 @@ function classifyProvider(
         refreshDisplay()
         return "completed"
       }
+      // #948：整批成功但仍有段落没译文 → 判 partial。旧判据是「有任一段非空即 completed」，
+      // 于是空段以原文渲染、整章仍被标已缓存并写盘，此后每次开章重放混合译文且不重译。
+      // 已译段保留（回退不是白跑），缺失段由外层收敛到 partial + 占位渲染。
+      if (success && lastError === null && hasAnyText) {
+        translatedParagraphs.value = paragraphTexts.slice()
+        return "partial"
+      }
       // 整批回退本身失败 → 返回 'failed' 让外层按原逻辑收敛（保留 lastErrorCode）
       // 不修改 status；status 由外层原流程收敛到 partial/failed（按有/无译文段分类）
       // code-review S3：此前这里是 `void paragraphTexts` + `return lastError === null ?
@@ -1116,7 +1141,6 @@ function classifyProvider(
       // 典型为内容策略拦截）→ 回传 content_filter，与 #654 的 Java 侧判定同源。
       // 若回退本身带了显式错误（HTTP 5xx / 429 / network），那个错误才是诊断信息，
       // 不得覆盖成 content_filter（否则用户看到「内容被拦截」而实际是服务端故障）。
-      const hasAnyText = paragraphTexts.some((p) => p !== undefined && p !== "")
       if (!hasAnyText && lastError === null) {
         zeroTextOverride.code = "content_filter"
         zeroTextOverride.message = t("novelTranslate.error.contentFilter")

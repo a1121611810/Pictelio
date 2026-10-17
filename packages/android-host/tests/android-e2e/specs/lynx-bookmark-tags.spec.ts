@@ -26,10 +26,10 @@
  * 条且目标插画可能不在其中，故「host 侧预测 id」不可靠）。故走**设备驱动的 id
  * 发现**，且与「进详情页」合成一步、**用可验证的动作闭环**（`enterDetailAndResolveId`）：
  * 单击定位到的心形 → host 侧收藏列表**恰好新增 1 条 public 收藏**（集合差；该账号
- * 收藏量 < 30，单页即完整快照，见 `bookmarkSets`）→ 同坐标心形须变红（证明 tap 命中
- * 心形而非旁边的可点行）→ 立即再点一次取消收藏还原基线。
+ * 收藏量 < 30，单页即完整快照，见 `bookmarkSets`）→ 同坐标胶囊须判为已收藏态（证明 tap 命中
+ * 心形而非旁边的可点行；判据见 `heartBookmarkState`，配色无关，#709）→ 立即再点一次取消收藏还原基线。
  * 这个闭环同时是三条证据：①「当前页确实是插画详情页」；②目标插画 id；③lynx 快速
- * 收藏路径实证（写 public、心形变红、计数 +1、服务端 restrict=public）。
+ * 收藏路径实证（写 public、胶囊转已收藏底色、计数 +1、服务端 restrict=public）。
  *
  * ── 三项验收（按序，逐项留证到 test-results/android-e2e/lynx-bookmark-tags/）──
  * 1. 长按心形 500ms → 面板出现；**且未写收藏**（host 侧 `GET /v2/illust/bookmark/
@@ -53,9 +53,9 @@
  *   → 截图实测 y 720..834（h=115 ✓）；「公开」左边距 = `px-4` = 43.2（实测 46），
  *   「私密」中心实测 **(309, 777)**；
  * - 心形**不写死**：详情页滚动位置随作品标签行数浮动，一律用像素特征现定位
- *   （`findHeartGlyph`：左下角区域内「近方形实心暗/红色块」——M3 outline 色
- *   #71787E 未收藏 / error 红已收藏）。实测命中 (71,1744)，与标签文字块
- *   （h/w≈0.46）和「保存」字块可靠区分。
+ *   （`findHeartGlyph`：左下角区域内「深色胶囊底 + 其内部严格内嵌的浅色心形笔画」，
+ *   #819 订正过——它早先扫的是「暗色或红色块」，与当前配色完全对不上）。
+ *   收藏态的判据另走 `heartBookmarkState`（读胶囊底色对应的 M3 令牌，不认色相）。
  *
  * ── 前置条件 ────────────────────────────────────────────────────────────
  * - AVD `pictelio_ui`（1080×2160 / density 480 / WebView 113），坐标常量绑定该
@@ -101,8 +101,25 @@ import {
   readAppLogcat,
   startMainActivity,
 } from "../prefs";
+import {
+  chipBookmarkState,
+  readBookmarkChipTokens,
+  type BookmarkChipState,
+} from "../bookmark-chip";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 收藏 chip 两态底色的令牌表（#709）：**运行时解析** app-lynx 的 `tokens.css`，
+ * 不在本文件复制任何色值——复制即意味着「配色改了判据还停在旧色板」，
+ * 那正是旧青度判据失效的形态（14 个组合里只对 3 个成立）。
+ *
+ * ⚠️ 判据口径随配色变更的日期与依据：见 spec `docs/specs/bookmark-color.md`
+ * §残余风险第 1 条（#709 的收口记录）。改动 chip 配色时**不必**再动这里，
+ * 但必须跑 `unit/bookmarkChip.test.ts`——它对 tokens.css 全表做表驱动断言，
+ * 配色一改若两态不再可分，会立刻红。
+ */
+const CHIP_TOKENS = readBookmarkChipTokens();
 
 /** 证据落盘目录（被 gitignore，仅本地取证用） */
 const EVIDENCE_DIR = resolve(
@@ -347,34 +364,34 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
 /**
  * 心形胶囊是否处于「已收藏」态。
  *
- * ⚠️ #819 **判据订正**：原判据找 `text-error` 红（r>150 且 g<110 且 b<110），阈值 0.5。
- * 它在本 UI 上**永远为假**——不是「偶尔漏检」，而是结构性失效：
- *   oracle（2026-09-29 两帧同坐标窗口 (100,1698) ±22/±19、步长 4 = 120 采样点实测）：
- *     未收藏 detail-scroll-8.png：胶囊底 **rgb(46,49,54)**，心形笔画 rgb(239,241,247)
- *                                → 旧判红命中 **0** / 120
- *     已收藏 act0-post-tap.png：胶囊底 **rgb(59,100,112)**（青），心形仍为白
- *                                → 旧判红命中 **0** / 120
- *   两态都是 0 ⇒ `heartFilled` 恒 false ⇒ `enterDetailAndResolveId` 的第 3 次重试
- *   分支必然命中 ⇒ 该 spec **结构性不可通过**（前 2 次尝试也是这么耗尽的）。
+ * ⚠️ #709 **判据二次订正**：本函数原按胶囊底色的**青度**判定
+ *   （`g-r ≥ 25 && b-r ≥ 25 && g < 200`，窗口 ±22/±19、步长 4、阈值 0.15）。
+ *   那是把「sky **亮色板**的 tertiary 恰好偏青」当成了「已收藏长什么样」。
+ *   M3 有 **7 主题 × 明暗 = 14 个组合**，逐个代入算术（对 tokens.css 证明式枚举，
+ *   非抽样）：只有 **3 个**（sky / green / bili 的亮色板）满足该判据，
+ *   **7 个暗色板全部失效**，另 4 个亮色板因红通道 > 绿通道也失效。
+ *   ⇒ 在那 11 个组合上，已收藏恒被判成未收藏 ⇒ 重试到耗尽 ⇒ spec 结构性不可通过；
+ *   而当前设备验收所用的主题恰好落在成立的 3 个里 ⇒ **换色板即再次假阴性，
+ *   在现有 e2e 里完全看不出来**。
  *
- * 现按「胶囊底色的青度」判定（主题色随 M3 配色变，红不是稳定信号）：
- *   判青 = (g - r) ≥ 25 且 (b - r) ≥ 25 且 g < 200（后两条排除白色心形笔画本身：
- *   rgb(239,241,247) 的 g-r=2 / b-r=8，天然不满足，无需单列）。
- * 同帧实测：已收藏 **37/120 = 0.308**；未收藏 **0/120**；同坐标空白区域对照 **0/120**。
- * 阈值取 **0.15**：距实测信号 2 倍余量，距阴性 0 有 15% 硬间隔。
+ * 现改为**配色无关**判据（`../bookmark-chip`）：chip 底色是 M3 令牌的实色值
+ * （spec `docs/specs/bookmark-color.md` §配色：未收藏 `--md-inverse-surface`、
+ * 已收藏 `--md-tertiary`，且明确取实色底），故把窗口里最常见的可归类色值
+ * 交给「该值属于哪一族令牌」裁决。令牌表**运行时解析 tokens.css**，色板一改自动跟随。
+ *
+ * 采样窗（±19 × ±22、步长 4 = 120 点）与占比阈值 0.15 **逐字沿用旧实现**，所以
+ * 2026-09-29 那组设备实测（已收藏 37/120 = 0.308、未收藏 0/120、空白对照 0/120）
+ * 在本次改动后**仍然成立**——改动只换「怎么分类」，不换「在哪采样」。
+ *
+ * ⚠️ 三态而非布尔：判不出时返回 `"unknown"`（窗口里没有 chip 实色 / 色值同时
+ * 落在两族令牌里），**绝不静默返回「未收藏」**——那正是旧实现最贵的错法：
+ * 假阴性会一路走到「回滚收藏并重试」，把根因指向布局/坐标。
  */
 const HEART_FILLED_RATIO = 0.15;
-function heartFilled(p: Pixels, spot: { x: number; y: number }): boolean {
-  let teal = 0;
-  let n = 0;
-  for (let y = spot.y - 22; y <= spot.y + 22; y += 4) {
-    for (let x = spot.x - 19; x <= spot.x + 19; x += 4) {
-      n++;
-      const [r, g, b] = colorAt(p, x, y);
-      if (g - r >= 25 && b - r >= 25 && g < 200) teal++;
-    }
-  }
-  return n > 0 && teal / n >= HEART_FILLED_RATIO;
+function heartBookmarkState(p: Pixels, spot: { x: number; y: number }): BookmarkChipState {
+  return chipBookmarkState((x, y) => colorAt(p, x, y), spot, CHIP_TOKENS, {
+    minShare: HEART_FILLED_RATIO,
+  }).state;
 }
 
 /**
@@ -855,7 +872,7 @@ function pressBack(): void {
  *   且用户页的缩略图上还能被心形判据误命中）。
  * 故**只看像素不足以确认「这是插画详情页」**，必须用一次**可验证的动作**闭环：
  * 单击定位到的心形 → 服务端收藏集合必须**恰好新增 1 条 public 收藏**（= 当前详情页
- * 插画的身份证明，同时就是 id 发现）→ 同坐标心形必须变红（证明 tap 命中的是心形，
+ * 插画的身份证明，同时就是 id 发现）→ 同坐标胶囊必须判为已收藏态（证明 tap 命中的是心形，
  * 不是旁边的可点行）→ 再点一次还原基线。
  * 任一环不成立即判定「不是插画详情页 / 没点中」→ 返回 + 重试（最多 3 次）。
  */
@@ -939,11 +956,18 @@ async function enterDetailAndResolveId(): Promise<string> {
     }
     const candidate = String(added[0]);
 
-    // 自验证步骤 2：同坐标心形必须变红（证明 tap 命中心形本身而非旁边的可点行）
-    if (!heartFilled(afterTap, heart)) {
-      attempts.push(`第 ${attempt} 次：心形胶囊未变已收藏色（heartFilled 判据未命中）`);
+    // 自验证步骤 2：同坐标心形必须变已收藏态（证明 tap 命中心形本身而非旁边的可点行）
+    const afterState = heartBookmarkState(afterTap, heart);
+    if (afterState !== "bookmarked") {
+      attempts.push(
+        `第 ${attempt} 次：心形胶囊未判为已收藏（chipBookmarkState 判出「${afterState}」）`,
+      );
+      // ⚠️ `unknown` 与 `not-bookmarked` 是**两种**不同的事实，日志必须分开说：
+      // 前者是「判据在这套配色/这帧上给不出结论」，后者是「结结实实读到了未收藏底色」。
+      // 合并成一句话就会让人照着「配色问题」去查产品，而 #709 记的恰恰是反过来的坑。
       console.warn(
-        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：心形未变已收藏色（heartFilled 未命中）→ 回滚收藏并重试`,
+        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：心形未判为已收藏（判出「${afterState}」` +
+          `${afterState === "unknown" ? "＝判据给不出结论，不是「读到未收藏」" : ""}）→ 回滚收藏并重试`,
       );
       hostDeleteBookmark(candidate);
       pressBack();

@@ -15,7 +15,8 @@ import {
   alignParagraphs,
   chunkParagraphs,
   createNovelTranslator,
-  parseAnchorDeltas,
+  fetchChunkViaProvider,
+  reassembleDeltas,
   runChunkPool,
   TranslationChunkError,
   type ChunkRange,
@@ -48,8 +49,13 @@ const SAMPLE_REQUEST: TranslationRequest = {
  * @param behavior 由测试指定如何返回 chunks（流式 delta / 一次性 / cached / error）
  */
 function mockProvider(behavior: {
-  /** 返回 delta 文本序列；空数组 = 立即 done（无 delta） */
+  /** 返回 delta 文本序列；空数组 = 立即 done（无 delta）。全部按占位 paragraphIndex=0 下发 */
   deltas?: string[]
+  /**
+   * 返回**自带段落序号**的 delta 序列（native 桥 / 整批非流式 provider 的形态：
+   * TranslationSseParser 已按 `[N]` 切好段并剥掉段间分隔符，逐段以 `delta_all` 下发）。
+   */
+  indexedDeltas?: Array<{ paragraphIndex: number; text: string }>
   /** 直接返回 cached chunk（缓存命中短路） */
   cached?: string[]
   /** 抛出 error chunk（测试 error 路径） */
@@ -66,6 +72,11 @@ function mockProvider(behavior: {
       if (behavior.deltas) {
         for (const d of behavior.deltas) {
           queue.push({ type: 'delta', paragraphIndex: 0, text: d })
+        }
+      }
+      if (behavior.indexedDeltas) {
+        for (const d of behavior.indexedDeltas) {
+          queue.push({ type: 'delta', paragraphIndex: d.paragraphIndex, text: d.text })
         }
       }
       if (behavior.errorChunk) queue.push({ type: 'error', ...behavior.errorChunk })
@@ -179,34 +190,201 @@ describe('alignParagraphs 段落对齐（AGENTS.md 测试硬约束 #3 禁静默�
   })
 })
 
-// ──────────────────── parseAnchorDeltas ────────────────────
+// ──────────────────── reassembleDeltas（#948）────────────────────
 
-describe('parseAnchorDeltas 流式 delta 按 [N] 锚定拆分', () => {
-  it('单 [N] 锚定 → 写入对应段落', () => {
-    const { state, tail } = parseAnchorDeltas('[0] 译文A', {})
-    expect(state).toEqual({ 0: '译文A' })
-    expect(tail).toBe('')
+/**
+ * Oracle 溯源：本组的期望值来自 issue #948 的验收条件 + 生产链路事实 ——
+ * native 桥（TranslationSseParser.emitConsolidated）逐段 trim 后以 `delta_all`
+ * 一帧下发整章，段间 `\n\n` 在 Java 侧已被剥掉 ⇒ JS 侧只能靠 `paragraphIndex` 复原
+ * 段落边界；web 流式 provider（mapEventToChunk）恒给占位 `paragraphIndex: 0`，
+ * 段落边界靠模型输出里的空行。
+ */
+describe('reassembleDeltas 流式 delta → 逐段译文重装配（#948）', () => {
+  it('序号可信（native 形态）：N 条带序号的 delta → N 段译文，fallbackCount=0', () => {
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '第一段·译' },
+        { paragraphIndex: 1, text: '第二段·译' },
+        { paragraphIndex: 2, text: '第三段·译' },
+      ],
+      ['第一段', '第二段', '第三段'],
+    )
+    expect(result.paragraphs).toEqual(['第一段·译', '第二段·译', '第三段·译'])
+    expect(result.fallbackCount).toBe(0)
+    expect(result.overflowCount).toBe(0)
   })
 
-  it('多 [N] 锚定连续 → 全部解析', () => {
-    const { state, tail } = parseAnchorDeltas('[0] A\n\n[1] B\n\n[2] C', {})
-    expect(state).toEqual({ 0: 'A', 1: 'B', 2: 'C' })
-    expect(tail).toBe('')
+  it('序号可信：同一段多次增量按到达顺序直接相连（不插入分隔符）', () => {
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '前半' },
+        { paragraphIndex: 1, text: '第二段' },
+        { paragraphIndex: 0, text: '后半' },
+      ],
+      ['原文1', '原文2'],
+    )
+    expect(result.paragraphs).toEqual(['前半后半', '第二段'])
+    expect(result.fallbackCount).toBe(0)
   })
 
-  it('半完成（delta 末尾未到下一个 [N]）→ 解析完整锚定后留空 tail（按段落分隔符 \(\n\n\) 由 caller 主动切分）', () => {
-    // 注：实现按完整锚定解析（不区分 complete vs partial）。
-    // 生产场景 LLM 输出按 \n\n 段落分隔符断行；partial 锚定场景由 caller
-    // 在调用 parseAnchorDeltas 前用 \n\n 切分 delta 块来保证完整性。
-    const { state, tail } = parseAnchorDeltas('[0] A\n\n[1] B\n\n[2] 正在', {})
-    expect(state).toEqual({ 0: 'A', 1: 'B', 2: '正在' })
-    expect(tail).toBe('')
+  it('序号可信：缺号不前移（段 1 缺失时，段 2 的译文不得落到段 1）', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '译一' },
+        { paragraphIndex: 2, text: '译三' },
+      ],
+      ['原文1', '原文2', '原文3'],
+    )
+    expect(result.paragraphs).toEqual(['译一', '原文2', '译三'])
+    expect(result.fallbackCount).toBe(1)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 
-  it('同段落多次累积 → 用 \\n\\n 拼接', () => {
-    const r1 = parseAnchorDeltas('[0] 第一行', {})
-    const r2 = parseAnchorDeltas(r1.tail + '[0] 第二行', r1.state)
-    expect(r2.state[0]).toBe('第一行\n\n第二行')
+  it('序号可信：越界序号计入 overflowCount，不挤占原文段落', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '译一' },
+        { paragraphIndex: 1, text: '译二' },
+        { paragraphIndex: 7, text: '多出来的段' },
+      ],
+      ['原文1', '原文2'],
+    )
+    expect(result.paragraphs).toEqual(['译一', '译二'])
+    expect(result.overflowCount).toBe(1)
+    expect(result.fallbackCount).toBe(0)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('序号可信：空文本桶等同缺号（计入 fallbackCount）', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '译一' },
+        { paragraphIndex: 1, text: '   ' },
+      ],
+      ['原文1', '原文2'],
+    )
+    expect(result.paragraphs).toEqual(['译一', '原文2'])
+    expect(result.fallbackCount).toBe(1)
+    warnSpy.mockRestore()
+  })
+
+  it('序号为占位 0（web 流式形态）：退回按空行拆段，段落边界仍正确', () => {
+    const result = reassembleDeltas(
+      [
+        { paragraphIndex: 0, text: '第一段·译\n\n' },
+        { paragraphIndex: 0, text: '第二段·译' },
+      ],
+      ['第一段', '第二段'],
+    )
+    expect(result.paragraphs).toEqual(['第一段·译', '第二段·译'])
+    expect(result.fallbackCount).toBe(0)
+  })
+
+  it('序号为占位 0 且模型没按空行分段 → 退化为整块 1 段 + fallback（既有语义，不静默）', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = reassembleDeltas([{ paragraphIndex: 0, text: '译一译二' }], ['原文1', '原文2'])
+    expect(result.paragraphs).toEqual(['译一译二', '原文2'])
+    expect(result.fallbackCount).toBe(1)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('零 delta → 全段回退原文 + fallbackCount=原文长度 + warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = reassembleDeltas([], ['原文1', '原文2'])
+    expect(result.paragraphs).toEqual(['原文1', '原文2'])
+    expect(result.fallbackCount).toBe(2)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
+// ──────────────────── fetchChunkViaProvider（#948：此前零覆盖）────────────────────
+
+describe('fetchChunkViaProvider delta 收集与重装配（#948）', () => {
+  const controller = new AbortController()
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('native 形态：delta_all 展开成 N 条带序号 delta → 逐段还原，fallbackCount=0', async () => {
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '第一段·译' },
+        { paragraphIndex: 1, text: '第二段·译' },
+        { paragraphIndex: 2, text: '第三段·译' },
+      ],
+    })
+    const result = await fetchChunkViaProvider(
+      { start: 0, end: 3 },
+      ['第一段', '第二段', '第三段'],
+      provider,
+      { ...SAMPLE_REQUEST, paragraphs: ['第一段', '第二段', '第三段'] },
+      SAMPLE_CONFIG,
+      controller.signal,
+    )
+    expect(result.paragraphs).toEqual(['第一段·译', '第二段·译', '第三段·译'])
+    expect(result.fallbackCount).toBe(0)
+  })
+
+  it('provider 少给一段 → fallbackCount>0（缺口是真信号，不是分隔符丢失的假象）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '第一段·译' },
+        { paragraphIndex: 1, text: '' },
+      ],
+    })
+    const result = await fetchChunkViaProvider(
+      { start: 0, end: 2 },
+      ['第一段', '第二段'],
+      provider,
+      { ...SAMPLE_REQUEST, paragraphs: ['第一段', '第二段'] },
+      SAMPLE_CONFIG,
+      controller.signal,
+    )
+    expect(result.fallbackCount).toBe(1)
+    expect(result.paragraphs).toEqual(['第一段·译', '第二段'])
+    warnSpy.mockRestore()
+  })
+
+  it('onChunk 仍逐帧透传（store 增量渲染依赖它）', async () => {
+    const seen: TranslationChunk[] = []
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '译一' },
+        { paragraphIndex: 1, text: '译二' },
+      ],
+    })
+    await fetchChunkViaProvider(
+      { start: 0, end: 2 },
+      ['原文1', '原文2'],
+      provider,
+      { ...SAMPLE_REQUEST, paragraphs: ['原文1', '原文2'] },
+      SAMPLE_CONFIG,
+      controller.signal,
+      (c) => seen.push(c),
+    )
+    expect(seen.filter((c) => c.type === 'delta')).toHaveLength(2)
+  })
+
+  it('cached chunk → 走既有对齐路径（防御性补齐数量）', async () => {
+    const provider = mockProvider({ cached: ['缓存1', '缓存2'] })
+    const result = await fetchChunkViaProvider(
+      { start: 0, end: 2 },
+      ['原文1', '原文2'],
+      provider,
+      { ...SAMPLE_REQUEST, paragraphs: ['原文1', '原文2'] },
+      SAMPLE_CONFIG,
+      controller.signal,
+    )
+    expect(result.paragraphs).toEqual(['缓存1', '缓存2'])
+    expect(result.fallbackCount).toBe(0)
   })
 })
 
@@ -400,6 +578,53 @@ describe('createNovelTranslator 主入口（8 状态判定）', () => {
     // 收到至少 1 个 delta + 1 个 done chunk
     expect(chunks.length).toBeGreaterThanOrEqual(2)
     expect(chunks.some((c) => c.type === 'done')).toBe(true)
+  })
+
+  // ─── #948：native 形态（带段落序号的 delta）走到主入口 ───
+
+  it('native 形态：逐段译文完整 → completed + 逐段译文（不再塌成 1 段）', async () => {
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '译文1' },
+        { paragraphIndex: 1, text: '译文2' },
+        { paragraphIndex: 2, text: '译文3' },
+        { paragraphIndex: 3, text: '译文4' },
+        { paragraphIndex: 4, text: '译文5' },
+      ],
+    })
+    const translator = createNovelTranslator({ provider })
+    const result = await translator.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    expect(result.status).toBe('completed')
+    expect(result.paragraphs).toEqual(['译文1', '译文2', '译文3', '译文4', '译文5'])
+  })
+
+  it('native 形态：有段落没译文 → partial（不得 completed —— completed 的定义是「已写入缓存」，半成品入缓存会把坏译文固化）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '译文1' },
+        { paragraphIndex: 1, text: '' },
+        { paragraphIndex: 2, text: '译文3' },
+        { paragraphIndex: 3, text: '译文4' },
+        { paragraphIndex: 4, text: '译文5' },
+      ],
+    })
+    const translator = createNovelTranslator({ provider })
+    const result = await translator.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    expect(result.status).toBe('partial')
+    // 缺号段落保留原文（不静默位移）：段 3 的译文不得落到段 2
+    expect(result.paragraphs).toEqual(['译文1', '段落2', '译文3', '译文4', '译文5'])
+    warnSpy.mockRestore()
+  })
+
+  it('web 流式形态（占位 paragraphIndex=0 + 空行）：仍 completed + 逐段对齐', async () => {
+    const provider = mockProvider({
+      deltas: ['[0] 译文1\n\n[1] 译文2', '\n\n[2] 译文3\n\n[3] 译文4', '\n\n[4] 译文5'],
+    })
+    const translator = createNovelTranslator({ provider })
+    const result = await translator.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    expect(result.status).toBe('completed')
+    expect(result.paragraphs).toEqual(['译文1', '译文2', '译文3', '译文4', '译文5'])
   })
 })
 

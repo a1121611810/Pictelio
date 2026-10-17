@@ -1,10 +1,10 @@
 /**
- * 收集防线：`tests/android-e2e/unit/**` 的 8 个契约单测**必须**被本包的
+ * 收集防线：`tests/android-e2e/unit/**` 的契约单测**必须**被本包的
  * `vitest.config.ts` 收进 `pnpm test`（进而进 `pnpm test:all` → CI）。
  *
  * ## 为什么需要这道防线（这是修过一次门禁漏洞的成果，issue #818）
  *
- * 这 8 个文件是 android-e2e 契约工具的**纯函数**单测（不碰 adb / 模拟器）。
+ * 这些文件是 android-e2e 契约工具的**纯函数**单测（不碰 adb / 模拟器）。
  * 在 `packages/app` 时代，它们的唯一收集者是 `tests/android-e2e/vitest.config.ts`，
  * 而跑该目录的唯一脚本会连带编译 APK + 起模拟器。于是：
  *
@@ -41,13 +41,24 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 /** 宿主包根 = unit → tests → android-host，共 2 级。 */
 const HOST_DIR = path.resolve(testDir, "../..");
 const VITEST_CONFIG = path.join(HOST_DIR, "vitest.config.ts");
-/** 被守卫的那 8 个契约单测所在目录（相对宿主包根）。 */
+/** 被守卫的那批契约单测所在目录（相对宿主包根）。 */
 const CONTRACT_DIR_REL = "tests/android-e2e/unit";
 const CONTRACT_DIR_ABS = path.join(HOST_DIR, "tests", "android-e2e", "unit");
 
-/** 必须随 CI 执行的 8 个契约单测（文件名 ↔ 各自定义的 oracle 一一对应）。 */
+/** 必须随 CI 执行的契约单测（文件名 ↔ 各自定义的 oracle 一一对应）。 */
 const CONTRACT_UNIT_TESTS = [
-  { file: "env.flavor.test.ts", covers: "E2E_FLAVOR 缺省/显式值判定（#818 失明数月的那一条）" },
+  {
+    file: "bookmarkChip.test.ts",
+    covers: "收藏 chip 底色判据 · 14 主题组合表驱动（#709 配色无关）",
+  },
+  {
+    file: "env.flavor.test.ts",
+    covers: "E2E_FLAVOR 缺省/显式值判定（#818 失明数月的那一条）",
+  },
+  {
+    file: "flowCheckBookmarkOracle.test.ts",
+    covers: "flow-check 收藏判据 · 合成 PNG 驱动 python 子命令（#709）",
+  },
   { file: "noControlChars.test.ts", covers: "源码裸控制字节防线" },
   { file: "prefs.devLogin.test.ts", covers: "dev intent 登录（adb 调用以 mock 顶掉）" },
   { file: "prefs.poll.test.ts", covers: "偏好轮询纯函数" },
@@ -73,7 +84,7 @@ const CONTRACT_UNIT_TESTS = [
  *      故转义走查表，见下。
  *   ③ **不能先转义再替换单星**：转义把单星变成「反斜杠 + 星号」，随后的替换会把
  *      那个转义反斜杠一起吃掉，产出 `[^/]*` 缺了转义斜杠的破损模式——
- *      实测表现为「include 里明明有这条 glob，8 个文件却全被判未收集」。
+ *      实测表现为「include 里明明有这条 glob，这些文件却全被判未收集」。
  *      故按字符扫一遍，单星在转义**之前**就处理掉。
  */
 const REGEX_META = new Set(".*+?^${}()|[]\\/".split(""));
@@ -118,14 +129,14 @@ function globToRegExp(glob: string): RegExp {
 describe("收集防线：android-e2e 契约单测必须进 pnpm test → test:all → CI（#818）", () => {
   const configSrc = readFileSync(VITEST_CONFIG, "utf8");
 
-  it("8 个契约单测都在磁盘上（迁移丢件即红）", () => {
+  it("契约单测都在磁盘上（迁移丢件即红）", () => {
     const missing = CONTRACT_UNIT_TESTS.filter(
       (t) => !existsSync(path.join(CONTRACT_DIR_ABS, t.file)),
     ).map((t) => t.file);
     expect(missing, `缺失的契约单测：${missing.join("、")}`).toEqual([]);
   });
 
-  it("本包 vitest 配置的 include 覆盖这 8 个文件（glob 匹配真实配置，非字面量比对）", () => {
+  it("本包 vitest 配置的 include 覆盖这些文件（glob 匹配真实配置，非字面量比对）", () => {
     const includeBlock = configSrc.match(/include:\s*\[([^\]]*)\]/)?.[1];
     expect(includeBlock, "vitest.config.ts 必须显式声明 include（#818 的修复形态）").toBeDefined();
 
@@ -166,8 +177,10 @@ describe("收集防线：android-e2e 契约单测必须进 pnpm test → test:al
     expect(configSrc).toMatch(/passWithNoTests:\s*false/);
   });
 
-  it("清单非空锚点：8 条不是抄来的常量（防止有人把数组清空后全绿）", () => {
-    expect(CONTRACT_UNIT_TESTS.length).toBe(8);
+  it("清单非空锚点：清单条数不是抄来的常量（防止有人把数组清空后全绿）", () => {
+    // 刻意写死条数：新增/删除契约单测时**必须**回来改这里，否则「清单」会与磁盘
+    // 悄悄分叉——而这个文件存在的全部意义就是让那种分叉立刻红。
+    expect(CONTRACT_UNIT_TESTS.length).toBe(10);
     for (const t of CONTRACT_UNIT_TESTS) expect(t.covers.length).toBeGreaterThan(0);
   });
 });

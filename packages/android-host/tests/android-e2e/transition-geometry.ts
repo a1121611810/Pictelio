@@ -55,6 +55,63 @@ export function regionSamples(region: Region): number {
 /** 灰度取值函数（由调用方从 canvas 像素注入，便于单测用合成数据） */
 export type GrayAt = (x: number, y: number) => number;
 
+/** 颜色取值函数（同上；刻意不 import `pixel.ts` 的 `Rgb`——那会把 canvas 拖进本纯模块） */
+export type ColorAt = (x: number, y: number) => readonly [number, number, number];
+
+/** 色桶量化步长（#821：由 spec 的内联 `colorBuckets` 收口到此，与原实现同值） */
+export const COLOR_BUCKET_STEP = 24;
+
+/** 色统计采样步长（#821：与原 spec 内联实现同值，改动会让历史帧的复算值漂移） */
+export const COLOR_STATS_STEP = 16;
+
+export interface RegionColorStats {
+  /** 区域内不同色桶数（沿用原 `colorBuckets` 口径） */
+  buckets: number;
+  /** 单一色块占比 = 众数桶份额（0..1）。单色平涂恒为 1 */
+  flatRatio: number;
+}
+
+/**
+ * 区域色统计：桶数 **与** 单一色块占比，一次采样同时产出（#821）。
+ *
+ * 为什么必须补第二个量：桶数只回答「有多少种颜色」，不回答「这些颜色各占多少」。
+ * 「整屏近乎单色」与「几块大色块」在桶数上可以同档（票面实测 6 vs 23，同阈值 25），
+ * 而后者是**有内容**的。严格意义的「非背景像素占比」不可得（没有已知背景色），
+ * 故退一步取**众数桶份额**：单色平涂下它构造性地等于 1，几块大色块下等于最大块的面积占比。
+ *
+ * oracle（#821，本机真实决策帧逐像素复算，同一采样口径）：
+ *   近空白  loaded-r3-recommended × CAROUSEL 0.853 / loaded-r1-illusts × TOPREF 0.841
+ *           loaded-r1-illusts × RESULTS 0.797
+ *   有内容  loaded-r3-recommended × TOPREF 0.355 / loaded-r3-recommended × RESULTS 0.421
+ *   同一张帧的插画区（空白）与信息条区（有内容）桶数 4 vs 23，是本判据最硬的正负样本对。
+ *
+ * ⚠️ **已知失效面（登记，非缺陷）**：色桶键用 `r,g,b` 三通道量化。
+ * 单测里没有任何一对颜色**只差蓝通道**，故把键里的蓝分量删掉，`unit/transition-geometry.test.ts`
+ * 仍会 36 条全绿——这条单测对蓝通道零判别力。真机上蓝通道参与分桶是对的
+ * （冷暖色调相近、红绿相近的画面必须靠蓝区分），但**改键时不要指望这批单测报错**，
+ * 须另造一对只差蓝的夹具。
+ */
+export function regionColorStats(
+  region: Region,
+  colorAt: ColorAt,
+  step: number = COLOR_STATS_STEP,
+): RegionColorStats {
+  const counts = new Map<string, number>();
+  let total = 0;
+  let max = 0;
+  for (let y = region.y0; y < region.y1; y += step) {
+    for (let x = region.x0; x < region.x1; x += step) {
+      const [r, g, b] = colorAt(x, y);
+      const key = `${Math.floor(r / COLOR_BUCKET_STEP)},${Math.floor(g / COLOR_BUCKET_STEP)},${Math.floor(b / COLOR_BUCKET_STEP)}`;
+      const n = (counts.get(key) ?? 0) + 1;
+      counts.set(key, n);
+      if (n > max) max = n;
+      total++;
+    }
+  }
+  return { buckets: counts.size, flatRatio: total === 0 ? 1 : max / total };
+}
+
 /** 区域平均亮度（步长 4，与 spec avgBrightness 同量级） */
 export function regionAvgBrightness(region: Region, gray: GrayAt): number {
   let sum = 0;
@@ -169,16 +226,53 @@ export function belowAnchorRegion(tapY: number, contentBottom: number): Region {
  * （逐带桶数 1..5、亮度 202..238 的均匀浅灰）。⇒ 色彩桶数与「是否加载完」
  * **没有稳定对应**：单张大幅插画铺满视口时纵向色块少，桶数天然偏低。
  *
- * 「画面已稳定」是内容无关的收敛信号；已稳定但桶数仍低 ⇒ 是内容形态低桶，放行。
+ * 「画面已稳定」是内容无关的收敛信号；已稳定但桶数仍低时，**还要再问一句
+ * 这块画面到底有没有东西**（#821）。
+ *
+ * ⚠️ #821 之前这一步是**闭包**的：入参只有桶数/阈值/是否稳定，没有任何表征
+ * 信息量的输入，于是「近空白」（整屏近乎单色，桶数低是因为什么都没加载）与
+ * 「低方差但有内容」（几块大色块，桶数低是正常的）在同一分支、同一行返回同一
+ * 裁决。实测样本对：同一张 `loaded-r3-recommended.png`，插画区 buckets=4 /
+ * flatRatio 0.853（空白）、信息条区 buckets=23 / flatRatio 0.355（有内容）。
+ * 近空白被放行后，下游内容断言在空画面上跑，报「FAB 菜单未收起」「换卡失败」
+ * ——报错文案指向与真实原因完全无关的方向。
  */
+
+/**
+ * 近空白阈值：单一色块占比 ≥ 此值即判「画面里没有结构」。
+ *
+ * 落点依据（两组实测值之间，见 `regionColorStats` 的 oracle 段）：
+ *   最高的「有内容」样本 0.421 → 留 30% 余量；
+ *   最低的「近空白」样本 0.797 → 留 33% 余量。
+ * ⚠️ 这两个常量是**对**那三张决策帧标定的。换采样区或换采样步长须重新复算，
+ * 否则「有内容」被误判成空白会**多**出 skip（漏验），反向则会退化成假红。
+ */
+export const NEAR_BLANK_FLAT_RATIO = 0.6;
+
+export type ContentLoadVerdict =
+  /** 桶数过阈：内容已加载，本轮可信 */
+  | "loaded"
+  /** 已稳定且桶数低，但**有内容**（低方差内容形态）——放行，本轮可信 */
+  | "stable-but-low-buckets"
+  /** 仍在变化 / 未达阈值：继续等 */
+  | "loading"
+  /** 已稳定、桶数低、且画面近乎单色平涂：本轮内容形态不可信 */
+  | "near-blank";
+
 export function judgeContentLoaded(params: {
   buckets: number;
   minBuckets: number;
   stable: boolean;
-}): { verdict: "loaded" | "stable-but-low-buckets" | "loading" } {
+  /** 单一色块占比（`regionColorStats` 实测）；必填——不提供就没有区分近空白的能力 */
+  flatRatio: number;
+  nearBlankFlatRatio?: number;
+}): { verdict: ContentLoadVerdict } {
   if (params.buckets > params.minBuckets) return { verdict: "loaded" };
-  if (params.stable) return { verdict: "stable-but-low-buckets" };
-  return { verdict: "loading" };
+  if (!params.stable) return { verdict: "loading" };
+  if (params.flatRatio >= (params.nearBlankFlatRatio ?? NEAR_BLANK_FLAT_RATIO)) {
+    return { verdict: "near-blank" };
+  }
+  return { verdict: "stable-but-low-buckets" };
 }
 
 // ─── 放射 FAB 几何（2026-09-28 #816 R2 订正）───

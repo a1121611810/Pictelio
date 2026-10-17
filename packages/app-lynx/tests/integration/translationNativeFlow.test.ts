@@ -139,13 +139,42 @@ describe('native 路径集成（真实适配器 + 真实 pipeline）', () => {
     await running
 
     expect(store.status).toBe('completed')
-    // 需求本身：用户能看到译文（不是「store 返回了某个值」）
-    expect(store.displayParagraphs.join('|')).toContain('第一段·译')
-    expect(store.displayParagraphs.join('|')).toContain('第二段·译')
+    // 需求本身：用户看到的**每一段**都是译文。
+    // #948：原断言是 `displayParagraphs.join('|')` 的子串包含，在「整章塌成 1 段」时
+    // 渲染串是 "第一段·译第二段·译|第二段"，两条 toContain 同时为 true ⇒ 假绿。
+    // 必须逐段等值，否则本用例判别不了段落塌陷。
+    expect(store.displayParagraphs).toEqual(['第一段·译', '第二段·译'])
     // 适配器确实把原生载荷按 Java 契约发出
     const sent = JSON.parse(mocks.translateStream.mock.calls[0][0] as string) as Record<string, unknown>
     expect(sent.baseURL).toBe('https://api.deepseek.com')
     expect(sent.input).toEqual(['第一段', '第二段'])
+  })
+
+  it('原生只译出 1/2 段 → partial 且不标记已缓存（#948：半成品不得进缓存）', async () => {
+    // Java 侧按 `[N]` 切段后只交付 index=0（模型对第 2 段漏锚 / 截断）。
+    // 旧行为：塌成 1 段 → 无块失败 → completed → writeCacheIfNeeded 把「译文1 + 原文2」
+    // 固化进缓存，此后每次开章都直接重放坏结果、不再重译 —— 用户伤害最重的一环。
+    mocks.translateStream.mockImplementation(() => Promise.resolve({ abort: vi.fn() }))
+    const frames = [
+      JSON.stringify({
+        type: 'delta_all',
+        paragraphs: [{ index: 0, text: '第一段·译' }],
+      }),
+      JSON.stringify({ type: 'done' }),
+    ]
+    mocks.translatePoll.mockImplementation(
+      (_id: string, cb: (v: string | null, e: string | null) => void) =>
+        cb(frames.shift() ?? JSON.stringify({ type: 'pending' }), ''),
+    )
+
+    const store = useNovelTranslateStore()
+    await store.translateChapter(201, 201, ['第一段', '第二段'], 0)
+
+    expect(store.status).toBe('partial')
+    expect(store.isCached[201]).toBe(false)
+    // 未译段渲染为占位而不是原文（ADR-0178 D4）——「静默混入原文」正是本票的现象
+    expect(store.displayParagraphs[0]).toBe('第一段·译')
+    expect(store.displayParagraphs[1]).not.toBe('第二段')
   })
 
 })

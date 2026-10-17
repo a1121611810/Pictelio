@@ -19,12 +19,41 @@ import {
 import { ApiErrorType, type ApiError } from "./types"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_API_BASE } from "./userAgent"
 import { setLocale } from "../i18n"
+import { keyedLadder } from "../../tests/helpers/attemptLadder"
 
 // 真实结构样例：/webview/v2/novel 返回的 HTML（含 window.pixiv.novel.text）
 const NOVEL_HTML = `<script>window.pixiv = { novel: { "text": "第一行\\n第二行" } }</script>`
 
 /** web 模式 fetch 返回的 JSON Response 构造（status 429 等错误也走 JSON body） */
 const jsonResponse = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status })
+
+/**
+ * 按 **URL（业务标识）** 分发的 fetch 替身：同一 URL 的多次网络尝试按登记的应答阶梯依次返回，
+ * 阶梯用尽后再来一次 = 「多发了一次」→ 记入收尾守卫并抛错，不静默沿用最后一档
+ * （测试约定强制约束 6「计数断言按标识映射」：序号映射会把多余的那次调用派给最后一个分支，
+ *  使「多发了一次」只表现为计数差、难以归因）。
+ *
+ * 重试 / 退避 / 401 重放**都不改 URL**，业务标识只能到 URL 为止——这不是「强行按标识映射」，
+ * 而是把该 URL 自己的尝试阶梯显式登记下来，并由收尾守卫把「用尽」指名道姓地报出来。
+ *
+ * 步骤写成工厂而非 Response 实例：Response 的 body 只能消费一次，每次尝试各造一个新的。
+ */
+function fetchLadder(
+  fetchMock: { mockImplementation(fn: (url: string) => Promise<Response>): unknown },
+  ladders: Record<string, Array<() => Response>>,
+): void {
+  keyedLadder<[string], string, Promise<Response>>(
+    fetchMock,
+    ([url]) => url,
+    Object.fromEntries(
+      Object.entries(ladders).map(([url, steps]) => [
+        url,
+        steps.map((step) => () => Promise.resolve(step())),
+      ]),
+    ),
+    "client.fetch",
+  )
+}
 
 // 认证就绪门（client.setAuthReadyProvider）默认清空，防跨用例泄漏；用例内按需注册。
 // 限流退避配置（ADR-0199 D4 seam）同理：null = 回落默认参数，防上一用例注入的
@@ -104,9 +133,12 @@ describe("client.requestRaw web 模式（fetch + /pixiv-api 代理）", () => {
 
   it("401 → execWithAuthRetry 自动刷新后重试成功（与 execute 行为一致）", async () => {
     // 第一次 401，刷新 handler 轮换 token 后重放请求第二次 200
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 401 }))
-      .mockResolvedValueOnce(new Response(NOVEL_HTML, { status: 200 }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/webview/v2/novel?id=123": [
+        () => jsonResponse(401),
+        () => new Response(NOVEL_HTML, { status: 200 }),
+      ],
+    })
     const refreshHandler = vi.fn(async () => {
       setAccessToken("refreshed-token")
     })
@@ -398,10 +430,13 @@ describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
 
   it("429→429→200 退避重试：fetch 共 3 次、最终 resolve、warn 留痕（attempt 从 1 计）", async () => {
     vi.useFakeTimers()
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/v1/illust/recommended": [
+        () => jsonResponse(429),
+        () => jsonResponse(429),
+        () => jsonResponse(200, { ok: true }),
+      ],
+    })
     const out = await (async () => {
       const p = probe(apiClient.get<{ ok: boolean }>("/v1/illust/recommended"))
       await vi.advanceTimersByTimeAsync(120_000)
@@ -451,11 +486,14 @@ describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
 
   it("401→刷新→重放 429→退避→200：refreshHandler 1 次、fetch 共 4 次（重放请求同样享受退避）", async () => {
     vi.useFakeTimers()
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(401))
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/v1/illust/recommended": [
+        () => jsonResponse(401),
+        () => jsonResponse(429),
+        () => jsonResponse(429),
+        () => jsonResponse(200, { ok: true }),
+      ],
+    })
     const refreshHandler = vi.fn(async () => {
       setAccessToken("refreshed-token")
     })
@@ -472,9 +510,9 @@ describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
 
   it("POST 分支同样接退避：429→200 重试成功，fetch 共 2 次", async () => {
     vi.useFakeTimers()
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/v1/illust/bookmark/add": [() => jsonResponse(429), () => jsonResponse(200, { ok: true })],
+    })
     const p = probe(apiClient.post<{ ok: boolean }>("/v1/illust/bookmark/add", { illust_id: "1" }))
     await vi.advanceTimersByTimeAsync(120_000)
     const out = await p
@@ -486,9 +524,12 @@ describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
 
   it("requestRaw 同样接退避：429→200 重试成功，fetch 共 2 次", async () => {
     vi.useFakeTimers()
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(429))
-      .mockResolvedValueOnce(new Response(NOVEL_HTML, { status: 200 }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/webview/v2/novel?id=123": [
+        () => jsonResponse(429),
+        () => new Response(NOVEL_HTML, { status: 200 }),
+      ],
+    })
     const p = probe(apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" }))
     await vi.advanceTimersByTimeAsync(120_000)
     const out = await p
@@ -628,25 +669,6 @@ describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退�
   const fetchMock = vi.fn()
   let warnSpy: MockInstance
 
-  /**
-   * 按 **URL（业务标识）** 分发的 fetch mock：同一 URL 的多次网络尝试按登记的应答阶梯依次返回，
-   * 阶梯用尽后再来一次 = 「多发了一次」→ 直接抛错，不静默沿用最后一档
-   * （测试约定 §6「计数断言按标识映射」：序号映射会把多余的那次调用派给最后一个分支，
-   *  使「多发了一次」只表现为计数差、难以归因）。
-   *
-   * 步骤写成工厂而非 Response 实例：Response 的 body 只能消费一次，每次尝试各造一个新的。
-   */
-  function mockFetchLadder(ladders: Record<string, Array<() => Response>>) {
-    const queue = new Map(Object.entries(ladders).map(([url, steps]) => [url, [...steps]]))
-    fetchMock.mockImplementation((url: string) => {
-      const steps = queue.get(url)
-      if (!steps) throw new Error(`fetch 收到未登记的 URL：${url}`)
-      const step = steps.shift()
-      if (!step) throw new Error(`fetch 对同一 URL 多发了一次：${url}（登记的尝试已用尽）`)
-      return Promise.resolve(step())
-    })
-  }
-
   beforeEach(() => {
     fetchMock.mockReset()
     setOnUnauthorized(null)
@@ -667,7 +689,7 @@ describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退�
     // 两次 get 无 signal → 共享同一 in-flight promise → 只有一条请求链，其两次网络尝试 URL 完全相同
     // （重试不改 URL，故业务标识只能到 URL 为止，尝试序号由该 URL 的应答阶梯承载）：
     // 第 1 次 429 → 退避 → 第 2 次 200；第 3 次即多发 ⇒ mock 抛错而非顺延。
-    mockFetchLadder({
+    fetchLadder(fetchMock, {
       "/pixiv-api/v1/illust/recommended": [
         () => jsonResponse(429),
         () => jsonResponse(200, { ok: true }),
@@ -756,9 +778,12 @@ describe("client web 模式 Accept-Language 头（ADR-0200 D3 + spec §2.2）", 
 
   it("401 重放：初始与重放请求均携带 Accept-Language（spec E4，review round 1 P2-1）", async () => {
     // 第一次 401 → execWithAuthRetry 刷新后重放同一 fn；Response 不可复用 → 逐次构造
-    fetchMock
-      .mockImplementationOnce(() => jsonResponse(401, {}))
-      .mockImplementationOnce(() => jsonResponse(200, { ok: true }))
+    fetchLadder(fetchMock, {
+      "/pixiv-api/v1/illust/detail?id=e4": [
+        () => jsonResponse(401, {}),
+        () => jsonResponse(200, { ok: true }),
+      ],
+    })
     const refreshHandler = vi.fn(async () => {
       setAccessToken("refreshed-token")
     })
@@ -769,5 +794,231 @@ describe("client web 模式 Accept-Language 头（ADR-0200 D3 + spec §2.2）", 
     // 重放走 execute 全量重建 headers → 语言头不得丢失（与初始请求一致）
     expect(fetchMock.mock.calls[0][1].headers["Accept-Language"]).toBe("zh-CN")
     expect(fetchMock.mock.calls[1][1].headers["Accept-Language"]).toBe("zh-CN")
+  })
+})
+
+// ─── #807 原生通道传输失败（IO 边界失败路径） ───
+// oracle 溯源：PictelioApiModule.request 的 catch 分支（宿主 android/app/src/lynx/java/
+// io/pictelio/app/PictelioApiModule.java 的「request 失败」段）以 status=0 回调，异常消息放在
+// data 位置（裸串，JSON.parse 必失败）。status=0 是「未拿到 HTTP 响应」的哨兵——原生通道上
+// DNS 解析失败 / 连接建立失败 / 超时的唯一形态。旧判据 `error instanceof TypeError` 在本通道
+// 恒 false（原生只回 status 与响应体，error 参数恒 null）⇒ 落 UNKNOWN 兜底 → 裸「未知错误」。
+describe("client 原生传输失败（回调 status=0 → 网络类，#807）", () => {
+  // 真实 DNS 失败消息形态（Android java.net.UnknownHostException）
+  const DNS_ERR = "Failed to resolve host 'app-api.pixiv.net'"
+
+  beforeEach(() => {
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("") // 原生模式 JS 零知 access_token
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("execute：回调 (0, DNS 失败消息, '') → NETWORK 且诊断文本不被丢弃（execute 分支）", async () => {
+    vi.stubGlobal("NativeModules", {
+      PictelioApi: {
+        request: (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+          cb(0, DNS_ERR, ""),
+      },
+    })
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.NETWORK)
+    expect((out.e as ApiError).message).toContain(DNS_ERR)
+  })
+
+  it("executeRaw：回调 (0, DNS 失败消息, '') → NETWORK 且诊断文本不被丢弃（executeRaw 分支）", async () => {
+    vi.stubGlobal("NativeModules", {
+      PictelioApi: {
+        request: (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+          cb(0, DNS_ERR, ""),
+      },
+    })
+    const out = await probe(apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" }))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.NETWORK)
+    expect((out.e as ApiError).message).toContain(DNS_ERR)
+  })
+
+  it("回调 (0, '', '')：异常消息为空串 → 仍是 NETWORK，不退化成「未知错误」", async () => {
+    // Java 侧 getMessage() 为空时降级为异常类名；但契约上 data 可以是空串 ⇒ 分类不得依赖它
+    vi.stubGlobal("NativeModules", {
+      PictelioApi: {
+        request: (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+          cb(0, "", ""),
+      },
+    })
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.NETWORK)
+    expect((out.e as ApiError).message).not.toContain("未知错误")
+  })
+
+  it("HTTP 层异常仍走既有分类（status=500 → SERVER），传输失败判定不放宽到有状态码的分支", async () => {
+    vi.stubGlobal("NativeModules", {
+      PictelioApi: {
+        request: (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+          cb(500, "server error", ""),
+      },
+    })
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.SERVER)
+  })
+
+  it("web 通道非 TypeError 异常的诊断文本不再被吞（fetch 拒绝 → NETWORK + 原文可见）", async () => {
+    // 生产里最常见的非 TypeError 拒绝源：fetch 替身在测试/预发中显式抛出的诊断。
+    // 旧实现把它归入 UNKNOWN 兜底并丢弃 message ⇒ 用户只看到「未知错误」。
+    const DIAG = "fetch 对同一 URL 多发了一次：/pixiv-api/v1/illust/recommended（登记的尝试已用尽）"
+    setAccessToken("web-token")
+    vi.stubGlobal("NativeModules", undefined)
+    const fetchMock = vi.fn(() => {
+      throw new Error(DIAG)
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.NETWORK)
+    expect((out.e as ApiError).message).toContain("多发了一次")
+  })
+})
+
+// ─── #819 A 项：web 模式认证就绪门重复执行 ───
+// 缺陷：execute / executeRaw 顶部（#815 为覆盖原生分支提上去）与底部各有一道字面相同的就绪门。
+// 原生分支提前 return 故底部不可达；web 模式两道都跑，而 authStore.restoreToken 的去重闩锁
+// _restoreInFlight 在 finally 里清空（**只做并发去重、不记忆化**）⇒ 恢复落定后仍无 accessToken 时
+// 真的会再跑一次恢复：失败路径多发一次 OAuth 交换，挂起路径等 2 × 10s 而非 10s。
+// 本组用例**真的跑 web 分支**（NativeModules 为 undefined ⇒ isNativeMode() 恒 false），
+// 不用任何测试开关/环境变量绕过。
+describe("client web 模式认证就绪门只过一道（#819 A）", () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("") // 恢复期间无 access_token
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("NativeModules", undefined) // ← 真 web 分支，不是绕过开关
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it("execute：恢复落定后仍无 accessToken → 认证就绪提供者恰被调用 1 次（不重复触发恢复）", async () => {
+    let providerCalls = 0
+    setAuthReadyProvider(async () => {
+      providerCalls++
+      return false // 恢复失败：无 token 可用
+    })
+    fetchLadder(fetchMock, { "/pixiv-api/v1/illust/recommended": [() => jsonResponse(200, { ok: true })] })
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.UNAUTHORIZED)
+    // 提供者即 authStore.restoreToken：每多调一次 = 多跑一次 loadRefreshToken，
+    // 失败路径还会多发一次 OAuth 交换（AC：至多发生一次）
+    expect(providerCalls).toBe(1)
+    expect(fetchMock).not.toHaveBeenCalled() // 无 token ⇒ 请求根本不该发出
+  })
+
+  it("executeRaw：恢复落定后仍无 accessToken → 认证就绪提供者恰被调用 1 次", async () => {
+    let providerCalls = 0
+    setAuthReadyProvider(async () => {
+      providerCalls++
+      return false
+    })
+    fetchLadder(fetchMock, {
+      "/pixiv-api/webview/v2/novel?id=819": [() => new Response(NOVEL_HTML, { status: 200 })],
+    })
+    const out = await probe(apiClient.requestRaw("GET", "/webview/v2/novel", { id: "819" }))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect((out.e as ApiError).type).toBe(ApiErrorType.UNAUTHORIZED)
+    expect(providerCalls).toBe(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("execute：提供者挂起 → 等待封顶在一个窗口（10s），而非两道门叠加的 20s", async () => {
+    vi.useFakeTimers()
+    let providerCalls = 0
+    setAuthReadyProvider(() => {
+      providerCalls++
+      return new Promise<boolean>(() => {}) // 永不落定（模拟恢复挂起）
+    })
+    fetchLadder(fetchMock, { "/pixiv-api/v1/illust/hang": [() => jsonResponse(200, { ok: true })] })
+    let settled: unknown = null
+    const p = apiClient
+      .get("/v1/illust/hang")
+      .then(
+        () => {
+          settled = "resolved"
+        },
+        (e: unknown) => {
+          settled = e
+        },
+      )
+    await vi.advanceTimersByTimeAsync(0) // 让 awaitAuthReady 的 10s 定时器挂上
+    await vi.advanceTimersByTimeAsync(9_900)
+    // 窗口内不得提前放行：证明断言测的是「等满一个窗口」而非「立刻返回」
+    expect(settled).toBeNull()
+    await vi.advanceTimersByTimeAsync(200) // 越过 10s
+    expect(settled).toMatchObject({ type: ApiErrorType.UNAUTHORIZED })
+    expect(providerCalls).toBe(1)
+    await p
+  })
+
+  it("executeRaw：提供者挂起 → 等待同样封顶在一个窗口（10s）", async () => {
+    vi.useFakeTimers()
+    let providerCalls = 0
+    setAuthReadyProvider(() => {
+      providerCalls++
+      return new Promise<boolean>(() => {})
+    })
+    fetchLadder(fetchMock, {
+      "/pixiv-api/webview/v2/novel?id=hang": [() => new Response(NOVEL_HTML, { status: 200 })],
+    })
+    let settled: unknown = null
+    const p = apiClient
+      .requestRaw("GET", "/webview/v2/novel", { id: "hang" })
+      .then(
+        () => {
+          settled = "resolved"
+        },
+        (e: unknown) => {
+          settled = e
+        },
+      )
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(9_900)
+    expect(settled).toBeNull()
+    await vi.advanceTimersByTimeAsync(200)
+    expect(settled).toMatchObject({ type: ApiErrorType.UNAUTHORIZED })
+    expect(providerCalls).toBe(1)
+    await p
+  })
+
+  it("恢复成功（拿到 accessToken）→ 恰好过一次门，请求带 Bearer 发出（#815 行为不回退）", async () => {
+    let providerCalls = 0
+    setAuthReadyProvider(async () => {
+      providerCalls++
+      setAccessToken("restored-token")
+      return true
+    })
+    fetchLadder(fetchMock, { "/pixiv-api/v1/illust/restored": [() => jsonResponse(200, { ok: true })] })
+    await expect(apiClient.get("/v1/illust/restored")).resolves.toEqual({ ok: true })
+    expect(providerCalls).toBe(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/v1/illust/restored",
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer restored-token" }) }),
+    )
   })
 })

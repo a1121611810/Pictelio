@@ -275,8 +275,15 @@ def classify(w, h, rows):
         if mid_ratio > 0.35 and ratio > 0.01:
             # 顶部有标题文字（深色行）+ 中部大块 → 详情页（大图浅色时彩色低）
             dark_top = 0
+            # ⚠️ 扫描区**必须按比例**给，不能写死像素：这里原来写的是 `range(60, 1020)`，
+            #   那是 1080 宽屏的边距。AVD `pictelio_ui` 实测 720×1280 ⇒ x 一旦到 1020
+            #   就越界，`pixel()` 直接 IndexError 崩掉整个分析器——于是 classify 从此
+            #   永远返回不了，flow-check 的每一步都判「页面异常」。
+            #   `flow-check.sh` 的 tap 坐标早就用 `sx/sy` 按屏宽缩放过（见该脚本注释
+            #   「旧脚本硬编码 1080x2400 坐标在低分屏上点击错位」），扫描区却漏了同一处。
+            #   比例式在 1080 宽上复现原意（≈60..1020），在 720 宽上自动收成 ≈40..680。
             for y in range(220, 400, 4):
-                for x in range(60, 1020, 8):
+                for x in range(int(w * 0.055), int(w * 0.945), 8):
                     r, g, b = pixel(rows, y, x)
                     if r < 120 and g < 120 and b < 120:
                         dark_top += 1
@@ -318,6 +325,167 @@ def page_state(w, h, rows):
     return {"state": "blank", "image_ratio": round(ratio, 3)}
 
 
+def read_chip_tokens(tokens_css):
+    """从 tokens.css 解析收藏 chip 两态底色（#709）。
+
+    返回 [{theme, tertiary:(r,g,b), inverse:(r,g,b)}]。**运行时解析**而不是硬编码色值：
+    配色一改这里自动跟随 —— 旧判据（按青度找已收藏色）失效的根因就是「判据里钉死了
+    某个色板的值」。7 主题 × 明暗 = 14 个组合，只有 3 个（sky/green/bili 亮色板）
+    的 tertiary 偏青，其余全部判不出「已收藏」。
+    """
+    import re
+
+    with open(tokens_css, "r", encoding="utf-8") as f:
+        css = f.read()
+    css = re.sub(r"/\*[\s\S]*?\*/", " ", css)  # 注释会混进「选择器」，必须先剥
+    out = {}
+    for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        sel = " ".join(sel.split())
+        t = re.search(r"--md-tertiary:\s*(#[0-9a-fA-F]{6})\s*;", body)
+        inv = re.search(r"--md-inverse-surface:\s*(#[0-9a-fA-F]{6})\s*;", body)
+        if not t or not inv:
+            continue
+        name = re.search(r"\.theme-([\w-]+)", sel)
+        if not name:
+            continue
+        dark = bool(re.search(r"\.theme-[\w-]+\.dark\b", sel))
+        if bool(re.search(r"\.dark\b", sel)) != dark:
+            continue
+        out.setdefault(name.group(1) + (".dark" if dark else ""), (t.group(1), inv.group(1)))
+    tokens = []
+    for theme in sorted(out):
+        t_hex, inv_hex = out[theme]
+        tokens.append(
+            {
+                "theme": theme,
+                "tertiary": tuple(int(t_hex[i : i + 2], 16) for i in (1, 3, 5)),
+                "inverse": tuple(int(inv_hex[i : i + 2], 16) for i in (1, 3, 5)),
+            }
+        )
+    return tokens
+
+
+# 色值容差（RGB 三通道和）：跨族最近色对距离 50（tokens.css 全表算出），取 24 留 2 倍余量。
+CHIP_TOLERANCE = 24
+# 窗口内 chip 实色占比下限（设备实测已收藏态 0.308 / 未收藏 0，取 0.15 留余量）
+CHIP_MIN_SHARE = 0.15
+# 采样窗口半宽/半高/步长：与 packages/android-host/tests/android-e2e/bookmark-chip.ts
+# 的 WINDOW_HALF_WIDTH / WINDOW_HALF_HEIGHT / WINDOW_STEP **逐字一致**。
+# ⚠️ 这三个常量必须与 TS 版同步：占比的分母是**窗口内**采样点数（120），
+# 不是整个卡片区网格。两者同用 0.15 阈值但分母差两个数量级时，真机会恒判 unknown。
+CHIP_WIN_HALF_W = 19
+CHIP_WIN_HALF_H = 22
+CHIP_WIN_STEP = 4
+
+
+def bookmark_chip(w, h, rows, tokens_css):
+    """定位收藏 chip 并判收藏态（#709，配色无关）。
+
+    输出 {"x","y","bg","share","state"}：
+      state ∈ bookmarked / not-bookmarked / unknown
+      unknown = 判不出（窗口里没有 chip 实色，或色值同时落在两族令牌里）。
+
+    为什么不能继续用红像素：chip 底色是 M3 令牌实色（未收藏 `--md-inverse-surface`、
+    已收藏 `--md-tertiary`，spec docs/specs/bookmark-color.md §配色）。措辞要说准：
+    这 28 个 chip 色里**有 13 个是 R > G 的**（如 violet.dark `#efb8c8`），所以
+    「没有一个是红的」是错的；成立的是更弱也更有用的那句——**没有一个能命中旧定位器的
+    判据** `r > 150 and g < 100 and b < 100`（实测 0 命中，因为它们的 G 都远大于 100）。
+    而推荐流的作品图里**到处是能被该判据命中的红**，旧定位器于是会去点画上的
+    红色插画，然后报「收藏未生效」。
+
+    两段式：**粗扫**在卡片区找 chip 令牌色的像素团并取质心（定位），
+    **细测**在质心周围的固定窗口内按精确 RGB 分组取众数（判态）。
+    占比的分母是窗口内采样点数，与 TS 版同口径。
+    """
+    tokens = read_chip_tokens(tokens_css)
+    if not tokens:
+        return {"x": None, "y": None, "state": "unknown", "reason": "tokens.css 未解析出任何主题"}
+
+    def near(c, t):
+        return abs(c[0] - t[0]) + abs(c[1] - t[1]) + abs(c[2] - t[2]) <= CHIP_TOLERANCE
+
+    def matchable(c):
+        return any(near(c, t["tertiary"]) or near(c, t["inverse"]) for t in tokens)
+
+    # 粗扫：卡片区（屏幕下半部，推荐流轮播卡 + 收藏胶囊都落在那里）内找 chip 令牌色像素，
+    # 按精确 RGB 分组并累加质心。不用「红色」等任何色相条件，作品图不会因此被选中。
+    y_lo = int(h * 0.45)
+    colors = {}
+    for y in range(y_lo, h, 2):
+        for x in range(0, w, 2):
+            c = pixel(rows, y, x)
+            if not matchable(c):
+                continue
+            e = colors.get(c)
+            if e is None:
+                colors[c] = [1, x, y]
+            else:
+                e[0] += 1
+                e[1] += x
+                e[2] += y
+    if not colors:
+        return {"x": None, "y": None, "state": "unknown", "reason": "卡片区未检出 chip 实色"}
+
+    _, (n, sum_x, sum_y) = max(colors.items(), key=lambda kv: kv[1][0])
+    cx = sum_x // float(n)
+    cy = sum_y // float(n)
+
+    # 细测：质心周围的固定窗口内，可匹配像素按精确 RGB 分组，取众数。
+    groups = {}
+    total = 0
+    for y in range(int(cy) - CHIP_WIN_HALF_H, int(cy) + CHIP_WIN_HALF_H + 1, CHIP_WIN_STEP):
+        if y < 0 or y >= h:
+            continue
+        for x in range(int(cx) - CHIP_WIN_HALF_W, int(cx) + CHIP_WIN_HALF_W + 1, CHIP_WIN_STEP):
+            if x < 0 or x >= w:
+                continue
+            total += 1
+            c = pixel(rows, y, x)
+            if not matchable(c):
+                continue
+            groups[c] = groups.get(c, 0) + 1
+    if total == 0:
+        return {"x": None, "y": None, "state": "unknown", "reason": "采样窗口完全落在画面外"}
+
+    bg, best_n = max(groups.items(), key=lambda kv: kv[1]) if groups else (None, 0)
+    share = best_n / float(total)
+    if bg is None:
+        return {
+            "x": int(cx),
+            "y": int(cy),
+            "bg": None,
+            "share": round(share, 3),
+            "state": "unknown",
+            "reason": f"窗口内 chip 实色占比 {share:.3f} < {CHIP_MIN_SHARE}",
+        }
+    marked = [t["theme"] for t in tokens if near(bg, t["tertiary"])]
+    unmarked = [t["theme"] for t in tokens if near(bg, t["inverse"])]
+    if share < CHIP_MIN_SHARE:
+        return {
+            "x": int(cx),
+            "y": int(cy),
+            "bg": "#%02x%02x%02x" % bg,
+            "share": round(share, 3),
+            "state": "unknown",
+            "reason": f"chip 实色占比 {share:.3f} < {CHIP_MIN_SHARE}",
+        }
+    if marked and not unmarked:
+        state = "bookmarked"
+    elif unmarked and not marked:
+        state = "not-bookmarked"
+    else:
+        state = "unknown"
+    return {
+        "x": int(cx),
+        "y": int(cy),
+        "bg": "#%02x%02x%02x" % bg,
+        "share": round(share, 3),
+        "state": state,
+        "marked": marked,
+        "unmarked": unmarked,
+    }
+
+
 def main():
     path, mode = sys.argv[1], sys.argv[2]
     w, h, rows = load_png(path)
@@ -329,6 +497,10 @@ def main():
         print(json.dumps(classify(w, h, rows)))
     elif mode == "topbar-nav":
         print(json.dumps(topbar_nav(w, h, rows)))
+    elif mode == "bookmark-chip":
+        # 第 3 个参数 = tokens.css 路径（调用方给，脚本不猜 cwd）
+        css = sys.argv[3] if len(sys.argv) > 3 else "src/styles/tokens.css"
+        print(json.dumps(bookmark_chip(w, h, rows, css)))
     else:
         print(json.dumps({"error": f"unknown mode {mode}"}))
 

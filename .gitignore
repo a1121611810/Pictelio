@@ -55,6 +55,10 @@ packages/app/test-results/
 /test-results/
 packages/*/test/e2e/screenshots/
 packages/app/test/e2e/screenshots/
+# attemptLadder.test.ts 的子 vitest 进程必须在包内 tests/ 下建临时用例
+# （vitest.config.ts 的 include 只认 tests/**/*.test.ts，写到系统 tmp 会假失败）。
+# 正常路径 finally 会 rmSync 掉；进程被 kill / CI 超时时会残留，这里兜住。
+packages/app-lynx/tests/helpers/.ladder-selfcheck-*/
 
 # ADR-0202：OTA web bundle 三件套通道已下线，ota/ 不再产出任何产物。
 # ignore 条目保留作防御——release.mjs step 4 的「发布无关变更拦截」对未跟踪文件同样生效，

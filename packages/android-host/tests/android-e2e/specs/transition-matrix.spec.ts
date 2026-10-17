@@ -98,6 +98,7 @@ import {
   CONTENT_BOTTOM,
   CONTENT_RIGHT,
   MIN_BOOKMARK_SAMPLES,
+  NEAR_BLANK_FLAT_RATIO,
   belowAnchorRegion,
   bookmarkSampleRegion,
   detectBookmarkRow,
@@ -107,8 +108,10 @@ import {
   judgeContentLoaded,
   judgeNotTopWindow,
   notTopWindow as notTopRegion,
+  regionColorStats,
   regionSamples as geomRegionSamples,
   roundPx,
+  type ContentLoadVerdict,
   type GrayAt,
 } from "../transition-geometry";
 
@@ -415,19 +418,14 @@ async function diffRegion(a: Buffer, b: Buffer, region: Region): Promise<number>
 // （以 `geomRegionSamples` 别名导入，由 unit/transition-geometry.test.ts 覆盖）。
 // #816 恢复锚点：若要改回本文件内的本地实现，从提交 9c2604d4 恢复该函数并把
 // import 中的 `regionSamples as geomRegionSamples` 换回 `regionSamples`。
+// ⚠️ `colorBuckets`（区域内色彩桶数）同样在 #821 迁到 `regionColorStats`：
+// 它要同时产出**桶数与单一色块占比**，两个量必须同一次采样得到（不同采样口径的
+// 两个量不能配对判据）。恢复锚点：从提交 9c2604d4 取回 `colorBuckets`，并把
+// import 中的 `regionColorStats` 换回它。
 
-/** 区域内色彩桶数（lynx-bookmark-tags recommendedLoaded 同款判据的窗口化版本）：
- *  骨架屏近乎纯色，真实内容（图片/文字）加载后色彩桶数骤增。 */
-function colorBuckets(p: Pixels, region: Region): number {
-  const buckets = new Set<string>();
-  for (let y = region.y0; y < region.y1; y += 16) {
-    for (let x = region.x0; x < region.x1; x += 16) {
-      const [r, g, b] = colorAt(p, x, y);
-      buckets.add(`${Math.floor(r / 24)},${Math.floor(g / 24)},${Math.floor(b / 24)}`);
-    }
-  }
-  return buckets.size;
-}
+/** 区域内色彩桶数与单一色块占比（#821 已迁至 `../transition-geometry` 的
+ *  `regionColorStats`——骨架屏近乎纯色，真实内容加载后色彩骤增；而「桶数低」究竟是
+ *  「低方差有内容」还是「整屏空白」只能靠单一色块占比区分，见该函数说明）。 */
 
 /** 区域内平均亮度（0..255）。用途：SearchSheet（底部 80vh 面板，顶边实测 ≈y360）打开时
  *  其面板区由列表内容（多为图片，均值 ~95）变为近白面板（均值 ~250）——用固定语义带
@@ -484,7 +482,7 @@ async function diffRegionLoose(a: Buffer, b: Buffer, region: Region): Promise<nu
   return changed;
 }
 
-/** 区域内「错误红」文字像素采样数（text-error M3 error 红；heartFilled 同阈值族）。 */
+/** 区域内「错误红」文字像素采样数（text-error M3 error 红；与收藏 chip 判据同族的红阈值）。 */
 function redTextSamples(p: Pixels, region: Region): number {
   let red = 0;
   for (let y = region.y0; y < region.y1; y += 2) {
@@ -618,44 +616,91 @@ async function waitForStableFrame(
 }
 
 /**
+ * 本轮内容加载的判定结果（#821：以前这里是 `Promise<void>`——裁决出了函数就没了）。
+ *
+ * `trusted=false` 只在 `verdict === "near-blank"` 时出现，含义是**「我没能确认这块
+ * 画面有内容」**，不是「内容有问题」。下游内容断言见到它必须 `t.skip()`，
+ * 不能拿差异偏低去判红——那正是票面里「菜单未收起 / 换卡失败」两条假红的成因。
+ */
+interface ContentLoadOutcome {
+  /** 本轮该区域的内容形态是否可信（false ⇒ 下游内容断言不得判红） */
+  trusted: boolean;
+  verdict: ContentLoadVerdict;
+  /** 末轮实测桶数（skip 文案必须点名它，否则读者无法复核） */
+  buckets: number;
+  /** 末轮实测单一色块占比 */
+  flatRatio: number;
+  minBuckets: number;
+  label: string;
+}
+
+/**
  * 等待区域内内容加载完成。
  *
- * 判据 = **色彩桶数过阈 或 画面已稳定**（2026-09-28 #814 订正）。
+ * 判据 = **色彩桶数过阈 或 画面已稳定**（2026-09-28 #814 订正）**+ 画面里有结构**
+ * （2026-10-17 #821 增补）。
  *
  * 原实现只有「桶数 > 阈值」一条判据，实测不可靠：loaded-r2-illusts.png 的最终帧桶数
  * 是 **88**（阈值 25，远超），但同一函数仍报「未超过 25」——因为 90s 全部耗在骨架屏
  * （逐带桶数 1..5、亮度 202..238 的均匀浅灰）上。**色彩桶数与「是否加载完」没有稳定对应**：
  * 单张大幅插画铺满视口时纵向色块少，桶数天然偏低；而骨架屏若恰有渐变也可能虚高。
  *
- * 「帧已稳定」是内容无关的收敛信号：列表不再变化 ⇒ 渲染已停。此时若桶数仍低，
- * 说明该内容形态就是低桶（而非还没加载完）——继续等也无意义，故放行。
+ * 「帧已稳定」是内容无关的收敛信号：列表不再变化 ⇒ 渲染已停。但**稳定**只说明
+ * 「不再动」，不说明「动过的东西有内容」——近空白画面同样稳定（#821 票面：实测桶数 6
+ * 与「低方差有内容」的 23 落进同一分支、同一行，返回同一裁决）。故再问一句单一色块占比：
+ *   · 有结构（占比 < 阈值）⇒ 内容形态低桶，**放行**（#814 的原意保留）；
+ *   · 无结构（占比 ≥ 阈值）⇒ 近空白，本轮内容形态不可信，返回 `trusted: false`。
  *
- * 超时文案区分两种失败，避免再把「加载慢」说成「内容没加载」：
- *   - 未稳定且桶数低 → 真的没加载完（附桶数与稳定度）
- *   - 已稳定但桶数低 → 内容形态低桶，放行并打日志
+ * ⚠️ 早先这里 `console.log` 完就 `return`，声明型返回值是 `Promise<void>`，5 个调用点
+ * 全部裸 await 什么也没拿到 ⇒ 下游无从知道屏幕是空的。这正是「报错文案指向错误根因」
+ * 的结构性来源，不是某条断言写得不好。
  */
 async function waitForContentLoaded(
   label: string,
   region: Region,
   minBuckets: number,
   timeoutMs = 90_000,
-): Promise<void> {
+): Promise<ContentLoadOutcome> {
   const deadline = Date.now() + timeoutMs;
   let last = 0;
+  let flatRatio = 1;
   let lastFrame: Buffer | null = null;
   while (Date.now() < deadline) {
     const cur = await screenshot(`loaded-${label}`);
-    last = colorBuckets(await toPixels(cur), region);
+    // 桶数与单一色块占比必须**同一次采样**产出：不同采样口径的两个量不能配对判据
+    const frame = await toPixels(cur);
+    const stats = regionColorStats(region, (x, y) => colorAt(frame, x, y));
+    last = stats.buckets;
+    flatRatio = stats.flatRatio;
     // 画面已收敛（与上一帧差异 ≤ STABLE_TH）⇒ 渲染已停
     const stable = lastFrame !== null && (await diffRegion(lastFrame, cur, region)) <= STABLE_TH;
-    const verdict = judgeContentLoaded({ buckets: last, minBuckets, stable });
-    if (verdict.verdict === "loaded") return;
+    const verdict = judgeContentLoaded({ buckets: last, minBuckets, stable, flatRatio });
+    const outcome: ContentLoadOutcome = {
+      trusted: verdict.verdict !== "near-blank",
+      verdict: verdict.verdict,
+      buckets: last,
+      flatRatio,
+      minBuckets,
+      label,
+    };
+    if (verdict.verdict === "loaded") return outcome;
+    if (verdict.verdict === "near-blank") {
+      // console.warn（不是 log）：这条是**本轮未验证**的唯一直接来源，
+      // vitest 之外的读者只会在 warn 里看到它。
+      console.warn(
+        `[transition-matrix] ⚠️ ${label} 画面已稳定、桶数 ${last} ≤ ${minBuckets}，且单一色块占比 ` +
+          `${flatRatio.toFixed(3)} ≥ ${NEAR_BLANK_FLAT_RATIO} ⇒ 判为**近空白**（内容没加载出来，` +
+          `**不是**内容形态低桶）。该区域下游的内容断言本轮不可信 ⇒ 一律 skip，**不得据此判产品回归**。`,
+      );
+      return outcome;
+    }
     if (verdict.verdict === "stable-but-low-buckets") {
       console.log(
-        `[transition-matrix] ℹ ${label} 画面已稳定但桶数 ${last} ≤ ${minBuckets}：` +
+        `[transition-matrix] ℹ ${label} 画面已稳定但桶数 ${last} ≤ ${minBuckets}` +
+          `（单一色块占比 ${flatRatio.toFixed(3)} < ${NEAR_BLANK_FLAT_RATIO}，画面有结构）：` +
           `判为内容形态低桶（非加载未完成），放行`,
       );
-      return;
+      return outcome;
     }
     lastFrame = cur;
     await SLEEP(2_000);
@@ -667,6 +712,23 @@ async function waitForContentLoaded(
     `等待内容加载超时（${label}：${stability}，未超过 ${minBuckets}）——证据 loaded-${label}.png。` +
       `注意：慢网络下首屏懒加载可能耗尽超时（实测单图 ~0.8s × 首屏 N 张），` +
       `此时应先确认网络而非判定内容异常`,
+  );
+}
+
+/**
+ * 「近空白 ⇒ 本轮未验证」的 skip 文案（#821）。
+ *
+ * 两条纪律落在同一句里：① 必须点名**页面**与**桶数**——判红时读者只见这条持久化消息；
+ * ② 必须写清「不据此判产品回归」——否则下一轮又会有人照着差异偏低的线索去查布局/坐标，
+ * 而 #814→#816→#821 连续几轮都是这个坑。
+ */
+function untrustedContentSkip(caseName: string, o: ContentLoadOutcome): string {
+  return (
+    `${caseName} 本轮未验证（#821 近空白）：${o.label} 画面已稳定、桶数 ${o.buckets} ≤ ` +
+    `${o.minBuckets}，且单一色块占比 ${o.flatRatio.toFixed(3)} ≥ ${NEAR_BLANK_FLAT_RATIO} ` +
+    `⇒ 判为**近空白**（该区域什么都没加载出来），不是「内容形态低桶」。` +
+    `本用例的内容断言（帧差 / 两两不同 / 菜单收起）全部依赖这块画面，` +
+    `本轮**不判定、也不得以差异偏低判为产品回归**。证据 loaded-${o.label}.png。`
   );
 }
 
@@ -709,18 +771,24 @@ describe.skipIf(SKIPPED)(
      * test 记为 **skipped**（不是 passed），信息不丢失、也不冒充通过。
      *
      * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
-     * R1 断言③「锚点卡下方区域」帧差、R3「收藏行」两两不同。这四行之外的断言形态各不相同，
+     * R1 断言③「锚点卡下方区域」帧差、R3「收藏行」两两不同。这几行之外的断言形态各不相同，
      * 都不是「显式 skip」，故一律不进本台账：
      *   · R1 断言①：判别窗无判别力时 `console.log` 声明不可判定 + 置 `notTopJudged = false`
      *     后**继续**（不判红，由断言② 兜底）；
-     *   · R1 断言②：**没有**不可判定分支，裸无条件 `expect`（失败即红）；
-     *   · R1 断言③：`t.skip()`（R1 的 `it` 回调有 `t` 形参）；
-     *   · R2 三条：R2 的 `it` 回调签名是 `async () => {}`、**没有 `t` 形参**，用不了 `t.skip()`；
-     *     其 `console.log` 是**抛错前的诊断日志**，不是「声明不可判定」。
+     *   · R1 断言②：**没有**不可判定分支，裸无条件 `expect`（失败即红）。
+     *
+     * ⚠️ **#821 新增两条记账口径**：
+     * ① 台账多出 `r2` 行。R2 原先**完全没有**行（它的「不可判定」只有一条抛错前的诊断
+     *    `console.log`），所以这一列的内容断言在门里是不可见的。#821 让它有了 skip 分支，
+     *    就必须让它在台账里也有一行——否则 skip 落在台账之外，门照样看不出「本轮未验证」。
+     * ② `r1/r2/r3` 各多出一个 skipped 写入点：`waitForContentLoaded` 判近空白时。
+     *    **记账一律在 `t.skip()` 之前**（`t.skip()` 是 throw，之后的语句不可达）。
      */
     const coreOutcome = {
       // R1 断言③ 是**单次**判定（不给 expected ⇒ 不做覆盖率判定）
       r1: { judged: 0, skipped: 0 },
+      // R2 三条断言同为单次判定，整体记一次（不给 expected）
+      r2: { judged: 0, skipped: 0 },
       // R3 收藏行是**三对两两不同** = 3 次子判定，故带 expected：
       // 采样窗可能只让部分对可判定，另几对被 `continue` 吞掉且**不写台账**。
       // 缺 expected 时「1/3 覆盖」既不判红也不 warn ⇒ 门完全静默（#819 第 11 轮 review）。
@@ -779,6 +847,10 @@ describe.skipIf(SKIPPED)(
         // 「帧对比代理」）。判红时读者只见这行名，写成渲染物名会把他引向错误的
         // 产品改动——#814→#816 连续三轮正是这个坑。
         ["R1 断言③ 锚点卡下方区域帧差 > INJECT_TH（代理「相关作品」段注入）", coreOutcome.r1],
+        // #821 新增。行名同样按**代理口径**表述：R2 三条断言分别判「放射菜单收起 + sheet
+        // 打开」「结果底部带持续更新 + 无失败红字」「切 scope 后结果区整体替换」，
+        // 不写成「翻页正常」「切了小说」这类渲染物名。
+        ["R2 放射菜单 / 翻页推进 / 切 scope 后结果区整体替换（帧差代理）", coreOutcome.r2],
         ["R3「收藏行」两两不同", coreOutcome.r3],
       ];
       await runReleaseGate({
@@ -797,7 +869,14 @@ describe.skipIf(SKIPPED)(
     it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡下方区域出现帧差（代理「相关作品」段注入）+ 滚动不回顶", async (t) => {
       // 深链到 /illusts（benchNav illust），等列表内容渲染完成
       await launchBenchNav("illust");
-      await waitForContentLoaded("r1-illusts", REGION_TOPREF, 25);
+      const r1Load = await waitForContentLoaded("r1-illusts", REGION_TOPREF, 25);
+      // #821：列表是空的（近空白）时，下面三条断言全部是在骨架屏/空画面上做帧对比，
+      // 差异必然偏低 ⇒ 会以「注入段未渲染」「滚动位置丢失」等**错误根因**判红。
+      // 故在这里就显式声明「本轮未验证」，记账在 t.skip() 之前。
+      if (!r1Load.trusted) {
+        coreOutcome.r1.skipped += 1;
+        t.skip(untrustedContentSkip("R1", r1Load));
+      }
       const topRef = await waitForStableFrame("r1-top", REGION_TOPREF);
 
       // 下滑约一屏（进入列表中部），取滚动基线帧 S1
@@ -971,10 +1050,17 @@ describe.skipIf(SKIPPED)(
       );
     }, 300_000);
 
-    it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async () => {
+    it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async (t) => {
       // 深链重进 /illusts（与 R1 状态解耦），经放射 FAB 内环搜索项打开 SearchSheet
       await launchBenchNav("illust");
-      await waitForContentLoaded("r2-illusts", REGION_TOPREF, 25);
+      // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
+      // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
+      // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
+      const r2IllustsLoad = await waitForContentLoaded("r2-illusts", REGION_TOPREF, 25);
+      if (!r2IllustsLoad.trusted) {
+        coreOutcome.r2.skipped += 1;
+        t.skip(untrustedContentSkip("R2", r2IllustsLoad));
+      }
       const beforeFab = await screenshot("r2-before-fab");
       tap(FAB_TAP.x, FAB_TAP.y);
       await SLEEP(1_500);
@@ -1043,7 +1129,11 @@ describe.skipIf(SKIPPED)(
       await SLEEP(1_000); // 键盘收起后布局回弹 + 首页请求落定缓冲
 
       // 等结果渲染（结果区色彩桶数阈值），取第一页基线帧
-      await waitForContentLoaded("r2-results", REGION_RESULTS, 20);
+      const r2ResultsLoad = await waitForContentLoaded("r2-results", REGION_RESULTS, 20);
+      if (!r2ResultsLoad.trusted) {
+        coreOutcome.r2.skipped += 1;
+        t.skip(untrustedContentSkip("R2", r2ResultsLoad));
+      }
       const f1 = await waitForStableFrame("r2-page1", REGION_RESULTS);
 
       // 滚动 + 翻页推进检测（有界判据；四跑定版）：
@@ -1084,7 +1174,11 @@ describe.skipIf(SKIPPED)(
       //   残留时 novel 首帧 ≈ 切换前首帧 → 差异趋零 → 断言红）
       tap(SCOPE_NOVEL_TAP.x, SCOPE_NOVEL_TAP.y);
       await SLEEP(1_500);
-      await waitForContentLoaded("r2-novel-scope", REGION_RESULTS, 20);
+      const r2NovelLoad = await waitForContentLoaded("r2-novel-scope", REGION_RESULTS, 20);
+      if (!r2NovelLoad.trusted) {
+        coreOutcome.r2.skipped += 1;
+        t.skip(untrustedContentSkip("R2", r2NovelLoad));
+      }
       const n2 = await waitForStableFrame("r2-novel-page1", REGION_RESULTS);
       const replaced = await diffRegion(n2, f1, REGION_RESULTS);
       expect(
@@ -1092,6 +1186,7 @@ describe.skipIf(SKIPPED)(
         `切「小说」scope 后结果区应整体替换（与插画首帧差异 ${replaced} 应 > ${CHANGE_TH}；` +
           `趋零 = 旧插画行残留）`,
       ).toBeGreaterThan(CHANGE_TH);
+      coreOutcome.r2.judged += 1;
       console.log(
         "[transition-matrix] ✓ R2 通过：翻页推进 + 无失败横幅 + 小说 scope 整体替换（证据 r2-*.png）",
       );
@@ -1099,7 +1194,13 @@ describe.skipIf(SKIPPED)(
 
     it("R3 lynx 推荐轮播：滑动换卡 ≥2 次 → 图片区前进 + 收藏行帧两两不同", async (t) => {
       await launchBenchNav("carousel");
-      await waitForContentLoaded("r3-recommended", REGION_CAROUSEL_IMAGE, 25);
+      // #821：票面那条「第 1 次滑动后封面图区未变化（差异 369 应 > 800）」就是在这里
+      // 产生的——r3-recommended 判成「低桶放行」，而那一轮封面图区其实**根本没加载出来**。
+      const r3Load = await waitForContentLoaded("r3-recommended", REGION_CAROUSEL_IMAGE, 25);
+      if (!r3Load.trusted) {
+        coreOutcome.r3.skipped += 1;
+        t.skip(untrustedContentSkip("R3", r3Load));
+      }
       const c0 = await waitForStableFrame("r3-card0", REGION_CAROUSEL_IMAGE);
       // 帧证据落盘（首跑教训：waitForStableFrame 不写盘，失败时无从取证 → 显式 screenshot）
       await screenshot("r3-card0");

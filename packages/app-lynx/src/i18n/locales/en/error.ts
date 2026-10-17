@@ -4,14 +4,14 @@ import type { ErrorKey } from "../zh-CN/error";
 
 const enError = {
   "error.hint.unauthorized": "Sign in again",
-  "error.hint.network": "Check your network connection",
+  "error.hint.network": "Check your network connection, or open Advanced settings → Network check for diagnostics",
   "error.hint.proxy": "Check that the local proxy is running",
   "error.hint.server": "Pixiv server is temporarily unavailable. Try again later",
   "error.fallback.loadFailed": "Failed to load",
   "error.fallback.sessionExpired": "Session expired",
   "error.hintSeparator": ". ",
   "error.api.proxy": "Local proxy connection failed. Check that the proxy app is running.",
-  "error.api.network": "Network unavailable. Check your connection.",
+  "error.api.network": "Network unavailable. Check your connection.{{detail}}",
   "error.api.unauthorized": "Session expired (HTTP {{status}}){{detail}}",
   "error.api.forbidden": "Access denied (HTTP {{status}}){{detail}}",
   "error.api.rateLimit": "Too many requests. Try again later (HTTP 429)",

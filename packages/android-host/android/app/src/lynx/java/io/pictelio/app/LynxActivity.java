@@ -102,6 +102,23 @@ public class LynxActivity extends AppCompatActivity {
      *  比事件总线更可靠：bundle 渲染时序无关，loadSettings 总会读到。 */
     private static final String DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
 
+    /**
+     * 强制打开「允许翻译 R18/R18G」外发授权 extra key（任何非空值即触发）。
+     *
+     * <p>写入 SharedPreferences {@link #DEV_FORCE_R18_PREFS_FILE} 的
+     * {@link #DEV_FORCE_TRANSLATE_R18_PREFS_KEY} = "true"；JS 端 settingsStore.loadSettings
+     * 读到该键后强制 _translateR18 / _translateR18G = true。
+     *
+     * <p>⚠️ 与 {@link #DEV_EXTRA_FORCE_R18} **刻意分离**：前者是「允许看见受限内容」，
+     * 本者是「允许把受限正文发给第三方 LLM」（spec §9.7 / ADR-0173 D3）。真实产品里这是
+     * 用户视角的两个独立决定；合成一个 extra 会让「切一下查看偏好」就把受限内容变得可外发。
+     *
+     * <p>落点选设备级扁平键而非账号级 {@code settings_translate_r18g_${uid}}：intent 到达时
+     * OAuth 交换尚未完成，此刻拿不到真实 uid，写账号级键只能靠硬编码——那等于把授权安到某个
+     * 特定账号上。改由 JS 侧在 loadSettings 里（此时 uid 已就绪）以内存态覆盖该账号的授权谓词。
+     */
+    private static final String DEV_EXTRA_FORCE_TRANSLATE_R18 = "pictelio_dev_force_translate_r18";
+
     // ─── 通知落点契约（#940 / ADR-0220 决策 8、9）────────────────────────────
     // ⚠️ 这些常量**不是** dev extra：通知落点必须在 release 可用
     //   （benchNav 整条链被 BuildConfig.DEBUG + __BENCH_NAV__ 门死，release 不可用）。
@@ -132,6 +149,11 @@ public class LynxActivity extends AppCompatActivity {
     private static final String DEV_FORCE_R18_PREFS_FILE = "CapacitorStorage";
     /** SharedPreferences key（JS 侧 settingsStore.loadSettings 读取同名键）。 */
     private static final String DEV_FORCE_R18_PREFS_KEY = "dev_force_r18";
+    /**
+     * SharedPreferences key（JS 侧 settingsStore.loadSettings 读取同名键）——
+     * 翻译外发授权的 dev 播种，与 {@link #DEV_FORCE_R18_PREFS_KEY} 是两个独立键。
+     */
+    private static final String DEV_FORCE_TRANSLATE_R18_PREFS_KEY = "dev_force_translate_r18";
     /** refresh_token 存储 key（对齐 app-lynx/src/utils/tokenStorage.ts 的 KEY 常量） */
     private static final String REFRESH_TOKEN_KEY = "refresh_token";
 
@@ -728,6 +750,12 @@ public class LynxActivity extends AppCompatActivity {
      *       的事件总线方案——bundle 渲染竞态不再丢事件（loadSettings 总会读到），
      *       SharedPreferences "CapacitorStorage" 写入路径完全一致（key 字符串与 native prefs adapter
      *       同契约，无 JS 端特殊处理）。</li>
+     *   <li>{@code pictelio_dev_force_translate_r18}：任意值（任何非空字符串视为 true）时写
+     *       {@link #DEV_FORCE_TRANSLATE_R18_PREFS_KEY} = "true"。JS 端 settingsStore.loadSettings
+     *       读到后强制「允许翻译 R18/R18G」授权谓词（spec §9.7 / ADR-0173 D3）。真机验证
+     *       R18G 章节需要它——否则闸门在请求发出前就拦下，验证通道无法取证。与上一条
+     *       {@code pictelio_dev_force_r18} 是两个独立键，不可合并（合并即等于「切查看偏好
+     *       就获得外发授权」）。</li>
      * </ul>
      * 门禁：{@code BuildConfig.DEBUG}。release 构建该判断恒 false，方法体整体作为死代码被 R8 移除，
      * 生产 APK 不含钩子（与 ADR-0136 benchNav 决策 1 同语义）。
@@ -756,6 +784,21 @@ public class LynxActivity extends AppCompatActivity {
                         + DEV_FORCE_R18_PREFS_FILE);
             } catch (Throwable t) {
                 Log.w(TAG, "dev hook: dev_force_r18 写入 SharedPreferences 失败", t);
+            }
+        }
+
+        // 4) 翻译外发授权播种：与 3) 刻意独立（见 DEV_EXTRA_FORCE_TRANSLATE_R18 的说明）。
+        // 真实产品路径要求用户经风险确认 UI 授权；此处是验证通道的替代入口，故只在 DEBUG 构建存在。
+        if (intent.hasExtra(DEV_EXTRA_FORCE_TRANSLATE_R18)) {
+            try {
+                getSharedPreferences(DEV_FORCE_R18_PREFS_FILE, MODE_PRIVATE)
+                        .edit()
+                        .putString(DEV_FORCE_TRANSLATE_R18_PREFS_KEY, "true")
+                        .apply();
+                Log.i(TAG, "dev hook: pictelio_dev_force_translate_r18 extra 已捕获，dev_force_translate_r18=true 已写入 "
+                        + DEV_FORCE_R18_PREFS_FILE);
+            } catch (Throwable t) {
+                Log.w(TAG, "dev hook: dev_force_translate_r18 写入 SharedPreferences 失败", t);
             }
         }
     }

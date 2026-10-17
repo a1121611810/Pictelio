@@ -98,7 +98,19 @@ export interface TranslationRequest {
  * @see ADR-0169 D4
  */
 export type TranslationChunk =
-  | { type: 'delta'; paragraphIndex: number; text: string } // 某段增量文本
+  /**
+   * 某段增量文本。
+   *
+   * `paragraphIndex` 是**块内**段落序号，语义分两种（消费方必须区分，见 #948）：
+   * - 真实序号：native 桥（TranslationSseParser）与整批非流式 provider 逐段下发，
+   *   序号可靠 —— 段落边界只能靠它复原（这两条链路不保段间空行）。
+   *   可靠性的依据：Java 侧 `buildInput` 以 `for (int i = 0; ...)` 逐段加 `[i]` 前缀
+   *   （**0-based** 已核实），`TranslationSseParser` 按同一序号原样回填，两端不重编号。
+   * - 占位 0：web 流式 provider（`mapEventToChunk`）恒给 0，段落边界靠模型输出里的空行。
+   *
+   * 两者的区分信号是「是否出现非零序号」，不是「序号唯一值个数」（单段块也只有一个 0）。
+   */
+  | { type: 'delta'; paragraphIndex: number; text: string }
   | { type: 'reasoning_delta'; text: string } // reasoning 增量（埋点用，不展示）
   | { type: 'cached'; paragraphs: string[] } // 缓存命中直接给整章
   | { type: 'done'; usage?: TranslationUsage } // 流成功结束

@@ -55,8 +55,21 @@
 
 ## 残余风险 / 跟进
 
-- **两处设备 oracle 被本次配色改动永久失效（已挂账 issue #709）**：
-  1. `scripts/lynx-flow-check.sh:90-149` 用「**红像素增量**」判定收藏生效（新配色不再产生红色）→ 会输出「⚠️ 收藏未生效」假告警（脚本自称回归项、不阻断）。
-  2. `packages/app/tests/android-e2e/specs/lynx-bookmark-tags.spec.ts`（设备验收，`#536/#538`）整套驱动基于颜色：`findHeartGlyph`（`:252-315`）找的是**红/暗色小方块**（`w∈[34,60]`、`h∈[38,64]`），新配色下 ♥ 是**深色 chip 胶囊内的浅色字形**→ 部件宽度远超窗口 → 返回 `null`；`heartFilled`（`:317-333`）以红像素占比判「已收藏」→ 新配色下恒 `false`。**修复方向与验收见 #709**（2026-09-21 code-review 查出，此前只登记了第 1 处）。
+- **设备 oracle 与配色耦合（issue #709；2026-10-17 复核订正，见下）**：
+  1. `scripts/lynx-flow-check.sh` 用「**红像素增量**」判定收藏生效，新配色不再产生红色 → 会输出「⚠️ 收藏未生效」假告警。**2026-10-17 复核：仍然成立**（脚本自 8-07 未改动），且心形定位与收藏确认是**双双重判据**，两者在当前配色下均失效；定位器还可能命中推荐内容的红色插画，导致点错位置后再报「未生效」。
+  2. `packages/android-host/tests/android-e2e/specs/lynx-bookmark-tags.spec.ts`（设备验收，`#536/#538`）——**本条已于 2026-10-17 订正，原描述作废**：原文记「`findHeartGlyph` 找红/暗色小方块、新配色下返回 `null`；`heartFilled` 以红像素占比判、恒 `false`」。这两个函数已随 commit `dacc9023`（**2026-09-29**，晚于本条登记日 8 天）重写为两段式心形定位 + **青色判据**（绿红差与蓝红差同时为正、绿通道低于上限），原文所述判据在当前代码里**已不存在**。
+     ⇒ 但**残余风险换了一种形态且并未解除**：青色判据只在 **7 主题 × 明暗 = 14 组合中的 3 个**成立（sky/light、green/light、bili/light）。**7 个暗色板全部失效**，亮色板的 violet / pink / orange / teal 亦失效（红通道大于绿通道）。当前设备验收所用的主题恰好落在成立的组合内 ⇒ **换色板即再次假阴性，且在现有 e2e 里完全看不出来**。
+
+> **2026-10-17 修复收口（#709 实施期结论）**：上面两条残余风险**均已解除**，且**未做真机/模拟器实跑**（需编 APK，被本轮铁律挡住）——以下结论全部建立在「源码契约 + 对 `tokens.css` 的确定性枚举 + 合成帧」上，不依赖实跑。
+>
+> 1. **`lynx-screen-analyze.py` 新增 `bookmark-chip` 子命令**（新增 `read_chip_tokens` / `bookmark_chip`），`packages/app-lynx/scripts/lynx-flow-check.sh` §2 改用它：定位与确认都读**胶囊底色对应的 M3 令牌**（运行时解析 `packages/app-lynx/src/styles/tokens.css`，脚本内不硬编码任何色值），不再有「红像素 + 白色邻域」定位，也不再有「红像素增量」确认。判不出时输出「本轮未验证」并给原因，**不再输出确定性的「⚠️ 收藏未生效」**；末尾汇总行也不再把收藏步并列进「全部通过」。`SETTINGS_ONLY` 旁路保留（并修掉一处会让它因 `set -u` 直接 exit 的新接线问题：`FAV_*` 三个变量必须声明在守卫之外）。
+> 2. **新增 `packages/android-host/tests/android-e2e/bookmark-chip.ts`**（令牌表解析 + 分类 + 采样），`lynx-bookmark-tags.spec.ts` 的 `heartFilled` 改为 `heartBookmarkState`：采样窗（±19×±22、步长 4 = 120 点）与占比阈值 **0.15 逐字沿用旧实现**，所以本 spec §Verification 记的 2026-09-29 设备实测（已收藏 37/120 = 0.308 / 未收藏 0/120 / 空白对照 0/120）**仍然成立**——改动只换「怎么分类」，不换「在哪采样」。
+> 3. **新证据（表驱动，14 组合逐个代入算术，非抽样）**：对 `tokens.css` 全部 14 个 `--md-tertiary` 逐个代入旧青度判据，成立的恰好 **3 个**（sky / green / bili 的**亮色板**），失效 **11 个**（7 个暗色板全部失效 + violet / pink / orange / teal 亮色板）——与 triage 的证明式枚举**结论一致**。跨状态最近色对距离实测 **50**（`.theme-sky.dark` 的 tertiary ↔ 同主题 inverse-surface），容差取 **24** ⇒ 两族可分且留 2 倍余量；判不出（`unknown`）时**绝不静默返回「未收藏」**。
+> 4. **新增两道随 CI 跑的门禁**（设备级脚本此前零自动化防线，这正是它长期失效而不被发现的原因）：`unit/bookmarkChip.test.ts`（14 组合表驱动 + 旧判据失效面演示 + 令牌表由 `tokens.css` 运行时解析）与 `unit/flowCheckBookmarkOracle.test.ts`（合成 PNG 驱动 python 子命令 + flow-check 脚本的旁路/措辞契约）。
+> 5. **仍未解除的一项**：**没有真机实跑证据**。上述改动只经过源码契约、令牌枚举与合成帧三层；**首次设备跑必须复核**：① `lynx-bookmark-tags.spec.ts` 在 **14 个组合里至少各跑一次**（尤其 7 个暗色板 —— 暗色板下 chip 是**浅色**胶囊，`findHeartGlyph` 的「深色胶囊」两段式定位同样是按亮色板校准的，本轮**按票面范围未改动**，它若在暗色板失效应另开票）；② `lynx-flow-check.sh` 的 chip 定位容差与占比下限（本轮沿用 `bookmark-chip.ts` 同族的 24 / 0.15，**同样只经合成帧验证**）。
+>
+> 上面第 5 条与本节上一条「深色主题未逐 palette 目视」是**同一个盲区**：记的是「没在设备上看过」。本轮把判据的**逻辑**补齐了，但没有补上**目视**。
 - **已修复的同类缺陷（token 名）**：环色曾写成 `var(--md-on-inverse-surface)`——该名**全仓未定义**（tokens.css 定义的是 `--md-inverse-on-surface`），无 fallback 的 `var()` 让整条声明静默失效（border-color 退为 currentColor），而单测/类型检查/构建全绿。已修正并新增源级守卫 `tests/mdTokenRefs.test.ts`（src 内每个 `var(--md-*)` 必须命中 tokens.css；抽取器带非空与数量下界断言，防空转恒真）。
-- **深色主题未逐 palette 目视**：令牌在 dark 主题下自动反相，逻辑上仍拉反差，但未对每个 dark palette 截图确认。
+- **深色主题未逐 palette 目视**：令牌在 dark 主题下自动反相，逻辑上仍拉反差，但未对每个 dark palette 截图确认。⚠️ **与上一条的暗色板失效是同一个盲区**：这条记的是「没看过」，上一条记的是「看了也会判错」。
+
+> **2026-10-17 订正说明**：本节原记「两处设备 oracle **永久失效**」，其中第 2 处已于 8 天后被修复（原文未跟踪），第 1 处仍然成立。同时原文引用的 `packages/app/tests/...` 路径随 ADR-0203 整包删除已无载体，真实位置在 `packages/android-host/tests/android-e2e/specs/`。行号锚已按本轮锚点政策移除——本仓并行改文档下行号必然漂移，改引小节与文件名。订正依据：#709 的 triage 验证（源码契约 + 令牌枚举证明式代入，未做设备实跑）。

@@ -59,20 +59,20 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     expect(calls.length, "afterAll 里 runReleaseGate 只应被调用一次").toBe(1);
   });
 
-  it("rows 必须来自 coreOutcome 台账（两行都在）", () => {
+  it("rows 必须来自 coreOutcome 台账（#821 起含 R2 行）", () => {
     expect(hook).toMatch(/coreOutcome\.r1/);
+    expect(hook).toMatch(/coreOutcome\.r2/);
     expect(hook).toMatch(/coreOutcome\.r3/);
   });
 
-  it("台账的四个记账字段都要有写入点，否则某行永远停在双 0", () => {
-    // 实测分布：R1 的 skipped/judged 各 1 处，**两处都在断言③**
-    // （`specs/transition-matrix.spec.ts` 的 `coreOutcome.r1.skipped += 1` 在
-    // `if (injected <= INJECT_TH)` 块内、紧随其后是 `coreOutcome.r1.judged += 1`）；
+  it("台账的每个记账字段都要有写入点，否则某行永远停在双 0", () => {
+    // 实测分布（#821 后）：R1 的 skipped 2 处（近空白 / 断言③）、judged 1 处；
+    // R2 的 skipped 3 处（三个 waitForContentLoaded 站点各一）、judged 1 处——
+    // R2 原先**一行都没有**，#821 给了它 skip 分支就必须同时给它台账行；
+    // R3 的 skipped 3 处（近空白 / 某帧未探测到收藏胶囊 / 三对全被采样窗吞掉）、
+    // judged 1 处、expected 1 处。
     // 断言① **不写台账**——它判别窗退化时只 `console.log` 声明 + 置
     // `notTopJudged = false` 后继续，由断言② 兜底（见 spec 的 JSDoc 计数口径段）。
-    // R3 的 skipped **2 处**（某帧未探测到收藏胶囊 / 三对全被采样窗吞掉两个分支）、
-    // judged 1 处。合计 3 处 skipped ⇒ 与 `qa-defense-lines.md` 的「3 处动态
-    // `t.skip()`」对齐。
     //
     // ⚠️ 这是 **change-detector**（钉源码形态），不是行为契约：把 `+= 1` 改写成 `++`
     // 或抽成 helper 都会让它变红，而那些是**语义等价**的合法重构。之所以仍保留：
@@ -82,17 +82,40 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
       (specSrc.match(new RegExp(`${field.replace(".", "\\.")}\\s*(?:\\+=|\\+\\+|--|=)`, "g")) ?? [])
         .length;
 
-    expect(
-      countWrites("coreOutcome.r1.skipped"),
-      "R1 断言③ 的 skipped 写入点（断言① 不写台账）",
-    ).toBeGreaterThanOrEqual(1);
+    expect(countWrites("coreOutcome.r1.skipped"), "R1 的 skipped 写入点（近空白 + 断言③）").toBe(2);
     expect(
       countWrites("coreOutcome.r1.judged"),
       "R1 断言③ 的 judged 写入点",
     ).toBeGreaterThanOrEqual(1);
+    expect(countWrites("coreOutcome.r2.skipped"), "R2 的 skipped 写入点（#821 新增）").toBe(3);
+    expect(countWrites("coreOutcome.r2.judged"), "R2 的 judged 写入点（#821 新增）").toBe(1);
     expect(countWrites("coreOutcome.r3.judged"), "R3 的 judged 写入点").toBeGreaterThanOrEqual(1);
-    // R3 有两处 skipped 分支，合并成一处会漏记一类不可判定
-    expect(countWrites("coreOutcome.r3.skipped"), "R3 的 skipped 写入点").toBe(2);
+    // R3 有三处 skipped 分支，合并成一处会漏记一类不可判定
+    expect(countWrites("coreOutcome.r3.skipped"), "R3 的 skipped 写入点").toBe(3);
+  });
+
+  it("#821：5 个 waitForContentLoaded 调用点必须绑定裁决，不得裸 await", () => {
+    // 退化形态：`await waitForContentLoaded(...)` 不接返回值 —— 裁决出了函数就没了，
+    // 下游无从知道屏幕是空的，于是又会在空画面上判红（票面那两条假红）。tsc 不会报
+    // （返回值可丢），单测也拦不住，只有契约能拦。
+    const sites =
+      specSrc.match(/^\s*(?:const\s+[\w]+\s*=\s*)?await waitForContentLoaded\(/gm) ?? [];
+    expect(sites.length, "waitForContentLoaded 调用点应恰好 5 处").toBe(5);
+    const bound = specSrc.match(/^\s*const\s+\w+\s*=\s*await waitForContentLoaded\(/gm) ?? [];
+    expect(bound.length, "每个调用点都必须用 const 接住裁决").toBe(5);
+  });
+
+  it("#821：绑定之后必须真的用上 —— 不得出现「接了裁决却从不被读」", () => {
+    // 上条只保证接住；这里再保证每个绑定名在绑定行之后被读过（`!x.trusted` 之类）。
+    const names = [
+      ...specSrc.matchAll(/^\s*const\s+(\w+)\s*=\s*await waitForContentLoaded\(/gm),
+    ].map((m) => m[1] as string);
+    expect(names.length).toBe(5);
+    for (const n of names) {
+      const uses = [...specSrc.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length;
+      // 1 = 只有声明那一处 ⇒ 接了但没读，等于裸 await
+      expect(uses, `裁决变量 ${n} 被声明后从未被读取`).toBeGreaterThan(1);
+    }
   });
 
   // ── 以下三条针对「countWrites 只数字符串出现次数」留下的三个洞 ──────────────
@@ -102,11 +125,13 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     // 这正是 #819 开票要堵的洞。实测把三处 `t.skip(` 全改 `return`（**保留**记账）时，
     // 只数写入次数的断言**全部照样绿** —— 而生产里 vitest 会记 passed 而非 skipped，
     // 即「冒充通过」。故这里断的是**形态**：记账与 t.skip 必须成对相邻。
+    // ⚠️ 字符类 `[13]` 漏了 `r2` ⇒ #821 新增的三处 R2 记账点会被**整条规则排除在集合外**，
+    // 规则根本没机会判它们。已扩到 `[123]`。
     const lines = specSrc.split("\n");
     const sites = lines
       .map((l, i) => ({ l, i }))
-      .filter(({ l }) => /coreOutcome\.r[13]\.skipped\s*\+=/.test(l));
-    expect(sites.length, "skipped 记账点应与 3 处 t.skip 一一对应").toBe(3);
+      .filter(({ l }) => /coreOutcome\.r[123]\.skipped\s*\+=/.test(l));
+    expect(sites.length, "skipped 记账点应与 8 处 t.skip 一一对应").toBe(8);
 
     for (const { i } of sites) {
       // 允许记账与 t.skip 之间夹注释行，不允许夹可执行语句
@@ -211,15 +236,15 @@ describe("发版门接线契约（门不许被静默摘掉）", () => {
     // 旁路**排除在集合之外**，规则 ① 根本没机会判它 —— 实测正是这样全绿的。
     // 收集要「行内任意位置」，收口才交给「必须以 coreOutcome. 开头」那条。
     const WRITES =
-      /(?<![\w.$])coreOutcome\.r[13]\.(judged|skipped|expected)\s*(?:\+=|--|\+\+|(?<![=!<>])=(?!=))/;
+      /(?<![\w.$])coreOutcome\.r[123]\.(judged|skipped|expected)\s*(?:\+=|--|\+\+|(?<![=!<>])=(?!=))/;
     const writes = lines.map((l, i) => ({ l, i })).filter(({ l }) => WRITES.test(l.trim()));
     expect(
       writes.length,
-      "台账写入点应至少 5 处（R1 skipped/judged + R3 skipped×2/judged/expected）",
-    ).toBeGreaterThanOrEqual(5);
+      "台账写入点应至少 12 处（R1 skipped×2/judged + R2 skipped×3/judged + R3 skipped×3/judged/expected）",
+    ).toBeGreaterThanOrEqual(12);
 
     for (const { l, i } of writes) {
-      const field = /coreOutcome\.r[13]\.(judged|skipped|expected)/.exec(l.trim())?.[1] ?? "";
+      const field = /coreOutcome\.r[123]\.(judged|skipped|expected)/.exec(l.trim())?.[1] ?? "";
       if (!TOP_LEVEL_FIELDS.has(field)) continue;
       const trimmed = l.trim();
       // ① 顶层：以 coreOutcome. 开头（不是 if / && / ?: 的尾巴）

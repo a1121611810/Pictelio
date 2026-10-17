@@ -146,44 +146,80 @@ function stripAnchorPrefix(s: string): string {
 // ─── chunk 解析：流式 delta → 完整段落译文 ───
 
 /**
- * 把流式 `delta` chunks 累积为段落译文（按 `[N]` 锚定拆分）。
- * provider 返回的 delta 形态：模型按 `[N]` 锚定逐段输出；本函数把累积 delta
- * 按 `[N]` 前缀切段、写入对应 paragraphIndex。
+ * 把流式 `delta` chunks 重装配为逐段译文（#948）。
  *
- * 非流式场景（provider 直接返回 `done` 而无 delta）：调用方用 alignParagraphs。
- */
-export interface ParsedChunkEvent {
-  paragraphIndex: number
-  /** 当前段落累积的完整译文（增量更新） */
-  text: string
-}
-
-/**
- * 把累积的 delta 字符串按 `[N]` 锚定拆为段落；返回更新后的 paragraphIndex → text map。
+ * 为什么不按空行拆：native 桥（`TranslationSseParser.emitConsolidated`）已按 `[N]`
+ * 锚把整章切成 N 段并逐段 trim，段间 `\n\n` 在 Java 侧就被剥掉了。JS 再把 delta 文本
+ * 拼起来交给 `alignParagraphs`，它看不到任何空行 ⇒ 整章塌成 1 段，其余 N−1 段静默
+ * 回退原文（真机唯一路径，见 issue #948）。
  *
- * @param accumulated delta 字符串（流式累积至今）
- * @param state 当前段落 map；首次调用传空对象
- * @returns 更新后的 map + 未消费的尾巴（不含完整段锚定的部分）
+ * 两条路径（判据 = delta 是否带**非零**段落序号）：
+ * - 序号可信（native 桥 / 整批非流式）：按 `paragraphIndex` 分桶；同一段的多次增量按
+ *   到达顺序直接相连（不插分隔符，否则段内会被再拆一次）。
+ * - 序号是占位 0（web 流式，`mapEventToChunk` 恒给 0）：退回按空行拆段的既有语义。
+ *   判据不能用「索引唯一值个数」，web 流式与「单段块」都只有一个取值 0，无法区分；
+ *   「出现非零」是唯一能证明序号可信的最小信号。
+ *
+ * 缺号**不做紧凑重排**：紧凑重排会把缺号之后的译文整体前移，造成静默错位
+ * （段 1 缺失时，段 2 的译文落到段 1，读起来仍然「通顺」，比塌陷更难发现）。
+ *
+ * @param deltas provider 下发的 delta 序列（按到达顺序）
+ * @param original 本块的原文段落
  */
-export function parseAnchorDeltas(
-  accumulated: string,
-  state: Record<number, string>,
-): { state: Record<number, string>; tail: string } {
-  // 寻找下一个 `[N]` 锚定；从 tail 起始位置向后
-  // 简化：每次扫描 `[(\d+)\]` 锚定，把对应段落追加到 state[i]
-  const anchorRegex = /\[(\d+)\][^\[]*/gu
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-  const next: Record<number, string> = { ...state }
-  while ((match = anchorRegex.exec(accumulated)) !== null) {
-    const idx = Number(match[1])
-    if (Number.isNaN(idx)) continue
-    const segment = match[0].slice(match[1].length + 2).trim() // 去掉 `[N]` 前缀
-    next[idx] = (next[idx] ?? '') + (next[idx] ? '\n\n' : '') + segment
-    lastIndex = match.index + match[0].length
+export function reassembleDeltas(
+  deltas: ReadonlyArray<{ paragraphIndex: number; text: string }>,
+  original: string[],
+): AlignResult {
+  if (deltas.length === 0) {
+    console.warn(
+      `[createNovelTranslator] no deltas for ${original.length} paragraphs; falling back all to original`,
+    )
+    return { paragraphs: original.slice(), fallbackCount: original.length, overflowCount: 0 }
   }
-  const tail = accumulated.slice(lastIndex)
-  return { state: next, tail }
+  if (!deltas.some((d) => d.paragraphIndex !== 0)) {
+    // 序号为占位 0（web 流式）⇒ 段落边界只能靠模型输出里的空行
+    return alignParagraphs(
+      deltas.map((d) => d.text).join(''),
+      original,
+    )
+  }
+
+  const buckets = new Map<number, string>()
+  for (const d of deltas) {
+    buckets.set(d.paragraphIndex, (buckets.get(d.paragraphIndex) ?? '') + d.text)
+  }
+
+  let fallbackCount = 0
+  const paragraphs: string[] = new Array<string>(original.length)
+  for (let i = 0; i < original.length; i++) {
+    const seg = (buckets.get(i) ?? '').trim()
+    if (seg.length === 0) {
+      fallbackCount += 1
+      paragraphs[i] = original[i]
+    } else {
+      paragraphs[i] = seg
+    }
+  }
+
+  // 越界序号：provider 多给了段。计入 overflow 但不挤占原文段落
+  let overflowCount = 0
+  for (const [idx, text] of buckets) {
+    if (idx >= 0 && idx < original.length) continue
+    if (text.trim().length === 0) continue
+    overflowCount += 1
+  }
+
+  if (fallbackCount > 0) {
+    console.warn(
+      `[createNovelTranslator] indexed deltas cover ${original.length - fallbackCount}/${original.length} paragraphs; falling back last ${fallbackCount} to original`,
+    )
+  }
+  if (overflowCount > 0) {
+    console.warn(
+      `[createNovelTranslator] indexed deltas carry ${overflowCount} out-of-range paragraph(s); truncated`,
+    )
+  }
+  return { paragraphs, fallbackCount, overflowCount }
 }
 
 // ─── chunk 并发池 ───
@@ -276,21 +312,23 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 // ─── 单块 provider 执行：消费 AsyncIterator 收集段落译文 ───
 
 /**
- * 把 provider.translate() 返回的 AsyncIterator<TranslationChunk> 消费为段落译文数组。
+ * 把 provider.translate() 返回的 AsyncIterator<TranslationChunk> 消费为段落译文。
  *
  * 行为：
- * - 累积 `delta` chunk 的 text（按 `[N]` 锚定拼接）；
- * - 首个 `delta` 到达后 provider.translating 生效；
- * - `cached` chunk → 直接采用 as cur return（缓存命中短路）；
- * - `done` chunk → 终止迭代；返回累积段落译文（若有任何 delta）；
- * - `error` chunk → 抛 TranslationError（caller 决定 retry / 整批回退）；
+ * - 收集 `delta` chunk 的 **（段落序号, 文本）** 对（#948：序号是段落寻址的唯一权威，
+ *   丢掉它就只能靠空行猜边界，而 native 桥已经把空行剥掉了）；
+ * - `cached` chunk → 直接采用并对齐（缓存命中短路）；
+ * - `done` chunk → 终止迭代；返回重装配后的段落译文（若有任何 delta）；
+ * - `error` chunk → 抛 TranslationChunkError（caller 决定 retry / 整批回退）；
  * - 用户中断（signal.aborted）→ 抛 AbortError，caller 静默退出。
  *
  * 回调：`onChunk`（可选）— 每收到 provider chunk 时转发给 caller（含 delta / cached
  * / done / error / reasoning_delta），caller store 据此更新 translatedParagraphs
  * （spec §7.2 状态机转移）。AbortSignal 触发后不再 emit 任何 chunk。
  *
- * @returns 与 range 等长的段落译文数组（数量对齐由 alignParagraphs 收尾）
+ * @returns 与 range 等长的段落译文 + 缺口/溢出计数。计数不是内部诊断：caller 用它决定
+ * 本块能否算「全译完」——`fallbackCount > 0` 的块不得让章节收敛到 completed
+ * （completed 的定义是「已写入缓存」，半成品入缓存会把混合译文固化，见 #948）。
  */
 export async function fetchChunkViaProvider(
   range: ChunkRange,
@@ -300,9 +338,9 @@ export async function fetchChunkViaProvider(
   config: LlmEndpointConfig,
   signal: AbortSignal,
   onChunk?: (chunk: TranslationChunk) => void,
-): Promise<string[]> {
+): Promise<AlignResult> {
   const iter = provider.translate(request, config, signal)
-  const deltas: string[] = []
+  const deltas: Array<{ paragraphIndex: number; text: string }> = []
   let cachedParagraphs: string[] | null = null
   let doneUsage: unknown = undefined
 
@@ -314,7 +352,7 @@ export async function fetchChunkViaProvider(
       onChunk?.(chunk)
       switch (chunk.type) {
         case 'delta':
-          deltas.push(chunk.text)
+          deltas.push({ paragraphIndex: chunk.paragraphIndex, text: chunk.text })
           break
         case 'reasoning_delta':
           // 埋点：不展示；保留 telemetry 通道（implement 阶段接入）
@@ -342,8 +380,7 @@ export async function fetchChunkViaProvider(
 
   if (cachedParagraphs !== null) {
     // 缓存命中：直接采用 + 对齐（防御性，确保数量匹配）
-    const aligned = alignParagraphs(cachedParagraphs.join('\n\n'), paragraphs)
-    return aligned.paragraphs
+    return alignParagraphs(cachedParagraphs.join('\n\n'), paragraphs)
   }
 
   if (deltas.length === 0) {
@@ -351,10 +388,7 @@ export async function fetchChunkViaProvider(
     throw new TranslationChunkError('unknown', 'no chunks emitted', false)
   }
 
-  const joined = deltas.join('')
-  const aligned = alignParagraphs(joined, paragraphs)
-  // 注：fallbackCount > 0 时 caller 据此决定是否缓存写；本 primitive 不决定缓存策略
-  return aligned.paragraphs
+  return reassembleDeltas(deltas, paragraphs)
 }
 
 /**
@@ -397,8 +431,10 @@ export interface NovelTranslatorHandle {
    * 发起翻译。返回 `Promise<{ status, paragraphs }>`。
    *
    * status 语义（spec §7）：
-   * - 'completed'：所有块成功（aligned paragraphs 数量 = 原文；fallbackCount = 0）
-   * - 'partial'：至少一块失败；返回的 paragraphs 失败块位置回退原文（fallbackCount > 0）
+   * - 'completed'：所有块成功**且每段都有译文**（含块内 fallbackCount = 0）。
+   *   「块成功」不够 —— #948：块内段落回退时曾判 completed，caller 据此把「译文 +
+   *   原文」的混合结果写进缓存，此后每次开章都重放坏结果且不再重译。
+   * - 'partial'：至少一块失败或有段落回退；返回的 paragraphs 对应位置回退原文
    * - 'aborted'：用户中断（signal.aborted）；paragraphs = 已成功块的译文（部分或空）
    * - 'failed'：全部块失败；paragraphs = 全部回退原文
    *
@@ -503,6 +539,9 @@ export function createNovelTranslator(
 
       let failedCount = 0
       let successCount = 0
+      // 块成功但段内仍有回退：与块级失败同等对待（#948）。此前只数块级失败，
+      // 于是「译文 + 原文」的混合结果被判 completed 并被 caller 写进缓存。
+      let incompleteCount = 0
       const paragraphs: string[] = new Array(request.paragraphs.length).fill('')
       for (let i = 0; i < blockResults.length; i++) {
         const result = blockResults[i]
@@ -515,15 +554,16 @@ export function createNovelTranslator(
           }
         } else {
           successCount++
+          if (result.fallbackCount > 0) incompleteCount++
           for (let j = range.start; j < range.end; j++) {
-            paragraphs[j] = result[j - range.start] ?? request.paragraphs[j]
+            paragraphs[j] = result.paragraphs[j - range.start] ?? request.paragraphs[j]
           }
         }
       }
 
       // 状态机收敛
       let status: TranslationStatus
-      if (failedCount === 0) {
+      if (failedCount === 0 && incompleteCount === 0) {
         status = 'completed'
       } else if (successCount === 0) {
         status = 'failed'

@@ -907,21 +907,21 @@ public class PictelioTranslateModule extends LynxModule {
      *       分隔同一段落序列。</li>
      * </ol>
      *
-     * <p><b>下游：两条路径共用同一个 {@code alignParagraphs}</b>（#943 第 2 轮 review 更正）：
+     * <p><b>下游对齐：两路已不再共用 {@code alignParagraphs}（#948 修复后的现状）</b>：
      * <ul>
      *   <li><b>响应侧</b>：native 由 {@code TranslationSseParser} 先按
      *       {@code PARAGRAPH_ANCHOR}（{@code \[(\d+)\]}）正则识别锚点、逐段 {@code trim()}
      *       后以 {@code delta_all} 下发；web 侧无此步，译文原文进 JS。</li>
-     *   <li><b>对齐侧（两路共用）</b>：{@code fetchChunkViaProvider} 把逐段 delta 用
-     *       {@code join('')} 拼回后交给 {@code alignParagraphs}
-     *       （{@code split(/\n\n+/u)} + {@code stripAnchorPrefix}），其返回值是
-     *       <b>两条路径共同的权威渲染来源</b>。</li>
+     *   <li><b>对齐侧（已分流）</b>：{@code fetchChunkViaProvider} 现在返回
+     *       {@code reassembleDeltas}（{@code createNovelTranslator.ts}）的结果，按「是否出现
+     *       非零 {@code paragraphIndex}」分流——native 桥序号可信 ⇒ 按序号分桶；web 流式恒给
+     *       占位 0 ⇒ 仍走 {@code join('')} + 按 {@code \n\n} 拆段的旧路。</li>
      * </ul>
-     * <b>由此得到一个既存缺陷（见 #948，本方法未引入、亦未修复）</b>：native 的 delta 已被
-     * Java 切好并 trim，JS 再用空串拼接 ⇒ {@code alignParagraphs} 看不到任何空行，整章被切成
-     * <b>1 段</b>、其余 N−1 段静默回退原文。实测：3 段译文 → fallbackCount=2。
-     * 请求侧的空行分隔符因此<b>只在 web 路径承重</b>；两条路径真正共同依赖的是
-     * {@code [N] } 锚点前缀本身。请求形态（而非译文形态）不参与下游对齐。
+     * <b>这里曾有过一个缺陷（#948，本方法未引入；已于 27ed2ebc 修复）</b>：native 的 delta 已被
+     * Java 切好并 trim，若 JS 再用空串拼接交给 {@code alignParagraphs}，它看不到任何空行，整章
+     * 被切成 <b>1 段</b>、其余 N−1 段静默回退原文。实测：3 段译文 → fallbackCount=2。
+     * 修法正是上面那条按序号分桶的旁路。请求侧的空行分隔符因此<b>只在 web 流式路径承重</b>；
+     * 两条路径真正共同依赖的是 {@code [N] } 锚点前缀本身。请求形态（而非译文形态）不参与下游对齐。
      *
      * <p><b>原「两端 input 形态必须一致」是伪约束（已删除）</b>：原文称「native 无 [N]
      * 锚定 → 无法按段回填」，与实现相反 —— 本方法逐段拼 {@code [N]}。而外层报文形态本就不同

@@ -17,14 +17,13 @@ android {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // 单引擎线（#802 起）：线上 v6.1.0 已是 60100，同号则无法覆盖安装，故抬到 602xx。
-        // 现值 60201（过渡版 v6.2.1 已发布占用）——事实源是 packages/app/package.json 的 version，
-        // 由 `pnpm sync:android-version`（scripts/sync-android-version.mjs）按
-        // major×10000+minor×100+patch 推导写回；**直接改本行会被该脚本覆盖回旧值**。
-        // ⚠️ 本分支已合回单引擎 main（PR #818）：原注释「不合进 main / main 走 60300」
-        // 是过渡分支并行期的假设，随合并作废。
-        // 待定：合回后 versionCode 序列尚未拍板（另起主线 60300，还是顺延 60202），
-        // 见 #819；未定案前不动本值。
+        // 版本号唯一事实源 = 唯一客户端包 packages/app-lynx/package.json 的 version（ADR-0203 决策 3 迁移）。
+        // `pnpm --dir packages/android-host sync:android-version`（scripts/sync-android-version.mjs）按
+        // major×10000+minor×100+patch 推导并回写下面两行；`build:android` / `build:android:release`
+        // 每次都先跑该脚本 ⇒ **直接改这两行会被覆盖回事实源推导值**。
+        // 序列无需独立 ADR：versionCode 由「事实源版本号 + 同步脚本公式」唯一确定，没有第二个决策可拍
+        // （#819 子项 5 的「序列未定案」表述已随发布推进失效；主线上同号覆盖安装的老问题早已不成立）。
+        // 下两行是脚本回写的结果，核对事实源而非核对这里：app-lynx 6.9.1 → 60901。
         versionCode 60901
         versionName "6.9.1"
         buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
