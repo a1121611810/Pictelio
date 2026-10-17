@@ -286,7 +286,7 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     warnSpy.mockRestore()
   })
 
-  it("searchUser 默认参数 → /v1/search/user 且只有 word/filter/sort（spec §5.1 参数表：端点不消费筛选与 search_target）", async () => {
+  it("searchUser 默认参数 → /v1/search/user 且只有 word/filter/sort（spec search-user-scope.md §5.1：五个筛选维度实测未发；search_target 是**必须不发**——端点枚举校验，任何取值皆 400）", async () => {
     const fixture = loadUserSearchFixture()
     fetchMock.mockResolvedValue(new Response(JSON.stringify(fixture), { status: 200 }))
     const result = await searchUser("水上")

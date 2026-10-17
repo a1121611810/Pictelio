@@ -148,8 +148,20 @@ const activeFilterCount = computed(() => countActiveFilters(filters.value))
 const illustDimmed = computed(() => state.value.scope === 'novel')
 const bookmarkDimmed = computed(() => state.value.sort === 'popular_desc')
 
-// scope 切到用户时收起折叠区：五个维度用户端点不消费（spec §5.1），开关行同步隐藏——
-// 不收起会留下一块没有入口的悬空面板
+// scope=user 时整个筛选折叠区隐藏（开关行 + 面板本体各带一道 v-if，见模板注释）：
+// **六个维度**（期间 / 收藏数 / 比例 / 分辨率 / AI 覆盖 / 匹配方式 target）都是插画·小说概念，
+// 用户端点没有对应物（spec search-user-scope.md §5.1）。
+// ⚠️ 六个维度的**不发的理由不同级**，不可合并成一句「不消费」：
+//   · target —— 是**必须不发**：端点对它做枚举校验，传任何取值（空串 / partial_match_for_tags /
+//     title_and_caption / 非法值）一律 400；对照组未知参数名（foo=bar）200 且结果不变
+//     ⇒ 服务端校验已识别参数、忽略未识别参数。「不消费」读起来像「发了无害」，是危险措辞。
+//   · 其余五个筛选维度 —— 实测未发 + 第三方实现同款，**未做反向实验**，属保守选择。
+// 隐藏的收益：scope=user 下这段是死 UI，留着等于给用户一个改了没反应的入口。
+// ⚠️ 本 watch 是**第二重保险**，不是唯一防线：模板里「折叠开关行」与「折叠面板本体」
+//   各自带 `v-if="state.scope !== 'user'"`。只靠这里的状态回写，一旦被删（重构时看不出
+//   它承载可见性），scope=user 下就会露出那块没有入口的悬空面板。
+//   此前本 watch 零机器防线（源码断言只数 `v-if` 出现次数，删掉它照样全绿），
+//   已由 SearchSheet.test.ts 补断言覆盖「scope 变化时收回 filterOpen」这条回写。
 watch(
   () => state.value.scope,
   (scope) => {
@@ -184,7 +196,12 @@ const AI_OPTIONS: { value: SearchFilters['aiOverride']; labelKey: I18nKey }[] = 
   { value: 'hide', labelKey: 'searchSheet.ai.hide' },
 ]
 /** 匹配方式三档（spec search-target-mode §3.1/§7.1）。档位→请求参数的映射在 search-core，
- *  本组件只选档；`novelDisabled` = 小说端点不识别该档（spec §4），复用 illustDimmed 置灰形态。 */
+ *  本组件只选档；`novelDisabled` = 该档在小说端**必须不发**——不是「不识别」（一手实测订正）：
+ *  `/v1/search/novel` 对 `search_target=title_and_caption` 直接返回 **HTTP 400**，
+ *  而省略该参数或传 `partial_match_for_tags` 均 200 返 30 条、未知参数名 `foo=bar` 也 200
+ *  ⇒ 是服务端**明确拒绝该取值**，不是「参数名不认识」。UI 复用 illustDimmed 置灰形态。
+ *  ⚠️ 正因是 400 硬拒，「置灰 + 值保留」必须与「不发」成对成立：置灰保值逻辑哪天回归、
+ *  小说端开始真发这个参数，每一次小说搜索都会直接 400 失败。 */
 const TARGET_OPTIONS: { value: SearchTargetMode; labelKey: I18nKey; novelDisabled: boolean }[] = [
   { value: 'partial', labelKey: 'searchSheet.target.partial', novelDisabled: false },
   { value: 'exact', labelKey: 'searchSheet.target.exact', novelDisabled: false },
@@ -618,7 +635,10 @@ onBeforeUnmount(() => {
       </view>
 
       <!-- 筛选折叠区开关（#474/#477：默认折叠；激活数徽标；chevron 翻转用字符切换）。
-           scope=user 整段隐藏：期间/收藏数/比例/分辨率/AI 五维度用户端点均不消费（spec §5.1 参数口径） -->
+           scope=user 整段隐藏：六个维度（期间/收藏数/比例/分辨率/AI 覆盖/匹配方式 target）用户端点全部不发
+           （spec search-user-scope.md §5.1）。⚠️ 六个维度**不发的理由不同级**：五个筛选维度是
+           「实测未发 + 第三方实现同款、未做反向实验」；target 则是**必须不发**——端点对它做枚举校验，
+           任何取值皆 400（未知参数名反而 200 且结果不变），不是「发了无害」 -->
       <view v-if="state.scope !== 'user'" class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center flex-1"
@@ -645,9 +665,11 @@ onBeforeUnmount(() => {
         </view>
       </view>
 
-      <!-- 折叠筛选区：view 不滚动 → scroll-view（lynx 滚动容器）；范围/排序联动置灰在 computed -->
+      <!-- 折叠筛选区：view 不滚动 → scroll-view（lynx 滚动容器）；范围/排序联动置灰在 computed。
+           ⚠️ scope=user 时**面板本体自带门控**（与上方开关行成对的第二道 v-if）：不靠
+           watch 收 filterOpen 才隐藏——watch 是第二重保险，不是唯一防线（见 setup 内注释）。 -->
       <scroll-view
-        v-if="filterOpen"
+        v-if="filterOpen && state.scope !== 'user'"
         scroll-orientation="vertical"
         class="mx-4 mt-2 max-h-[42vh] flex-shrink-0 border border-outline rounded-[var(--md-shape-large)] p-3 flex flex-col gap-3"
       >

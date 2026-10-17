@@ -1,6 +1,10 @@
 /**
- * 缓存键真值表。oracle：spec §6.2（word_scope_sort + 筛选规范段；aiOverride=follow 不落键）
- * + docs/specs/search-target-mode.md:100-101（档位落键规则）。
+ * 缓存键真值表。oracle：docs/specs/search-advanced-filters.md §6.2
+ * （word_scope_sort + 筛选规范段；aiOverride=follow 不落键）
+ * + docs/specs/search-target-mode.md §6「档位落键规则」。
+ *
+ * ⚠️ 锚点纪律：只引小节号、禁引行号（行号必然随并行改文档漂移）；且裸 `§6.2` 会与
+ * search-target-mode.md §6 混读（那里讲的是缓存键可达性），故此处一律带文件名。
  */
 import { describe, expect, it } from "vitest";
 import { buildCacheKey } from "../src/cacheKey";
@@ -50,7 +54,7 @@ describe("buildCacheKey", () => {
     expect(a).not.toBe(b);
   });
 
-  // oracle：docs/specs/search-target-mode.md:100「partial（默认）不落键」
+  // oracle：docs/specs/search-target-mode.md §6「partial（默认）不落键」
   it("target=partial 与默认档逐字同键（含骨架断言，禁 ft 段）", () => {
     const key = buildCacheKey("東方", "all", "date_desc", {
       ...DEFAULT_SEARCH_FILTERS,
@@ -69,7 +73,7 @@ describe("buildCacheKey", () => {
     ).toBe("東方_all_date_desc|fp=1w");
   });
 
-  // oracle：docs/specs/search-target-mode.md:101「非默认落 ft=exact / ft=title_and_caption」
+  // oracle：docs/specs/search-target-mode.md §6「非默认落 ft=exact / ft=title_and_caption」
   it("非默认档落对应 ft 段", () => {
     expect(
       buildCacheKey("東方", "all", "date_desc", { ...DEFAULT_SEARCH_FILTERS, target: "exact" }),

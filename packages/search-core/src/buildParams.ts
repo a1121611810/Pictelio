@@ -1,22 +1,17 @@
 /**
  * 筛选状态 → 端点请求构建（spec §3.3 参数映射 + §3.4 热门矩阵 + §6.1 契约变更）。
- *
- * 真值 oracle：docs/research/pixiv-appapi-search-filter-params.md（Pixiv-Shaft 对齐
- * iOS 官方 8.6.5-8.7.3 抓包）。关键规则：
- * - `search_target` 由**用户可选档位**决定（spec docs/specs/search-target-mode.md §4，两端不对称）：
- *   illust 端 partial → **整个参数不传**（显式传 partial 会转严格标签匹配并忽略
- *   merge_plain_keyword_results，Shaft #906）；novel 端 partial → **显式发**（不传退化为纯字面
- *   匹配、同义词不展开，#1038）。novel 端不识别 title_and_caption（该端点不消费，UI 置灰）。
- * - 恒发 `merge_plain_keyword_results=true` / `include_translated_tag_results=true`
- *   （iOS/Shaft/pixez 一致）。`include_potential_violation_works` 维持不传（iOS 默认 false
- *   会隐藏部分作品）。`search_ai_type` 不接入（#479 裁决）。
- * - 热门矩阵（#478）：popular → popular-preview 端点，无 `sort`、无分页参数、
- *   **不携带收藏数区间**（服务端忽略），期间/比例/分辨率照常透传。
- * - scope 适用性（#476 Q4）：比例/分辨率仅进插画路（scope=novel 时即使状态残留也不发）；
- *   期间/收藏数双路携带（收藏数受热门排除约束）。
- * - 用户搜索（#1019 / spec docs/specs/search-user-scope.md §5.1）：`/v1/search/user` 一手实测，
- *   参数只有 word + filter + sort 三项——merge/include 两 bool 与 search_target 均**未发**且
- *   第三方实现（pixez / Mako）同款；该端点无 popular-preview 对应物，三档 sort 一律直发。
+ * 真值 oracle：docs/research/pixiv-appapi-search-filter-params.md（Pixiv-Shaft 对齐 iOS
+ * 官方 8.6.5-8.7.3 抓包）。⚠️ 2026-10-17 一轮**绕过本文档**的一手 AppAPI 实测推翻了其中
+ * 两条**理由**（§11.1 / §11.3），**但映射全部保持不变**（保守选择，不依赖被推翻的理由）；
+ * 改的只是理由与置信度，采样明细与复跑入口一律以该文档 §11 为准：
+ * - `search_target`（用户可选档位，两端不对称，spec search-target-mode.md §4）：illust 端
+ *   partial → **不传**（#906「显式传会转严格标签匹配」**未复现**，§11.1）；novel 端 partial
+ *   → **显式发**（方向可信、机制未证实，§11.5）；novel 端 `title_and_caption`
+ *   **实测被拒（HTTP 400）** ⇒ 置灰保值不放宽（spec §4 表）；user 端**必须不发**——枚举校验、
+ *   任何取值皆 400（§11.3），「不消费」是危险措辞。
+ * - 恒发两 bool 的理由**已下调**（`merge_plain_keyword_results` 三端无可观测效果，§11.2）⇒ 只因
+ *   无害 + 对齐第三方而保留；`include_potential_violation_works` 不传、`search_ai_type` 不接入
+ *   （#479）。热门矩阵（#478）/ scope 适用性（#476）/ 用户端三档 sort 逐位相同见 §11.3-§11.4。
  */
 import { resolvePeriodRange } from "./period";
 import type { SearchFilters, SearchTargetMode } from "./filters";
@@ -71,7 +66,8 @@ const ILLUST_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
 const NOVEL_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
   partial: "partial_match_for_tags",
   exact: "exact_match_for_tags",
-  // 小说端不识别该档（spec §4 证据强度：Mako 枚举只有 partial/exact/text/keyword），置灰不发送
+  // 小说端 title_and_caption 实测被拒（HTTP 400，非「不识别」）⇒ 置灰保值不发；
+  // 放宽它会让每一次小说搜索直接失败。spec §4 + verify-novel-title-target.sh
   title_and_caption: null,
 };
 

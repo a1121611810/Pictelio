@@ -3,9 +3,20 @@
  * - §1.1/§1.2 基础与筛选参数行（官方 iOS 抓包值）
  * - §3/§4 popular-preview：接受筛选但**无 sort、无分页、收藏数被忽略**
  * - 档位映射 oracle：docs/specs/search-target-mode.md §4 表（两端不对称）
- *   + Shaft #906（illust 显式 partial 会丢标题命中 → 改不传）
- *   + #1038（novel 不传退化为纯字面匹配 → 恒显式 partial）
+ *   + Shaft #906：illust 端 partial **不传** search_target（映射来源）。
+ *     ⚠️ #906 的**理由**（显式传 partial 会转严格标签匹配 → 丢标题命中）本次一手实测
+ *     **未复现**：omit / 显式 partial / merge=true / 两者并用 四组组合 × 3 检索词 × 2 轮
+ *     **交错**采样共 12 次，ID 序列 md5 完全相同；决定性反证是多词 `Rosmontis rosemary`
+ *     在 omit 与显式 partial 下同为 4 条（exact 为 1 条）。⇒ 两者**等价**，
+ *     「不传」是**保守选择**（无害 + 对齐第三方），**不要再拿「显式发即回归」当理由**。
+ *     ⚠️ 方法论：插画端结果集随时间漂移，A/B 比对**必须交错采样**，顺序采样会产出
+ *     方向相反的假差异——#906 这条错误结论能活下来就是踩了这个坑。
+ *     复跑：docs/research/verify-illust-target-equivalence.sh
+ *   + #1038（novel 不传退化为纯字面匹配 → 恒显式 partial；映射方向可信，理由未一手证实）
  *   + docs/research/verify-query-syntax.sh 一手实测（四档 × 双端点）
+ *   + 一手实测（交错 2 轮）：novel 端 `search_target=title_and_caption` **被拒（HTTP 400）**，
+ *     非「不识别」——省略该参 / 传 partial_match_for_tags 均 200 返 30 条，对照组未知参数名
+ *     `foo=bar` 亦 200 且结果不变 ⇒ 服务端**枚举校验硬拒该取值**。见下方真值表注释。
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -25,7 +36,7 @@ const input = (over: Partial<Parameters<typeof buildIllustSearchRequest>[0]> = {
 });
 
 describe("buildIllustSearchRequest", () => {
-  it("默认筛选：裸基础参 + 恒发两 bool，partial 档**不传 search_target**（#906）", () => {
+  it("默认筛选：裸基础参 + 恒发两 bool，partial 档**不传 search_target**（#906 映射；实测与显式发等价，故保守不传）", () => {
     const r = buildIllustSearchRequest(input());
     expect(r.endpoint).toBe("/v1/search/illust");
     expect(r.params).toEqual({
@@ -178,10 +189,17 @@ describe("buildNovelSearchRequest", () => {
  * 档位 × 端点 真值表（spec search-target-mode §4，**两端不对称**）。
  * oracle 逐字转写自该表，不从实现反推：
  * | 档位 | 插画端 | 小说端 |
- * | partial | 整个参数不传 | 显式发 partial_match_for_tags |
+ * | partial | 整个参数不传（保守选择，见文件头：实测显式发与不传等价） | 显式发 partial_match_for_tags |
  * | exact | exact_match_for_tags | exact_match_for_tags |
- * | title_and_caption | title_and_caption | 端点不识别 → 不发 |
- * 佐证：Shaft #906 / #1038 + docs/research/verify-query-syntax.sh 实测。
+ * | title_and_caption | title_and_caption | **端点实测被拒（HTTP 400）→ 必须不发** |
+ *
+ * ⚠️ 末行原写「端点不识别 → 不发」，**已被一手实测推翻并订正**：不是「未被识别」，是
+ * **被明确拒绝**。`/v1/search/novel` 省略 search_target → 200/30 条；
+ * `title_and_caption` → **400/0 条**；`partial_match_for_tags` → 200/30 条；
+ * 对照组未知参数名 `foo=bar` → 200/30 条（交错 2 轮一致）。对照组说明服务端不是「不认识
+ * 这个参数名」，而是**校验通过、取值被拒**。故措辞从「不识别」改为「实测被拒」——
+ * 前者读起来像「发了无害」，后者才是「发了直接 400 失败」的强度。
+ * 佐证：docs/research/verify-query-syntax.sh + 上述交错采样；#906 / #1038 的理由见文件头。
  *
  * 基础键集 = baseParams 四项（word/filter/merge/include）+ 非热门恒发 sort，已按字典序写死。
  */
@@ -229,11 +247,17 @@ describe("search_target 档位矩阵（spec §4：两端不对称）", () => {
   );
 
   /**
-   * 反证断言（本票最关键一条）：插画端 partial 档的参数键集里**没有** search_target。
-   * 若将来有人「顺手补全」成显式 partial_match_for_tags，服务端会转严格标签匹配并
-   * 忽略 merge_plain_keyword_results ⇒ 丢失标题/关键字命中（Shaft #906）——即回归。
+   * 反证断言：插画端 partial 档的参数键集里**没有** search_target（characterization，锁定现状映射）。
+   *
+   * ⚠️ **勿把这条读成「显式发就是回归」**——旧文案如此写，是错的。#906 的理由（显式
+   * partial 会转严格标签匹配、忽略 merge_plain_keyword_results ⇒ 丢标题/关键字命中）
+   * 本次一手实测**未复现**：omit / 显式 partial / merge=true / 两者并用 四组组合 × 3 检索词
+   * × 2 轮**交错**采样共 12 次，ID 序列 md5 完全相同；决定性反证是多词 `Rosmontis rosemary`
+   * 在 omit 与显式 partial 下同为 4 条，而 exact 为 1 条。⇒ 两者**等价**。
+   * 所以这条断言防的不是「功能回归」，而是**顺手补全**：它把「partial 档不落该键」钉死，
+   * 将来若有人以「补全参数」为由加上 `search_target`，diff 会逼人重看这一段映射决策。
    */
-  it("反证：插画端 partial 档**不含** search_target 键（显式发即回归，Shaft #906）", () => {
+  it("反证：插画端 partial 档**不含** search_target 键（锁定映射；实测显式发与不传等价，非「发了即回归」）", () => {
     for (const word of ["東方", "東方 フラン", "Rosmontis rosemary"]) {
       const r = buildIllustSearchRequest(input({ word, filters: DEFAULT_SEARCH_FILTERS }));
       expect(Object.keys(r.params)).not.toContain("search_target");
@@ -313,7 +337,7 @@ describe("buildUserSearchRequest", () => {
     }
   });
 
-  it("不复用 baseParams 的两个恒发 bool（实测未发且用户端点不消费）", () => {
+  it("不复用 baseParams 的两个恒发 bool（实测未发；user 端这两个参数三端均无可观测效果）", () => {
     const keys = Object.keys(user("date_desc").params);
     expect(keys).not.toContain("merge_plain_keyword_results");
     expect(keys).not.toContain("include_translated_tag_results");

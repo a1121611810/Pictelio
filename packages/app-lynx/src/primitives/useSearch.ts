@@ -40,8 +40,6 @@ import { toApiError } from "../utils/errors"
 import { t, apiErrorMessage } from "../i18n"
 import {
   DEFAULT_SEARCH_FILTERS,
-  buildIllustSearchRequest,
-  buildNovelSearchRequest,
   filterByBookmarkBand,
   type SearchFilters,
 } from "@pictelio/search-core"

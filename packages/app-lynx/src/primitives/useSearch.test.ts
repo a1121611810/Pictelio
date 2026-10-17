@@ -15,7 +15,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
 import type { SearchResultItem } from "./useSearch"
 import type { SearchTransport } from "../api/search"
-import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS, type SearchFilters } from "@pictelio/search-core"
+import {
+  BOOKMARK_BANDS,
+  DEFAULT_SEARCH_FILTERS,
+  buildNovelSearchRequest,
+  type SearchFilters,
+} from "@pictelio/search-core"
 import { toIllustId, toNovelId, toUserId } from "../api/id"
 import {
   ApiErrorType,
@@ -867,6 +872,67 @@ describe("筛选（spec §5.2/§3.4；#474 T4）", () => {
     c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" })
     expect(c.state.filters.ratio).toBe("landscape")
     expect(transport.searchIllust).not.toHaveBeenCalled()
+  })
+
+  // ── 匹配方式档位（spec docs/specs/search-target-mode.md §8.5 的控制器验收项）───
+  // §8.5 点名的两条验收此前在测试里零断言（只有注释提到 target），是 code-review Spec 轴的
+  // BLOCK-2。档位 → 请求参数的真值表单点在 search-core（tests/buildParams.test.ts
+  // 「search_target 档位矩阵」§4 表 6 组合 + 反证），本块只锁控制器这一侧。
+  // ⚠️ 锚点只引**小节号**、不引行号：本仓并行改该 spec 频率高，行号锚必然漂移且无声
+  // （第一轮的 `§8.5` 更因该 spec §8 无 `###` 子标题而根本不可解析——已改为真小节）。
+  describe("target 档位切换（spec search-target-mode §8.5）", () => {
+    it("切 exact → 450ms debounce 后重新发起搜索，且请求携带 target=exact", async () => {
+      const transport = createTransport()
+      const c = useSearch({ transport })
+      c.search("花")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(transport.searchIllust).toHaveBeenCalledTimes(1)
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, target: "exact" })
+      await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+      // 「三档切换各自重搜」（§8.5）：档位与 ratio/bookmark/aiOverride 共用
+      // setFilters 这条 FILTER_DEBOUNCE_MS 通道，故断点是「debounce 后发出新一批请求」
+      expect(transport.searchIllust).toHaveBeenCalledTimes(2)
+      expect(transport.searchIllust).toHaveBeenNthCalledWith(
+        2,
+        "花",
+        "date_desc",
+        expect.any(AbortSignal),
+        { ...DEFAULT_SEARCH_FILTERS, target: "exact" },
+      )
+      expect(c.state.filters.target).toBe("exact")
+      await settle()
+      expect(c.state.status).toBe("ready")
+    })
+
+    it("scope=novel + title_and_caption：值保留，且该档不进小说请求（spec §8.5 / §4）", async () => {
+      const searchNovelMock = vi.fn<
+        (
+          word: string,
+          sort: SearchSort,
+          signal?: AbortSignal,
+          filters?: SearchFilters,
+        ) => Promise<PixivNovelListResponse>
+      >(async () => novelResponse([], null))
+      const c = useSearch({ transport: createTransport({ searchNovel: searchNovelMock }) })
+      c.setScope("novel")
+      c.search("花")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(searchNovelMock).toHaveBeenCalledTimes(1)
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" })
+      await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+      // 值保留（§8.5 + §7.1）：置灰只挡 tap、不清状态，切回插画即恢复
+      expect(c.state.filters.target).toBe("title_and_caption")
+      const sent = searchNovelMock.mock.calls[1]![3]!
+      expect(sent.target).toBe("title_and_caption") // 控制层整份透传，不在这里丢弃
+      // 不携带（§8.5 → §4 表「该端点不识别 → 置灰，值保留不发」）：丢弃发生在请求
+      // 构建层，停在「控制器把值交给 transport」这一层断言不到该纪律 —— 故接真构建函数断端到端
+      // 效果（与 buildParams.test.ts 的区别：那里直接喂字面量，这里喂控制器实际交出的那份 filters）
+      const req = buildNovelSearchRequest({ word: "花", sort: "date_desc", filters: sent })
+      expect(req.endpoint).toBe("/v1/search/novel")
+      expect(Object.keys(req.params)).not.toContain("search_target")
+      await settle()
+      expect(c.state.status).toBe("ready")
+    })
   })
 
   it("收藏数兜底：非热门路径按 total_bookmarks 本地过滤（spec §7）", async () => {
