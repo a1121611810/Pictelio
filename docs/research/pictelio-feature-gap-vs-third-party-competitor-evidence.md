@@ -204,7 +204,7 @@
 - **Android 原生**：`NetDiagProbe.java`（专用非路由 OkHttp client + `EventListener` 分阶段计时 dnsStart:88 / connectStart:102 / secureConnectStart:116，带鉴权请求注入 Referer:223，入口 `run()`:264）；双桥 `NetDiagPlugin.java`（`@CapacitorPlugin(name="NetDiag")`:20，注册 `MainActivityWebview.java:73`）与 `NetDiagModule.java`（`@LynxMethod diagnose`:33，注册 `LynxActivity.java:117`、`LynxRuntimeInitializer.java:81`）；权限 `ACCESS_NETWORK_STATE`（`AndroidManifest.xml:64`）。
 - **TS 降级**：webview `packages/app/src/native/NetDiag.ts:49-63`（原生优先，dev/web 降级仅 http 子集 + `degraded: true`）；lynx `packages/app-lynx/src/utils/netDiagnostics.ts:29-57`。
 - **E2E**：`packages/app/tests/android-e2e/specs/network-check.spec.ts`、`lynx-network-check.spec.ts`。
-- **spec 偏差（未实现项）**：`docs/specs/network-self-check.md:70` 要求 ErrorDisplay 在 NETWORK/TIMEOUT/PROXY 时给「运行网络自检」CTA，`ErrorDisplay.tsx` 中零命中。
+- **spec 偏差（未实现项）**：`docs/specs/network-self-check.md` §UI 要求 ErrorDisplay 在 NETWORK/TIMEOUT/PROXY 时给「运行网络自检」CTA，`ErrorDisplay.tsx` 中零命中。
 
 ### A2. WebDAV 备份（20 提交：a1588d08→1039539f；ADR-0156，spec `docs/specs/webdav-backup.md`）
 
@@ -272,10 +272,13 @@
   - 分辨率：最小边 px 下限 → `width_min`+`height_min` 同值（`buildParams.ts:102-105`）；UI 预设 1000/2000/3000（lynx `SearchSheet.vue:122`、webview `SearchFilterSheet.tsx` RES_OPTIONS）。
   - AI 三态覆盖：`follow/all/hide`（follow=听账号级设置）；**不注入 `search_ai_type`**（#479 裁决，`buildParams.ts:12` 注释），all→show、hide→mask 客户端处理（`ai.ts:10-14` `resolveAiMode`）。
 - **参数集**（`buildParams.ts:47-107`，对照旧报告「裸四参」）：恒发 `word/filter=for_ios/merge_plain_keyword_results=true/include_translated_tag_results=true`（:48-55）+ `sort`（非热门）+ `search_target`（见下）+ `start_date/end_date` + `bookmark_num_min/max`（:80-89；**热门路径不携带** :86）+ `ratio_pattern` + `width_min/height_min`；明确不发 `duration`/`search_ai_type`/`include_potential_violation_works`（:11-12）。热门矩阵：popular-preview 无 sort、无分页、忽略收藏数，期间/比例/分辨率照常透传（:13-15）；小说路永不携带比例/分辨率（:118）。
-- **search_target 行为修复**（`buildParams.ts:57-65`，对照旧行为=两端恒显式传 partial，`ce9594cf` diff 删除行）：插画端单词标签**不传**（不传 ≡ partial 且并入标题命中；显式传 partial 反而做严格 tag 匹配并忽略 merge 参数——Shaft #906）；含空格多标签传 `exact_match_for_tags`；小说端**恒显式传**（不传退化纯字面匹配、同义词不展开——#1038）。依据 `docs/research/pixiv-appapi-search-filter-params.md` §1.1/§2/§9.3、spec §6.1 表。
-- **双端 UI**：webview 底部 Sheet（#477 变体 A，ReaderSettingsSheet 范式）`components/search/SearchFilterSheet.tsx:13,116`，入口=搜索栏筛选 icon+激活数徽标（`Search.tsx:271,339,375-379`），URL 六键 `fp/fd/fb/fr/fw/fa` 会话同步（`urlCodec.ts:9-40`；`fd` 优先于 `fp`、`fb`=带宽序号、follow 不落 `fa`；decode 回填支持浏览器前进/后退 `Search.tsx:158,194`），即改即搜 450ms debounce（`Search.tsx:247`）；lynx SearchSheet 折叠筛选区（`SearchSheet.vue:93-105`，scope=novel 时比例/分辨率置灰 `:100`、热门时收藏数置灰 `:101`，chips `:115-165`）。**lynx 一期无自定义日期 UI**（仅五预设）——spec §4 L102 拍板状态/参数层 custom 两端通用。
+- **search_target 行为修复**（`buildParams.ts:57-65`，对照旧行为=两端恒显式传 partial，`ce9594cf` diff 删除行）：插画端单词标签**不传**（不传 ≡ partial 且并入标题命中；显式传 partial 反而做严格 tag 匹配并忽略 merge 参数——Shaft #906）；含空格多标签传 `exact_match_for_tags`（**已于 #1025 删除**：该派生分支已移除，档位改由用户在「匹配方式」三档中自选，默认 partial 档对多词**不发** `search_target`）；小说端**恒显式传**（不传退化纯字面匹配、同义词不展开——#1038）。依据 `docs/research/pixiv-appapi-search-filter-params.md` §1.1/§2/§9.3、`docs/specs/search-advanced-filters.md` §6.1 表。
+> ⚠️ 2026-10-17 提示（一）：本条记录的「显式传 partial 反而做严格 tag 匹配并忽略 merge 参数（Shaft #906）」是**第三方源码推断**；2026-10-17 本仓一手交错采样**未复现**（见 `docs/specs/search-target-mode.md` §4 / §4.1）。此处按历史留痕保留原文，不改判。
+> ⚠️ 2026-10-17 提示（二）：上一条提示**只订正了 #906 那半句**，未覆盖同条里的另一半——「含空格多标签传 `exact_match_for_tags`」的**派生逻辑已于 #1025 删除**（`word.includes(" ")` 自动派生 `exact_match_for_tags` 的分支移除；`docs/specs/search-target-mode.md` §5）。防线在 `packages/search-core/tests/buildParams.test.ts`「多词 + 默认 partial 档 → **不再自动 exact**，不发送 search_target」。本行保留原文按历史留痕，**不代表现状**：现状以 #1025 后的代码与该单测为准。空格语义不变（服务端仍按 AND 解析），变的只是结果集大小。
+- **双端 UI**：webview 底部 Sheet（#477 变体 A，ReaderSettingsSheet 范式）`components/search/SearchFilterSheet.tsx:13,116`，入口=搜索栏筛选 icon+激活数徽标（`Search.tsx:271,339,375-379`），URL 六键 `fp/fd/fb/fr/fw/fa` 会话同步（`urlCodec.ts:9-40`；`fd` 优先于 `fp`、`fb`=带宽序号、follow 不落 `fa`；decode 回填支持浏览器前进/后退 `Search.tsx:158,194`），即改即搜 450ms debounce（`Search.tsx:247`）；lynx SearchSheet 折叠筛选区（`SearchSheet.vue:93-105`，scope=novel 时比例/分辨率置灰 `:100`、热门时收藏数置灰 `:101`，chips `:115-165`）。**lynx 一期无自定义日期 UI**（仅五预设）——`docs/specs/search-advanced-filters.md` §4「状态归属」条拍板状态/参数层 custom 两端通用（原文：lynx 无便利的原生 date input，故一期仅预设五档、自定义起止为 webview 专属，二期补 UI 即可）。
+> ⚠️ 2026-10-17 锚点订正：本条原写「spec §4 L102」——裸小节 + **指错的行号**（§4 的 L102 现为 `tests/` 目录行，与本句主张无关）。已改为小节锚 + 实际条文名。
 - **缓存与兜底**：缓存键 `buildCacheKey`（`cacheKey.ts:9-30`）= base + 筛选规范段，默认筛选返回裸 base，follow 不落键；webview 用作 LRU（容量 20）+ 防重入（`searchStore.ts:144,154`）。收藏数兜底 `filterByBookmarkBand`（`fallback.ts:10-20`，泛型注入 `getBookmarks` 取数器——29246f17）：区间参数对免费账号被服务端静默忽略、对 popular-preview 完全忽略（`fallback.ts:1-7` 注释），客户端按 `total_bookmarks` 本地过滤。
-- **工单/验收**：#481–#484 全 CLOSED（gh 实测）；#485 CLOSED（门禁 check:all/test:all/lint:all 全绿 + webview CDP 冒烟 11/11 PASS `scripts/audit-real-interaction/search_filter_smoke.mjs` + lynx 可达性 + 引擎往返）；spec `docs/specs/search-advanced-filters.md:3` = implemented。**遗留**：agent-browser 筛选主流程 E2E 用例（spec 标注可选后续，CI 化时补）。
+- **工单/验收**：#481–#484 全 CLOSED（gh 实测）；#485 CLOSED（门禁 check:all/test:all/lint:all 全绿 + webview CDP 冒烟 11/11 PASS `scripts/audit-real-interaction/search_filter_smoke.mjs` + lynx 可达性 + 引擎往返）；spec `docs/specs/search-advanced-filters.md` **状态行** = implemented。**遗留**：agent-browser 筛选主流程 E2E 用例（spec 标注可选后续，CI 化时补）。
 - **评审痕迹**：b605f946 复审修复（ADR-0155 增补 5 行、缓存与覆盖测试用例 +59/+42、触控目标、buildParams 2 行微调）；3b703cf6 oxlint 警告清零。
 
 ## B. 相关作品注入行（9 提交 `3f773575..6f76bab1`）——P1-6 关闭
@@ -331,7 +334,7 @@
 | 8 | 名次保序（不走 searchMerger） | webview `stores/rankingStore.ts:4-9` 头注释：「展平页面时**严格保持页序 × 页内序**——**禁止**走 createTQFeedStore 的 merge 路径（它对 items 做 sortByDate + 去重……直接毁掉名次顺序）」「名次 = 全局下标 + 1（跨页累加，spec §5.5）」；`flattenIllusts:64-70` 实现；`RankEntry.rank:26-30`；受限条目过滤只移除不重编号（名次空洞=裁决 #7 预期）。lynx `pages/Ranking.vue:3`：「名次 = 渲染流下标 + 1，跨页保序」（数据层 `primitives/createRankingFeed.ts` 复用 createMixFeed 单源） |
 | 9 | 7 档维度 + 日期纯函数 | `ranking-core/src/modes.ts:37-45` `RANK_MODES` 七档（`day/week/month/week_rookie/week_original/day_r18/week_r18g`）；`date.ts:1-11` 展示格式化不含 Intl、不经本地时区（Lynx 无 Intl） |
 
-辅助：spec `docs/specs/ranking.md:3` 状态 `implemented`（2026-09-13）；ADR-0158 存在（`docs/adr/ADR-0158-ranking-information-architecture.md`）。工单备注：#512–#519 在 issue tracker 仍全 OPEN（`gh issue view` 2026-09-14 实测），代码已全落地——与 WebDAV #462–#472 同模式。
+辅助：spec `docs/specs/ranking.md` **状态行** = `implemented`（2026-09-13）；ADR-0158 存在（`docs/adr/ADR-0158-ranking-information-architecture.md`）。工单备注：#512–#519 在 issue tracker 仍全 OPEN（`gh issue view` 2026-09-14 实测），代码已全落地——与 WebDAV #462–#472 同模式。
 
 ### A2. i18n 中英双语（本轮新关闭项，四版判定 ❌ → ✅）
 

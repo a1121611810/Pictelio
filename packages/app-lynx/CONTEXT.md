@@ -369,11 +369,11 @@ Java 端 Lynx NativeModule（ADR-0170 D1）；与 PictelioAuth / PictelioApi / P
 _Avoid_: 复用 PixivApiPlugin（鉴权头不同 / 流式 vs 一次性 / Base URL 动态 vs 硬编码）
 
 **translateStream / translatePoll / abortStream**：
-Java 三个 `@LynxMethod`（ADR-0170:296 / :605 / :711）；JS 侧 `translateStream` 发起流 + `translatePoll` 拉批 + `abortStream` 取消。**生产读缝 = translatePoll**（ADR-0174 D1，与事件总线共享 STREAM_TERMINAL，单一事实源）。
+Java 三个 `@LynxMethod`（`PictelioTranslateModule.java` 的 `translateStream` / `translatePoll` / `abortStream`）；JS 侧 `translateStream` 发起流 + `translatePoll` 拉批 + `abortStream` 取消。**生产读缝 = translatePoll**（ADR-0174 D1，与事件总线共享 STREAM_TERMINAL，单一事实源）。
 _Avoid_: 用单 callback 多次回调（实测 callback 通道不可靠，每流至多 1 帧）、开静态 test hook 跳过生产路径
 
 **信封契约（envelope contract）**：
-每帧载荷形态（ADR-0170 §1.4 收步、ADR-0170:492-506、commit `87ffb5a3` 修订）：`{type, streamId, seq, ...}`；`streamId` = 流的稳定标识（JS 侧 `newStreamId()` 生成）；`seq` **入缓冲时盖章**（不是发送时）；两路发送（轮询 + 总线）必须**同一字符串**（即同一帧被两路各盖一次章的根因已记录在 ADR-0170 §6）。
+每帧载荷形态（ADR-0170 §1.4 收步、ADR-0170「实现期修订」节 §跨端信封契约（单一事实源）、commit `87ffb5a3` 修订）：`{type, streamId, seq, ...}`；`streamId` = 流的稳定标识（JS 侧 `newStreamId()` 生成）；`seq` **入缓冲时盖章**（不是发送时）；两路发送（轮询 + 总线）必须**同一字符串**（即同一帧被两路各盖一次章的根因已记录在 ADR-0170 §6）。
 _Avoid_: 发送时盖章（已被证伪 = 同一帧被两路各盖一次章，seq 不同则 JS 去重永不命中）、省略 streamId（陈旧流帧被新翻译消费）
 
 **AbortController 包装（JS 侧）**：
@@ -429,7 +429,7 @@ per-stream 共享解析状态对象；含 `frameQueue`（ConcurrentLinkedQueue�
 _Avoid_: 实例级共享 state（M2 污染 = 陈旧流帧被新流 parser 接收）、instance 字段直接挂 module（`deltaSeen` 历史坑）
 
 **pruneFinishedStreams**：
-终态交付后清理注册表（ADR-0170:471-485）；`STREAM_FRAMES` / `STREAM_TERMINAL` / `STREAM_TERMINAL_MSG` / `STREAM_SEQ` 全部自我清理（防泄漏）；ADR-0176 D2 扩展到 TranslationStreamState 同步清理。
+终态交付后清理注册表（实现见 `PictelioTranslateModule.java` 的 `pruneFinishedStreams`，开新流时清掉除自己以外的所有完结条目）；`STREAM_FRAMES` / `STREAM_TERMINAL` / `STREAM_TERMINAL_MSG` / `STREAM_SEQ` 全部自我清理（防泄漏）；ADR-0176 D2 扩展到 TranslationStreamState 同步清理。
 _Avoid_: 终态不清理（map 永久增长）、复用相同 streamId 而不重置
 
 **污染机制 M1/M2/M3**：
@@ -450,7 +450,7 @@ _Avoid_: 用 `process.env.NODE_ENV`（build-time 不可靠）、单点 typeof �
 _Avoid_: 假 keystore 同时伪造密文（与 SecureStorageCompat 解耦失去测试意义）、反射注入生产 Keystore
 
 **TestLynxContext**【ADR-0174 / research §2.1】：
-Robolectric 下驱动 PictelioTranslateModule 必需的 LynxContext 子类；LynxContext 抽象类只有 1 个抽象方法 `handleException(Exception)`，子类 5 行；构造成功，`getContext()` 返回内部 `MutableContextWrapper` 包着 app Context，`getLynxView() === null`（publishFramesViaEvent 因此安全退出，:559-567）。
+Robolectric 下驱动 PictelioTranslateModule 必需的 LynxContext 子类；LynxContext 抽象类只有 1 个抽象方法 `handleException(Exception)`，子类 5 行；构造成功，`getContext()` 返回内部 `MutableContextWrapper` 包着 app Context，`getLynxView() === null`（`PictelioTranslateModule.java` 的 `publishFramesViaEvent` 因此安全退出——它开头的 `instanceof LynxContext` + `getLynxView() != null` 守卫）。
 _Avoid_: 用普通 Context 构造 module（`appContext()` ClassCastException 被兜底 catch 抓成「请求构造失败」，不写终态）
 
 **utf8Encode / utf8Decode**【ADR-0172 §1】：
@@ -470,7 +470,7 @@ _Avoid_: 复用内容显示谓词（把翻译授权 = 内容显示 = 两件不�
 _Avoid_: 设备级开关（多账号用户无法独立控制）、与内容显示开关复用
 
 **translatePoll 生产读缝（production read seam）**【ADR-0174 D1】：
-单测钉住「Java 终态契约」必须经 `translatePoll` 读 STREAM_TERMINAL（ADR-0170:607）；与事件总线共享同一 register。改坏 `registerTerminal` 的 `put`（裸文本）→ 寄存器里就是裸文本 → 生产读路径原样回传 → `JSONObject` 抛 `JSONException` → **红**（M1 变异实测 6/9）。
+单测钉住「Java 终态契约」必须经 `translatePoll` 读 STREAM_TERMINAL（`PictelioTranslateModule.java` 的 `translatePoll`）；与事件总线共享同一 register。改坏 `registerTerminal` 的 `put`（裸文本）→ 寄存器里就是裸文本 → 生产读路径原样回传 → `JSONObject` 抛 `JSONException` → **红**（M1 变异实测 6/9）。
 _Avoid_: 开静态 test hook 跳过生产路径（缝自身仍构造 JSON，生产被改坏也照样绿 = 「事实 5」陷阱）
 
 **五路径 + 成功路径**【ADR-0174 D3】：
@@ -478,7 +478,7 @@ _Avoid_: 开静态 test hook 跳过生产路径（缝自身仍构造 JSON，生�
 _Avoid_: 只测成功路径（production 改坏 error 路径不被发现）
 
 **成功路径必须排空帧缓冲**【ADR-0174 D5 / research §2.5】：
-`TranslationSseParser` 在 `response.completed` 也 emit 一个 `{"type":"done"}` 负载帧（`TranslationSseParserTest.java:86-95` 钉住），而 `translatePoll` 优先返回帧缓冲；「轮询到第一个 done 就断言」永远读不到终态寄存器 → M1 下仍绿（事实 5 同款）。修正：断言**每一次交付的载荷都是 JSON**（把缓冲排空）。
+`TranslationSseParser` 在 `response.completed` 也 emit 一个 `{"type":"done"}` 负载帧（`TranslationSseParserTest` 的用例 `outputTextDoneIsNotAStreamTerminal` 钉住），而 `translatePoll` 优先返回帧缓冲；「轮询到第一个 done 就断言」永远读不到终态寄存器 → M1 下仍绿（事实 5 同款）。修正：断言**每一次交付的载荷都是 JSON**（把缓冲排空）。
 _Avoid_: 「第一个 done 即断言」（被骗绿）
 
 **UUID 隔离**【ADR-0174 D4】：
@@ -486,7 +486,7 @@ _Avoid_: 「第一个 done 即断言」（被骗绿）
 _Avoid_: 用固定 token（与残留状态纠缠）、反射清类静态 map（生产无 reset 入口）
 
 **事件总线盲区（LynxView null under Robolectric）**【ADR-0174 D6 / research §2.6】：
-`publishFramesViaEvent`（ADR-0170:557-595）在 JVM 不可观测：`mContext instanceof LynxContext` + `ctx.getLynxView() != null` → Robolectric 下 `getLynxView() === null`（P4 实测）；M2 变异 9/9 绿。Resolution paths: (a) LynxView Robolectric shadow（需 `@Config(instrumentedPackages = "com.lynx.tasm")`，本仓零 shadow 先例）或 (b) 抽 event-bus 载荷构造为可测类。本阶段承认盲区（≤1 mutation test/release + android-e2e ≥4-segment 兜底）。
+`publishFramesViaEvent`（`PictelioTranslateModule.java`）在 JVM 不可观测：`mContext instanceof LynxContext` + `ctx.getLynxView() != null` → Robolectric 下 `getLynxView() === null`（P4 实测）；M2 变异 9/9 绿。Resolution paths: (a) LynxView Robolectric shadow（需 `@Config(instrumentedPackages = "com.lynx.tasm")`，本仓零 shadow 先例）或 (b) 抽 event-bus 载荷构造为可测类。本阶段承认盲区（≤1 mutation test/release + android-e2e ≥4-segment 兜底）。
 _Avoid_: 用 mock LynxView（副作用未知）、跳过总线盲区（不让 CI 看到这块）
 
 **M1/M2 变异测试**【ADR-0174 §后果；AGENTS.md 测试硬约束 #2 真实样例 + #6 期望值溯源】：
@@ -603,7 +603,7 @@ _Avoid_: 将 IFR 作为滚动跟手/交互性能手段；关掉它换取 bundle 
 app-lynx 现状的**自研内存路由**（`src/router.ts` `_state` + `_history` + `<component :is>`，路由语义与 vue-router 对齐、无 URL 环境）将迁移为**官方 vue-router `createMemoryHistory()`**（ADR-0066/ADR-0049 语义保持；迁移可行性双端实证见 `docs/research/vue-router-migration-feasibility.md`）。官方特殊性仅两点：初始位置为 nowhere（须手动指定**首启动点**）+ 无 URL 环境；memory 下 `history.state` 是**每条目可携带的数据**（`push(to, data?)` 第二参数），不是浏览器 `{back, current, forward}` 结构。_Avoid_: 继续维护自研路由、把 RouterView 空白归因 vue-router 兼容性（根因 = kebab-case 陷阱，见下）
 
 **首帧内容化（first-frame content）**【2026-09-03 新增，vue-router 迁移】：
-启动首帧直接渲染「发现」页（骨架屏）、不等登录态恢复（#61/#63）；未登录由 initRouter 收敛 replace 到 /login（不入栈）。迁移后 = 模块顶层同步 `router.replace(DISCOVER_PATH)`（`router.ts:189`，`DISCOVER_PATH = '/discover'`，`router.ts:29`；memory history 无自动初始导航，此即**首启动点**）。⚠️ 【2026-10-03 ADR-0218 维度重构】首帧路由**已由 `/recommended` 改为 `/discover`**，原推荐轮播组件 `Recommended.vue` 现挂在 `/discover` 上（页面内容未变，变的是外环语义：插画/小说已降为页内二级 tab）。_Avoid_: 首帧前 await restoreToken（登录页闪屏回归）、用 push 定起点（登录页被返回可达）、把首帧路径写回 `/recommended`
+启动首帧直接渲染「发现」页（骨架屏）、不等登录态恢复（#61/#63）；未登录由 initRouter 收敛 replace 到 /login（不入栈）。迁移后 = 模块顶层同步 `router.replace(DISCOVER_PATH)`（`router.ts` 的模块顶层与 `initRouter` 各一处，`DISCOVER_PATH = '/discover'` 由同文件导出；memory history 无自动初始导航，此即**首启动点**）。⚠️ 【2026-10-03 ADR-0218 维度重构】首帧路由**已由 `/recommended` 改为 `/discover`**，原推荐轮播组件 `Recommended.vue` 现挂在 `/discover` 上（页面内容未变，变的是外环语义：插画/小说已降为页内二级 tab）。_Avoid_: 首帧前 await restoreToken（登录页闪屏回归）、用 push 定起点（登录页被返回可达）、把首帧路径写回 `/recommended`
 
 **返回裁决链（back decision chain）**【2026-09-03 新增】：
 系统返回的逐级裁决：**modalStack 弹层 → 返回守卫 → `meta.backBehavior:'exit'` → `hasBackEntry()` 有历史则 `router.back()` → 无历史提示「再按一次退出应用」+ 2s 窗口 exit**。入口 = 系统返回桥（原生 `LynxActivity` `OnBackPressedDispatcher`，返回键/侧滑同路径 → 全局事件 `pictelioBack` → JS `handleSystemBack`；ADR-0066，迁移原生侧不动）。旧等价物 `evaluateBackRoute`（routerCore 纯函数）顺序不变，仅③④实现来源换 vue-router 等价物。_Avoid_: 重排裁决顺序（modalStack 最前；exit 页不允许回退到已失效会话）
@@ -726,7 +726,8 @@ _Avoid_: 用 `navigator.clipboard`（运行时不存在的对象，可选链会�
 _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `word`、为含空格标签自造引号语法
 
 **用户搜索范围（User search scope）**【2026-10-16 新增，#1023，spec `docs/specs/search-user-scope.md`，ADR-0132 §4 修订】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
-搜索范围的**第四档**，端点 `GET /v1/search/user`——这是上面「画师名必须走独立端点」在产品面的落地。请求**只带 `word` / `filter=for_ios` / `sort` 三个参数**：用户端点不消费 `search_target`，也不消费任何筛选参数（期间/收藏数/比例/分辨率/AI 覆盖全部不适用，UI 上隐藏整个筛选折叠区）。响应顶层只有两个键：`user_previews`（每条 = `user` + `illusts` + `novels` + `is_muted`，即**用户行 + 少量作品预览**）与 `next_url`（该端点自己的游标，单游标推进）。
+搜索范围的**第四档**，端点 `GET /v1/search/user`——这是上面「画师名必须走独立端点」在产品面的落地。请求**只带 `word` / `filter=for_ios` / `sort` 三个参数**。⚠️ **「用户端点不消费 `search_target`」是危险措辞，必须按「必须不发」写**（2026-10-17 一手反向实测订正；口径见 spec `docs/specs/search-user-scope.md` §5.1 与 `docs/specs/search-advanced-filters.md` §3.2、一手记录 `docs/research/pixiv-appapi-search-filter-params.md` §11.3）：该端点对它做**枚举校验**，传**任何**值（空串 / `partial_match_for_tags` / `exact_match_for_tags` / `title_and_caption` / 非法值 `zzz`）一律 **HTTP 400**；对照的不相关**未知参数名**（`foo=bar`）返回 **200 且结果不变** ⇒ 它**校验已识别参数、忽略未识别参数**，不是来者不拒。「不消费」读起来像「发了无害」，实测是**「发了必失败」**——下游 agent 读到「不消费」就可能认为可以随手带上该参数。
+⚠️ **其余筛选参数（期间/收藏数/比例/分辨率/AI 覆盖，全部不适用、UI 上隐藏整个筛选折叠区）的依据与上面不同**：实测**未发** + 第三方实现同款（pixez `getSearchUser` / Mako `UserSearchEngine`），**尚未做反向实验**——那次反向实验只针对 `search_target` 一个参数，**不要借它的 400 结论给这批参数盖上「已实测」的章**。⚠️ **`merge_plain_keyword_results` 置信度已下调**（2026-10-17 实测）：illust / novel / user **三端**传 `true` / `false` / 不传**结果都不变**（无可观测效果），**恒发行为保持不变**（无害 + 对齐第三方 + 既有实现零 diff），只降级声明强度。响应顶层只有两个键：`user_previews`（每条 = `user` + `illusts` + `novels` + `is_muted`，即**用户行 + 少量作品预览**）与 `next_url`（该端点自己的游标，单游标推进）。
 两个响应面的坑（一手实测 2026-10-16，脚本 `docs/research/verify-search-user-api.sh`，fixture `packages/app-lynx/src/api/__fixtures__/search-users.json`）：
 1. **`user` 是轻量对象、无 `profile`**——没有 `total_follow_users` / `total_illusts` / `total_followers`（那些只在 `/v1/user/detail`）⇒ **用户行不得渲染粉丝数/作品数**；要显示须二次请求 `getUserDetail`。
 2. **`profile_image_urls` 只有 `medium`**（无 `px_16x16` / `px_50x50` / `px_170x170`）⇒ 头像只取 `medium`；`UserRow.vue` 既有 `medium || px_170x170` 回退分支在这条路径上走不到 `medium` 之外（无害冗余）。
@@ -734,13 +735,18 @@ _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `w
 _Avoid_: 从 user 行读粉丝/作品数（字段不存在）、用 `word` 端点找画师名（标签与画师名互斥，见上）
 
 **搜索目标档位（Search target mode）**【2026-10-17 新增，#1028，spec `docs/specs/search-target-mode.md`】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
-搜索弹层里用户可选的**匹配方式**三档——标签部分一致（`partial`）/ 标签完全一致（`exact`）/ 标题·说明（`title_and_caption`），行位置在筛选折叠区第一行（与官方「検索オプション」同一容器）。⚠️ 它**不是** API 的 `search_target` 原始值（原始值是 `partial_match_for_tags` / `exact_match_for_tags` / `title_and_caption`），两者的映射**两端不对称**：标签部分一致在插画端是**整个参数不传**、在小说端必须**显式发** `partial_match_for_tags`。标题·说明档在小说端**不被识别属推断**（未实测）⇒ 小说端置灰、值保留不发。标签部分一致是默认档，也是唯一大小写归一成立的档（见下条）。scope=user 时整个筛选折叠区已隐藏，用户端点不消费 `search_target`。
-_Avoid_: 按 `word` 是否含空格推导档位（已移除；含空格不再被强制成「标签完全一致」）、在小说端省略 `partial_match_for_tags`、宣称标题·说明档在小说端可用
+搜索弹层里用户可选的**匹配方式**三档——标签部分一致（`partial`）/ 标签完全一致（`exact`）/ 标题·说明（`title_and_caption`），行位置在筛选折叠区第一行（与官方「検索オプション」同一容器）。⚠️ 它**不是** API 的 `search_target` 原始值（原始值是 `partial_match_for_tags` / `exact_match_for_tags` / `title_and_caption`），两者的映射**两端不对称**：标签部分一致在插画端是**整个参数不传**、在小说端必须**显式发** `partial_match_for_tags`。标签部分一致是默认档，也是唯一大小写归一成立的档（见下条）。
+⚠️ **插画端取「不传」是保守选择，不是已证实的必需**（2026-10-17 一手实测订正）：旧表述「显式传 partial 会转成严格标签匹配并丢掉关键字/标题命中」出自 **Shaft #906 的第三方源码推断，本次一手实测未复现**——四组组合（omit / 显式 partial / `merge_plain_keyword_results=true` / 两者并用）在 3 检索词 × 2 轮**交错**采样下 **ID 序列 md5 完全相同**；决定性反证是多词 `Rosmontis rosemary` 在 omit 与显式 partial 下**同为 4 条**而 `exact` 是 1 条。**映射维持「不传」不变**，理由已从「显式发会坏行为」降级为「不依赖未经证实的差异」。
+⚠️ **标题·说明档在小说端是「实测被拒」，不是「不被识别」**（2026-10-17 交错 2 轮一手实测，端点 `/v1/search/novel`、word=東方）：省略 `search_target` → **200 / 30 条**；显式发 `search_target=title_and_caption` → **HTTP 400 / 0 条**；`search_target=partial_match_for_tags` 与未知参数名 `foo=bar`（对照）均 **200 / 30 条**。对照组说明**不是「参数名不被认识」而是服务端明确拒绝该取值** ⇒ 本词条原写的「不被识别属推断（未实测）」**低估了后果强度** ⇒ 小说端置灰保值挡的**不是「服务端没实现所以无害」而是「一次 HTTP 400」**：一旦置灰保值逻辑哪天回归、小说端开始真发这个参数，**每一次小说搜索都会直接失败**。旧推断证据（Mako `SearchNovelTagMatchOption` 只有 partial/exact/text/keyword、官方帮助中心未列该档）保留作历史留痕。
+⚠️ **任何「A/B 序列相同/不同」的断言与任何复跑都必须交错采样**（A、B、A、B…，口径见 spec `docs/specs/search-target-mode.md` §4.1）：插画端结果集**随时间漂移**——同一查询连续采样，首位 ID 从 150944641 漂到 150944731（秒级内稳定），顺序采样（A 全跑完再跑 B）会把漂移误读成参数差异、产生**方向完全相反的假差异**；交错采样下 md5 **相同**只说明该组合在本轮**无可观测效果**。
+scope=user 时整个筛选折叠区已隐藏，且用户端点对 `search_target` 做**枚举校验、任何取值皆 400** ⇒ **必须不发**（不是「不消费」；见上面「用户搜索范围」词条）。
+_Avoid_: 按 `word` 是否含空格推导档位（已移除；含空格不再被强制成「标签完全一致」）、在小说端省略 `partial_match_for_tags`、宣称标题·说明档在小说端可用、在 scope=user 下带 `search_target`（实测任何取值皆 **400**）、用「端点不消费它」当不发的理由（真实理由是**发了就 400**，措辞方向相反）、以「显式传 partial 会坏行为」当已证实事实（本次实测未复现，映射不变只是保守选择）
 
 **查询语法透传（Query syntax passthrough）**【2026-10-17 新增，#1028，spec `docs/specs/search-target-mode.md` §7.2】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
-搜索词里的**布尔语法由 pixiv 服务端解析**——空格 = AND、`OR` = 或、`-` 前缀 = 排除、`( )` = 嵌套、全角与半角等价（上面「关键词的两个硬约束」的第 1 条即其中一条）。本仓**只把用户原始 `word` 透传**，不做客户端解析。弹层在输入框正下方给一行提示，**只提示、不校验、不拦截输入**。一手实测（2026-10-16，插画 / 小说双端点 × 四个 `search_target` 档全部成立）：`docs/research/verify-query-syntax.sh` + 结论摘要 `docs/research/pixiv-query-syntax-verified-2026-10.md`。
+搜索词里的**布尔语法由 pixiv 服务端解析**——空格 = AND、`OR` = 或、`-` 前缀 = 排除、`( )` = 嵌套、全角与半角等价（上面「关键词的两个硬约束」的第 1 条即其中一条）。本仓**只把用户原始 `word` 透传**，不做客户端解析。弹层在输入框正下方给一行提示，**只提示、不校验、不拦截输入**。一手实测（2026-10-16，插画 / 小说双端点 × **可被服务端接受的** `search_target` 档成立；小说端 `title_and_caption` 实测被拒 HTTP 400，不计入「成立」）：`docs/research/verify-query-syntax.sh` + 结论摘要 `docs/research/pixiv-query-syntax-verified-2026-10.md`。
 ⚠️ **大小写归一只在标签部分一致 / 不传档成立**——标签完全一致档实测大小写敏感 ⇒ 提示文案**不得承诺「大小写无关」**。
-_Avoid_: 客户端拼装/解析查询串（与服务端语义重复且易漂移）、在提示文案里写「大小写无关」
+⚠️ **复跑该脚本必须交错采样**：结论表里任何跨组比对都受上面「插画端结果集随时间漂移」约束——顺序采样会把漂移读成参数差异（口径与漂移证据见 spec `docs/specs/search-target-mode.md` §4.1）。
+_Avoid_: 客户端拼装/解析查询串（与服务端语义重复且易漂移）、在提示文案里写「大小写无关」、顺序采样跑 A/B 比对
 
 ### 图床缓存契约（Image host cache contract）
 
