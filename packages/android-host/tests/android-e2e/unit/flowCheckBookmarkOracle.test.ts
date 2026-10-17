@@ -33,7 +33,12 @@ const FLOW_SCRIPT = resolve(here, "../../../app-lynx/scripts/lynx-flow-check.sh"
 // 帧取 180×320 而不是真机尺寸：分析器是**纯 Python** 解 PNG 并逐像素扫，
 // 代价与像素数成正比。720×1280 的帧会让「14 组合逐个代入」那条用例跑 20s+，
 // 在默认 5s 超时下直接判红（实测：`pnpm test:all` 下就是这条红的）。
-// 缩到 1/4 面积后各判据的比例量（chip 占比）按构造不变——见 `frame` 的说明。
+//
+// ⚠️ 缩帧**不等价于**保真，差在两处**固定像素**量（早先这里写着「各判据的比例量按
+// 构造不变」，是错的，已订正）：采样窗 39×45 与粗扫步长 2px 都不随帧缩放，
+// 于是它们相对屏幕被放大了约 4 倍（窗高占比 13.75% vs 真机 3.5%，步长 1.1% vs 0.28%）。
+// 因此本文件的 share 是**夹具专属数值**，只用来钉住窗口几何，不与设备实测对齐；
+// 它对「分母用错」那类缺陷的判别力是真的（见 `frame` 说明与变异验证）。
 const W = 180;
 const H = 320;
 
@@ -104,15 +109,32 @@ function analyzeChip(png: Buffer): Record<string, unknown> {
 /**
  * 画面：深色底 + 一块红色插画（模拟推荐流）+ 一颗 chip 胶囊。
  *
- * `chipHeightFrac` = chip 的纵向高度占屏高的比例。判据的扫描域是 y ≥ 0.45H 的
- * 下半部（推荐流收藏胶囊落在那里），故 chip 的**占比**随这个值线性变化：
- * 0.30 → 约 0.25（过阈），0.03 → 约 0.025（不过阈）。
+ * ⚠️ **chip 必须按真实比例画**（spec `docs/specs/bookmark-color.md` 的 2026-09-21
+ * web-core 实测：chip 内容宽约屏宽 13%、高约屏高 4.4%）。本夹具早先把它画成占屏高
+ * 30%、宽 45% 的巨物，于是**结构上不可能**暴露判据的分母错配——真机上 share 只有
+ * 0.014（恒判 unknown），而这 10 条用例全绿。夹具比被测代码更假，是最隐蔽的一类假绿。
+ *
+ * chip 内部留一条**非 chip 色**的标签带，让 share 不恒为 1.0（否则阈值成了摆设）。
+ * 但请注意它**复现不了**设备实测的 0.308：本帧里 chip 高 14px、采样窗高 45px，
+ * 窗比 chip 高 3 倍，命中量由几何决定（见下方用例的逐项推导），与标签带无关。
+ *
+ * `chipHeightFrac` / `chipWidthFrac` 用于**故意做小**来验证占比下限真的起作用。
  */
-function frame(chip: Rgb, opts: { redArt?: boolean; chipHeightFrac?: number } = {}): Buffer {
-  const chipH = H * (opts.chipHeightFrac ?? 0.3);
+function frame(
+  chip: Rgb,
+  opts: { redArt?: boolean; chipHeightFrac?: number; chipWidthFrac?: number } = {},
+): Buffer {
+  const chipH = H * (opts.chipHeightFrac ?? 0.044);
+  const chipW = W * (opts.chipWidthFrac ?? 0.13);
+  const labelH = Math.max(2, Math.round(chipH * 0.2));
   return encodePng((x, y) => {
     // chip 画在画面下半部左侧（推荐流收藏胶囊的位置）
-    if (y > H * 0.7 && y < H * 0.7 + chipH && x < W * 0.45) {
+    if (y > H * 0.7 && y < H * 0.7 + chipH && x < chipW) {
+      // 中间一条标签带：非 chip 色 ⇒ 窗口内占比 < 1（阈值 0.15 才有判别意义）
+      const inChip = y > H * 0.7 && y < H * 0.7 + chipH;
+      if (inChip && y - H * 0.7 > chipH * 0.4 && y - H * 0.7 < chipH * 0.4 + labelH) {
+        return [200, 200, 200];
+      }
       return chip;
     }
     if (opts.redArt && y > H * 0.2 && y < H * 0.6 && x > W * 0.6) {
@@ -148,6 +170,19 @@ describe("flow-check 收藏 chip 判据（#709）", () => {
     const r = analyzeChip(frame(BOOKMARKED));
     expect(r.state).toBe("bookmarked");
     expect(r.bg).toBe("#3b6470");
+    // 窗口确实落在 chip 上（而非落在空背景上被判成「占比恰好过阈」）。
+    //
+    // ⚠️ 这不是设备实测值的复现，而是**窗口几何的余量登记**，逐项可算：
+    //   夹具   chip 高 14px（屏高 4.4%）、宽 23px；粗扫步长 2px 命中 7 行 × 12 列
+    //          ⇒ 质心 cy=232、cx=18.86
+    //   细测窗 y=210..254 步长 4 共 12 行、x=-1..35 步长 4（-1 出画）共 8 列 ⇒ 分母 96
+    //   命中   chip 占 y=225..238，其中 226/234/238 三行落在 chip 色（230 命中标签带）
+    //          且 x≤23 的 6 列 ⇒ 18
+    //   ⇒ 18/96 = 0.1875
+    // 早先这里写的是 `toBeGreaterThan(0.5)`，实测 0.188 —— **断言凭感觉拍的，无出处**。
+    // 别拿它去对齐设备实测的 0.308：那边采样窗只占屏高 3.5%、比 chip（4.4%）还矮，
+    // 几何完全不同。窗口常量一漂，这个数就跟着动，这正是它要抓的东西。
+    expect(r.share as number).toBeCloseTo(0.1875, 2);
   });
 
   it("画面里有大片红色插画时也**不会**判成 chip（旧的红像素定位会被骗）", () => {

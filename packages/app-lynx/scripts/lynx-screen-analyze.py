@@ -362,6 +362,13 @@ def read_chip_tokens(tokens_css):
 CHIP_TOLERANCE = 24
 # 窗口内 chip 实色占比下限（设备实测已收藏态 0.308 / 未收藏 0，取 0.15 留余量）
 CHIP_MIN_SHARE = 0.15
+# 采样窗口半宽/半高/步长：与 packages/android-host/tests/android-e2e/bookmark-chip.ts
+# 的 WINDOW_HALF_WIDTH / WINDOW_HALF_HEIGHT / WINDOW_STEP **逐字一致**。
+# ⚠️ 这三个常量必须与 TS 版同步：占比的分母是**窗口内**采样点数（120），
+# 不是整个卡片区网格。两者同用 0.15 阈值但分母差两个数量级时，真机会恒判 unknown。
+CHIP_WIN_HALF_W = 19
+CHIP_WIN_HALF_H = 22
+CHIP_WIN_STEP = 4
 
 
 def bookmark_chip(w, h, rows, tokens_css):
@@ -375,6 +382,10 @@ def bookmark_chip(w, h, rows, tokens_css):
     已收藏 `--md-tertiary`，spec docs/specs/bookmark-color.md §配色），
     14 个组合里没有一个是红的；而推荐流的作品图里**到处是红**——
     旧定位器于是会去点画上的红色插画，然后报「收藏未生效」。
+
+    两段式：**粗扫**在卡片区找 chip 令牌色的像素团并取质心（定位），
+    **细测**在质心周围的固定窗口内按精确 RGB 分组取众数（判态）。
+    占比的分母是窗口内采样点数，与 TS 版同口径。
     """
     tokens = read_chip_tokens(tokens_css)
     if not tokens:
@@ -383,32 +394,66 @@ def bookmark_chip(w, h, rows, tokens_css):
     def near(c, t):
         return abs(c[0] - t[0]) + abs(c[1] - t[1]) + abs(c[2] - t[2]) <= CHIP_TOLERANCE
 
-    # 候选：任一 chip 令牌色的像素，按颜色分组统计面积。
-    # 「卡片区」= 屏幕下半部（推荐流轮播卡 + 收藏胶囊都落在那里）；
-    # 不用「红色」等任何色相条件，作品图不会因此被选中。
+    def matchable(c):
+        return any(near(c, t["tertiary"]) or near(c, t["inverse"]) for t in tokens)
+
+    # 粗扫：卡片区（屏幕下半部，推荐流轮播卡 + 收藏胶囊都落在那里）内找 chip 令牌色像素，
+    # 按精确 RGB 分组并累加质心。不用「红色」等任何色相条件，作品图不会因此被选中。
     y_lo = int(h * 0.45)
     colors = {}
     for y in range(y_lo, h, 2):
         for x in range(0, w, 2):
             c = pixel(rows, y, x)
-            if any(near(c, t["tertiary"]) or near(c, t["inverse"]) for t in tokens):
-                key = c
-                e = colors.get(key)
-                if e is None:
-                    colors[key] = [1, x, y]
-                else:
-                    e[0] += 1
+            if not matchable(c):
+                continue
+            e = colors.get(c)
+            if e is None:
+                colors[c] = [1, x, y]
+            else:
+                e[0] += 1
+                e[1] += x
+                e[2] += y
     if not colors:
         return {"x": None, "y": None, "state": "unknown", "reason": "卡片区未检出 chip 实色"}
 
-    bg, (n, sx, sy) = max(colors.items(), key=lambda kv: kv[1][0])
-    share = n / float(len(range(y_lo, h, 2)) * len(range(0, w, 2)))
+    _, (n, sum_x, sum_y) = max(colors.items(), key=lambda kv: kv[1][0])
+    cx = sum_x // float(n)
+    cy = sum_y // float(n)
+
+    # 细测：质心周围的固定窗口内，可匹配像素按精确 RGB 分组，取众数。
+    groups = {}
+    total = 0
+    for y in range(int(cy) - CHIP_WIN_HALF_H, int(cy) + CHIP_WIN_HALF_H + 1, CHIP_WIN_STEP):
+        if y < 0 or y >= h:
+            continue
+        for x in range(int(cx) - CHIP_WIN_HALF_W, int(cx) + CHIP_WIN_HALF_W + 1, CHIP_WIN_STEP):
+            if x < 0 or x >= w:
+                continue
+            total += 1
+            c = pixel(rows, y, x)
+            if not matchable(c):
+                continue
+            groups[c] = groups.get(c, 0) + 1
+    if total == 0:
+        return {"x": None, "y": None, "state": "unknown", "reason": "采样窗口完全落在画面外"}
+
+    bg, best_n = max(groups.items(), key=lambda kv: kv[1]) if groups else (None, 0)
+    share = best_n / float(total)
+    if bg is None:
+        return {
+            "x": int(cx),
+            "y": int(cy),
+            "bg": None,
+            "share": round(share, 3),
+            "state": "unknown",
+            "reason": f"窗口内 chip 实色占比 {share:.3f} < {CHIP_MIN_SHARE}",
+        }
     marked = [t["theme"] for t in tokens if near(bg, t["tertiary"])]
     unmarked = [t["theme"] for t in tokens if near(bg, t["inverse"])]
     if share < CHIP_MIN_SHARE:
         return {
-            "x": sx,
-            "y": sy,
+            "x": int(cx),
+            "y": int(cy),
             "bg": "#%02x%02x%02x" % bg,
             "share": round(share, 3),
             "state": "unknown",
@@ -421,8 +466,8 @@ def bookmark_chip(w, h, rows, tokens_css):
     else:
         state = "unknown"
     return {
-        "x": sx,
-        "y": sy,
+        "x": int(cx),
+        "y": int(cy),
         "bg": "#%02x%02x%02x" % bg,
         "share": round(share, 3),
         "state": state,

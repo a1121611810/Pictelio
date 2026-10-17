@@ -152,7 +152,10 @@ for attempt in 1 2 3; do
   FAV_OK="yes"
   # 还原基线：推荐内容常已是已收藏态，点回原态，避免脚本给账号留痕
   adb shell input tap "$CX" "$CY"; sleep 2
-  RESTORED=$($ANALYZE /tmp/flow_fav.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
+  # ⚠️ 必须**重新截图**：复用上面那张等于把「点完就确认」变成「点前就确认」——
+  #   旧帧的 AST 与 CST 已知不等，判定恒假，而 tap 其实已经真实发出。
+  shot fav_restore
+  RESTORED=$($ANALYZE /tmp/flow_fav_restore.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
   RST=$(echo "$RESTORED" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
   [ "$RST" = "$CST" ] && echo "   ✓ 已还原基线态（$RST）" || echo "   ⚠️ 还原未确认（当前 $RST，期望 $CST）——不阻断"
   break
