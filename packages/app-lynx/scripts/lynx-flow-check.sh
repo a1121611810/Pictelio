@@ -82,71 +82,86 @@ fi
 echo "   ✓ 登录成功，进入推荐页"
 
 # ─── SETTINGS_ONLY=1：跳过中间回归步骤（收藏/详情/小说/R18），直接验证设置页滚动（issue #90 核心）。
-# 中间步骤依赖真实推荐内容视觉特征（红色插画干扰 ♥ 定位）+ BACK 导航，模拟器上偶发不稳定，
+# 中间步骤依赖真实推荐内容 + BACK 导航，模拟器上偶发不稳定，
 # 属测试基建脆弱性而非 app 缺陷（web-core E2E 与多轮 flow 已验证 app 功能正常）。
+# ⚠️ 必须声明在 `SKIP_MID` 守卫**之外**：脚本开了 `set -u`，而末尾的汇总行会读这三个
+# 变量。SETTINGS_ONLY=1（跳过中间回归步骤的旁路）时它们从未被赋值 ⇒ 未绑定变量直接
+# 让脚本 exit ——旁路反而成了硬失败。这是 #709 接线时踩到的，靠「声明前置」修掉。
+FAV_NOTE=""
+FAV_STATE=""
+FAV_OK=""
 SKIP_MID="${SETTINGS_ONLY:-}"
 if [ -z "$SKIP_MID" ]; then
 
-echo "════ 2. 卡片收藏（动态定位 ♥，内容敏感失败重试） ════"
-# 收藏是回归链路非核心项：真实推荐内容随机（红色插画干扰 ♥ 像素定位），
-# 重试 3 次；仍失败仅警告（app 功能经 flow 多轮验证正常，此处是测试定位脆弱性）。
-FAV_OK=""
+echo "════ 2. 卡片收藏（动态定位收藏 chip，判据配色无关） ════"
+# 收藏是回归链路非核心项：不阻断。
+#
+# ⚠️ #709 **判据订正**：本步原先做两件**都只认红色**的事，且两件都失效：
+#   ① 定位 ♥ = 全屏扫「红像素 + 周围有白色邻域」——chip 底色是 M3 令牌实色
+#      （未收藏 `--md-inverse-surface` / 已收藏 `--md-tertiary`，见 spec
+#      docs/specs/bookmark-color.md §配色），**14 个主题组合里没有一个是红的**；
+#      而推荐流的作品图里到处是红 ⇒ 定位器会去点画上的红色插画（点错位置）。
+#   ② 确认生效 = 比较全屏红像素计数是否增加 —— 点 chip 根本不改变任何红色像素
+#      ⇒ 3 次重试后恒定输出「⚠️ 收藏未生效」，读起来像产品回归而其实不是。
+# 现改为：定位与确认都读**胶囊底色对应的 M3 令牌**（令牌表由 lynx-screen-analyze.py
+# 运行时解析 src/styles/tokens.css，不在本脚本硬编码任何色值）。
+#
+# 三态而不是「成功/失败」：判不出时（unknown）报「本轮未验证」并给原因，
+# **绝不**输出确定性的「收藏未生效」——那是本仓反复吃亏的那类假阴性。
 for attempt in 1 2 3; do
-  shot rec1   # 收藏前基准（登录后的推荐页顶部）
-  R0=$(red rec1)
-  HEART=$(python3 - scripts/lynx-screen-analyze.py <<'PYEOF' || true
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location('a', sys.argv[1])
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-w, h, rows = m.load_png('/tmp/flow_rec1.png')
-cands = []
-for y in range(0, h, 2):
-    for x in range(0, w, 2):
-        r, g, b = m.pixel(rows, y, x)
-        if not (r > 150 and g < 100 and b < 100):
-            continue
-        light = 0
-        for dx, dy in [(14, 0), (-14, 0), (0, 14), (0, -14), (10, 10), (-10, 10), (10, -10), (-10, -10)]:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < w and 0 <= ny < h:
-                nr, ng, nb = m.pixel(rows, ny, nx)
-                if m.is_whiteish(nr, ng, nb):
-                    light += 1
-        if light >= 5:
-            cands.append((x, y))
-if not cands:
-    print("")
-    sys.exit(0)
-cands.sort(key=lambda p: (p[1], p[0]))
-clusters = []
-cur = [cands[0]]
-for p in cands[1:]:
-    if p[1] - cur[-1][1] <= 40:
-        cur.append(p)
-    else:
-        clusters.append(cur)
-        cur = [p]
-clusters.append(cur)
-top = clusters[0]
-left = [p for p in top if p[0] < w * 0.55]
-sel = left or top
-print(f"{sum(p[0] for p in sel) // len(sel)} {sum(p[1] for p in sel) // len(sel)}")
-PYEOF
-)
-  if [ -z "$HEART" ]; then echo "   ⚠️ 第 $attempt 次未找到 ♥"; continue; fi
-  set -- $HEART
-  echo "   ♥ 定位: ($1,$2)"
-  adb shell input tap $1 $2; sleep 2
-  shot fav
-  R1=$(red fav)
-  echo "   收藏红像素 $R0 → $R1"
-  if [ "$R1" -gt "$R0" ]; then
-    echo "   ✓ 收藏成功（红 $R0 → $R1）"
-    FAV_OK="yes"
-    break
+  shot rec1
+  CHIP=$($ANALYZE /tmp/flow_rec1.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
+  CX=$(echo "$CHIP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('x') or '')" 2>/dev/null || echo "")
+  CY=$(echo "$CHIP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('y') or '')" 2>/dev/null || echo "")
+  CST=$(echo "$CHIP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
+  CBG=$(echo "$CHIP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('bg',''))" 2>/dev/null || echo "")
+  if [ -z "$CX" ] || [ -z "$CY" ]; then
+    FAV_NOTE="第 $attempt 次未在卡片区定位到收藏 chip（$(echo "$CHIP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('reason','无返回'))" 2>/dev/null || echo 无返回)）"
+    echo "   ⚠️ $FAV_NOTE"
+    continue
   fi
+  echo "   收藏 chip 定位: ($CX,$CY) 底色 $CBG → 初始态 $CST"
+  case "$CST" in
+    bookmarked|not-bookmarked) ;;
+    *)
+      FAV_NOTE="chip 底色 $CBG 判不出收藏态（两族令牌都命中或都没命中 ⇒ 该配色下不可分）"
+      echo "   ⚠️ 第 $attempt 次：$FAV_NOTE"
+      continue
+      ;;
+  esac
+  adb shell input tap "$CX" "$CY"; sleep 2
+  shot fav
+  AFTER=$($ANALYZE /tmp/flow_fav.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
+  AST=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
+  ABG=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('bg',''))" 2>/dev/null || echo "")
+  echo "   点击后 chip 底色 $CBG → $ABG，判出态 $AST"
+  if [ "$AST" = "$CST" ]; then
+    # 状态读得出来且没变：tap 没命中 chip（或收藏写入失败）。这是**真观测**，
+    # 不是「判不出」，所以可以给确定结论。
+    FAV_NOTE="点击后 chip 底色未变（$CBG → $ABG）——tap 未命中 chip 或收藏写入失败"
+    echo "   ⚠️ 第 $attempt 次：$FAV_NOTE"
+    continue
+  fi
+  if [ "$AST" != "bookmarked" ] && [ "$AST" != "not-bookmarked" ]; then
+    FAV_NOTE="点击后 chip 底色判不出态（$ABG）——本轮不可判定"
+    echo "   ⚠️ 第 $attempt 次：$FAV_NOTE"
+    continue
+  fi
+  echo "   ✓ 收藏态切换成功（$CST → $AST，底色 $CBG → $ABG）"
+  FAV_STATE="$CST → $AST"
+  FAV_OK="yes"
+  # 还原基线：推荐内容常已是已收藏态，点回原态，避免脚本给账号留痕
+  adb shell input tap "$CX" "$CY"; sleep 2
+  RESTORED=$($ANALYZE /tmp/flow_fav.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
+  RST=$(echo "$RESTORED" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
+  [ "$RST" = "$CST" ] && echo "   ✓ 已还原基线态（$RST）" || echo "   ⚠️ 还原未确认（当前 $RST，期望 $CST）——不阻断"
+  break
 done
-[ -n "$FAV_OK" ] || echo "   ⚠️ 收藏未生效（3 次重试仍失败）——不阻断（回归项）"
+if [ -z "$FAV_OK" ]; then
+  # ⚠️ 这里**不能**再写「收藏未生效」：多数情况下本轮只是判不出或没定位到，
+  # 与产品行为无关。措辞按 #819 既有的 skip-with-reason 口径（见 qa-defense-lines）。
+  echo "   ⏭ 本轮未验证：${FAV_NOTE:-三次尝试均未取得可判定的 chip 态}（本步为回归项，不阻断）"
+fi
 
 echo "════ 3. 推荐页滚动加载 ════"
 shot rec1; C1=$(colored rec1)
@@ -336,7 +351,15 @@ echo "   滚回顶部后红色像素：$R_TOP2（应回落）"
 
 echo ""
 echo "════════ 完整流程结果 ════════"
-echo "✅ 全部通过：登录 → 推荐滚动 → 卡片收藏 → 插画详情 → 小说 → 我的/R18 → 设置页滚动"
+# ⚠️ 收藏步是回归项、非阻断，且 #709 之后可能落在「本轮未验证」而不是「通过」。
+# 这里**不能**把它和其余步骤并列写进「全部通过」——那正是本仓反复吃亏的
+# 「日志宣称验证了实际未验证的事」。
+echo "✅ 已通过的阻断步骤：登录 → 推荐滚动 → 插画详情 → 小说 → 我的/R18 → 设置页滚动"
+if [ -n "$FAV_OK" ]; then
+  echo "✅ 卡片收藏：收藏态切换成功（$FAV_STATE）"
+else
+  echo "⏭ 卡片收藏：本轮未验证（${FAV_NOTE:-未取得可判定的 chip 态}）——回归项，不阻断"
+fi
 # [spec] 错误码断言：220201（illegal item-key → 小说列表空白根因）必须为 0；
 # 99900/990200 仅打印作参考（可能来自其他瞬时场景，不设断言避免误伤）
 echo "（错误码检查：220201 断言为 0；99900/990200 仅参考）"

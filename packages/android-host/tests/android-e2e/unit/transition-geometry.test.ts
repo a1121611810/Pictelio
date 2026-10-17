@@ -10,6 +10,7 @@ import {
   DARK_ROW_MAX_BRIGHTNESS,
   FAB_GEOMETRY_VW,
   MIN_BOOKMARK_SAMPLES,
+  NEAR_BLANK_FLAT_RATIO,
   belowAnchorRegion,
   bookmarkSampleRegion,
   contentHeightVw,
@@ -21,8 +22,10 @@ import {
   judgeContentLoaded,
   judgeNotTopWindow,
   notTopWindow,
+  regionColorStats,
   regionSamples,
   roundPx,
+  type ColorAt,
   type GrayAt,
   type Region,
 } from "../transition-geometry";
@@ -124,24 +127,89 @@ describe("belowAnchorRegion（R1 死像素稀释）", () => {
   });
 });
 
-describe("judgeContentLoaded（R2 桶数不可信）", () => {
-  it("桶数过阈 → loaded（实测最终帧桶数 88 > 25）", () => {
-    expect(judgeContentLoaded({ buckets: 88, minBuckets: 25, stable: false }).verdict).toBe(
-      "loaded",
-    );
+describe("regionColorStats（#821：桶数之外的第二个信号）", () => {
+  const FULL: Region = { x0: 0, y0: 0, x1: 1080, y1: 816 };
+
+  it("单色平涂 → flatRatio 恰为 1（构造性事实：唯一色桶吃掉全部采样点）", () => {
+    const fill: ColorAt = () => [32, 34, 38];
+    expect(regionColorStats(FULL, fill)).toEqual({ buckets: 1, flatRatio: 1 });
   });
 
-  it("桶数低但画面已稳定 → stable-but-low-buckets（放行，不误报超时）", () => {
-    // 实测骨架屏逐带桶数 1..5；但单张大图铺屏时桶数天然低 → 稳定即可放行
-    expect(judgeContentLoaded({ buckets: 23, minBuckets: 25, stable: true }).verdict).toBe(
-      "stable-but-low-buckets",
-    );
+  it("几块大色块 → flatRatio 落到各块份额的众数，远低于近空白阈值", () => {
+    // 三等分横带：每带 1/3 ⇒ flatRatio ≈ 1/3，且 buckets = 3
+    const bands: ColorAt = (_x, y) =>
+      y < 272 ? [30, 30, 30] : y < 544 ? [200, 200, 210] : [90, 60, 60];
+    const s = regionColorStats(FULL, bands);
+    expect(s.buckets).toBe(3);
+    expect(s.flatRatio).toBeLessThan(NEAR_BLANK_FLAT_RATIO);
+    expect(s.flatRatio).toBeGreaterThan(0.3);
+  });
+
+  it("实测口径（oracle = 本机 test-results 的真实决策帧，逐像素复算）", () => {
+    // 以下数字是对**同一轮真实运行**留在工作区的证据帧，用与实现同口径
+    // （步长 16、量化步长 24）在对应采样区上复算得到的，不是从实现反推的：
+    //   近空白（内容没加载出来）：
+    //     transition-matrix/loaded-r3-recommended.png × REGION_CAROUSEL_IMAGE → 0.853
+    //     transition-matrix/loaded-r1-illusts.png      × REGION_TOPREF        → 0.841
+    //     transition-matrix/loaded-r1-illusts.png      × REGION_RESULTS       → 0.797
+    //   低方差但**有**内容：
+    //     transition-matrix/loaded-r3-recommended.png × REGION_TOPREF        → 0.355
+    //     transition-matrix/loaded-r3-recommended.png × REGION_RESULTS       → 0.421
+    //   ↑ 第二组是本判据最硬的正样本：**同一张帧**的插画区是空白、信息条区有内容，
+    //     桶数 4 与 23（阈值 25）分居阈值两侧却曾落进同一分支 —— 这正是 #821 的混淆。
+    // 阈值 0.6 落在两组之间：距最低的空白样本 +33%，距最高的「有内容」样本 −30%。
+    expect(0.797).toBeGreaterThan(NEAR_BLANK_FLAT_RATIO);
+    expect(0.421).toBeLessThan(NEAR_BLANK_FLAT_RATIO);
+  });
+});
+
+describe("judgeContentLoaded（#821：近空白 ≠ 低方差有内容）", () => {
+  it("桶数过阈 → loaded（实测最终帧桶数 88 > 25）", () => {
+    expect(
+      judgeContentLoaded({ buckets: 88, minBuckets: 25, stable: false, flatRatio: 0.301 }).verdict,
+    ).toBe("loaded");
+  });
+
+  it("桶数 23、已稳定、单一色块占比 0.421 → 仍放行（低方差**有内容**，原行为保留）", () => {
+    // 0.421 = loaded-r3-recommended.png × REGION_RESULTS 实测（该区确有内容）。
+    // 这条同时是「假绿守卫」：若实现退回只看桶数与 stable，本条与下一条同分支，
+    // 断言仍会绿 —— 所以下一条才是真正卡住回归的那一条。
+    expect(
+      judgeContentLoaded({ buckets: 23, minBuckets: 25, stable: true, flatRatio: 0.421 }).verdict,
+    ).toBe("stable-but-low-buckets");
+  });
+
+  it("桶数 4、已稳定、单一色块占比 0.853 → near-blank（近空白，旧实现恒判放行）", () => {
+    // 0.853 = loaded-r3-recommended.png × REGION_CAROUSEL_IMAGE 实测（插画没加载出来）。
+    // 改动前本用例与上一条走同一分支、同一行、返回同一 verdict —— 输入集封闭导致
+    // 不可区分。现在必须分开。
+    expect(
+      judgeContentLoaded({ buckets: 4, minBuckets: 25, stable: true, flatRatio: 0.853 }).verdict,
+    ).toBe("near-blank");
+  });
+
+  it("桶数 6、已稳定、flatRatio 0.797 → near-blank（票面记的那一轮桶数）", () => {
+    expect(
+      judgeContentLoaded({ buckets: 6, minBuckets: 25, stable: true, flatRatio: 0.797 }).verdict,
+    ).toBe("near-blank");
+  });
+
+  it("近空白但仍在变化 → loading（继续等，不提前判死）", () => {
+    expect(
+      judgeContentLoaded({ buckets: 4, minBuckets: 25, stable: false, flatRatio: 0.853 }).verdict,
+    ).toBe("loading");
+  });
+
+  it("桶数过阈时即使单一色块占比极高也判 loaded —— 富内容可以只有很少的桶", () => {
+    expect(
+      judgeContentLoaded({ buckets: 9, minBuckets: 25, stable: true, flatRatio: 0.5 }).verdict,
+    ).toBe("stable-but-low-buckets");
   });
 
   it("桶数低且仍在变化 → loading（真的没加载完，继续等）", () => {
-    expect(judgeContentLoaded({ buckets: 3, minBuckets: 25, stable: false }).verdict).toBe(
-      "loading",
-    );
+    expect(
+      judgeContentLoaded({ buckets: 3, minBuckets: 25, stable: false, flatRatio: 0.12 }).verdict,
+    ).toBe("loading");
   });
 });
 

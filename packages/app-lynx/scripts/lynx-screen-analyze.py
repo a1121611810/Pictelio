@@ -318,6 +318,119 @@ def page_state(w, h, rows):
     return {"state": "blank", "image_ratio": round(ratio, 3)}
 
 
+def read_chip_tokens(tokens_css):
+    """从 tokens.css 解析收藏 chip 两态底色（#709）。
+
+    返回 [{theme, tertiary:(r,g,b), inverse:(r,g,b)}]。**运行时解析**而不是硬编码色值：
+    配色一改这里自动跟随 —— 旧判据（按青度找已收藏色）失效的根因就是「判据里钉死了
+    某个色板的值」。7 主题 × 明暗 = 14 个组合，只有 3 个（sky/green/bili 亮色板）
+    的 tertiary 偏青，其余全部判不出「已收藏」。
+    """
+    import re
+
+    with open(tokens_css, "r", encoding="utf-8") as f:
+        css = f.read()
+    css = re.sub(r"/\*[\s\S]*?\*/", " ", css)  # 注释会混进「选择器」，必须先剥
+    out = {}
+    for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        sel = " ".join(sel.split())
+        t = re.search(r"--md-tertiary:\s*(#[0-9a-fA-F]{6})\s*;", body)
+        inv = re.search(r"--md-inverse-surface:\s*(#[0-9a-fA-F]{6})\s*;", body)
+        if not t or not inv:
+            continue
+        name = re.search(r"\.theme-([\w-]+)", sel)
+        if not name:
+            continue
+        dark = bool(re.search(r"\.theme-[\w-]+\.dark\b", sel))
+        if bool(re.search(r"\.dark\b", sel)) != dark:
+            continue
+        out.setdefault(name.group(1) + (".dark" if dark else ""), (t.group(1), inv.group(1)))
+    tokens = []
+    for theme in sorted(out):
+        t_hex, inv_hex = out[theme]
+        tokens.append(
+            {
+                "theme": theme,
+                "tertiary": tuple(int(t_hex[i : i + 2], 16) for i in (1, 3, 5)),
+                "inverse": tuple(int(inv_hex[i : i + 2], 16) for i in (1, 3, 5)),
+            }
+        )
+    return tokens
+
+
+# 色值容差（RGB 三通道和）：跨族最近色对距离 50（tokens.css 全表算出），取 24 留 2 倍余量。
+CHIP_TOLERANCE = 24
+# 窗口内 chip 实色占比下限（设备实测已收藏态 0.308 / 未收藏 0，取 0.15 留余量）
+CHIP_MIN_SHARE = 0.15
+
+
+def bookmark_chip(w, h, rows, tokens_css):
+    """定位收藏 chip 并判收藏态（#709，配色无关）。
+
+    输出 {"x","y","bg","share","state"}：
+      state ∈ bookmarked / not-bookmarked / unknown
+      unknown = 判不出（窗口里没有 chip 实色，或色值同时落在两族令牌里）。
+
+    为什么不能继续用红像素：chip 底色是 M3 令牌实色（未收藏 `--md-inverse-surface`、
+    已收藏 `--md-tertiary`，spec docs/specs/bookmark-color.md §配色），
+    14 个组合里没有一个是红的；而推荐流的作品图里**到处是红**——
+    旧定位器于是会去点画上的红色插画，然后报「收藏未生效」。
+    """
+    tokens = read_chip_tokens(tokens_css)
+    if not tokens:
+        return {"x": None, "y": None, "state": "unknown", "reason": "tokens.css 未解析出任何主题"}
+
+    def near(c, t):
+        return abs(c[0] - t[0]) + abs(c[1] - t[1]) + abs(c[2] - t[2]) <= CHIP_TOLERANCE
+
+    # 候选：任一 chip 令牌色的像素，按颜色分组统计面积。
+    # 「卡片区」= 屏幕下半部（推荐流轮播卡 + 收藏胶囊都落在那里）；
+    # 不用「红色」等任何色相条件，作品图不会因此被选中。
+    y_lo = int(h * 0.45)
+    colors = {}
+    for y in range(y_lo, h, 2):
+        for x in range(0, w, 2):
+            c = pixel(rows, y, x)
+            if any(near(c, t["tertiary"]) or near(c, t["inverse"]) for t in tokens):
+                key = c
+                e = colors.get(key)
+                if e is None:
+                    colors[key] = [1, x, y]
+                else:
+                    e[0] += 1
+    if not colors:
+        return {"x": None, "y": None, "state": "unknown", "reason": "卡片区未检出 chip 实色"}
+
+    bg, (n, sx, sy) = max(colors.items(), key=lambda kv: kv[1][0])
+    share = n / float(len(range(y_lo, h, 2)) * len(range(0, w, 2)))
+    marked = [t["theme"] for t in tokens if near(bg, t["tertiary"])]
+    unmarked = [t["theme"] for t in tokens if near(bg, t["inverse"])]
+    if share < CHIP_MIN_SHARE:
+        return {
+            "x": sx,
+            "y": sy,
+            "bg": "#%02x%02x%02x" % bg,
+            "share": round(share, 3),
+            "state": "unknown",
+            "reason": f"chip 实色占比 {share:.3f} < {CHIP_MIN_SHARE}",
+        }
+    if marked and not unmarked:
+        state = "bookmarked"
+    elif unmarked and not marked:
+        state = "not-bookmarked"
+    else:
+        state = "unknown"
+    return {
+        "x": sx,
+        "y": sy,
+        "bg": "#%02x%02x%02x" % bg,
+        "share": round(share, 3),
+        "state": state,
+        "marked": marked,
+        "unmarked": unmarked,
+    }
+
+
 def main():
     path, mode = sys.argv[1], sys.argv[2]
     w, h, rows = load_png(path)
@@ -329,6 +442,10 @@ def main():
         print(json.dumps(classify(w, h, rows)))
     elif mode == "topbar-nav":
         print(json.dumps(topbar_nav(w, h, rows)))
+    elif mode == "bookmark-chip":
+        # 第 3 个参数 = tokens.css 路径（调用方给，脚本不猜 cwd）
+        css = sys.argv[3] if len(sys.argv) > 3 else "src/styles/tokens.css"
+        print(json.dumps(bookmark_chip(w, h, rows, css)))
     else:
         print(json.dumps({"error": f"unknown mode {mode}"}))
 
