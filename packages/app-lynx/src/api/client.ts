@@ -153,6 +153,22 @@ export function isOAuthTokenErrorResponse(status: number, body: unknown): boolea
   )
 }
 
+/**
+ * 传输层失败的诊断文本（#807）。
+ *
+ * 两条通道都把底层诊断塞进第二个入参，但形态不同：web 通道传捕获到的异常对象，
+ * 原生通道传回调 data 位置的异常消息裸串（PictelioApiModule 的 catch 分支）。
+ * 只取 `message` 字段的字符串形态——原生侧该值可能是裸串，也可能是类名降级值。
+ */
+function transportDiagnostic(error: unknown): string {
+  if (typeof error === "string") return error.trim()
+  if (error && typeof error === "object") {
+    const msg = (error as { message?: unknown }).message
+    if (typeof msg === "string") return msg.trim()
+  }
+  return ""
+}
+
 export function classifyError(status: number, error: unknown, responseBody?: unknown): ApiError {
   if (
     responseBody &&
@@ -165,8 +181,21 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
       messageKey: "error.api.proxy",
     }
   }
-  if (!status && error instanceof TypeError) {
-    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接", messageKey: "error.api.network" }
+  // ⚠️ #807：判据从「error 是 TypeError」改为「status 为 0 = 未拿到 HTTP 响应」。
+  // 原判据在**原生通道是死分支**：原生回调只回 status 与响应体，error 恒为 null，
+  // 而传输失败（DNS / 连接建立 / 超时）恰是原生通道最常见的失败形态
+  // → 落 UNKNOWN 兜底 → 用户只看到无信息量的「未知错误」（issue #807 走查实测）。
+  // 两条通道的 status=0 来源都是确定的：原生侧的传输失败哨兵 + web 侧 fetch 拒绝。
+  // 诊断文本一并保留：旧实现只认 TypeError 之外的异常连 message 都被整段丢弃。
+  if (!status) {
+    const detail = transportDiagnostic(error)
+    const suffix = detail ? ` (${detail})` : ""
+    return {
+      type: ApiErrorType.NETWORK,
+      message: `网络不可用，请检查连接${suffix}`,
+      messageKey: "error.api.network",
+      params: { detail: suffix },
+    }
   }
   const pixivMsg = responseBody ? extractPixivErrorMessage(responseBody) : null
   const suffix = pixivMsg ? ` (${pixivMsg})` : ""
@@ -353,10 +382,10 @@ async function execute<T>(
   // 启动窗口内没有走本客户端的 POST 读路径；给 POST 加门会给恢复期的写操作
   // 引入额外延迟。若将来新增经本客户端的启动期 POST，须重新评估。
   //
-  // ℹ️ 已知冗余（web 模式，本轮不修）：原生分支下方另有第二道同款就绪门 + 未登录 throw，
-  // 与本门在 web 模式重复过闸；且 authStore.restoreToken 的去重闩锁 `_restoreInFlight`
-  // 在 finally 里清空（不记忆化），故恢复失败路径会真的跑两次 `loadRefreshToken`。
-  // 修它要动认证时序且 web 分支无单测覆盖 → 已挂 #819 第 6 项待办。
+  // #819 A 项：这里曾与原生分支下方的同款门并存，web 模式两道都跑。authStore.restoreToken 的
+  // 去重闩锁 `_restoreInFlight` 在 finally 里清空（**只做并发去重、不记忆化**）⇒ 恢复落定后仍无
+  // accessToken 时第二道门会真的再跑一次恢复（失败路径多发一次 OAuth 交换，挂起路径等 2×10s）。
+  // 两道门之间除原生分支的提前 return 外不改动任何状态，故对 web 路径判据恒等 ⇒ 下方只留未登录 throw。
   if (method === "GET" && !accessToken) {
     await awaitAuthReady()
   }
@@ -394,15 +423,17 @@ async function execute<T>(
         if (status >= 200 && status < 300) {
           resolve(parsed as T)
         } else {
-          reject(classifyError(status, null, parsed))
+          // #807：status=0 = 原生侧传输失败（异常消息在 data 位置，裸串 JSON.parse 必失败 ⇒
+          // parsed 恒 null）。把它交给 classifyError 作诊断文本，否则该文本在错误链路里被丢弃。
+          reject(classifyError(status, status === 0 ? dataStr : null, parsed))
         }
       })
     })
   }
 
-  if (method === "GET" && !accessToken) {
-    await awaitAuthReady()
-  }
+  // 就绪等待已在原生分支之前统一做过，且与其判据恒等（其间只有原生分支的提前 return，
+  // 不改动 accessToken）⇒ 重复过一次只会让恢复路径多跑一轮（#815 提门 / #819 A 删重复门）。
+  // 此处只判「等待已落定仍无 token」= 真的未登录。
   if (method === "GET" && !accessToken) {
     throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
   }
@@ -462,6 +493,8 @@ async function executeRaw(
   // 只有 api/novel.ts 的 fetchNovelText / fetchNovelData（均为 GET），`apiClient.post`
   // 的调用方则全是用户点击触发的写操作（收藏 / 追更 / 评论 / 关注）。给 POST 加门会给
   // 恢复期的写操作引入额外延迟。若将来新增经本客户端的启动期 POST，须重新评估。
+  //
+  // #819 A 项：本门是全局唯一一道就绪门；原生分支下方原有的同款门已删（理由同 execute 顶部注释）。
   if (method === "GET" && !accessToken) {
     await awaitAuthReady()
   }
@@ -500,15 +533,17 @@ async function executeRaw(
         if (status >= 200 && status < 300) {
           resolve(dataStr)
         } else {
-          reject(classifyError(status, null, parsed))
+          // #807：status=0 = 原生侧传输失败（异常消息在 data 位置，裸串 JSON.parse 必失败 ⇒
+          // parsed 恒 null）。把它交给 classifyError 作诊断文本，否则该文本在错误链路里被丢弃。
+          reject(classifyError(status, status === 0 ? dataStr : null, parsed))
         }
       })
     })
   }
 
-  if (method === "GET" && !accessToken) {
-    await awaitAuthReady()
-  }
+  // 就绪等待已在原生分支之前统一做过，且与其判据恒等（其间只有原生分支的提前 return，
+  // 不改动 accessToken）⇒ 重复过一次只会让恢复路径多跑一轮（#815 提门 / #819 A 删重复门）。
+  // 此处只判「等待已落定仍无 token」= 真的未登录。
   if (method === "GET" && !accessToken) {
     throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
   }

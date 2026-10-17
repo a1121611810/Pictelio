@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { presentError, reportSessionError, registerSessionErrorHandler, fatalError } from './errorPresentation'
 import { ApiErrorType, type ApiError } from '../api/types'
 import { classifyError } from '../api/client'
+import { setLocale } from '../i18n'
 
 function err(type: ApiErrorType, message: string, status?: number): ApiError {
   return { type, message, status }
@@ -23,7 +24,7 @@ describe('utils.errorPresentation.presentError', () => {
 
   it('NETWORK → 主文案 + 网络提示', () => {
     expect(presentError(err(ApiErrorType.NETWORK, '网络不可用，请检查连接'))).toBe(
-      '网络不可用，请检查连接。请检查网络连接是否正常',
+      '网络不可用，请检查连接。请检查网络连接是否正常，或到「高级设置 → 网络自检」查看诊断',
     )
   })
 
@@ -52,6 +53,29 @@ describe('utils.errorPresentation.presentError', () => {
   it('classifyError 产出的真实错误同样分档（401 → UNAUTHORIZED 文案）', () => {
     const classified = classifyError(401, null, null)
     expect(presentError(classified)).toBe('登录已过期 (HTTP 401)。请重新登录')
+  })
+
+  // #807 AC2：原生传输失败渲染出的文案必须「可行动」（下一步指引 + 诊断原文），
+  // 且不得出现无信息量的「未知错误」兜底。
+  it('原生传输失败（status=0 + 诊断原文）→ 渲染含网络提示与原文，无「未知错误」', () => {
+    const diag = "Failed to resolve host 'app-api.pixiv.net'"
+    const shown = presentError(classifyError(0, diag, null))
+    expect(shown).not.toContain('未知错误')
+    expect(shown).toContain('网络自检')
+    expect(shown).toContain(diag)
+  })
+
+  it('原生传输失败在英文下同样给出行动指引与诊断原文（AC：双语语义一致）', () => {
+    setLocale('en')
+    try {
+      const diag = "Failed to resolve host 'app-api.pixiv.net'"
+      const shown = presentError(classifyError(0, diag, null))
+      expect(shown).not.toContain('Unknown error')
+      expect(shown).toContain('Network check')
+      expect(shown).toContain(diag)
+    } finally {
+      setLocale('zh-CN')
+    }
   })
 
   it('普通 Error → 取 message，无 hint（UNKNOWN 分类）', () => {
