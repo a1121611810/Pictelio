@@ -111,11 +111,32 @@ export interface SaveNamingContext {
 const unknownPlaceholderWarned = new Set<string>()
 
 /**
+ * 空段占位符的**模板层**剥离（#757）：净化后为空的 {title}/{author} 连同紧邻连接符一并从
+ * 模板里删掉，使 `{title}_{id}` 在 title 缺失时得 `{id}`——单存链 saveIllustPages 的 ctx
+ * title 恒空且不传 author，不剥就会静默落盘 `_123456.jpg` / `-123456.jpg`。
+ *
+ * 连接符两侧都要吃：段落在模板首部时（`{title}_{id}`）残段是其后继，在尾部时（`{id}_{title}`）
+ * 是其前驱，只吃一侧会在另一侧留下孤立连接符。
+ *
+ * 必须在模板层而非值替换后清洗：后者分不清「空段残留」与「真实标题自带的首尾连接符」，
+ * 会把 `suffix_` 削成 `suffix`。与 {p} 单页剥离同风格故不带 warn——剥离后产出的是形态完好
+ * 的文件名，不是降级。
+ */
+function stripEmptySegmentPlaceholders(tpl: string, ctx: SaveNamingContext): string {
+  let t = tpl
+  if (sanitizeLimitedSegment(ctx.title) === "") t = t.replace(/[-_. ]?\{title\}[-_. ]?/g, "")
+  if (sanitizeLimitedSegment(ctx.author ?? "") === "") t = t.replace(/[-_. ]?\{author\}[-_. ]?/g, "")
+  return t
+}
+
+/**
  * 模板展开内核（不含扩展名拼装）：返回净化 trim 后的文件名基段。
  * - `{p}`：多页展开为 0-based 页号；单页展开为空串（spec D4）
  * - 单页含 `{p}` 的模板先在**模板层**剥离紧邻连接符残段（`_{p}` / `_p{p}` / `-{p}` 等
  *   → `{id}_{p}` 单页得 `<id>`、`{id}_p{p}` 单页得 `<id>`）；在模板层剥离避免误伤
  *   以 p 结尾的标题值
+ * - 值为空的 {title}/{author} 段同样在**模板层**剥离紧邻连接符（见上），覆盖「段空整体非空」
+ *   这一 {p} 之外的第三种残段形态
  * - 未知占位符原样保留 + 模块级去重 warn（spec D2）
  */
 function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<string>): string {
@@ -124,6 +145,7 @@ function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<s
   if (!multiPage && t.includes("{p}")) {
     t = t.replace(/[-_. ]?p?\{p\}/g, "")
   }
+  t = stripEmptySegmentPlaceholders(t, ctx)
   const expanded = t.replace(/\{(\w+)\}/g, (raw, name: string) => {
     switch (name) {
       case "id":

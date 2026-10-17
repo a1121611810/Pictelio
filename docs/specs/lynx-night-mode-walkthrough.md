@@ -3,18 +3,21 @@
 > 票：[#692](https://github.com/a1121611810/Pictelio/issues/692)；spec [docs/specs/lynx-night-mode.md](./lynx-night-mode.md)（§4.8 原生接线与机器防线）；决策 [ADR-0180](../adr/ADR-0180-lynx-dark-mode.md) D6 / D7。
 > 定位：**机器防线的补位，不是重复**——契约测试只证明「读点存在、键名同源、色值同源」（`darkModeJavaContract.test.ts`），证明不了「设备上真的这么显示」：Lynx 样式引擎的复合选择器解析、Android 平台 splash 的持久化语义、厂商 ROM 差异三段都不在单测射程内。
 > 环境：开发机 `emulator-5554`（AVD `pictelio_ui`，Android 14 / API 34）为主设备；API 28–30 设备用于 §T3-5 残留记录（minSdk = 28）。
-> 前置：debug 构建（`pnpm dev:android` 或 `pnpm build:android` + `pnpm cap:sync`）——`run-as` 直改 prefs 需要 debug 包。
+> 前置：debug 构建（`pnpm dev:android-host` 或 `pnpm build:android-host`——宿主脚本已内含 app-lynx 产物构建与资产同步，无独立的 cap 同步步骤）——`run-as` 直改 prefs 需要 debug 包。
 
 ## 0. 记录约定
 
 - **截图命名**：`docs/research/assets/lynx-night-mode-walkthrough/<矩阵>-<场景>.png`
-  - T2：`t2-sky-light.png` / `t2-sky-dark.png`（6 主题 × 亮暗 = 12 张）
+  - T2：`t2-sky-light.png` / `t2-sky-dark.png`（7 主题 × 亮暗 = 14 张）
   - T3：`t3-statusbar-<场景>.png` / `t3-splash-<场景>.png`
-  - T4：`t4-viewer-dark.png` / `t4-restrict-dark.png` / `t4-novel-dark.png` / `t4-skeleton-dark.png` / `t4-scrollbar-dark.png`
+  - T4：`t4-viewer-dark.png` / `t4-restrict-dark.png` / `t4-novel-dark.png` / `t4-skeleton-dark.png` / `t4-scrollbar-dark.png` / `t4-placeholder-dark.png`
 - **执行结果落档**：新建 `docs/research/lynx-night-mode-walkthrough-acceptance.md`，**仿 [lynx-systembars-t4-acceptance.md](../research/lynx-systembars-t4-acceptance.md) 先例**——环境/分支/commit 头 + 逐项断言表（含「实测」与「判定」列）+ 截图相对路径 + 结论段；**落档后关闭 [#692](https://github.com/a1121611810/Pictelio/issues/692)**。
 - **判定列口径**：✅ 通过 / ⚠️ 接受项（记录即可）/ ❌ 失败（当场建 issue 并在结论段引用）。
 - **环境记录**（每轮开头一行）：`adb shell getprop ro.build.version.sdk` + `adb shell settings get secure ui_night_mode`（系统侧亮暗：0=亮 / 1=暗 / 2=自动）+ APK 版本与 commit。
 - **色值 oracle 只有一份**：期望色一律读 `packages/app-lynx/src/styles/tokens.css` 对应 `.theme-X.dark` 块（**禁止**在本文或落档报告里抄第二份色值——`tests/palettes-drift.test.ts` 已把「产物 ≡ 生成脚本」锁死，文档抄写只会制造漂移源）。
+- **陈述的可核性分级**（[#1017](https://github.com/a1121611810/Pictelio/issues/1017) 订正时逐条标注）：
+  - **可与代码交叉核验**：主题档数（`packages/app-lynx/src/utils/themeColor.ts` 的 `THEME_COLOR_OPTIONS`）、色板令牌（`tokens.css` 的 `.theme-X(.dark)`）、manifest launcher（`packages/android-host/android/app/src/main/AndroidManifest.xml` + `app/build.gradle` 的 `launcherActivity` 占位）、splash 面/plate（`res/values{,-night}/styles.xml`）、`minSdk`（`android/variables.gradle`）、图标尺寸（`core-splashscreen` AAR 的 `values.xml`）。
+  - **只能走查实测、无法与代码交叉核验**：设备环境（AVD `pictelio_ui` / API 34）、`screencap` 轮询帧率、T2 各主题的像素采样值、T4-6 的对比度实测值。这些在本矩阵里一律写明出处（落档或前序票），**不写成看起来像已核验的断言**。
 
 ## 1. 命令骨架
 
@@ -37,8 +40,11 @@ adb shell run-as io.pictelio.app sh -c \
 #    确认；「正常路径」断言一律走 UI 切换。
 
 # ── 冷启动 / 截图 ─────────────────────────────────────────────────────
+# launcher activity 名**按 flavor 注入**，manifest 里没有硬编码类名（`android:name="${launcherActivity}"`）。
+# 因此命令骨架不能写死某个类——先解析再启动（同 scripts/audit-real-interaction/run_regression.mjs 的解析式）：
+LAUNCHER=$(adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER io.pictelio.app | tail -1 | tr -d '\r')
 adb shell am force-stop io.pictelio.app
-adb shell am start -n io.pictelio.app/.MainActivity
+adb shell am start -n "$LAUNCHER"      # lynx flavor → io.pictelio.app/.LynxActivity
 adb exec-out screencap -p > t3-splash-xxx.png      # splash 首帧窗口 < 1s：需轮询抓帧或录屏
 adb shell screenrecord --time-limit 5 /sdcard/splash.mp4 && adb pull /sdcard/splash.mp4
 
@@ -48,17 +54,25 @@ adb shell screenrecord --time-limit 5 /sdcard/splash.mp4 && adb pull /sdcard/spl
 adb shell dumpsys window | grep -i appearance
 ```
 
-## 2. T2 矩阵 —— 6 主题 × 亮/暗（复合选择器载重假设）
+## 2. T2 矩阵 —— 7 主题 × 亮/暗（复合选择器载重假设）
 
 **本轮头号断言**：`.theme-X.dark` **复合选择器在 Lynx 样式引擎实际生效**（这是 T2 的载重平台假设：CSS 级覆盖靠特异性 (0,2,0) > (0,1,0)，Web 侧成立不等于 Lynx 侧成立）。若某一主题暗色下只有部分角色变暗（primary 变了、surface 没变），即复合类未整体命中 → ❌ 建 issue。
 
+主题档数的单一事实源 = `packages/app-lynx/src/utils/themeColor.ts` 的 `THEME_COLOR_OPTIONS`（id 集合供持久化与校验；`tokens.css` 逐条提供 `.theme-X` / `.theme-X.dark` 色板）。外观设置页的色块是 `Me.vue` 里**逐条手写**的同构模板（不走 `v-for`），故本表的行数需同时与该清单和 Me 页色块数对齐；**新增主题时两处与本表同步加行**。
+
 | # | 主题 | 操作 | 期望 | 截图 |
 |---|---|---|---|---|
-| T2-1 … T2-6 | sky / violet / pink / green / orange / teal | 「我的 → 外观」切至该主题色 → 外观模式切「亮色」→ 截图；再切「暗色」→ 截图 | 亮/暗两态整树换色（顶栏、卡片、FAB、列表底、文本层同步）；**界面无处残留亮色 surface** | `t2-<theme>-light.png` / `t2-<theme>-dark.png` |
+| T2-1 | sky | 「我的 → 外观」切至该主题色 → 外观模式切「亮色」→ 截图；再切「暗色」→ 截图 | 亮/暗两态整树换色（顶栏、卡片、FAB、列表底、文本层同步）；**界面无处残留亮色 surface** | `t2-sky-light.png` / `t2-sky-dark.png` |
+| T2-2 | violet | 同上 | 同上 | `t2-violet-light.png` / `t2-violet-dark.png` |
+| T2-3 | pink | 同上 | 同上 | `t2-pink-light.png` / `t2-pink-dark.png` |
+| T2-4 | green | 同上 | 同上 | `t2-green-light.png` / `t2-green-dark.png` |
+| T2-5 | orange | 同上 | 同上 | `t2-orange-light.png` / `t2-orange-dark.png` |
+| T2-6 | teal | 同上 | 同上 | `t2-teal-light.png` / `t2-teal-dark.png` |
+| T2-7 | bili | 同上 | 同上；bili 在 `tokens.css` 明暗两套色板俱全（同为其余 6 支），故与其余主题同法载重验证 | `t2-bili-light.png` / `t2-bili-dark.png` |
 
 - **像素采样（可选但推荐，作为「真是这套色板」的证据）**：`screencap` 取页面大面积区域中心点，与该主题 `.theme-X.dark` 的 `--md-surface` 比对（worked example：`.theme-sky.dark --md-surface = #101418`，其余主题从 `tokens.css` 读）。取色脚本可复用 `scripts/audit-real-interaction/analyze_rec.py` 一族（必要时临时扩一个单图取色入口，不要提交进 main）。
 - **交叉项**：每主题暗色下另确认**主题色色块预览**显示的是该主题暗色 primary（`appearanceClasses` 同源，Me 页色块与整树不能分叉）。
-- 判定：12 张全 ✅ 才过；任一主题暗色「半吊子」（部分角色未覆盖）→ ❌。
+- 判定：14 张全 ✅ 才过；任一主题暗色「半吊子」（部分角色未覆盖）→ ❌。
 
 ## 3. T3 矩阵 —— 状态栏图标 / splash / plate / 低版本残留
 
@@ -84,7 +98,8 @@ adb shell dumpsys window | grep -i appearance
 | T3-2d | 手动暗 | 亮（反配置） | UI 切暗 → force-stop → start | **暗色** splash | `t3-splash-manual-dark.png` |
 
 - 反配置两项（T3-2c/d）是 #692 的**验收核心**：接线前这两项必然失败。
-- splash 显示窗口短：`screenrecord` 整段后抽帧；若模拟器编码器故障（本仓库有先例，见 `docs/research/real-interaction-audit.md` §pictelio_low），改 `screencap` 轮询（~40ms 间隔）。
+- splash 显示窗口短：`screenrecord` 整段后抽帧；若模拟器编码器故障（本仓库有先例，见 `docs/research/real-interaction-audit.md` §pictelio_low），改 `screencap` 轮询。
+  ⚠️ **轮询帧率的正确量级是 ~350ms/帧，不是 ~40ms**（[#1017](https://github.com/a1121611810/Pictelio/issues/1017) 订正：原写的 ~40ms 无出处且与实测矛盾）。实测见落档 [T3-3](../research/lynx-night-mode-walkthrough-acceptance.md) 节：轮询只能稳定捕到底色，捕不到完整图标帧；**行之有效的 splash 取证配方需另定**（工具链决策 → [#1030](https://github.com/a1121611810/Pictelio/issues/1030)），在配方落地前 T3-3a/b/c 每轮都会取证受限。
 
 ### T3-3 plate（图标底板）视觉效果
 
@@ -97,14 +112,15 @@ adb shell dumpsys window | grep -i appearance
 - **T3-3c（已登记差异，走查定夺）**：系统跟随模式（主轨 `AppTheme.NoActionBarLaunch`）的 plate **未接线**——其父保持 `Theme.SplashScreen`。原因：base `Theme.SplashScreen.IconBackground` 附带 `android:windowBackground=compat_splash_screen` 与 `splashScreenIconSize` 覆写，换父会改变 API 28–30 compat 渲染路径（`Theme.SplashScreen.Light/Dark` 两支仅经 API 31+ 平台通道使用，无此影响，故已接线）。走查时对比「manual 暗色 splash（有圆盘）」vs「system 暗色 splash（无圆盘）」差异，决定是否将主轨一并切换（若切换，需补 <31 回归项）。
 - **T3-3c 追加项 · icon-size 轨间差异（同一父链差异的另一面）**：已接线的兜底轨继承 `Theme.SplashScreen.IconBackground` 的 `splashScreenIconSize = @dimen/splashscreen_icon_size_with_background`（**240dp，含背景尺寸**）与 `android:windowBackground = @drawable/compat_splash_screen`；主轨（父 `Theme.SplashScreen`）走 `splashscreen_icon_size_no_background`（**288dp**）与 `compat_splash_screen_no_icon_background`（数值出处：本地 `core-splashscreen-1.2.0` AAR `res/values/values.xml`；API 31+ 另因兜底轨父链接线 `android:windowSplashScreenIconBackgroundColor` → 平台按「带背景」形态渲染）。**故 API 31+ 上「manual 暗色 splash」与「system 暗色 splash」的 splash 图标大小不同**——走查时把 icon-size 与圆盘一并对比（复用 `t3-splash-manual-dark.png` / `t3-splash-system-dark.png` 两帧量同一屏宽下的图标占比），并决定是否统一：统一 = ① 主轨切父，或 ② 兜底轨显式覆写 `splashScreenIconSize`；两条都需补 API 28–30 compat 回归项（同 T3-3c 的切换代价）。
 
-### T3-4 改设置 → 重启的一次性滞后窗口
+### T3-4 改设置 → 重启的滞后窗口（非一次性，见 T3-4b）
 
 | # | 路径 | 操作 | 期望 |
 |---|---|---|---|
 | T3-4a | **正常路径（UI 切换）** | UI 切「暗色」→ force-stop → 冷启动 | 首次冷启动 splash 即为暗色——**无滞后**（设置变更当场重设持久化主题 + `onResume` 兜底） |
-| T3-4b | **绕过 JS 路径（记录项）** | 强杀后 `run-as` 直改 prefs 为 `dark` → 冷启动 #1 → 再冷启动 #2 | #1 仍显旧持久化主题、#2 正确——**一次性滞后确认为平台持久化口径**（`setSplashScreenTheme` 管下一次冷启动）；属接受项，记录即可 |
+| T3-4b | **绕过 JS 路径（记录项 · 预期为失败）** | 强杀后 `run-as` 直改 prefs 为 `dark` → 冷启动 #1 → 再冷启动 #2 | #1 仍显旧持久化主题（符合预期）；**#2 仍显旧主题**——实测 splash 持久化**未随一次 `onResume` 恢复**，滞后 ≥2 次冷启动（落档 T3-4 节实测：`t3-4b-coldstart1.png` / `t3-4b-coldstart2.png`，两次均为亮色 splash，JS 内容已正确转暗） |
 
-- T3-4b 的目的不是求修，而是把「滞后窗口的边界」写成可复现的事实：滞后只出现在**设置变更未走 JS 通知路径**的场景（直改 prefs / 变更后进程未再经历 `onResume`）。
+- **T3-4b 的「期望」是失败态，不是通过态**（[#1017](https://github.com/a1121611810/Pictelio/issues/1017) 订正）。原文写「#2 正确 —— 一次性滞后」，与落档实测相反；走查者若只看本列会把它当成已通过项。判定时按**失败**记：#2 若仍显旧主题 = 与本表一致（不是新缺陷）；#2 已正确 = 与本表不一致（说明行为变了，需重取落档）。
+- T3-4b 的目的不是求修，而是把「滞后窗口的边界」写成可复现的事实：滞后只出现在**设置变更未走 JS 通知路径**的场景（直改 prefs / 变更后进程未再经历 `onResume`）；该路径用户不可达（正常入口必走 T3-4a 的 UI 路径），故登记为接受项。修该缺陷不在本矩阵范围。
 
 ### T3-5 API 28–30 残留（接受项）
 
