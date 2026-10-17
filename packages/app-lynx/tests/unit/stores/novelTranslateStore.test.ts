@@ -893,6 +893,59 @@ describe.each(TIMING_PROFILES)('半成品策略（ADR-0171 §5）[$profile]', ({
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
+  // ─── #948：块内段落回退 ≠ 块成功 ───
+
+  it('#948：块内段落有回退 → partial 且**不写缓存**（completed 的定义是「已写入缓存」）', async () => {
+    // 2 段请求，provider 只给出第 1 段译文。块本身「成功」（无 error chunk），
+    // 旧状态机只看块级失败数 ⇒ completed ⇒ 把「第 1 段译文 + 第 2 段原文」写进缓存。
+    mocks.providerIter.mockImplementationOnce(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '译一' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(47, 47, ['p1', 'p2'], 0)
+    expect(store.status).toBe('partial')
+    expect(store.isCached[47]).toBe(false)
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('#948：native 形态（带段落序号的 delta）逐段译全 → completed + 写缓存（回归防线）', async () => {
+    mocks.providerIter.mockImplementationOnce(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '译一' },
+        { type: 'delta', paragraphIndex: 1, text: '译二' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(48, 48, ['p1', 'p2'], 0)
+    expect(store.status).toBe('completed')
+    expect(store.displayParagraphs).toEqual(['译一', '译二'])
+    expect(mocks.cacheSet).toHaveBeenCalled()
+  })
+
+  it('#948：整批回退只译出部分段落 → partial 且不写缓存（此前 `some(非空)` 即判 completed）', async () => {
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: '5xx', retryable: true }]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '整批' },
+          { type: 'delta', paragraphIndex: 1, text: '' },
+          { type: 'done' },
+        ]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(49, 49, ['p1', 'p2'], 0)
+    expect(store.status).toBe('partial')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+    // 已译段仍要留下来（回退不是白跑）
+    expect(store.displayParagraphs[0]).toBe('整批')
+  })
+
   it('ADR-0178 D1 fallback：retryable=true 错误 → 整批回退（stream=false mock）成功 → completed + 写缓存', async () => {
     // 第一次 providerIter 调用（chunked pipeline 流式）→ error retryable=true
     // 第二次 providerIter 调用（整批回退，stream=false）→ success
