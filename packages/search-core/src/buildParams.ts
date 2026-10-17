@@ -1,29 +1,28 @@
 /**
  * 筛选状态 → 端点请求构建（spec §3.3 参数映射 + §3.4 热门矩阵 + §6.1 契约变更）。
- *
- * 真值 oracle：docs/research/pixiv-appapi-search-filter-params.md（Pixiv-Shaft 对齐
- * iOS 官方 8.6.5-8.7.3 抓包）。关键规则：
- * - `search_target` 修复（spec §6.1，Shaft #906/#1038）：illust 端单词标签**不传**该参数
- *   （不传 ≡ partial 且并入标题命中；显式传 partial 反而做严格 tag 匹配并忽略 merge 参数）；
- *   novel 端**恒显式传**（不传退化为纯字面匹配、同义词不展开）；含空格多标签两端都传
- *   `exact_match_for_tags`。
- * - 恒发 `merge_plain_keyword_results=true` / `include_translated_tag_results=true`
- *   （iOS/Shaft/pixez 一致）。`include_potential_violation_works` 维持不传（iOS 默认 false
- *   会隐藏部分作品）。`search_ai_type` 不接入（#479 裁决）。
- * - 热门矩阵（#478）：popular → popular-preview 端点，无 `sort`、无分页参数、
- *   **不携带收藏数区间**（服务端忽略），期间/比例/分辨率照常透传。
- * - scope 适用性（#476 Q4）：比例/分辨率仅进插画路（scope=novel 时即使状态残留也不发）；
- *   期间/收藏数双路携带（收藏数受热门排除约束）。
+ * 真值 oracle：docs/research/pixiv-appapi-search-filter-params.md（Pixiv-Shaft 对齐 iOS
+ * 官方 8.6.5-8.7.3 抓包）。⚠️ 2026-10-17 一轮**绕过本文档**的一手 AppAPI 实测推翻了其中
+ * 两条**理由**（§11.1 / §11.3），**但映射全部保持不变**（保守选择，不依赖被推翻的理由）；
+ * 改的只是理由与置信度，采样明细与复跑入口一律以该文档 §11 为准：
+ * - `search_target`（用户可选档位，两端不对称，spec search-target-mode.md §4）：illust 端
+ *   partial → **不传**（#906「显式传会转严格标签匹配」**未复现**，§11.1）；novel 端 partial
+ *   → **显式发**（方向可信、机制未证实，§11.5）；novel 端 `title_and_caption`
+ *   **实测被拒（HTTP 400）** ⇒ 置灰保值不放宽（spec §4 表）；user 端**必须不发**——枚举校验、
+ *   任何取值皆 400（§11.3），「不消费」是危险措辞。
+ * - 恒发两 bool 的理由**已下调**（`merge_plain_keyword_results` 三端无可观测效果，§11.2）⇒ 只因
+ *   无害 + 对齐第三方而保留；`include_potential_violation_works` 不传、`search_ai_type` 不接入
+ *   （#479）。热门矩阵（#478）/ scope 适用性（#476）/ 用户端三档 sort 逐位相同见 §11.3-§11.4。
  */
 import { resolvePeriodRange } from "./period";
-import type { SearchFilters } from "./filters";
+import type { SearchFilters, SearchTargetMode } from "./filters";
 
-export type SearchScope = "all" | "illust" | "novel";
+export type SearchScope = "all" | "illust" | "novel" | "user";
 export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
 
 export type SearchEndpointPath =
   | "/v1/search/illust"
   | "/v1/search/novel"
+  | "/v1/search/user"
   | "/v1/search/popular-preview/illust"
   | "/v1/search/popular-preview/novel";
 
@@ -54,14 +53,31 @@ function baseParams(word: string): Record<string, string> {
   };
 }
 
-/** 插画端匹配方式：单词标签 → 不传（undefined 语义）；多标签 → exact（spec §6.1） */
-function illustTargetParam(word: string): string | null {
-  return word.includes(" ") ? "exact_match_for_tags" : null;
-}
+/**
+ * 档位 → `search_target` 原始值映射（spec search-target-mode §4）。**两端不对称，别写反。**
+ * `null` = 该端点不发送此参数。
+ */
+const ILLUST_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
+  partial: null,
+  exact: "exact_match_for_tags",
+  title_and_caption: "title_and_caption",
+};
 
-/** 小说端匹配方式：恒显式传（不传 = 纯字面匹配，#1038） */
-function novelTargetParam(word: string): string {
-  return word.includes(" ") ? "exact_match_for_tags" : "partial_match_for_tags";
+const NOVEL_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
+  partial: "partial_match_for_tags",
+  exact: "exact_match_for_tags",
+  // 小说端 title_and_caption 实测被拒（HTTP 400，非「不识别」）⇒ 置灰保值不发；
+  // 放宽它会让每一次小说搜索直接失败。spec §4 + verify-novel-title-target.sh
+  title_and_caption: null,
+};
+
+function applyTarget(
+  params: Record<string, string>,
+  table: Record<SearchTargetMode, string | null>,
+  mode: SearchTargetMode,
+): void {
+  const value = table[mode];
+  if (value !== null) params.search_target = value;
 }
 
 /** 期间段：popular-preview 同样接受期间（透传）；收藏数段见 applyBookmark（#478） */
@@ -94,8 +110,7 @@ export function buildIllustSearchRequest(input: BuildSearchRequestInput): BuiltS
   const endpoint = popular ? "/v1/search/popular-preview/illust" : "/v1/search/illust";
   const params = baseParams(word);
   if (!popular) params.sort = sort;
-  const target = illustTargetParam(word);
-  if (target !== null) params.search_target = target;
+  applyTarget(params, ILLUST_TARGET_PARAMS, filters.target);
   applyPeriod(params, filters, now);
   applyBookmark(params, filters, popular);
   if (filters.ratio !== null) params.ratio_pattern = filters.ratio;
@@ -112,9 +127,24 @@ export function buildNovelSearchRequest(input: BuildSearchRequestInput): BuiltSe
   const endpoint = popular ? "/v1/search/popular-preview/novel" : "/v1/search/novel";
   const params = baseParams(word);
   if (!popular) params.sort = sort;
-  params.search_target = novelTargetParam(word);
+  applyTarget(params, NOVEL_TARGET_PARAMS, filters.target);
   applyPeriod(params, filters, now);
   applyBookmark(params, filters, popular);
   // 比例/分辨率是插画专属维度：小说路**永不携带**（即使状态残留——#476 置灰不清值 + #475 §2）
   return { endpoint, params };
+}
+
+/**
+ * 用户搜索（#1019）。不走 `baseParams`：merge/include 两 bool 与 `search_target` 实测未发，
+ * 端点亦不消费期间/收藏数/比例/分辨率/AI 类型（spec §5.1）。
+ * 用户端点无 popular-preview 对应物，`popular_desc` 同样直发 `/v1/search/user`。
+ */
+export function buildUserSearchRequest(input: {
+  word: string;
+  sort: SearchSort;
+}): BuiltSearchRequest {
+  return {
+    endpoint: "/v1/search/user",
+    params: { word: input.word, filter: "for_ios", sort: input.sort },
+  };
 }

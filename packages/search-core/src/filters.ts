@@ -24,6 +24,12 @@ export type RatioPattern = "landscape" | "portrait" | "square";
 /** AI 覆盖（#479）：follow=听账号级设置；all/hide=本次搜索覆盖（不写回设置） */
 export type AiOverride = "follow" | "all" | "hide";
 
+/**
+ * 搜索目标档位（用户可选）。注意与 Pixiv API 的 search_target **原始值**不是一回事：
+ * partial 在两端映射到不同的「是否显式发送」——见 spec docs/specs/search-target-mode.md §4 表。
+ */
+export type SearchTargetMode = "partial" | "exact" | "title_and_caption";
+
 export interface SearchFilters {
   period: SearchPeriod;
   bookmark: BookmarkBand | null;
@@ -31,6 +37,8 @@ export interface SearchFilters {
   /** 分辨率下限（px）：官方预设档即宽度与高度同值（研究文档 §1.2） */
   minPixels: number | null;
   aiOverride: AiOverride;
+  /** 搜索目标档位；默认 partial（= 维持现状，见 spec search-target-mode §5 行为变更） */
+  target: SearchTargetMode;
 }
 
 export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
@@ -39,6 +47,7 @@ export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
   ratio: null,
   minPixels: null,
   aiOverride: "follow",
+  target: "partial",
 };
 
 /**
@@ -59,6 +68,11 @@ export const BOOKMARK_BANDS: readonly BookmarkBand[] = [
 const PERIOD_PRESETS: ReadonlySet<PeriodPreset> = new Set(["1d", "1w", "1m", "6m", "1y"]);
 const RATIO_PATTERNS: ReadonlySet<RatioPattern> = new Set(["landscape", "portrait", "square"]);
 const AI_OVERRIDES: ReadonlySet<AiOverride> = new Set(["follow", "all", "hide"]);
+const SEARCH_TARGET_MODES: ReadonlySet<SearchTargetMode> = new Set([
+  "partial",
+  "exact",
+  "title_and_caption",
+]);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -72,7 +86,8 @@ export function isDefaultFilters(f: SearchFilters): boolean {
     f.bookmark === null &&
     f.ratio === null &&
     f.minPixels === null &&
-    f.aiOverride === "follow"
+    f.aiOverride === "follow" &&
+    f.target === "partial"
   );
 }
 
@@ -84,6 +99,7 @@ export function countActiveFilters(f: SearchFilters): number {
   if (f.ratio !== null) n += 1;
   if (f.minPixels !== null) n += 1;
   if (f.aiOverride !== "follow") n += 1;
+  if (f.target !== "partial") n += 1;
   return n;
 }
 
@@ -97,6 +113,7 @@ export function normalizeFilters(raw: {
   ratio?: unknown;
   minPixels?: unknown;
   aiOverride?: unknown;
+  target?: unknown;
 }): SearchFilters {
   // ── period ──
   let period: SearchPeriod = { kind: "any" };
@@ -143,5 +160,11 @@ export function normalizeFilters(raw: {
   const a = raw.aiOverride;
   const aiOverride: AiOverride = AI_OVERRIDES.has(a as AiOverride) ? (a as AiOverride) : "follow";
 
-  return { period, bookmark, ratio, minPixels, aiOverride };
+  // ── target ──
+  const t = raw.target;
+  const target: SearchTargetMode = SEARCH_TARGET_MODES.has(t as SearchTargetMode)
+    ? (t as SearchTargetMode)
+    : "partial";
+
+  return { period, bookmark, ratio, minPixels, aiOverride, target };
 }

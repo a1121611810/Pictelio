@@ -86,6 +86,7 @@ const enMisc = {
   "searchSheet.scope.all": "All",
   "searchSheet.scope.illust": "Illustrations",
   "searchSheet.scope.novel": "Novels",
+  "searchSheet.scope.user": "Users",
   "searchSheet.sort.newest": "Newest",
   "searchSheet.sort.oldest": "Oldest",
   "searchSheet.sort.popular": "Popular",
@@ -131,6 +132,13 @@ const enMisc = {
   "searchSheet.type.manga": "Manga",
   "searchSheet.type.ugoira": "Ugoira",
   "searchSheet.type.illust": "Illustration",
+  "searchSheet.targetTitle": "Match type",
+  "searchSheet.target.partial": "Tag partial match",
+  "searchSheet.target.exact": "Exact tag match",
+  "searchSheet.target.titleAndCaption": "Title & caption",
+  "searchSheet.targetDimmedHint":
+    "\"Title & caption\" applies to the Illustrations scope. Values you set are kept",
+  "searchSheet.querySyntaxHint": "Space = and · - exclude · OR = or · ( )",
 
   // ─── NovelExportSheet.vue ───
   "novelExportSheet.title": "Export novel",

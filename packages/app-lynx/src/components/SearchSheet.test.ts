@@ -17,8 +17,55 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import zhMisc from '../i18n/locales/zh-CN/misc'
+import enMisc from '../i18n/locales/en/misc'
 
 const source = readFileSync(fileURLToPath(new URL('./SearchSheet.vue', import.meta.url)), 'utf8')
+
+/**
+ * 剥掉源码注释，只留可渲染 / 可执行文本（逐字符挖空但保留换行 ⇒ 行号不变）。
+ *
+ * 「数某字面量出现几次」型断言**必须**先过这道：`SearchSheet.vue` 的 setup 注释里逐字抄了
+ * `v-if="state.scope !== 'user'"`（解释「开关行 / 面板本体各带一道」）。不剥就把注释算进去，
+ * 断言两向都不可信——删掉真门控照样绿（假绿），删掉注释反倒假红（脆到改个注释就红）。
+ * 覆盖三种注释：HTML 模板注释（尖括号包裹的注释记号）、JS 块注释、JS 行注释；
+ * `//` 前为 `:` 时跳过（不吃 URL 的 `://`）。
+ * 已知边界：本文件无 URL 字面量与字符串内的 `//`，故不做字符串感知。
+ */
+function stripComments(src: string): string {
+  const blank = (from: number, to: number): string => src.slice(from, to).replace(/[^\n]/g, ' ')
+  let out = ''
+  let i = 0
+  for (;;) {
+    const line = src.indexOf('//', i)
+    if (line >= 0 && src[line - 1] === ':') {
+      out += src.slice(i, line + 2) // URL 的 `://` 不是注释
+      i = line + 2
+      continue
+    }
+    const block = src.indexOf('/*', i)
+    const html = src.indexOf('<!--', i)
+    const starts = [line, block, html].filter((p) => p >= 0)
+    if (starts.length === 0) break
+    const at = Math.min(...starts)
+    let end: number
+    if (at === html) {
+      const close = src.indexOf('-->', at + 4)
+      end = close < 0 ? src.length : close + 3
+    } else if (at === block) {
+      const close = src.indexOf('*/', at + 2)
+      end = close < 0 ? src.length : close + 2
+    } else {
+      const nl = src.indexOf('\n', at)
+      end = nl < 0 ? src.length : nl
+    }
+    out += src.slice(i, at) + blank(at, end)
+    i = end
+  }
+  return out + src.slice(i)
+}
+
+/** 剥注释后的模板文本：本文件所有「数出现次数」型断言的输入（见 stripComments 说明） */
+const template = stripComments(source)
 
 /** zh 字典值 = 抽取前存量文案逐字快照（渲染产物不变的 oracle；#511 第 2 类补抽约定） */
 const LEGACY_ZH: Record<string, string> = {
@@ -29,6 +76,7 @@ const LEGACY_ZH: Record<string, string> = {
   'searchSheet.scope.all': '全部',
   'searchSheet.scope.illust': '插画',
   'searchSheet.scope.novel': '小说',
+  'searchSheet.scope.user': '用户',
   'searchSheet.sort.newest': '最新',
   'searchSheet.sort.oldest': '最早',
   'searchSheet.sort.popular': '热门',
@@ -293,7 +341,8 @@ describe('SearchSheet AI 三态行遮罩（ADR-0155：mask 行内遮罩 / only �
 
 describe('SearchSheet 筛选折叠区（#474/#477：SearchSheet 内折叠筛选区，默认折叠）', () => {
   it('开关：激活数徽标 + a11y 标签 + chevron 图标（⌄/⌃ → AppIcon expand_more / expand_less，ADR-0208 决策 3）', () => {
-    expect(source).toContain('v-if="filterOpen"')
+    // 面板门控带 scope 条件（scope=user 隐藏，见「用户搜索范围」块），故不锁逐字相等
+    expect(source).toMatch(/<scroll-view\s+v-if="filterOpen/)
     expect(source).toContain("filterOpen = !filterOpen")
     expect(source).toContain('SEARCH_A11Y_LABELS.filterToggle')
     expect(source).toContain('{{ activeFilterCount }}')
@@ -325,5 +374,249 @@ describe('SearchSheet 筛选折叠区（#474/#477：SearchSheet 内折叠筛选�
   it('变更入口走 controller.setFilters（450ms debounce 在控制器内层，spec §5.2）', () => {
     expect(source).toContain('function onFilterChange(next: SearchFilters): void {')
     expect(source).toContain('controller.setFilters(next)')
+  })
+})
+
+// ─── 搜索范围「用户」（issue #1019-#1022 / spec docs/specs/search-user-scope.md §5.4）───
+// 这些是 spec 给出的**行为契约**，此前只有实现没有任何断言（code-review Spec 轴 BLOCK-1/BLOCK-2）。
+// 本仓无 .vue 渲染测试基建，故沿用本文件既有的模板源码断言形态。oracle = spec §3.2/§5.4 条款原文。
+describe('SearchSheet 用户搜索范围（spec search-user-scope §5.4）', () => {
+  it('scope 段静态写出第 4 档「用户」（沿用本文件既有的静态 chip 约定，禁 v-for）', () => {
+    expect(source).toContain("@tap=\"onScopeTap('user')\"")
+    expect(source).toContain(">{{ t('searchSheet.scope.user') }}</text>")
+    // 三档既有 chip 仍在（静态断言，防重构时被 v-for 收编）
+    expect(source).toContain(">{{ t('searchSheet.scope.illust') }}</text>")
+    expect(source).toContain(">{{ t('searchSheet.scope.novel') }}</text>")
+  })
+
+  it('头像只取 medium（spec §3.2 实测：该响应 profile_image_urls 只有 medium 一个键）', () => {
+    // 只看 userAvatar 函数体：文件头注释里「不写 px_170x170 回退」这句会污染全文正则
+    const avatarFn = source.match(/function userAvatar\([\s\S]*?\n\}/)?.[0] ?? ''
+    expect(avatarFn).toContain('profile_image_urls.medium')
+    // 无 px_170x170 / px_50x50 / px_16x16 回退——实测键不存在，写了也是永不命中的死分支
+    expect(avatarFn).not.toMatch(/px_/)
+  })
+
+  it('R18 预览项不渲染图：scrim 占位包住 SkeletonImage（spec §5.4 安全承诺）', () => {
+    expect(source).toContain('function isPreviewRestricted(item: PixivIllust | PixivNovel): boolean {')
+    expect(source).toContain('return item.x_restrict > 0')
+    expect(source).toContain("isPreviewRestricted(item) ? 'bg-scrim'")
+    expect(source).toContain('v-if="!isPreviewRestricted(item)"')
+  })
+
+  it('预览缩略图：illusts 优先补 novels、截断到 USER_PREVIEW_MAX', () => {
+    expect(source).toContain('const USER_PREVIEW_MAX = 3')
+    expect(source).toContain('[...entity.illusts, ...(entity.novels ?? [])].slice(0, USER_PREVIEW_MAX)')
+  })
+
+  it('scope=user 隐藏 sort 段与筛选折叠区（sort 用户端点实测完全忽略；折叠区里的 target 档**必须不发**——端点枚举校验、任何取值皆 400）', () => {
+    // 三道门控：sort 段 / 折叠**开关行** / 折叠**面板本体**。
+    // ⚠️ 数出现次数前**必须先剥注释**（template = stripComments(source)）：SearchSheet.vue 的
+    // setup 注释里逐字抄了同一段 v-if 字面量（解释「开关行 / 面板本体各带一道」）。按原文数会
+    // 被这句注释凑到 3——删掉真门控照样绿（假绿），删掉注释反倒假红（脆到改注释就红），两向都假。
+    // 剥注释后该字面量的真实命中 = **2**（sort 段 + 折叠开关行）；面板本体那道是**另一段字符串**
+    // （与 filterOpen 成对），另有独立断言。
+    const GATE_RE = /v-if="state\.scope !== 'user'"/g
+
+    /** 该标记之前有几道 GATE 门控（标记本身不存在会先在这里证伪） */
+    const gatesBefore = (marker: string): number => {
+      const at = template.indexOf(marker)
+      expect(at, `模板中未找到标记：${marker}`).toBeGreaterThan(-1)
+      return template.slice(0, at).match(GATE_RE)?.length ?? 0
+    }
+
+    // ① sort 段：三枚 chip 都落在**第 1 道**门控之后、第 2 道之前（= 只被 sort 段那道罩住）。
+    //    定位到「谁被哪道罩住」而非只比总数：总数断了只说得出「少了一个」，说不出少的是哪个。
+    for (const chip of ['newest', 'oldest', 'popular']) {
+      expect(
+        gatesBefore(`t('searchSheet.sort.${chip}')`),
+        `sort 段 ${chip} chip 未被第 1 道 scope=user 门控罩住`,
+      ).toBe(1)
+    }
+    // sort chip 本体（另两个 scope 仍要用）必须在
+    expect(template).toContain(">{{ t('searchSheet.sort.popular') }}</text>")
+
+    // ② 折叠**开关行**：开关本体（a11y 标签 + 翻转 tap）落在**第 2 道**门控之后。
+    for (const marker of ['SEARCH_A11Y_LABELS.filterToggle', '@tap="filterOpen = !filterOpen"']) {
+      expect(
+        gatesBefore(marker),
+        `折叠开关行（${marker}）未被第 2 道 scope=user 门控罩住`,
+      ).toBe(2)
+    }
+
+    // ③ 折叠**面板本体**不可见：门控与 filterOpen 成对。⚠️ 这条不能只靠 watch 收 filterOpen——
+    // 删掉那个 watch 测试照样全绿（源码断言数不到 watch 里的状态回写），而 scope=user 下
+    // 会露出一块没有入口的悬空面板。面板本体自带 v-if ⇒ 可见性不依赖任何状态回写。
+    // （2026-10-17 补记：watch 那道第二重保险此前**确实零断言**——上面这句说的就是当时的实情，
+    //   属历史留痕保留；该缺口已由紧随其后的一条独立 it 补上机器防线。）
+    expect(template, '折叠面板本体未带 scope 门控').toMatch(
+      /<scroll-view\s+v-if="filterOpen && state\.scope !== 'user'"/,
+    )
+
+    // 护栏（放最后：上面三条各自报错才指出「哪道门控」坏了，这条只兜「总数悄悄变了」——
+    // 新增第三道 / 挪动位置时逼人重看上面三条的归属，不让总数悄悄通过）。
+    expect(
+      template.match(GATE_RE) ?? [],
+      '剥注释后应恰好 2 道门控：sort 段 + 折叠开关行',
+    ).toHaveLength(2)
+  })
+
+  // ── 第二重保险的独立防线（此前为零）──
+  // SearchSheet.vue 里 `watch(() => state.value.scope)` 在切到 user 时收 filterOpen=false：
+  // 切回别的档时不会莫名展开。上一条 it 的模板门控锁的是「v-if 出现次数」，**数不到 watch 里的
+  // 状态回写** ⇒ 删掉整个 watch，上一条照样全绿。组件注释对此诚实写明了缺口，
+  // 但诚实不等于有防线（此即补这条的原因）。
+  it('第二重保险仍在位：watch(scope) 切到 user 时收 false（切回来不会莫名展开）', () => {
+    // 取剥注释后的源码（template）：组件注释逐字抄过 v-if 字面量，不剥会让注释满足断言
+    const scopeWatch = /watch\(\s*\(\) => state\.value\.scope[\s\S]*?\n\)/.exec(template)
+    expect(scopeWatch, '未找到 watch(() => state.value.scope) —— 第二重保险被删或改了形').not.toBeNull()
+    // 作用域到 watch 调用体：只锁「文件里有这句」的话，他处出现同形文本即退化成恒真断言
+    // （文件内另有一道 watch(() => state.value.status)，故定位必须带 state.value.scope 锚）
+    expect(scopeWatch![0]).toMatch(/if \(scope === 'user'\) filterOpen\.value = false/)
+  })
+
+  it('用户行点按跳作者主页且不进 heroTransition（无插画 id 可测矩形）', () => {
+    expect(source).toContain('void navigate(`/user/${row.entity.user.id}`)')
+    // heroTransition.begin 仍在同一分支之后的内容行路径上（未把用户行也接进转场）
+    expect(source).toContain('heroTransition.begin(row.entity.id)')
+  })
+
+  it('用户行跳过 AI 遮罩与标签静音过滤（PixivUserPreview 无 illust_ai_type / tags）', () => {
+    expect(source).toContain("if (r.type === 'user') return true")
+  })
+
+  it('两条渲染降级路径都经 warnRenderFallback，且告警查 proxyImageUrl 的返回值', () => {
+    // 查返回值而非入参：非信任域绝对 URL 被 proxyImageUrl 拒载返回空串，只查入参会静默变空白
+    expect(source).toContain('const url = proxyImageUrl(entity.user.profile_image_urls.medium')
+    expect(source).toContain('if (!url) warnRenderFallback(`avatar-')
+    expect(source).toContain('if (!url) warnRenderFallback(`preview-')
+  })
+
+  it('渲染降级告警去重集存在（同一 key 只报一次，防列表重渲染刷屏）', () => {
+    expect(source).toContain('const warnedRenderFallbacks = new Set<string>()')
+    expect(source).toContain('if (warnedRenderFallbacks.has(key)) return')
+  })
+})
+
+// ─── 匹配方式 + 查询语法提示（issue #1027 / spec docs/specs/search-target-mode.md §7）───
+// oracle = spec §7.1（形态、置灰、置灰原因提示行）/ §7.2（行位、门控、文案与文案纪律）。
+// ⚠️ 锚点只引**小节号**、不引行号：本仓并行改该 spec 频率高，行号锚必然漂移且无声。
+// 档位→请求参数映射与缓存键在 search-core（#1025 落地），本文件只锁组件侧接线。
+describe('SearchSheet 匹配方式行（spec search-target-mode §7.1）', () => {
+  it('置于筛选折叠区第一行：标题 + 三档 chip，且排在「期间」之前', () => {
+    expect(source).toContain("t('searchSheet.targetTitle')")
+    expect(source).toContain('v-for="opt in TARGET_OPTIONS"')
+    expect(source).toContain('filters.target === opt.value')
+    // 行位：目标行起点 < 期间行起点（清除全部行是维度之上的操作条，不参与此序比较）
+    const targetRow = source.indexOf("t('searchSheet.targetTitle')")
+    const periodRow = source.indexOf("t('searchSheet.periodTitle')")
+    expect(targetRow).toBeGreaterThan(-1)
+    expect(periodRow).toBeGreaterThan(targetRow)
+  })
+
+  it('三枚 chip 的档位值与 t() key 齐备（partial / exact / title_and_caption，spec §3.1 联合类型）', () => {
+    const options = /const TARGET_OPTIONS[^=]*=\s*\[[\s\S]*?\n\]/.exec(source)
+    expect(options).not.toBeNull()
+    expect(options![0]).toContain("value: 'partial'")
+    expect(options![0]).toContain("value: 'exact'")
+    expect(options![0]).toContain("value: 'title_and_caption'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.partial'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.exact'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.titleAndCaption'")
+    // 档位类型取自 search-core 单点事实源，不在组件里就地重声明联合类型
+    expect(source).toContain('type SearchTargetMode')
+    expect(source).toContain("from '@pictelio/search-core'")
+  })
+
+  it('scope=novel 时 title 档置灰且点击无效：门控复用 illustDimmed，另两档不置灰', () => {
+    // 小说端点不识别 title_and_caption（spec §4/§7.1）⇒ 仅该档 novelDisabled
+    const options = /const TARGET_OPTIONS[^=]*=\s*\[[\s\S]*?\n\]/.exec(source)
+    expect(options![0]).toContain('novelDisabled: true')
+    expect(options![0].match(/novelDisabled: false/g)).toHaveLength(2)
+    // 门控与比例/分辨率同款（illustDimmed = scope === 'novel'）
+    expect(source).toContain("const illustDimmed = computed(() => state.value.scope === 'novel')")
+    expect(source).toContain('return opt.novelDisabled && illustDimmed.value')
+    // 点击被短路
+    expect(source).toContain('@tap="!isTargetDisabled(opt) && setTarget(opt.value)"')
+    // 接线断言**作用域到 setTarget 函数体**：全文 toContain 只锁「文件里有这句」，
+    // 锁不住「是 setTarget 在用它」——他处出现同形调用时它就退化成恒真断言。
+    const setTargetFn = /function setTarget\(v: SearchTargetMode\): void \{[\s\S]*?\n\}/.exec(source)
+    expect(setTargetFn).not.toBeNull()
+    expect(setTargetFn![0]).toContain('onFilterChange({ ...filters.value, target: v })')
+  })
+
+  it('置灰不清值：isTargetDisabled 只读不写（值保留，切回插画恢复，spec §7.1）', () => {
+    const gate = /function isTargetDisabled\([\s\S]*?\n\}/.exec(source)
+    expect(gate).not.toBeNull()
+    // 门控函数体内不得出现对 target 的赋值/复位
+    expect(gate![0]).not.toContain('target:')
+    // 且组件内不存在「scope 变 novel 就把 target 打回 partial」的分支
+    expect(source).not.toContain("target: 'partial'")
+  })
+
+  it('scope=novel 时 chips 下方给置灰原因提示行（spec §7.1：解释置灰 + 保值）', () => {
+    // key 必须真的接进模板——字典里有值、模板里没引用 = 死 key，此前零断言
+    expect(source, 'targetDimmedHint 未接进模板').toContain(
+      "t('searchSheet.targetDimmedHint')",
+    )
+    // 门控与第三枚 chip 同一条件（illustDimmed），非独立判定；
+    // 同为 illustDimmed 门控的还有 ratioDimmedHint 一行，故正则必须带上本 key 才不串味
+    const hint =
+      /<text v-if="illustDimmed"[^>]*>\s*\{\{ t\('searchSheet\.targetDimmedHint'\) \}\}/.exec(source)
+    expect(hint, '置灰提示行未与第三枚 chip 共用 illustDimmed 门控').not.toBeNull()
+    // zh/en 两侧都有值（缺一侧 = 语言切换即露空行）
+    expect(zhMisc['searchSheet.targetDimmedHint']).toBeTruthy()
+    expect(enMisc['searchSheet.targetDimmedHint']).toBeTruthy()
+  })
+  // ⚠️ 曾在这里多一条「筛选变更走 controller.setFilters」的 it：两行断言与上方
+  // 「#474/#477 筛选折叠区」块的既有 it 逐字重复（同义反复，Standards A4）；且它只断
+  // 「onFilterChange 存在 + 它调 controller.setFilters」——实测把 setTarget 改成直调
+  // controller.setFilters 绕开单入口，这两条**照样绿**，即它防不住任何回归。
+  // target 接线的真实防线是上面「scope=novel 时 title 档置灰」块里那条
+  // （已改为作用域到 setTarget 函数体）。
+})
+
+describe('SearchSheet 查询语法提示行（spec search-target-mode §7.2）', () => {
+  it('置于输入框正下方：紧跟输入行 view、词条区之前', () => {
+    const inputRow = source.indexOf('@confirm="onConfirm"')
+    const hintRow = source.indexOf("t('searchSheet.querySyntaxHint')")
+    const historyBlock = source.indexOf('v-if="!keyword.trim()"')
+    expect(hintRow).toBeGreaterThan(inputRow)
+    expect(historyBlock).toBeGreaterThan(hintRow)
+  })
+
+  it('仅 keyword.trim() 非空时显示（idle 态不占位），且不改写输入值', () => {
+    const hint = /<view v-if="keyword\.trim\(\)" class="px-4 mt-1 flex-shrink-0">[\s\S]*?<\/view>/.exec(
+      source,
+    )
+    expect(hint, '未找到绑定 keyword.trim() 的提示行容器').not.toBeNull()
+    expect(hint![0]).toContain("t('searchSheet.querySyntaxHint')")
+    expect(hint![0]).toContain('text-label-small text-outline')
+    // 只提示：不校验、不拦截——提示行内不得出现任何对 keyword 的写入
+    expect(hint![0]).not.toContain('keyword =')
+    expect(hint![0]).not.toContain('keyword.value =')
+  })
+
+  it('文案含 spec §7.2 四项语法；且不承诺「大小写无关」（§7.2 文案纪律）', () => {
+    const zh = zhMisc['searchSheet.querySyntaxHint']
+    // oracle = spec §7.2 给定原文的四个语法项：空格=与 / -排除 / OR=或 / ( )
+    expect(zh).toContain('空格=与')
+    expect(zh).toContain('-排除')
+    expect(zh).toContain('OR=或')
+    expect(zh).toContain('( )')
+    // 文案纪律（spec §7.2）：实测 exact_match_for_tags 档大小写敏感（RoSeMaRy → 0 条），
+    // 而本票默认档 partial 大小写无关；两者并存时措辞须避免绝对化。
+    // 这两条是**独立防线**：断言只查片段，不先用 toBe 把全文钉死——钉死后任何「大小写」字样
+    // 都会被上一条连带判定，本条永远绿，纪律形同虚设（Standards A5：恒真/被连带判定的断言）。
+    expect(zh).not.toContain('大小写')
+    expect(enMisc['searchSheet.querySyntaxHint']).not.toMatch(/case/i)
+  })
+
+  it('匹配方式三枚 chip 的 zh 文案 = spec §7.1 给定原文', () => {
+    // oracle = spec §7.1 给定的字面量（标题 + 三枚 chips）
+    expect(zhMisc['searchSheet.targetTitle']).toBe('匹配方式')
+    expect(zhMisc['searchSheet.target.partial']).toBe('标签部分一致')
+    expect(zhMisc['searchSheet.target.exact']).toBe('标签完全一致')
+    expect(zhMisc['searchSheet.target.titleAndCaption']).toBe('标题·说明')
   })
 })

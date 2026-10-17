@@ -1,7 +1,11 @@
 /**
- * 搜索结果 LRU 缓存键（spec §6.2）：word_scope_sort + 筛选规范段。
- * 筛选必须进键——否则换筛选命中脏缓存（#476 派生结论：正确性硬要求）。
+ * 搜索结果 LRU 缓存键（spec docs/specs/search-advanced-filters.md §6.2）：
+ * word_scope_sort + 筛选规范段。
+ * 筛选进键的理由：换筛选会命中脏缓存（#476 派生结论）。⚠️ 这是**前瞻性接线，不是当前
+ * 正确性要求**——本函数零生产消费方（webview 侧 inFlightSearchKey 随 ADR-0203 删除），
+ * 口径与依据见 spec docs/specs/search-target-mode.md §6。
  * aiOverride=follow 不落键（跟随账号设置的结果与无覆盖一致）。
+ * target=partial 同理不落键（默认档与未设档同键，#1026；同上 §6）。
  */
 import { BOOKMARK_BANDS, isDefaultFilters, type SearchFilters } from "./filters";
 import type { SearchScope, SearchSort } from "./buildParams";
@@ -27,5 +31,7 @@ export function buildCacheKey(
   if (filters.ratio !== null) seg.push(`fr=${filters.ratio}`);
   if (filters.minPixels !== null) seg.push(`fw=${filters.minPixels}`);
   if (filters.aiOverride !== "follow") seg.push(`fa=${filters.aiOverride}`);
+  // 追加在末尾：存量非默认筛选的键逐字不变，升级不撞旧缓存。
+  if (filters.target !== "partial") seg.push(`ft=${filters.target}`);
   return `${base}|${seg.join("|")}`;
 }

@@ -4,13 +4,23 @@
 // 期望值出处（oracle 溯源）：
 // - debounce 300ms / 空词立即复位 / isSearching 窗口标记 → spec D2 定案；
 // - scope/sort 切换立即重搜、paginationError 语义、loadMore 双游标；
+// - scope=user 单路请求 / 单游标 / 不经收藏数兜底 → spec docs/specs/search-user-scope.md
+//   §5.3（请求形状见 §5.1：不发 search_target 与筛选参数，故 searchUser 只收三参）；
 // - mergeSearchResults 混排（date 降序 + 同日 illust 优先）；
 // - 实时响应 mock 数据结构来自真实契约：字段形状逐字对齐 lynx api/types.ts
-//   。
+//   ，用户预览直接取一手抓包 fixture（api/__fixtures__/search-users.json）。
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
+import type { SearchResultItem } from "./useSearch"
 import type { SearchTransport } from "../api/search"
-import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS, type SearchFilters } from "@pictelio/search-core"
+import {
+  BOOKMARK_BANDS,
+  DEFAULT_SEARCH_FILTERS,
+  buildNovelSearchRequest,
+  type SearchFilters,
+} from "@pictelio/search-core"
 import { toIllustId, toNovelId, toUserId } from "../api/id"
 import { keyedLadder, ladder } from "../../tests/helpers/attemptLadder"
 import {
@@ -19,6 +29,7 @@ import {
   type PixivIllustListResponse,
   type PixivNovel,
   type PixivNovelListResponse,
+  type PixivUserPreview,
   type SearchSort,
 } from "../api/types"
 
@@ -98,6 +109,26 @@ function novelResponse(items: PixivNovel[], next_url: string | null): PixivNovel
   return { novels: items, next_url }
 }
 
+// ─── 用户搜索样例：一手抓包 fixture（测试硬约束 #2 真实样例） ───
+// GET /v1/search/user?word=水上 的真实响应（spec §3 取证脚本产物）。用户对象**无 profile**
+// （spec §3.2：粉丝/作品数只在 /v1/user/detail），profile_image_urls 只有 medium。
+// 两页划分按 fixture 内的真实顺序：前两条（带 illusts）与后两条（带 novels）。
+const userFixture = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../api/__fixtures__/search-users.json", import.meta.url)), "utf8"),
+) as { user_previews: PixivUserPreview[]; next_url: string | null }
+
+const USER_PAGE1: PixivUserPreview[] = userFixture.user_previews.slice(0, 2)
+const USER_PAGE2: PixivUserPreview[] = userFixture.user_previews.slice(2)
+/** fixture 里的真实 next_url（/v1/search/user?word=水上&filter=for_ios&sort=date_desc&offset=30） */
+const NEXT_USER = userFixture.next_url as string
+
+function userResponse(
+  items: PixivUserPreview[],
+  next_url: string | null,
+): { user_previews: PixivUserPreview[]; next_url: string | null } {
+  return { user_previews: items, next_url }
+}
+
 // ─── fake transport（vi.fn 记录调用；override 控制时序） ───
 
 function createTransport(overrides: Partial<SearchTransport> = {}): SearchTransport {
@@ -106,6 +137,8 @@ function createTransport(overrides: Partial<SearchTransport> = {}): SearchTransp
     searchNovel: vi.fn(async () => novelResponse([], null)),
     searchIllustNext: vi.fn(async () => illustResponse([], null)),
     searchNovelNext: vi.fn(async () => novelResponse([], null)),
+    searchUser: vi.fn(async () => userResponse([], null)),
+    searchUserNext: vi.fn(async () => userResponse([], null)),
     ...overrides,
   }
 }
@@ -140,6 +173,17 @@ async function settle(): Promise<void> {
   }
 }
 
+/**
+ * 结果行的 entity.id（断言助手）：混排 / illust / novel 用例只应含作品行，
+ * 混入 user 行直接抛错——不用 user.id 静默顶替，避免「用户行误入作品结果」被断言吞掉。
+ */
+function entityIds(rows: SearchResultItem[]): number[] {
+  return rows.map((r) => {
+    if (r.type === "user") throw new Error("entityIds: 断言里混入 user 行")
+    return r.entity.id
+  })
+}
+
 describe("mergeSearchResults", () => {
   it("按 create_date 降序交叉混排（iso 字符串字典序）", () => {
     const i1 = makeIllust(1, "2026-08-10T00:00:00+09:00")
@@ -147,7 +191,7 @@ describe("mergeSearchResults", () => {
     const n1 = makeNovel(3, "2026-08-08T00:00:00+09:00")
     const n2 = makeNovel(4, "2026-08-01T00:00:00+09:00")
     const out = mergeSearchResults([i1, i2], [n1, n2])
-    expect(out.map((r) => r.entity.id)).toEqual([1, 3, 2, 4])
+    expect(entityIds(out)).toEqual([1, 3, 2, 4])
   })
 
   it("同一 create_date → illust 优先于 novel（同类型保持相对顺序）", () => {
@@ -158,7 +202,7 @@ describe("mergeSearchResults", () => {
     const out = mergeSearchResults([i1, i2], [n1])
     expect(out.map((r) => r.type)).toEqual(["illust", "illust", "novel"])
     // 同类型返回 0 → 保持服务端相对顺序（V8 稳定排序）
-    expect(out.map((r) => r.entity.id)).toEqual([1, 2, 3])
+    expect(entityIds(out)).toEqual([1, 2, 3])
   })
 
   it("空输入安全", () => {
@@ -292,7 +336,7 @@ describe("useSearch", () => {
       await d2.promise
       await settle() // 排空续体链：fetch → Promise.all → executeSearch
       expect(c.state.status).toBe("ready")
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([2])
+      expect(entityIds(c.state.results)).toEqual([2])
     })
   })
 
@@ -316,7 +360,7 @@ describe("useSearch", () => {
       const c = useSearch({ transport })
       c.search("星空")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([1, 4, 3, 2])
+      expect(entityIds(c.state.results)).toEqual([1, 4, 3, 2])
       expect(c.state.results.map((r) => r.type)).toEqual(["illust", "novel", "novel", "illust"])
       expect(c.state.status).toBe("ready")
     })
@@ -336,6 +380,188 @@ describe("useSearch", () => {
       expect(c.state.error).toBeNull() // 部分降级不置首载错误
       expect(c.state.results.map((r) => r.type)).toEqual(["novel"])
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("[useSearch]"), netErr)
+    })
+  })
+
+  describe("scope=user（spec §5.3：单路请求 / 原样映射 / 单游标）", () => {
+    it("只发 searchUser（三参、不带 filters），插画/小说 transport 零调用", async () => {
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, NEXT_USER)),
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(transport.searchUser).toHaveBeenCalledTimes(1)
+      // 三参即全部参数：用户端点不消费筛选（spec §5.1），传第四参会与该签名不符
+      expect(transport.searchUser).toHaveBeenCalledWith("水上", "date_desc", expect.any(AbortSignal))
+      expect(transport.searchIllust).not.toHaveBeenCalled()
+      expect(transport.searchNovel).not.toHaveBeenCalled()
+      expect(c.state.status).toBe("ready")
+    })
+
+    it("结果原样映射 type=user / date=null（实体逐字段一致，未经任何加工）", async () => {
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, null)),
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.results).toHaveLength(2)
+      expect(c.state.results.map((r) => r.type)).toEqual(["user", "user"])
+      expect(c.state.results.map((r) => r.date)).toEqual([null, null]) // 用户无 create_date
+      // 原样：实体内容与 transport 返回逐字段一致（无字段丢失/重命名/重排）
+      expect(c.state.results[0]!.entity).toStrictEqual(USER_PAGE1[0])
+      expect(c.state.results[1]!.entity).toStrictEqual(USER_PAGE1[1])
+      // fixture 取证：用户对象无 profile（spec §3.2）
+      expect(c.state.results[0]!.entity.user.name).toBe("水上凛香")
+    })
+
+    it("不经收藏数兜底：scope=user 下激活 bookmark 区间仍全量返回（用户无 total_bookmarks）", async () => {
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, null)),
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! })
+      await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+      expect(transport.searchUser).toHaveBeenCalledTimes(2) // 筛选触发重搜
+      expect(c.state.results).toHaveLength(2) // 若走兜底会被 total_bookmarks 缺失滤空
+    })
+
+    it("loadMore：走 user 单游标、追加结果、next_url 为 null 后 hasMore=false", async () => {
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, NEXT_USER)),
+        searchUserNext: vi.fn(async () => userResponse(USER_PAGE2, null)),
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.hasMore).toBe(true)
+      expect(c.state.results).toHaveLength(2)
+      await c.loadMore()
+      expect(transport.searchUserNext).toHaveBeenCalledWith(NEXT_USER, expect.any(AbortSignal))
+      expect(transport.searchIllustNext).not.toHaveBeenCalled()
+      expect(transport.searchNovelNext).not.toHaveBeenCalled()
+      expect(c.state.results).toHaveLength(4)
+      expect(c.state.results.map((r) => r.entity.user.id)).toEqual([860868, 39088846, 2192187, 10262542])
+      expect(c.state.hasMore).toBe(false)
+      expect(c.state.paginationError).toBe(false)
+      expect(c.state.error).toBeNull()
+    })
+
+    it("分页失败：结果保留 + paginationError=true + next_url 不推进（可重试），重试成功复位", async () => {
+      const searchUserNextMock = vi
+        .fn()
+        .mockRejectedValueOnce(netErr)
+        .mockResolvedValueOnce(userResponse(USER_PAGE2, null))
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, NEXT_USER)),
+        searchUserNext: searchUserNextMock,
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      await c.loadMore() // 第一页失败
+      expect(c.state.status).toBe("ready")
+      expect(c.state.results).toHaveLength(2)
+      expect(c.state.error).toContain("网络不可用")
+      expect(c.state.paginationError).toBe(true)
+      expect(c.state.hasMore).toBe(true)
+      await c.loadMore() // 重试
+      await settle()
+      expect(c.state.results).toHaveLength(4)
+      expect(c.state.paginationError).toBe(false)
+      expect(c.state.error).toBeNull()
+    })
+
+    it("首载失败 → status=error（单路不降级：无部分成功分支、不告警）；refresh 重试成功复位", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const searchUserMock = vi
+        .fn()
+        .mockRejectedValueOnce(netErr)
+        .mockResolvedValueOnce(userResponse(USER_PAGE1, null))
+      const transport = createTransport({ searchUser: searchUserMock })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.status).toBe("error")
+      expect(c.state.error).toContain("网络不可用")
+      expect(c.state.results).toEqual([])
+      expect(c.state.hasMore).toBe(false)
+      expect(warn).not.toHaveBeenCalled() // 失败即错误态，无静默/降级
+      await c.refresh()
+      await settle()
+      expect(c.state.status).toBe("ready")
+      expect(c.state.error).toBeNull()
+      expect(c.state.results).toHaveLength(2)
+      expect(searchUserMock).toHaveBeenCalledTimes(2)
+    })
+
+    it("空结果：ready + 空数组 + hasMore=false（判空交给 UI 的空态）", async () => {
+      const transport = createTransport({ searchUser: vi.fn(async () => userResponse([], null)) })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("查无此人")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.status).toBe("ready")
+      expect(c.state.results).toEqual([])
+      expect(c.state.hasMore).toBe(false)
+      expect(c.state.error).toBeNull()
+    })
+
+    it("游标不残留：all（有双游标）→ setScope('user') 且用户无 next → hasMore=false", async () => {
+      const NEXT_I = "https://app-api.pixiv.net/v1/search/illust?word=x&offset=30"
+      const NEXT_N = "https://app-api.pixiv.net/v1/search/novel?word=x&offset=30"
+      const transport = createTransport({
+        searchIllust: vi.fn(async () =>
+          illustResponse([makeIllust(1, "2026-01-03T00:00:00+09:00")], NEXT_I),
+        ),
+        searchNovel: vi.fn(async () => novelResponse([makeNovel(2, "2026-01-01T00:00:00+09:00")], NEXT_N)),
+        searchUser: vi.fn(async () => userResponse([], null)),
+      })
+      const c = useSearch({ transport })
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.hasMore).toBe(true)
+      c.setScope("user")
+      await settle()
+      expect(transport.searchUser).toHaveBeenCalledTimes(1)
+      expect(transport.searchIllust).toHaveBeenCalledTimes(1) // 未再发插画请求
+      expect(transport.searchNovel).toHaveBeenCalledTimes(1)
+      expect(c.state.hasMore).toBe(false)
+      expect(c.state.results).toEqual([])
+    })
+
+    it("dispose：此后 search/setScope/setSort/setFilters/loadMore/refresh/reset 全 no-op", async () => {
+      const transport = createTransport({
+        searchUser: vi.fn(async () => userResponse(USER_PAGE1, NEXT_USER)),
+      })
+      const c = useSearch({ transport })
+      c.setScope("user")
+      c.search("水上")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(c.state.status).toBe("ready")
+      c.dispose()
+      c.search("别的词")
+      c.setScope("all")
+      c.setSort("date_asc")
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "portrait" })
+      await c.loadMore()
+      await c.refresh()
+      c.reset()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(transport.searchUser).toHaveBeenCalledTimes(1) // 仅 dispose 前那次
+      expect(transport.searchUserNext).not.toHaveBeenCalled()
+      expect(transport.searchIllust).not.toHaveBeenCalled()
+      expect(transport.searchNovel).not.toHaveBeenCalled()
+      expect(c.state.results).toHaveLength(2) // 快照不被后续调用改写
     })
   })
 
@@ -444,7 +670,7 @@ describe("useSearch", () => {
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
       await c.loadMore()
       expect(c.state.status).toBe("ready")
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([1]) // 列表保留
+      expect(entityIds(c.state.results)).toEqual([1]) // 列表保留
       expect(c.state.error).toContain("网络不可用")
       expect(c.state.paginationError).toBe(true)
       expect(c.state.hasMore).toBe(true) // next_url 未推进 → 内联重试可再次 loadMore
@@ -519,7 +745,7 @@ describe("useSearch", () => {
       expect(c.state.status).toBe("ready")
       expect(searchIllustMock).toHaveBeenCalledTimes(1) // 未再发插画请求
       expect(c.state.hasMore).toBe(false) // novel 游标为 null + illust 游标已清空
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([3]) // 仅小说新结果
+      expect(entityIds(c.state.results)).toEqual([3]) // 仅小说新结果
     })
 
     it("all 加载期间一侧未 settle：state 保持旧快照，不混拼新旧关键词，settle 后原子落表", async () => {
@@ -537,7 +763,7 @@ describe("useSearch", () => {
       const c = useSearch({ transport: t })
       c.search("old")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([1, 2])
+      expect(entityIds(c.state.results)).toEqual([1, 2])
       // 新词：illust 立即 settle、novel 挂起 → Promise.all 未结束
       phase = "new"
       c.search("new")
@@ -545,11 +771,11 @@ describe("useSearch", () => {
       await settle() // 排空 illust 续体；novel 仍 pending
       expect(c.state.status).toBe("loading")
       // 核心断言：不出现「新词插画 + 旧词小说」混拼（P2-1 修复前此处为 [9, 2]）
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([1, 2])
+      expect(entityIds(c.state.results)).toEqual([1, 2])
       novelDeferred.resolve(novelResponse([makeNovel(4, "2026-01-02T00:00:00+09:00")], null))
       await settle()
       expect(c.state.status).toBe("ready")
-      expect(c.state.results.map((r) => r.entity.id)).toEqual([9, 4])
+      expect(entityIds(c.state.results)).toEqual([9, 4])
     })
 
     it("分页失败重试成功：error/paginationError 复位（banner 消失）", async () => {
@@ -670,6 +896,67 @@ describe("筛选（spec §5.2/§3.4；#474 T4）", () => {
     expect(transport.searchIllust).not.toHaveBeenCalled()
   })
 
+  // ── 匹配方式档位（spec docs/specs/search-target-mode.md §8.5 的控制器验收项）───
+  // §8.5 点名的两条验收此前在测试里零断言（只有注释提到 target），是 code-review Spec 轴的
+  // BLOCK-2。档位 → 请求参数的真值表单点在 search-core（tests/buildParams.test.ts
+  // 「search_target 档位矩阵」§4 表 6 组合 + 反证），本块只锁控制器这一侧。
+  // ⚠️ 锚点只引**小节号**、不引行号：本仓并行改该 spec 频率高，行号锚必然漂移且无声
+  // （第一轮的 `§8.5` 更因该 spec §8 无 `###` 子标题而根本不可解析——已改为真小节）。
+  describe("target 档位切换（spec search-target-mode §8.5）", () => {
+    it("切 exact → 450ms debounce 后重新发起搜索，且请求携带 target=exact", async () => {
+      const transport = createTransport()
+      const c = useSearch({ transport })
+      c.search("花")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(transport.searchIllust).toHaveBeenCalledTimes(1)
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, target: "exact" })
+      await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+      // 「三档切换各自重搜」（§8.5）：档位与 ratio/bookmark/aiOverride 共用
+      // setFilters 这条 FILTER_DEBOUNCE_MS 通道，故断点是「debounce 后发出新一批请求」
+      expect(transport.searchIllust).toHaveBeenCalledTimes(2)
+      expect(transport.searchIllust).toHaveBeenNthCalledWith(
+        2,
+        "花",
+        "date_desc",
+        expect.any(AbortSignal),
+        { ...DEFAULT_SEARCH_FILTERS, target: "exact" },
+      )
+      expect(c.state.filters.target).toBe("exact")
+      await settle()
+      expect(c.state.status).toBe("ready")
+    })
+
+    it("scope=novel + title_and_caption：值保留，且该档不进小说请求（spec §8.5 / §4）", async () => {
+      const searchNovelMock = vi.fn<
+        (
+          word: string,
+          sort: SearchSort,
+          signal?: AbortSignal,
+          filters?: SearchFilters,
+        ) => Promise<PixivNovelListResponse>
+      >(async () => novelResponse([], null))
+      const c = useSearch({ transport: createTransport({ searchNovel: searchNovelMock }) })
+      c.setScope("novel")
+      c.search("花")
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+      expect(searchNovelMock).toHaveBeenCalledTimes(1)
+      c.setFilters({ ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" })
+      await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+      // 值保留（§8.5 + §7.1）：置灰只挡 tap、不清状态，切回插画即恢复
+      expect(c.state.filters.target).toBe("title_and_caption")
+      const sent = searchNovelMock.mock.calls[1]![3]!
+      expect(sent.target).toBe("title_and_caption") // 控制层整份透传，不在这里丢弃
+      // 不携带（§8.5 → §4 表「该端点不识别 → 置灰，值保留不发」）：丢弃发生在请求
+      // 构建层，停在「控制器把值交给 transport」这一层断言不到该纪律 —— 故接真构建函数断端到端
+      // 效果（与 buildParams.test.ts 的区别：那里直接喂字面量，这里喂控制器实际交出的那份 filters）
+      const req = buildNovelSearchRequest({ word: "花", sort: "date_desc", filters: sent })
+      expect(req.endpoint).toBe("/v1/search/novel")
+      expect(Object.keys(req.params)).not.toContain("search_target")
+      await settle()
+      expect(c.state.status).toBe("ready")
+    })
+  })
+
   it("收藏数兜底：非热门路径按 total_bookmarks 本地过滤（spec §7）", async () => {
     const transport = createTransport({
       searchIllust: vi.fn(async () =>
@@ -685,7 +972,7 @@ describe("筛选（spec §5.2/§3.4；#474 T4）", () => {
     await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
     c.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! })
     await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
-    expect(c.state.results.map((r) => r.entity.id)).toEqual([2])
+    expect(entityIds(c.state.results)).toEqual([2])
   })
 
   it("热门路径收藏数不兜底（#478 置灰语义：请求不带参数，本地也不过滤）", async () => {

@@ -22,13 +22,13 @@ import { useHeroSource } from '../composables/heroTransition'
 import { artworkTitle } from '../utils/artworkTitle'
 import { openNovel } from '../utils/novelNavigation'
 import { t, type I18nKey } from '../i18n'
-import type { SearchState, SearchResultItem } from '../primitives/useSearch'
+import type { ContentResultItem, SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useSearchHistoryStore } from '../stores/searchHistoryStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { thumbUrl } from '../utils/imageUrl'
+import { proxyImageUrl, thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
 import BottomSheet from './BottomSheet.vue'
@@ -39,8 +39,15 @@ import {
   DEFAULT_SEARCH_FILTERS,
   resolveAiMode,
   type SearchFilters,
+  type SearchTargetMode,
 } from '@pictelio/search-core'
-import type { SearchScope, SearchSort } from '../api/types'
+import type {
+  PixivIllust,
+  PixivNovel,
+  PixivUserPreview,
+  SearchScope,
+  SearchSort,
+} from '../api/types'
 import { safeBottom } from '../utils/safeArea'
 import { useInputPlaceholderColor } from '../composables/useInputPlaceholderColor'
 import { useSheetDismiss, SHEET_ANIMATION } from '../composables/useSheetDismiss'
@@ -70,12 +77,16 @@ const effectiveAiMode = computed(() =>
 )
 /** 仅看态移除非 AI 行（ADR-0155 only 语义）；mask 走行遮罩，不在数据层移除。
  *  标签静音（ADR-0187 D4 / #732）：命中词表行在**数据层移除**——不进 isRowMasked
- *  （静音=不可见，无需遮罩态，spec docs/specs/tag-mute.md 边界） */
+ *  （静音=不可见，无需遮罩态，spec docs/specs/tag-mute.md 边界）。
+ *  用户行原样透传（spec search-user-scope §5.4）：PixivUserPreview 无 illust_ai_type / tags，
+ *  isAiWork / isTagMuted 的入参均为弱类型，传进去编译期与语义都不成立。 */
 const visibleResults = computed(() => {
   const rows = rawResults.value
-  const aiVisible =
-    effectiveAiMode.value === 'only' ? rows.filter((r) => !settings.isAiWork(r.entity)) : rows
-  return aiVisible.filter((r) => !settings.isTagMuted(r.entity))
+  return rows.filter((r) => {
+    if (r.type === 'user') return true
+    if (effectiveAiMode.value === 'only' && settings.isAiWork(r.entity)) return false
+    return !settings.isTagMuted(r.entity)
+  })
 })
 
 // ── [lynx:fix] 结果列表整树重建防御（ADR-0107 D4 同款，IllustList/Bookmarks 先例）──
@@ -137,6 +148,27 @@ const activeFilterCount = computed(() => countActiveFilters(filters.value))
 const illustDimmed = computed(() => state.value.scope === 'novel')
 const bookmarkDimmed = computed(() => state.value.sort === 'popular_desc')
 
+// scope=user 时整个筛选折叠区隐藏（开关行 + 面板本体各带一道 v-if，见模板注释）：
+// **六个维度**（期间 / 收藏数 / 比例 / 分辨率 / AI 覆盖 / 匹配方式 target）都是插画·小说概念，
+// 用户端点没有对应物（spec search-user-scope.md §5.1）。
+// ⚠️ 六个维度的**不发的理由不同级**，不可合并成一句「不消费」：
+//   · target —— 是**必须不发**：端点对它做枚举校验，传任何取值（空串 / partial_match_for_tags /
+//     title_and_caption / 非法值）一律 400；对照组未知参数名（foo=bar）200 且结果不变
+//     ⇒ 服务端校验已识别参数、忽略未识别参数。「不消费」读起来像「发了无害」，是危险措辞。
+//   · 其余五个筛选维度 —— 实测未发 + 第三方实现同款，**未做反向实验**，属保守选择。
+// 隐藏的收益：scope=user 下这段是死 UI，留着等于给用户一个改了没反应的入口。
+// ⚠️ 本 watch 是**第二重保险**，不是唯一防线：模板里「折叠开关行」与「折叠面板本体」
+//   各自带 `v-if="state.scope !== 'user'"`。只靠这里的状态回写，一旦被删（重构时看不出
+//   它承载可见性），scope=user 下就会露出那块没有入口的悬空面板。
+//   此前本 watch 零机器防线（源码断言只数 `v-if` 出现次数，删掉它照样全绿），
+//   已由 SearchSheet.test.ts 补断言覆盖「scope 变化时收回 filterOpen」这条回写。
+watch(
+  () => state.value.scope,
+  (scope) => {
+    if (scope === 'user') filterOpen.value = false
+  },
+)
+
 function onFilterChange(next: SearchFilters): void {
   controller.setFilters(next)
 }
@@ -162,6 +194,22 @@ const AI_OPTIONS: { value: SearchFilters['aiOverride']; labelKey: I18nKey }[] = 
   { value: 'follow', labelKey: 'searchSheet.ai.follow' },
   { value: 'all', labelKey: 'searchSheet.ai.all' },
   { value: 'hide', labelKey: 'searchSheet.ai.hide' },
+]
+/** 匹配方式三档（spec search-target-mode §3.1/§7.1）。档位→请求参数的映射在 search-core，
+ *  本组件只选档；`novelDisabled` = 该档在小说端**必须不发**——不是「不识别」（一手实测订正）：
+ *  `/v1/search/novel` 对 `search_target=title_and_caption` 直接返回 **HTTP 400**，
+ *  而省略该参数或传 `partial_match_for_tags` 均 200 返 30 条、未知参数名 `foo=bar` 也 200
+ *  ⇒ 是服务端**明确拒绝该取值**，不是「参数名不认识」。UI 复用 illustDimmed 置灰形态。
+ *  ⚠️ 正因是 400 硬拒，「置灰 + 值保留」必须与「不发」成对成立：置灰保值逻辑哪天回归、
+ *  小说端开始真发这个参数，每一次小说搜索都会直接 400 失败。 */
+const TARGET_OPTIONS: { value: SearchTargetMode; labelKey: I18nKey; novelDisabled: boolean }[] = [
+  { value: 'partial', labelKey: 'searchSheet.target.partial', novelDisabled: false },
+  { value: 'exact', labelKey: 'searchSheet.target.exact', novelDisabled: false },
+  {
+    value: 'title_and_caption',
+    labelKey: 'searchSheet.target.titleAndCaption',
+    novelDisabled: true,
+  },
 ]
 
 function bandLabel(band: { min: number; max: number | null }): string {
@@ -198,37 +246,52 @@ function setMinPixels(v: number | null): void {
 function setAiOverride(v: SearchFilters['aiOverride']): void {
   onFilterChange({ ...filters.value, aiOverride: v })
 }
+function setTarget(v: SearchTargetMode): void {
+  onFilterChange({ ...filters.value, target: v })
+}
+/** 该档在当前 scope 是否不可选（scope=novel 时 title 档置灰）。置灰只挡 tap，
+ *  不改 filters.target —— 值保留，切回插画即恢复（与比例/分辨率同款，spec §7.1）。 */
+function isTargetDisabled(opt: (typeof TARGET_OPTIONS)[number]): boolean {
+  return opt.novelDisabled && illustDimmed.value
+}
 function clearAllFilters(): void {
   onFilterChange({ ...DEFAULT_SEARCH_FILTERS })
 }
 
 // ── 结果行渲染辅助 ──
+/** 内容行（插画/小说）：用户行走独立分支，不经缩略图/副标题/R18 等级派生 */
+// ContentResultItem 由 useSearch 导出（与控制器共用一个定义）
+
 function rowKey(row: SearchResultItem): string {
   // item-key 必须 String（ADR-0055/0056）：type 前缀防插画/小说 id 撞 key
+  // 用户行的 id 挂在 entity.user 上（PixivUserPreview 顶层无 id）
+  if (row.type === 'user') return `${row.type}-${row.entity.user.id}`
   return `${row.type}-${row.entity.id}`
 }
 
-function rowThumb(row: SearchResultItem): string {
+function rowThumb(row: ContentResultItem): string {
   // 插画/小说共用 image_urls 契约（square_medium 加速行内缩略图）
   return thumbUrl(row.entity.image_urls)
 }
 
 /** 行式副标题：作者 · 类型/字数（spec D5；字数对齐各列表页 `{{ text_length }} 字` 惯例） */
-function rowSub(row: SearchResultItem): string {
+function rowSub(row: ContentResultItem): string {
   if (row.type === 'novel') return t('searchSheet.charCount', { count: row.entity.text_length })
   const kind = row.entity.type
   return kind === 'manga' ? t('searchSheet.type.manga') : kind === 'ugoira' ? t('searchSheet.type.ugoira') : t('searchSheet.type.illust')
 }
 
 /** R18 等级派生（对齐 RestrictedNovelCard：x_restrict===2 → R-18G，否则 R-18） */
-function restrictLevel(row: SearchResultItem): 1 | 2 {
+function restrictLevel(row: ContentResultItem): 1 | 2 {
   return row.entity.x_restrict === 2 ? 2 : 1
 }
 
 // ── AI 三态（ADR-0155）行遮罩辅助 ──
 
-/** 行是否处于遮罩态：R18 受限 或 AI 遮罩态（R18 优先；AI 段走有效模式注入，#479） */
+/** 行是否处于遮罩态：R18 受限 或 AI 遮罩态（R18 优先；AI 段走有效模式注入，#479）。
+ *  用户行恒 false（PixivUserPreview 无 R18/AI 字段），既兜住类型收窄也符合语义。 */
 function isRowMasked(row: SearchResultItem): boolean {
+  if (row.type === 'user') return false
   return (
     isRestricted(row.entity) ||
     (effectiveAiMode.value === 'mask' && settings.isAiWork(row.entity))
@@ -236,7 +299,7 @@ function isRowMasked(row: SearchResultItem): boolean {
 }
 
 /** AI 等级派生（novel_ai_type===2 → 纯 AI，否则 AI 辅助） */
-function aiLevel(row: SearchResultItem): 1 | 2 {
+function aiLevel(row: ContentResultItem): 1 | 2 {
   // 联合类型不能直接取可选属性——经结构化中间类型收窄（同 settingsStore.isAiWork 形态）
   const item: { illust_ai_type?: number; novel_ai_type?: number } = row.entity
   const t = item.illust_ai_type ?? item.novel_ai_type ?? 0
@@ -244,14 +307,56 @@ function aiLevel(row: SearchResultItem): 1 | 2 {
 }
 
 /** 遮罩行徽章文案（R18 优先；AI 段复用 AiOverlay 域 key） */
-function rowMaskLabel(row: SearchResultItem): string {
+function rowMaskLabel(row: ContentResultItem): string {
   if (isRestricted(row.entity)) return restrictLevel(row) === 2 ? 'R-18G' : 'R-18'
   return aiLevel(row) === 2 ? t('aiOverlay.pure') : t('aiOverlay.assisted')
 }
 
 /** 遮罩行原因文案（复用 RestrictOverlay / AiOverlay 域 key，zh 值逐字一致） */
-function rowMaskHint(row: SearchResultItem): string {
+function rowMaskHint(row: ContentResultItem): string {
   return isRestricted(row.entity) ? t('restrictOverlay.blocked') : t('aiOverlay.maskHint')
+}
+
+// ── 用户行渲染辅助（spec search-user-scope §5.4；实测 user 是轻量对象：无 profile，
+//     profile_image_urls 只有 medium 一个键，故头像只取 medium、不写 px_170x170 回退）──
+
+/** 预览缩略图最多几张（超出部分不可达，/user/:id 是完整出口） */
+const USER_PREVIEW_MAX = 3
+
+/** 渲染降级告警去重集（同一 key 只报一次，防列表重渲染刷屏；禁静默降级） */
+const warnedRenderFallbacks = new Set<string>()
+
+/** reason 只放 ASCII 事实（硬编码中文门禁豁免 console 参数，不豁免普通入参） */
+function warnRenderFallback(key: string, reason: string): void {
+  if (warnedRenderFallbacks.has(key)) return
+  warnedRenderFallbacks.add(key)
+  console.warn(`[SearchSheet] 用户行渲染降级：${reason} (key=${key})`)
+}
+
+/** 头像：实测该响应 profile_image_urls 只有 medium（spec §3.2） */
+function userAvatar(entity: PixivUserPreview): string {
+  // 告警查 proxyImageUrl 的**返回值**而非入参：非信任域绝对 URL 会被它拒绝加载返回空串，
+  // 只查入参会让「字段非空但域外」静默变成空白头像（测试硬约束 #3）。
+  const url = proxyImageUrl(entity.user.profile_image_urls.medium || '')
+  if (!url) warnRenderFallback(`avatar-${entity.user.id}`, `avatar unavailable (userId=${entity.user.id})`)
+  return url
+}
+
+/** 预览缩略图序列：illusts 优先、不足补 novels，最多 USER_PREVIEW_MAX 张 */
+function userPreviewItems(entity: PixivUserPreview): (PixivIllust | PixivNovel)[] {
+  return [...entity.illusts, ...(entity.novels ?? [])].slice(0, USER_PREVIEW_MAX)
+}
+
+/** 预览缩略图走 square_medium（实测预览小说 image_urls 无 original，thumbUrl 已是该口径） */
+function userPreviewThumb(entity: PixivUserPreview, item: PixivIllust | PixivNovel, index: number): string {
+  const url = thumbUrl(item.image_urls)
+  if (!url) warnRenderFallback(`preview-${entity.user.id}-${index}`, `preview item missing thumbnail url (userId=${entity.user.id}, index=${index})`)
+  return url
+}
+
+/** 预览项是否受限：x_restrict > 0 一律不渲染图（spec §5.4——绕过行内遮罩会泄露受限内容） */
+function isPreviewRestricted(item: PixivIllust | PixivNovel): boolean {
+  return item.x_restrict > 0
 }
 
 // ── 输入 ──
@@ -291,6 +396,11 @@ function onResultTap(row: SearchResultItem): void {
   searchSheet.closeSearch()
   if (row.type === 'novel') {
     openNovel(row.entity.id)
+    return
+  }
+  // 用户行进画师主页，无插画 id 可测矩形 ⇒ 不发起 heroTransition（spec §5.4）
+  if (row.type === 'user') {
+    void navigate(`/user/${row.entity.user.id}`)
     return
   }
   heroTransition.begin(row.entity.id) // 发起矩形测量（不等待，决策 12 机制 1：不给导航加可见延迟）
@@ -418,6 +528,12 @@ onBeforeUnmount(() => {
         </view>
       </view>
 
+      <!-- 查询语法提示（spec search-target-mode §7.2）：服务端已解析 AND(空格)/OR/负号排除/括号，
+           这里只做可发现性提示——**不校验、不拦截输入**。有词才占位（idle 态不留空白行）。 -->
+      <view v-if="keyword.trim()" class="px-4 mt-1 flex-shrink-0">
+        <text class="text-label-small text-outline block">{{ t('searchSheet.querySyntaxHint') }}</text>
+      </view>
+
       <!-- 词条区（idle 且无词：spec D5）：搜索历史 chips（单删 × + 全清入口）/ 无历史提示 -->
       <view v-if="!keyword.trim()" class="flex-shrink-0 px-4 mt-4">
         <view class="flex flex-row items-center justify-between">
@@ -444,7 +560,7 @@ onBeforeUnmount(() => {
         <text v-else class="text-body-medium text-outline mt-3 block">{{ t('searchSheet.historyEmptyHint') }}</text>
       </view>
 
-      <!-- scope 段：全部 / 插画 / 小说（空词只更新状态；有词立即重搜，spec US10） -->
+      <!-- scope 段：全部 / 插画 / 小说 / 用户（空词只更新状态；有词立即重搜，spec US10） -->
       <view class="flex flex-row gap-2 px-4 mt-4 flex-shrink-0">
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
@@ -473,10 +589,22 @@ onBeforeUnmount(() => {
         >
           <text class="text-body-small" :class="scopeTextCls(state.scope === 'novel')">{{ t('searchSheet.scope.novel') }}</text>
         </view>
+        <view
+          class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
+          :class="scopeCls(state.scope === 'user')"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="SEARCH_A11Y_LABELS.scopeUser"
+          @tap="onScopeTap('user')"
+        >
+          <text class="text-body-small" :class="scopeTextCls(state.scope === 'user')">{{ t('searchSheet.scope.user') }}</text>
+        </view>
       </view>
 
-      <!-- sort 段（紧凑行）：最新 / 最早 / 热门（热门走独立端点无分页，spec US11） -->
-      <view class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
+      <!-- sort 段（紧凑行）：最新 / 最早 / 热门（热门走独立端点无分页，spec US11）。
+           scope=user 整段隐藏：一手实测（docs/research/verify-search-user-api.sh，三词 × 三档）
+           用户端点**完全忽略** sort——date_asc / date_desc / popular_desc 返回同一 ID 序列。
+           留着 chip 就是给用户一个点了没反应的三选一控件，故与筛选折叠区同样隐藏。 -->
+      <view v-if="state.scope !== 'user'" class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
           :class="sortCls(state.sort === 'date_desc')"
@@ -506,8 +634,12 @@ onBeforeUnmount(() => {
         </view>
       </view>
 
-      <!-- 筛选折叠区开关（#474/#477：默认折叠；激活数徽标；chevron 翻转用字符切换） -->
-      <view class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
+      <!-- 筛选折叠区开关（#474/#477：默认折叠；激活数徽标；chevron 翻转用字符切换）。
+           scope=user 整段隐藏：六个维度（期间/收藏数/比例/分辨率/AI 覆盖/匹配方式 target）用户端点全部不发
+           （spec search-user-scope.md §5.1）。⚠️ 六个维度**不发的理由不同级**：五个筛选维度是
+           「实测未发 + 第三方实现同款、未做反向实验」；target 则是**必须不发**——端点对它做枚举校验，
+           任何取值皆 400（未知参数名反而 200 且结果不变），不是「发了无害」 -->
+      <view v-if="state.scope !== 'user'" class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center flex-1"
           :class="filterOpen ? 'bg-primary-container' : 'bg-surface-container-high'"
@@ -533,14 +665,33 @@ onBeforeUnmount(() => {
         </view>
       </view>
 
-      <!-- 折叠筛选区：view 不滚动 → scroll-view（lynx 滚动容器）；范围/排序联动置灰在 computed -->
+      <!-- 折叠筛选区：view 不滚动 → scroll-view（lynx 滚动容器）；范围/排序联动置灰在 computed。
+           ⚠️ scope=user 时**面板本体自带门控**（与上方开关行成对的第二道 v-if）：不靠
+           watch 收 filterOpen 才隐藏——watch 是第二重保险，不是唯一防线（见 setup 内注释）。 -->
       <scroll-view
-        v-if="filterOpen"
+        v-if="filterOpen && state.scope !== 'user'"
         scroll-orientation="vertical"
         class="mx-4 mt-2 max-h-[42vh] flex-shrink-0 border border-outline rounded-[var(--md-shape-large)] p-3 flex flex-col gap-3"
       >
         <view v-if="activeFilterCount > 0" class="flex flex-row justify-end">
           <text class="text-label-medium text-primary" @tap="clearAllFilters">{{ t('searchSheet.clearAll') }}</text>
+        </view>
+
+        <!-- 匹配方式（spec §7.1：折叠区第一行，与官方「検索オプション」同容器）：
+             三档 chip；scope=novel 时 title 档置灰且点击无效，值保留（映射在 search-core） -->
+        <view>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.targetTitle') }}</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              v-for="opt in TARGET_OPTIONS"
+              :key="opt.value"
+              :class="chipCls(filters.target === opt.value, isTargetDisabled(opt))"
+              @tap="!isTargetDisabled(opt) && setTarget(opt.value)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.target === opt.value)">{{ t(opt.labelKey) }}</text>
+            </view>
+          </view>
+          <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">{{ t('searchSheet.targetDimmedHint') }}</text>
         </view>
 
         <view>
@@ -701,6 +852,48 @@ onBeforeUnmount(() => {
               class="w-full"
             >
               <view class="flex flex-row items-center px-4 py-3" @tap="onResultTap(row)">
+                <!-- 用户行（scope=user，spec §5.4）：画师头像 + 名称 · 账号 + 作品预览缩略图。
+                     user 是轻量对象（无 profile），故不渲染粉丝数/作品数；预览项受限即 scrim 占位 -->
+                <!-- 用户行分支。⚠️ lynx `<list>` 内结构不变量（ADR-0162）：行类型只在
+                     scope 切换时变化，而 scope 切换必经 scopeRestart → view='loading' →
+                     整个 <list> 被摘除 → ready 后以 :key="listEpoch" 整树重建；同 scope 内
+                     所有行同类型 ⇒ 该分支不会在已挂载的 list 上原地翻转，故不需要设备 spike。 -->
+                <template v-if="row.type === 'user'">
+                  <view class="w-[14vw] h-[14vw] rounded-full overflow-hidden flex-shrink-0 bg-surface-container-highest">
+                    <SkeletonImage
+                      :src="userAvatar(row.entity)"
+                      aspect-ratio="1 / 1"
+                      min-h="14vw"
+                      lazy-load
+                      class="w-full h-full"
+                    />
+                  </view>
+
+                  <view class="flex-1 ml-3 min-w-0">
+                    <text class="text-body-medium text-surface-on [max-line:1]" style="word-break: break-all">{{ row.entity.user.name }}</text>
+                    <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]" style="word-break: break-all">{{ row.entity.user.account }}</text>
+                  </view>
+
+                  <!-- 预览缩略图（illusts 优先、不足补 novels，最多 3 张，square_medium） -->
+                  <view class="flex flex-row flex-shrink-0 ml-2">
+                    <view
+                      v-for="(item, i) in userPreviewItems(row.entity)"
+                      :key="i"
+                      class="w-[8vw] h-[8vw] rounded-[var(--md-shape-small)] overflow-hidden flex-shrink-0 ml-[1.333vw]"
+                      :class="isPreviewRestricted(item) ? 'bg-scrim' : 'bg-surface-container-highest'"
+                    >
+                      <SkeletonImage
+                        v-if="!isPreviewRestricted(item)"
+                        :src="userPreviewThumb(row.entity, item, i)"
+                        aspect-ratio="1 / 1"
+                        min-h="8vw"
+                        lazy-load
+                        class="w-full h-full"
+                      />
+                    </view>
+                  </view>
+                </template>
+                <template v-else>
                 <!-- 缩略图：R18/R18G 行 = scrim 遮罩 + 中央徽章（等效行内遮罩，RestrictOverlay
                      流内模式含两行文案，14vw 盒内溢出——badge-only 缩放复用；不预过滤 isRestricted()） -->
                 <view
@@ -734,6 +927,7 @@ onBeforeUnmount(() => {
                     <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]" style="word-break: break-all">{{ row.entity.user.name }} · {{ rowSub(row) }}</text>
                   </template>
                 </view>
+                </template>
 
                 <text class="text-[3.2vw] text-surface-on-variant flex-shrink-0 ml-2">{{ t('searchSheet.rowAction') }}</text>
               </view>
