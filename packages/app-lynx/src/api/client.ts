@@ -185,9 +185,15 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
   // 原判据在**原生通道是死分支**：原生回调只回 status 与响应体，error 恒为 null，
   // 而传输失败（DNS / 连接建立 / 超时）恰是原生通道最常见的失败形态
   // → 落 UNKNOWN 兜底 → 用户只看到无信息量的「未知错误」（issue #807 走查实测）。
-  // 两条通道的 status=0 来源都是确定的：原生侧的传输失败哨兵 + web 侧 fetch 拒绝。
+  // status=0 的来源共三处，全部是「没拿到 HTTP 响应」的哨兵：
+  //   1. 原生侧 `PictelioApiModule.java` catch 分支显式以 0 回调（异常消息放 data 位）；
+  //   2. 同一模块 `result.optInt("status", 0)` 的默认值——响应体畸形/缺字段也落 0；
+  //   3. web 侧 fetch 拒绝（两个调用点都写死 `classifyError(0, err, null)`）。
+  // 判据写 `status === 0` 而**不是** `!status`：后者连 `NaN` 都为真，会把「调用方传了
+  // 垃圾状态码」这个客户端 bug 伪装成网络故障、把用户引去查网络。当前三个来源都给整数 0，
+  // 故两者在可达路径上行为一致，收紧只为封住不可达的误分类（`client.test.ts` 有钉）。
   // 诊断文本一并保留：旧实现只认 TypeError 之外的异常连 message 都被整段丢弃。
-  if (!status) {
+  if (status === 0) {
     const detail = transportDiagnostic(error)
     const suffix = detail ? ` (${detail})` : ""
     return {

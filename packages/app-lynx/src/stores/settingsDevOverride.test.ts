@@ -12,6 +12,14 @@
 //
 // Java 侧形态断言跑在 stripComments 之后的文本上（口径同 utils/darkModeJavaContract.test.ts）：
 // 否则「只在注释里写一句已实现」照样全绿。每个检测器带夹具自检。
+//
+// ⚠️ **已知边界（登记，非缺陷）**：本文件是**文本层契约**，不是 release 行为的证明。
+// 它能钉住的是「`dev_force_translate_r18` 的写入点在 `applyDevIntentHooks` 方法体内，
+// 且该方法首句即 `if (!BuildConfig.DEBUG) return;`」——2026-10-17 grep 复核确认该 key
+// 在 `LynxActivity.java` 只有**一个**写入点（:796），没有绕过守卫的第二条路。
+// 它证不了的是：release 构建里 `BuildConfig.DEBUG` 确实为 false。后者要么靠一次 release
+// APK 的行为观察，要么靠 Gradle 侧断言，当前本仓没有防线——别把「守卫早退存在」
+// 读成「release 一定忽略 extra」。
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { readFileSync } from "node:fs"
 import { ref } from "vue"

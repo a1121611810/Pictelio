@@ -119,6 +119,16 @@ describe('client.classifyError', () => {
     const e = classifyError(0, new TypeError('fetch failed'), null)
     expect(e.type).toBe(ApiErrorType.NETWORK)
   })
+
+  it('status 为 NaN → 不得伪装成网络故障（判据是 `status === 0`，不是 `!status`）', () => {
+    // #807 的判据收紧钉。`!status` 连 NaN 都为真 ⇒ 「调用方传了垃圾状态码」这个
+    // 客户端 bug 会被报成 NETWORK，把用户引去查网络。当前三个 status=0 来源
+    // （原生 catch、原生 optInt 默认值、web fetch 拒绝）都给整数 0，所以这条
+    // 守的是**不可达路径上的误分类**：回归时把 `=== 0` 写回 `!status`，本条转红。
+    const e = classifyError(Number.NaN, null, null)
+    expect(e.type).not.toBe(ApiErrorType.NETWORK)
+    expect(e.type).toBe(ApiErrorType.UNKNOWN)
+  })
 })
 
 describe('client.rewriteUrl', () => {

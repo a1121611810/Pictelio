@@ -145,19 +145,22 @@ describe("regionColorStats（#821：桶数之外的第二个信号）", () => {
     expect(s.flatRatio).toBeGreaterThan(0.3);
   });
 
-  it("实测口径（oracle = 本机 test-results 的真实决策帧，逐像素复算）", () => {
-    // 以下数字是对**同一轮真实运行**留在工作区的证据帧，用与实现同口径
-    // （步长 16、量化步长 24）在对应采样区上复算得到的，不是从实现反推的：
+  it("阈值余量登记：0.6 落在两组实测值之间（正负样本均来自真实决策帧）", () => {
+    // ⚠️ 这**不是**「逐像素复算」用例（早先的用例名这么写，是过度声称）：证据帧在
+    // `test-results/` 下、被 .gitignore 覆盖，仓内 0 张被追踪，无法在 CI 里复算。
+    // 它真实做的是**阈值余量登记**——把两组已登记的实测值对常数量一遍，两端各留约 1/3 余量：
     //   近空白（内容没加载出来）：
-    //     transition-matrix/loaded-r3-recommended.png × REGION_CAROUSEL_IMAGE → 0.853
-    //     transition-matrix/loaded-r1-illusts.png      × REGION_TOPREF        → 0.841
-    //     transition-matrix/loaded-r1-illusts.png      × REGION_RESULTS       → 0.797
+    //     loaded-r3-recommended.png × REGION_CAROUSEL_IMAGE → 0.853
+    //     loaded-r1-illusts.png      × REGION_TOPREF        → 0.841
+    //     loaded-r1-illusts.png      × REGION_RESULTS       → 0.797  ← 取最低的正样本
     //   低方差但**有**内容：
-    //     transition-matrix/loaded-r3-recommended.png × REGION_TOPREF        → 0.355
-    //     transition-matrix/loaded-r3-recommended.png × REGION_RESULTS       → 0.421
+    //     loaded-r3-recommended.png × REGION_TOPREF        → 0.355
+    //     loaded-r3-recommended.png × REGION_RESULTS       → 0.421  ← 取最高的负样本
     //   ↑ 第二组是本判据最硬的正样本：**同一张帧**的插画区是空白、信息条区有内容，
     //     桶数 4 与 23（阈值 25）分居阈值两侧却曾落进同一分支 —— 这正是 #821 的混淆。
-    // 阈值 0.6 落在两组之间：距最低的空白样本 +33%，距最高的「有内容」样本 −30%。
+    //   阈值 0.6 落在两组之间：距最低的空白样本 +33%，距最高的「有内容」样本 −30%。
+    // 数值溯源仍是真实设备逐像素复算（`transition-geometry.ts` 的 oracle 段登记了出处），
+    // 只是**复算动作不在本用例里**，别把它当可重跑的证据链。
     expect(0.797).toBeGreaterThan(NEAR_BLANK_FLAT_RATIO);
     expect(0.421).toBeLessThan(NEAR_BLANK_FLAT_RATIO);
   });
@@ -201,9 +204,14 @@ describe("judgeContentLoaded（#821：近空白 ≠ 低方差有内容）", () =
   });
 
   it("桶数过阈时即使单一色块占比极高也判 loaded —— 富内容可以只有很少的桶", () => {
+    // 入参必须**真的**过阈（88 > 25），否则这条钉不住它自称的东西。
+    // 早先这里写的是 `{buckets: 9, minBuckets: 25}`：9 < 25，用例名说「过阈」而断言
+    // 给的是 `stable-but-low-buckets`，名与断言互相打架（Spec B3）。
+    // 它守的是 `judgeContentLoaded` 的短路顺序：桶数过阈的判定必须**先于**近空白判定，
+    // 否则一个「桶够多但其中一色块占 95%」的富内容区会被误判成 near-blank 而白跑一轮。
     expect(
-      judgeContentLoaded({ buckets: 9, minBuckets: 25, stable: true, flatRatio: 0.5 }).verdict,
-    ).toBe("stable-but-low-buckets");
+      judgeContentLoaded({ buckets: 88, minBuckets: 25, stable: true, flatRatio: 0.95 }).verdict,
+    ).toBe("loaded");
   });
 
   it("桶数低且仍在变化 → loading（真的没加载完，继续等）", () => {

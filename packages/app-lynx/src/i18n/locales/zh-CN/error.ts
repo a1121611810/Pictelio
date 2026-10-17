@@ -1,5 +1,9 @@
 // 错误呈现域（presentError + API 层 classifyError 主文案）。
-// zh 值 = 存量文案逐字快照，迁移期禁改写；{{detail}} 为服务端错误详情（数据非文案，不翻译）。
+// zh 值**原则上**是存量文案逐字快照，迁移期禁改写；{{detail}} 为服务端错误详情
+// （数据非文案，不翻译）。
+// ⚠️ 例外已存在 2 条，均由 #807 引入并有意为之（判据改动要求文案跟着变）：
+//   error.hint.network（补「去哪查」）、error.api.network（新增 {{detail}} 槽）。
+//   新增改动前请先回到 `classifyError`（src/api/client.ts）看判据有没有一起动。
 const zhError = {
   "error.hint.unauthorized": "请重新登录",
   // #807：网络类补「去哪查」——网络自检页是应用内唯一能定位到 DNS/链路层失败的入口

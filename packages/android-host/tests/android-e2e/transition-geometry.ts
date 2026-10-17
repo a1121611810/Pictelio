@@ -84,6 +84,12 @@ export interface RegionColorStats {
  *           loaded-r1-illusts × RESULTS 0.797
  *   有内容  loaded-r3-recommended × TOPREF 0.355 / loaded-r3-recommended × RESULTS 0.421
  *   同一张帧的插画区（空白）与信息条区（有内容）桶数 4 vs 23，是本判据最硬的正负样本对。
+ *
+ * ⚠️ **已知失效面（登记，非缺陷）**：色桶键用 `r,g,b` 三通道量化。
+ * 单测里没有任何一对颜色**只差蓝通道**，故把键里的蓝分量删掉，`unit/transition-geometry.test.ts`
+ * 仍会 36 条全绿——这条单测对蓝通道零判别力。真机上蓝通道参与分桶是对的
+ * （冷暖色调相近、红绿相近的画面必须靠蓝区分），但**改键时不要指望这批单测报错**，
+ * 须另造一对只差蓝的夹具。
  */
 export function regionColorStats(
   region: Region,
