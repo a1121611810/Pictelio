@@ -18,8 +18,8 @@ const HERE = fileURLToPath(new URL(".", import.meta.url))
 const PKG_ROOT = resolve(HERE, "../..")
 const LADDER = resolve(HERE, "attemptLadder.ts")
 
-/** 起一个子 vitest 跑一段用例，返回 {status, output} */
-function runChild(source: string): { status: number | null; output: string } {
+/** 起一个子 vitest 跑一段用例，返回 {status, output}。ladderPath 默认为被测 helper */
+function runChild(source: string, ladderPath: string = LADDER): { status: number | null; output: string } {
   // 必须落在包内：vitest.config.ts 的 include 是 `tests/**/*.test.ts`，
   // 写到系统临时目录会被子进程判为「No test files found」而假失败。
   const dir = mkdtempSync(join(PKG_ROOT, "tests/helpers/.ladder-selfcheck-"))
@@ -29,6 +29,10 @@ function runChild(source: string): { status: number | null; output: string } {
     const r = spawnSync(
       "npx",
       ["vitest", "run", "--config", resolve(PKG_ROOT, "vitest.config.ts"), file],
+      // ⚠️ spawnSync 阻塞事件循环，vitest 无法提前抢占，真正的预算是
+      // vitest.config.ts 的 `testTimeout: 15000`。这里给的值是 spawnSync 自己的
+      // 看门狗，不是用例超时——写成 180s 只会让人以为预算很宽裕。实测两个子 vitest
+      // 冷启合计约 7s，余量不多；别把这个数调大来「防 flaky」，要防就减少子进程数。
       { encoding: "utf8", cwd: PKG_ROOT, timeout: 180_000 },
     )
     return { status: r.status, output: `${r.stdout ?? ""}${r.stderr ?? ""}` }
@@ -82,15 +86,48 @@ it("故意传未登记的标识", () => {
     expect(output).toContain("alpha")
   })
 
-  it("守卫本身非恒真：noteExhaustion 若退化为「只记录不抛错」，上面两条子进程都会变绿", () => {
-    // 把 noteExhaustion 换成不抛错的夹具版本，守卫应当**不再**报错 ⇒
-    // 证明那两条断言真的在守「抛错」这件事，而不是在守别的什么。
-    const source = LADDER
-    const original = readLadder()
-    expect(original).toContain("throw new LadderExhaustedError(message)")
-    // 若有人把 throw 删掉只留 exhausted.push，上面两条子进程断言会同时失败
-    // （它们断言的是子进程必须红）。这条用例把该依赖显式记下来。
-    expect(source).toMatch(/\.ts$/)
+  it("反事实：把收尾守卫的 expect.fail 换成 console.error，上面两条子进程必须**变绿**", () => {
+    // 为什么是这个变异、而不是「删掉 noteExhaustion 的 throw」：
+    // 子进程用例体把多余调用包在 `try {} catch {}` 里**吞掉**了异常（见上面两例），
+    // 所以让子进程变红的**唯一**通路是 `afterEach` 的 `expect.fail`——`throw` 删不删
+    // 子进程都照样红。早先这条用例名写的是「noteExhaustion 退化为只记录不抛错 ⇒ 变绿」，
+    // 那是**错的**：删掉 throw 后 exhausted 照样入队，afterEach 照样 fail。
+    //
+    // 现在做真正能判别的反事实：把守卫从「让用例红」改成「只打日志」，
+    // 子进程就应当变绿 ⇒ 证明前两条守的确实是这个守卫，而不是别的什么。
+    const dir = mkdtempSync(join(PKG_ROOT, "tests/helpers/.ladder-selfcheck-"))
+    try {
+      const mutated = join(dir, "attemptLadder.mutated.ts")
+      const src = readFileSync(LADDER, "utf8")
+      const out = src.replace("expect.fail(", "console.error(")
+      // 变异没生效 = 反事实不成立，必须当场失败（否则会拿未变异的副本去断言「变绿」）
+      expect(out, "守卫变异未生效：源码里已找不到 expect.fail(").not.toBe(src)
+      writeFileSync(mutated, out)
+
+      const { status, output } = runChild(
+        `
+import { expect, it, vi } from "vitest"
+import { ladder } from ${JSON.stringify(mutated)}
+
+it("故意多发一次", () => {
+  const mock = vi.fn()
+  ladder(mock, [() => "第一次的应答"], "selfcheck.searchNovel")
+  expect(mock()).toBe("第一次的应答")
+  try {
+    mock()
+  } catch {}
+  expect(true).toBe(true)
+})
+`,
+        mutated,
+      )
+      // 守卫被换成只打日志 ⇒ 子进程应当**通过**。若这里仍红，说明前两条守的不是这个守卫。
+      expect(status, `去掉守卫后子进程本该通过，却红了。输出：\n${output}`).toBe(0)
+      // 但异常本身还该在（子进程用例体吞掉了它，守卫换了地方打出来）
+      expect(output).toContain("阶梯用尽后又被调用（多发了一次）")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

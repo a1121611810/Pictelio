@@ -134,7 +134,10 @@ for attempt in 1 2 3; do
   AFTER=$($ANALYZE /tmp/flow_fav.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
   AST=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
   ABG=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('bg',''))" 2>/dev/null || echo "")
-  echo "   点击后 chip 底色 $CBG → $ABG，判出态 $AST"
+  # 可观测性：share 是判据的量化输出，不打出来就无法在设备日志里核对
+  # 「这次到底读到多少占比」。设备实测 0.308 是 720×1280 下的值，本脚本跑真机即该量级。
+  ASH=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('share',''))" 2>/dev/null || echo "")
+  echo "   点击后 chip 底色 $CBG → $ABG，判出态 $AST，窗口内占比 ${ASH:-?}"
   if [ "$AST" = "$CST" ]; then
     # 状态读得出来且没变：tap 没命中 chip（或收藏写入失败）。这是**真观测**，
     # 不是「判不出」，所以可以给确定结论。

@@ -150,8 +150,10 @@ expect(pressed).toBe("true");
 
    **`mockResolvedValueOnce` 存量登记（#996 收口，2026-10-17 实测）**：仓内共 **25 处可执行调用 / 8 个文件**仍是「按调用序号一次性分发」（grep 命中 26，另 1 处在 `novelTranslateStore.test.ts:256` 的注释里，不计）。#996 只改了 `useSearch.test.ts`、`watchlistFeed.test.ts`、`notificationStore.test.ts` 三个文件。**关键澄清：本条第三 bullet 的「按标识分发」只针对「同一 target 排多个值、顺序即语义」的情形**；每个 target 每用例只排一个值的单发替身没有分发顺序可言，不受本条约束。按这个标准逐个核对，剩余 25 处分两类：
 
-   - **顺序即被测语义，不可改**（4 处）：`createMixFeed.test.ts:1084`（首屏空、次屏有内容 = 分页）、`createWatchlistToggle.test.ts:74`（先失败后成功 = 重试阶梯）、`rateLimitBackoff.test.ts:153`（先 429 后成功 = 退避阶梯）、`useComments.test.ts:292`（首次返回 1 条、其后走 `mockResolvedValue` 默认 = 在途 `loadMore` 的对照）。
-   - **单发替身，无顺序可混淆**（21 处）：`novelTranslateStore.test.ts` 15 处（`nativeProbeEndpoint` 9 + `nativeGetEndpoint` 2 + `nativeSetApiKey` / `nativeClearEndpoint` / `cacheClear` / `cacheGet` 各 1，逐用例各排一个）、`translationCacheFilesystemBranch.test.ts` 3 处（三个独立用例各排一个）、`useNovelWatchlistToggle.test.ts` 1、`useApiQuery.test.ts` 1。
+   - **顺序即被测语义，不可改**（5 处）：`createMixFeed.test.ts:1084-1085`（同一 target 上链式两次，首屏空、次屏有内容 = 分页）、`createWatchlistToggle.test.ts:74`（先失败后成功 = 重试阶梯）、`rateLimitBackoff.test.ts:153`（先 429 后成功 = 退避阶梯）、`useComments.test.ts:292`（首次返回 1 条、其后走 `mockResolvedValue` 默认 = 在途 `loadMore` 的对照）。
+   - **单发替身，无顺序可混淆**（20 处）：`novelTranslateStore.test.ts` 15 处（`nativeProbeEndpoint` 9 + `nativeGetEndpoint` 2 + `nativeSetApiKey` / `nativeClearEndpoint` / `cacheClear` / `cacheGet` 各 1，逐用例各排一个）、`translationCacheFilesystemBranch.test.ts` 3 处（三个独立用例各排一个）、`useNovelWatchlistToggle.test.ts` 1、`useApiQuery.test.ts` 1。
+
+   计数口径是**可执行调用点**（`grep -c` 排除注释行），故 5 + 20 = 25 与总数对齐；早先写成 4 + 21 少列了 `createMixFeed` 链式的第二行，已订正。
 
    ⚠️ **登记不等于放行**：第二类虽然没有当下的顺序混淆，但「一次性替身」本身仍让断言指向性偏弱（失败时看不出是哪个标识）。改动这些文件时按第一 bullet「等条件，不等时间」的方向升级，不要把本表当成永久豁免。`novelTranslateStore.test.ts` 另有门禁冻结线（仓内最大测试文件），本轮明确不加内容。
 
