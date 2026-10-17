@@ -6,7 +6,9 @@ set -eo pipefail
 # 并在安装前**校验 APK 时间戳**（比本次构建开始时刻新）。
 PKG=io.pictelio.app
 ACT=$PKG/io.pictelio.app.LynxActivity
-MODE="${1:-deepseek}"   # deepseek | mock
+# 缺省走本地 mock 端点（红线：验证不得依赖活着的付费 provider）。要打真实 provider
+# 必须显式传参 —— 上一版缺省 deepseek，等于每次复跑都真实计费。
+MODE="${1:-mock}"     # mock | deepseek
 # 仓库根从本脚本位置推导（tools → android-e2e → tests → android-host → packages → root），
 # 不写死任何机器上的绝对路径——否则换机/换用户即失效。
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd)"
@@ -19,6 +21,7 @@ if [ "$MODE" = "mock" ]; then
 else
   BASE="https://api.deepseek.com"; MODEL="deepseek-flash"
   KEY=$(grep '^DEEPSEEK_API_KEY=' packages/app-lynx/.env | head -1 | sed 's/DEEPSEEK_API_KEY=//' | sed "s/^['\"]//;s/['\"]$//")
+  echo "[e2e] 警告：MODE=$MODE 会向真实付费 provider 发起请求"
 fi
 
 # 构建（带 pipefail）+ 新鲜度校验
@@ -52,6 +55,7 @@ adb shell am force-stop "$PKG"; sleep 2
 adb logcat -c
 adb shell am start -n "$ACT" \
   --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true \
+  --es pictelio_dev_force_translate_r18 true \
   --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" \
   --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel >/dev/null
 # 直达正文页（benchNav novel-detail）：三段式点击链（列表→介绍页→正文）在合成点击下
@@ -60,10 +64,13 @@ adb shell am start -n "$ACT" \
 NOVEL_ID="${NOVEL_ID:-25434593}"
 adb shell am force-stop "$PKG"; sleep 2
 adb logcat -c
-adb shell am start -n "$ACT" --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel-detail --es benchNavNovelId "$NOVEL_ID" >/dev/null
+# R18G 章需要**两个**独立授权：显示（dev_force_r18）与外发（dev_force_translate_r18）。
+# 缺后者则 isTranslationRestricted(2) 在请求发出前就拦下，脚本只会看到「未观察到请求」。
+adb shell am start -n "$ACT" --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true --es pictelio_dev_force_translate_r18 true --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel-detail --es benchNavNovelId "$NOVEL_ID" >/dev/null
 sleep 18
 
 # 定位翻译按钮（蓝色带）并点击；点完必须看到「请求入口」日志，否则重点一次
+REQUEST_SEEN=0
 for attempt in 1 2 3; do
   adb exec-out screencap -p > /tmp/pictelio-e2e/btn-$attempt.png
   Y=$(python3 - <<'PY'
@@ -100,10 +107,24 @@ PY
   sleep 6
   if adb logcat -d | grep -q 'translateStream 入口'; then
     echo "[e2e] 请求已发出（attempt $attempt）"
+    REQUEST_SEEN=1
     break
   fi
   echo "[e2e] 未观察到请求，重试"
 done
+
+# 失败必须**显式**报出。上一版重试耗尽后直接继续往下跑并以 0 退出，调用方
+# （CI / 人工）会把「跑完了」读成「验证通过」—— 阴性结果被当成绿灯是本仓反复在消灭的假绿。
+if [ "$REQUEST_SEEN" -ne 1 ]; then
+  echo "[e2e] 失败：重试耗尽仍未观察到 translateStream 入口日志，请求**未发出**。"
+  echo "[e2e] 常见原因：R18G 闸门拦截（缺 dev_force_translate_r18 授权播种）/"
+  echo "           翻译按钮未渲染/未点到（见下方 logcat 与截图）。"
+  echo "=== JAVA ==="
+  adb logcat -d | grep -E 'R18 gate blocked|translateStream 入口|dev hook' | tail -10 | cut -c1-170
+  echo "=== JS ==="
+  adb logcat -d | grep -E 'novelTranslateStore' | tail -5 | cut -c1-170
+  exit 1
+fi
 
 sleep 30
 echo "=== JAVA ==="

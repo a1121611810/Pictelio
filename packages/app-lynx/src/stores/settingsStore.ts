@@ -802,6 +802,27 @@ export const useSettingsStore = defineStore("settings", () => {
     } catch (e) {
       console.warn("[settingsStore] dev hook dev_force_r18 读取失败（忽略）", e)
     }
+
+    // Dev hook：强制打开「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D3）。
+    // 与上方 dev_force_r18 **刻意分离**：「允许看见受限内容」≠「允许把受限正文发给第三方
+    // LLM」。两个开关是用户视角下的两个独立决定，故此处不读 dev_force_r18、也不共用键——
+    // 共用会让「切一下查看偏好」就把受限内容变得可外发（红线）。
+    //
+    // 只改内存态、**不回写** translateR18Key/translateR18gKey：dev 播种是验证通道的临时授权，
+    // 落盘会伪造出用户从未做过的持久授权（也让登出→重登后残留）。落盘的唯一入口仍是
+    // setTranslateR18/setTranslateR18G（经 UI 的风险确认流程）。
+    //
+    // 键由 LynxActivity.applyDevIntentHooks 在 BuildConfig.DEBUG 门禁下写入
+    // （pictelio_dev_force_translate_r18 extra），release 构建不写该键、本分支恒不命中。
+    try {
+      const devForceTranslate = await prefs().get("dev_force_translate_r18")
+      if (devForceTranslate === "true") {
+        _translateR18.value = true
+        _translateR18G.value = true
+      }
+    } catch (e) {
+      console.warn("[settingsStore] dev hook dev_force_translate_r18 读取失败（忽略）", e)
+    }
   }
 
   function setShowR18(enabled: boolean): void {

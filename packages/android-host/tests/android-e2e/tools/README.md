@@ -40,8 +40,26 @@ dev intent hooks（全部 `BuildConfig.DEBUG` 门禁，release 包不含）：
 | --------------------------------------------------- | ----------------------------------------------------------------- |
 | `pictelio_dev_refresh_token`                        | 自动登录（写 Keystore + OAuth 交换）                              |
 | `pictelio_dev_force_r18`                            | 强制 `showR18` / `showR18G`（否则受限作品不进列表、翻译入口隐藏） |
+| `pictelio_dev_force_translate_r18`                  | 强制**翻译外发授权** `translateR18` / `translateR18G`             |
 | `pictelio_dev_llm_base_url` / `_model` / `_api_key` | 播种翻译 endpoint（apiKey 进 Keystore，其余进 SharedPreferences） |
 | `benchNav`                                          | 直达页面（`novel` = 小说列表等，见 LynxActivity）                 |
+
+⚠️ `pictelio_dev_force_r18` 与 `pictelio_dev_force_translate_r18` **不是同一个开关，不可互相替代**
+（spec §9.7 / ADR-0173 D3）：
+
+| 开关                        | 覆盖的决定                  | 缺它会怎样                                     |
+| --------------------------- | --------------------------- | ---------------------------------------------- |
+| `pictelio_dev_force_r18`    | 允许**看见**受限内容        | 作品渲染成灰占位，翻译入口不出现在 UI 里       |
+| `pictelio_dev_force_translate_r18` | 允许把受限正文**发给第三方 LLM** | 闸门在请求发出前拦下，验证看不到任何请求日志 |
+
+两者合成一个 extra 会让「切一下查看偏好」就把受限内容变得可外发 —— 所以 JS 侧是两个独立 prefs
+键（`dev_force_r18` / `dev_force_translate_r18`）、两个独立 override 块。
+
+第二个键**默认关闭**（`devLoginIntentArgs` 的 `forceTranslateR18` 参数缺省 `false`）：闸门在真机上
+照常工作，默认打开会让「未授权仍被拦」这条契约在 e2e 链路上再也验不到。
+
+两个播种都只改内存态、**不回写**账号级授权键（`settings_translate_r18*_${uid}`）：落盘的授权只能
+经产品 UI 的风险确认流程产生。
 
 ### 已知限制（2026-09-19 实测）
 

@@ -77,6 +77,30 @@ describe("devLoginIntentArgs", () => {
     expect(devLoginIntentArgs("T", false)).not.toContain("pictelio_dev_force_r18");
   });
 
+  it("翻译授权播种 extra 缺省不下发（阴性：默认不授予 R18/R18G 外发授权）", () => {
+    // oracle = 闸门默认拒绝（settingsStore.isTranslationRestricted：x_restrict=2 需
+    // translate_r18g）。harness 默认不得携带该 extra，否则「未授权仍被拦」这条契约
+    // 在 e2e 链路上就再也验不到（红线：显示权限不得蕴含翻译授权）。
+    expect(devLoginIntentArgs("T")).not.toContain("pictelio_dev_force_translate_r18");
+    expect(devLoginIntentArgs("T", false)).not.toContain("pictelio_dev_force_translate_r18");
+  });
+
+  it("显式请求时下发翻译授权播种 extra（阳性：R18G 章可越过闸门）", () => {
+    // oracle = LynxActivity 的 DEBUG 门禁 dev hook（消费侧写 prefs 键
+    // dev_force_translate_r18 → settingsStore.loadSettings 强制翻译授权谓词）。
+    expect(devLoginIntentArgs("T", true, true)).toEqual(
+      expect.arrayContaining(["--es", "pictelio_dev_force_translate_r18", "true"]),
+    );
+  });
+
+  it("翻译授权 extra 独立于显示 extra（关掉显示不影响授权播种，反之亦然）", () => {
+    // 两者是两个刻意分离的决定；任一开关不得连带另一个。
+    expect(devLoginIntentArgs("T", false, true)).toContain("pictelio_dev_force_translate_r18");
+    expect(devLoginIntentArgs("T", false, true)).not.toContain("pictelio_dev_force_r18");
+    expect(devLoginIntentArgs("T", true, false)).toContain("pictelio_dev_force_r18");
+    expect(devLoginIntentArgs("T", true, false)).not.toContain("pictelio_dev_force_translate_r18");
+  });
+
   it("设备 shell 侧单引号包裹：URL-safe 字符原样保留", () => {
     // 真实 token 形态：含 _ 与 -，单引号包裹后 shell 不会展开
     const args = devLoginIntentArgs("aZ-_09AZ-_09AZ-_09AZ-_09AZ-_09AZ-_09AZ0");

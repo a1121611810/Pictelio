@@ -301,7 +301,11 @@ const DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
  * 显式打 `io.pictelio.app/.LynxActivity` 而非 `MAIN_ACTIVITY`：该钩子只在
  * LynxActivity 内实现，落到别的 Activity 上 intent 会被静默忽略。
  */
-export function devLoginIntentArgs(token: string, forceR18 = true): string[] {
+export function devLoginIntentArgs(
+  token: string,
+  forceR18 = true,
+  forceTranslateR18 = false,
+): string[] {
   // token 是设备 shell 侧参数，单引号包裹并转义内嵌单引号，防注入与截断
   const quoted = `'${token.replace(/'/gu, `'\\''`)}'`;
   const args = [
@@ -318,11 +322,21 @@ export function devLoginIntentArgs(token: string, forceR18 = true): string[] {
   // 既没有真实像素（像素判据恒等），又点不进去（导航断言必败）。项目内已有先例：
   // tools/verify-translation.sh:47 与 tools/README.md:42 都带这个 extra。
   if (forceR18) args.push("--es", DEV_EXTRA_FORCE_R18, "true");
+  // 播种「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D3）。**默认关闭**：
+  // 翻译闸门在真机上照常工作，只有显式要验受限章节翻译的用例才该打开它——
+  // 默认打开会让「未授权仍被拦」这条契约在 e2e 链路上再也验不到。
+  // 与 forceR18 是两个独立开关（看见 ≠ 允许外发），任一不得连带另一个。
+  if (forceTranslateR18) args.push("--es", DEV_EXTRA_FORCE_TRANSLATE_R18, "true");
   return args;
 }
 
 /** 强制 R-18 可见的 dev hook extra。oracle = LynxActivity.java:103 DEV_EXTRA_FORCE_R18 */
 const DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
+/**
+ * 强制 R-18/R-18G 翻译外发授权的 dev hook extra。
+ * oracle = LynxActivity 的 DEV_EXTRA_FORCE_TRANSLATE_R18（BuildConfig.DEBUG 门禁）。
+ */
+const DEV_EXTRA_FORCE_TRANSLATE_R18 = "pictelio_dev_force_translate_r18";
 
 /** 登录成功标记。oracle = LynxActivity 内 `dev hook: 自动登录成功` 那一行（实测 2026-09-28） */
 const DEV_LOGIN_SUCCESS_MARK = "dev hook: 自动登录成功";
@@ -405,6 +419,7 @@ export async function loginViaDevIntent(
   timeoutMs = 90_000,
   forceR18 = true,
   attempts = 3,
+  forceTranslateR18 = false,
 ): Promise<void> {
   if (!token) {
     throw new Error(
@@ -423,7 +438,11 @@ export async function loginViaDevIntent(
   for (let attempt = 1; attempt <= attempts; attempt++) {
     // 先杀进程，保证下面的 am start 走完整启动流程并触发 applyDevIntentHooks
     forceStopApp(serial);
-    runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token, forceR18)], TIMEOUTS.adb);
+    runOrThrow(
+      adbPath(),
+      ["-s", serial, ...devLoginIntentArgs(token, forceR18, forceTranslateR18)],
+      TIMEOUTS.adb,
+    );
 
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
