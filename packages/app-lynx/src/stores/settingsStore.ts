@@ -813,7 +813,19 @@ export const useSettingsStore = defineStore("settings", () => {
     // setTranslateR18/setTranslateR18G（经 UI 的风险确认流程）。
     //
     // 键由 LynxActivity.applyDevIntentHooks 在 BuildConfig.DEBUG 门禁下写入
-    // （pictelio_dev_force_translate_r18 extra），release 构建不写该键、本分支恒不命中。
+    // （pictelio_dev_force_translate_r18 extra）。
+    //
+    // ⚠️ **「release 构建不写该键」只在写侧成立，读侧没有任何对应门禁**。debug 与
+    // release 的 applicationId 同为 io.pictelio.app，`adb install -r` 不清
+    // SharedPreferences ⇒ 同一设备先装 debug 播种过、再覆盖装 release，**本分支会命中**，
+    // 于是受限正文被发往第三方 LLM——而用户从未做过外发授权。
+    //
+    // 为什么这里不加门禁：`__DEV__` 在 debug APK 上也是 production
+    // （见 router.ts 关于 benchNav 的同款记录），原生 BuildConfig.DEBUG 目前**没有
+    // 暴露给 JS**，所以 JS 侧没有可用的「是否 debug 构建」判定。真正的修法是给 debug
+    // 加 `applicationIdSuffix`（根治，影响面大）或把 DEBUG 经原生模块暴露给 JS。
+    // 存量同形键 `dev_force_r18` 一样（且已上线），本键只是把它从「允许看见」扩到
+    // 「允许外发」。已显式挂账见 #1035——**别把写侧门禁读成读侧也安全**。
     try {
       const devForceTranslate = await prefs().get("dev_force_translate_r18")
       if (devForceTranslate === "true") {

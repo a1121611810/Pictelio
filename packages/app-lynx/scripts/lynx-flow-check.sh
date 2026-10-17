@@ -47,7 +47,18 @@ adb shell "run-as $PKG sh -c '
   [ -f \$S ] && sed -i \"\|<string name=\\\"capacitor-storage_refresh_token\\\">|d\" \$S'" 2>/dev/null
 adb logcat -c
 adb shell am force-stop $PKG; sleep 1
-adb shell am start -n $PKG/.MainActivity >/dev/null
+# ⚠️ launcher activity **不可写死**：manifest 按 flavor 注入（#116/#117），本脚本写死的
+#   `.MainActivity` 在 lynx flavor 上不存在 ⇒ `am start` 报
+#   「Activity class {io.pictelio.app/io.pictelio.app.MainActivity} does not exist」，
+#   整条真机流程在第 0 步就死掉、后面所有步骤从未被执行过（2026-10-17 实测）。
+#   实测当前解析结果是 `io.pictelio.app/.LynxActivity`。这里改成向系统问，
+#   解析失败才回退到已知的 lynx 类名。
+LAUNCH_ACTIVITY=$(adb shell cmd package resolve-activity --brief \
+  -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PKG" 2>/dev/null \
+  | tr -d '\r' | grep -E "^$PKG/" | head -1)
+[ -n "$LAUNCH_ACTIVITY" ] || LAUNCH_ACTIVITY="$PKG/.LynxActivity"
+echo "   launcher: $LAUNCH_ACTIVITY"
+adb shell am start -n "$LAUNCH_ACTIVITY" >/dev/null
 sleep 9
 
 echo "════ 1. 登录（全自动） ════"
@@ -59,7 +70,7 @@ for i in $(seq 1 12); do
   [ "$STATE" != "blank" ] && break
 done
 if [ "$STATE" = "recommended" ] || [ "$STATE" = "images" ] || [ "$STATE" = "detail" ]; then
-  echo "   ✓ 已自动登录（$STATE）"
+  echo "   ✓ 已自动登录（${STATE}）"
 elif [ "$STATE" = "login" ]; then
   ELEMS=$($ANALYZE /tmp/flow_s.png login-elements)
   IN_Y=$(echo "$ELEMS" | python3 -c "import json,sys; print((json.load(sys.stdin).get('input') or {}).get('y',''))")
@@ -78,7 +89,7 @@ elif [ "$STATE" = "login" ]; then
 else
   echo "❌ 页面异常: $STATE"; exit 1
 fi
-[ "$STATE" != "login" ] && [ "$STATE" != "blank" ] || { echo "❌ 登录未跳转推荐页（$STATE）"; exit 1; }
+[ "$STATE" != "login" ] && [ "$STATE" != "blank" ] || { echo "❌ 登录未跳转推荐页（${STATE}）"; exit 1; }
 echo "   ✓ 登录成功，进入推荐页"
 
 # ─── SETTINGS_ONLY=1：跳过中间回归步骤（收藏/详情/小说/R18），直接验证设置页滚动（issue #90 核心）。
@@ -137,20 +148,20 @@ for attempt in 1 2 3; do
   # 可观测性：share 是判据的量化输出，不打出来就无法在设备日志里核对
   # 「这次到底读到多少占比」。设备实测 0.308 是 720×1280 下的值，本脚本跑真机即该量级。
   ASH=$(echo "$AFTER" | python3 -c "import json,sys; print(json.load(sys.stdin).get('share',''))" 2>/dev/null || echo "")
-  echo "   点击后 chip 底色 $CBG → $ABG，判出态 $AST，窗口内占比 ${ASH:-?}"
+  echo "   点击后 chip 底色 $CBG → ${ABG}，判出态 ${AST}，窗口内占比 ${ASH:-?}"
   if [ "$AST" = "$CST" ]; then
     # 状态读得出来且没变：tap 没命中 chip（或收藏写入失败）。这是**真观测**，
     # 不是「判不出」，所以可以给确定结论。
-    FAV_NOTE="点击后 chip 底色未变（$CBG → $ABG）——tap 未命中 chip 或收藏写入失败"
+    FAV_NOTE="点击后 chip 底色未变（$CBG → ${ABG}）——tap 未命中 chip 或收藏写入失败"
     echo "   ⚠️ 第 $attempt 次：$FAV_NOTE"
     continue
   fi
   if [ "$AST" != "bookmarked" ] && [ "$AST" != "not-bookmarked" ]; then
-    FAV_NOTE="点击后 chip 底色判不出态（$ABG）——本轮不可判定"
+    FAV_NOTE="点击后 chip 底色判不出态（${ABG}）——本轮不可判定"
     echo "   ⚠️ 第 $attempt 次：$FAV_NOTE"
     continue
   fi
-  echo "   ✓ 收藏态切换成功（$CST → $AST，底色 $CBG → $ABG）"
+  echo "   ✓ 收藏态切换成功（$CST → ${AST}，底色 $CBG → ${ABG}）"
   FAV_STATE="$CST → $AST"
   FAV_OK="yes"
   # 还原基线：推荐内容常已是已收藏态，点回原态，避免脚本给账号留痕
@@ -160,7 +171,7 @@ for attempt in 1 2 3; do
   shot fav_restore
   RESTORED=$($ANALYZE /tmp/flow_fav_restore.png bookmark-chip src/styles/tokens.css 2>/dev/null || echo "")
   RST=$(echo "$RESTORED" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null || echo "")
-  [ "$RST" = "$CST" ] && echo "   ✓ 已还原基线态（$RST）" || echo "   ⚠️ 还原未确认（当前 $RST，期望 $CST）——不阻断"
+  [ "$RST" = "$CST" ] && echo "   ✓ 已还原基线态（${RST}）" || echo "   ⚠️ 还原未确认（当前 ${RST}，期望 ${CST}）——不阻断"
   break
 done
 if [ -z "$FAV_OK" ]; then
@@ -191,7 +202,7 @@ for pos in "270 400" "270 500" "540 550"; do
   shot det_try
   ST=$(classify det_try)
   if [ "$ST" = "detail" ]; then
-    echo "   ✓ 进入详情页 at ($1,$2)（classify=$ST）"
+    echo "   ✓ 进入详情页 at ($1,$2)（classify=${ST}）"
     DETAIL_OK="yes"
     break
   fi
@@ -213,18 +224,18 @@ for y in range(250, min(h, 1350), 8):
 print(round(nw / total, 3))
 PYEOF
 )
-echo "   详情页中部非白占比: $DET_NW（大图渲染）"
+echo "   详情页中部非白占比: ${DET_NW}（大图渲染）"
 if python3 -c "exit(0 if float('${DET_NW:-0}') > 0.15 else 1)"; then
   echo "   ✓ 详情大图已渲染"
 else
-  echo "❌ 详情大图未渲染（非白 $DET_NW）"; exit 1
+  echo "❌ 详情大图未渲染（非白 ${DET_NW}）"; exit 1
 fi
 
 echo "════ 5. 详情返回 → 推荐 ════"
 adb shell input keyevent 4; sleep 4
 shot back1
 ST5=$(classify back1)
-[ "$ST5" = "login" ] || [ "$ST5" = "blank" ] || { echo "   ✓ 返回后内容页（$ST5）"; }
+[ "$ST5" = "login" ] || [ "$ST5" = "blank" ] || { echo "   ✓ 返回后内容页（${ST5}）"; }
 # 返回是否成功由步骤 6 兜底：只有推荐页的"小说"入口有效
 
 echo "════ 6. 小说列表 → 正文 → 返回 ════"
@@ -238,7 +249,7 @@ if [ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ]; t
   shot nv1b; ST6=$(classify nv1b)
 fi
 # 小说列表 = 有顶部栏的文本页（text/me；推荐瀑布流 recommended 表示未切过去）
-[ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ] || echo "   ✓ 进入小说列表（$ST6）"
+[ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ] || echo "   ✓ 进入小说列表（${ST6}）"
 [ "$ST6" != "recommended" ] || { echo "❌ 未进入小说列表（仍在推荐页）"; exit 1; }
 # [spec] 小说列表内容非空断言：item-key 传数字 → lynx 220201 illegal item-key → 列表条目不渲染
 # （骨架屏消失后纯空白）。内容区（顶部栏下方）暗色文本像素占比过低视为空白。
@@ -267,13 +278,13 @@ adb shell input keyevent 4; sleep 3   # 正文返回 → 列表
 adb shell input keyevent 4; sleep 3   # 列表返回 → 推荐
 shot nv3
 ST6B=$(classify nv3)
-[ "$ST6B" = "login" ] || [ "$ST6B" = "blank" ] || echo "   ✓ 小说流程完成（$ST6B）"
+[ "$ST6B" = "login" ] || [ "$ST6B" = "blank" ] || echo "   ✓ 小说流程完成（${ST6B}）"
 
 echo "════ 7. 我的 → R18 切换（坐标敏感，失败不阻断） ════"
 adb shell input tap $(sx 900) $(sy 145); sleep 4   # 顶部"我的"
 shot me1
 ST7=$(classify me1)
-[ "$ST7" = "login" ] || [ "$ST7" = "blank" ] || { echo "   ✓ 进入我的页（$ST7）"; }
+[ "$ST7" = "login" ] || [ "$ST7" = "blank" ] || { echo "   ✓ 进入我的页（${ST7}）"; }
 # R18 开关切换（布局随分辨率变化，固定区域对比仅作参考）——png 空防护 + 不阻断
 adb exec-out screencap -p > /tmp/r18_before.png 2>/dev/null
 adb shell input tap $(sx 540) $(sy 740); sleep 2
@@ -303,7 +314,7 @@ echo "   R18 切换后全屏变化像素: $R18_DIFF"
 adb shell input keyevent 4; sleep 3
 shot final
 STF=$(classify final)
-[ "$STF" = "login" ] || [ "$STF" = "blank" ] || echo "   ✓ 返回内容页（$STF）"
+[ "$STF" = "login" ] || [ "$STF" = "blank" ] || echo "   ✓ 返回内容页（${STF}）"
 fi   # ← SETTINGS_ONLY：跳过中间回归步骤的 if 结束
 
 echo "════ 8. 设置页滚动（issue #90：scroll-view + 5 组） ════"
@@ -331,7 +342,7 @@ fi
 # "我的" = 最右侧 tab（右缘偏内 40px ≈ 两字中心；最右块常把 关注/小说/我的 合并成一块）
 ME_X=$(echo "$NAV" | python3 -c "import json,sys; b=json.load(sys.stdin)['blocks']; print(max(0, b[-1]['x1'] - 40))" 2>/dev/null || true)
 ME_Y=$(echo "$NAV" | python3 -c "import json,sys; print(json.load(sys.stdin)['y'])" 2>/dev/null || true)
-[ -n "$ME_X" ] && [ -n "$ME_Y" ] || { echo "❌ 顶栏定位失败（ME_X=$ME_X ME_Y=$ME_Y）"; exit 1; }
+[ -n "$ME_X" ] && [ -n "$ME_Y" ] || { echo "❌ 顶栏定位失败（ME_X=$ME_X ME_Y=${ME_Y}）"; exit 1; }
 echo "   「我的」tab 定位: ($ME_X,$ME_Y)"
 adb shell input tap "$ME_X" "$ME_Y"; sleep 4
 shot me_top
@@ -352,7 +363,7 @@ fi
 adb shell input swipe $(sx 540) $(sy 400) $(sx 540) $(sy 1600) 300; sleep 2   # 滚回顶部
 shot me_top2
 R_TOP2=$(red me_top2)
-echo "   滚回顶部后红色像素：$R_TOP2（应回落）"
+echo "   滚回顶部后红色像素：${R_TOP2}（应回落）"
 [ "$R_TOP2" -lt "$((R_BOT - 10))" ] || echo "   ⚠️ 滚回顶部后红色未明显回落（可能仍在中段）——不阻断"
 
 echo ""
@@ -362,7 +373,7 @@ echo "════════ 完整流程结果 ════════"
 # 「日志宣称验证了实际未验证的事」。
 echo "✅ 已通过的阻断步骤：登录 → 推荐滚动 → 插画详情 → 小说 → 我的/R18 → 设置页滚动"
 if [ -n "$FAV_OK" ]; then
-  echo "✅ 卡片收藏：收藏态切换成功（$FAV_STATE）"
+  echo "✅ 卡片收藏：收藏态切换成功（${FAV_STATE}）"
 else
   echo "⏭ 卡片收藏：本轮未验证（${FAV_NOTE:-未取得可判定的 chip 态}）——回归项，不阻断"
 fi

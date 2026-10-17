@@ -275,8 +275,15 @@ def classify(w, h, rows):
         if mid_ratio > 0.35 and ratio > 0.01:
             # 顶部有标题文字（深色行）+ 中部大块 → 详情页（大图浅色时彩色低）
             dark_top = 0
+            # ⚠️ 扫描区**必须按比例**给，不能写死像素：这里原来写的是 `range(60, 1020)`，
+            #   那是 1080 宽屏的边距。AVD `pictelio_ui` 实测 720×1280 ⇒ x 一旦到 1020
+            #   就越界，`pixel()` 直接 IndexError 崩掉整个分析器——于是 classify 从此
+            #   永远返回不了，flow-check 的每一步都判「页面异常」。
+            #   `flow-check.sh` 的 tap 坐标早就用 `sx/sy` 按屏宽缩放过（见该脚本注释
+            #   「旧脚本硬编码 1080x2400 坐标在低分屏上点击错位」），扫描区却漏了同一处。
+            #   比例式在 1080 宽上复现原意（≈60..1020），在 720 宽上自动收成 ≈40..680。
             for y in range(220, 400, 4):
-                for x in range(60, 1020, 8):
+                for x in range(int(w * 0.055), int(w * 0.945), 8):
                     r, g, b = pixel(rows, y, x)
                     if r < 120 and g < 120 and b < 120:
                         dark_top += 1
