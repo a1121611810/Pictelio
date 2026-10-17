@@ -12,6 +12,7 @@ import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch }
 import type { SearchTransport } from "../api/search"
 import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS, type SearchFilters } from "@pictelio/search-core"
 import { toIllustId, toNovelId, toUserId } from "../api/id"
+import { keyedLadder, ladder } from "../../tests/helpers/attemptLadder"
 import {
   ApiErrorType,
   type PixivIllust,
@@ -256,8 +257,15 @@ describe("useSearch", () => {
       const searchIllustMock = vi.fn<
         (word: string, sort: SearchSort, signal?: AbortSignal, filters?: SearchFilters) => Promise<PixivIllustListResponse>
       >()
-      searchIllustMock.mockImplementationOnce(() => d1.promise)
-      searchIllustMock.mockImplementationOnce(() => d2.promise)
+      // 按**关键词**（业务标识）分发，不按调用序号：本例两次搜索分别查 "a" 与 "ab"，
+      // 序号分发下「第 1 次给 d1、第 2 次给 d2」只是「先后」而非「是谁」的代理——被测代码
+      // 若把两个关键词发反（或复用上一个词），序号链照样绿，而 keyedLadder 直接点名漏登记的词。
+      keyedLadder(
+        searchIllustMock,
+        ([word]: [string]) => word,
+        { a: () => d1.promise, ab: () => d2.promise },
+        "useSearch.searchIllust",
+      )
       // 非 abort-aware 的 fake transport（不因 abort reject）—— 测的是控制器自身防线：
       // settle 后校验 signal.aborted，模拟「旧响应延迟 resolve」仍不回填
       const transport = createTransport({ searchIllust: searchIllustMock })
@@ -489,10 +497,17 @@ describe("useSearch", () => {
       const searchIllustMock = vi.fn(async () =>
         illustResponse([makeIllust(1, "2026-01-03T00:00:00+09:00")], NEXT_I),
       )
-      const searchNovelMock = vi
-        .fn()
-        .mockResolvedValueOnce(novelResponse([makeNovel(2, "2026-01-01T00:00:00+09:00")], NEXT_N))
-        .mockResolvedValueOnce(novelResponse([makeNovel(3, "2026-01-02T00:00:00+09:00")], null))
+      const searchNovelMock = vi.fn()
+      // 两次搜索同一关键词 "a"（all 首载 → setScope('novel') 重搜），业务标识相同、
+      // 尝试序号是唯一可表达的语义 → 走有界阶梯：第 3 次即「多搜了一次」，当场抛错而非顺延。
+      ladder(
+        searchNovelMock,
+        [
+          () => novelResponse([makeNovel(2, "2026-01-01T00:00:00+09:00")], NEXT_N),
+          () => novelResponse([makeNovel(3, "2026-01-02T00:00:00+09:00")], null),
+        ],
+        "useSearch.searchNovel",
+      )
       const c = useSearch({ transport: createTransport({ searchIllust: searchIllustMock, searchNovel: searchNovelMock }) })
       c.search("a")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
@@ -538,10 +553,17 @@ describe("useSearch", () => {
     })
 
     it("分页失败重试成功：error/paginationError 复位（banner 消失）", async () => {
-      const searchIllustNextMock = vi
-        .fn()
-        .mockRejectedValueOnce(netErr)
-        .mockResolvedValueOnce(illustResponse([makeIllust(2, "2026-01-03T00:00:00+09:00")], null))
+      const searchIllustNextMock = vi.fn()
+      // 同一 next_url 的两次翻页（第 1 次失败 → 用户点重试）：URL 不变，尝试序号是唯一
+      // 可表达的语义 → 有界阶梯，第 3 次即「多翻了一次」。
+      ladder(
+        searchIllustNextMock,
+        [
+          () => Promise.reject(netErr),
+          () => Promise.resolve(illustResponse([makeIllust(2, "2026-01-03T00:00:00+09:00")], null)),
+        ],
+        "useSearch.searchIllustNext",
+      )
       const c = useSearch({
         transport: createTransport({
           searchIllust: vi.fn(async () =>

@@ -185,10 +185,19 @@ describe("notificationStore（Pinia：已读推进 / 角标）", () => {
   })
 
   it("已读键读取：缺失 → null（首次使用）；畸形 → warn + null（不静默）", async () => {
-    idbGetMock.mockResolvedValueOnce(null)
+    // 按**槽内容**而非调用序号分发的状态化替身：两次 `loadLastReadMs()` 读的是同一个键
+    // （NOTIFICATIONS_LAST_READ_KEY），序号链「第 1 次 null、第 2 次畸形」只是「先后」而非
+    // 「槽里是什么」的代理——被测代码若多读一次，或把两次读的顺序颠倒，序号链照样绿。
+    let slot: unknown = undefined
+    idbGetMock.mockImplementation(async (key: string) => {
+      expect(key).toBe(NOTIFICATIONS_LAST_READ_KEY)
+      return slot ?? null
+    })
+
+    slot = null
     await expect(loadLastReadMs()).resolves.toBeNull()
 
-    idbGetMock.mockResolvedValueOnce("garbage-timeout")
+    slot = "garbage-timeout"
     await expect(loadLastReadMs()).resolves.toBeNull()
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[notificationStore]"), "garbage-timeout")
   })

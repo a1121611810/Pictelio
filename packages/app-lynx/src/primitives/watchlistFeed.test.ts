@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { mergeWatchlistPage, createWatchlistFeed } from "./watchlistFeed"
 import type { WatchlistNovelListResponse, WatchlistSeries } from "../api/types"
+import { ladder } from "../../tests/helpers/attemptLadder"
 
 function makeSeries(id: number): WatchlistSeries {
   return {
@@ -78,7 +79,17 @@ describe("createWatchlistFeed", () => {
 
   it("fetchMore 失败：pageError 槽置文案 + 已加载内容保留 + nextUrl 保留供重试", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {})
-    const fetchNext = vi.fn().mockRejectedValueOnce(new Error("500")).mockResolvedValueOnce(page([2], null))
+    // 同一 next_url 的两次翻页（第 1 次失败 → 重试）：翻页不改业务标识，尝试序号是唯一
+    // 可表达的语义 → 有界阶梯，第 3 次即「多翻了一次」，当场抛错而非顺延到最后一档。
+    const fetchNext = vi.fn()
+    ladder<[string | null], Promise<WatchlistNovelListResponse>>(
+      fetchNext,
+      [
+        () => Promise.reject(new Error("500")),
+        () => Promise.resolve(page([2], null)),
+      ],
+      "watchlistFeed.fetchMore",
+    )
     const feed = createWatchlistFeed({
       fetchFirst: vi.fn().mockResolvedValue(page([1], "/p2")),
       fetchNext,
@@ -110,10 +121,12 @@ describe("createWatchlistFeed", () => {
     // 被吞的重复调用不得递增竞态代，否则在飞响应落地被丢弃 → 假空态
     let resolveSlow!: (v: WatchlistNovelListResponse) => void
     const slow = new Promise<WatchlistNovelListResponse>((res) => (resolveSlow = res))
-    const fetchFirst = vi
-      .fn()
-      .mockImplementationOnce(() => slow)
-      .mockResolvedValueOnce(page([9], null))
+    const fetchFirst = vi.fn()
+    ladder<[], Promise<WatchlistNovelListResponse>>(
+      fetchFirst,
+      [() => slow, () => Promise.resolve(page([9], null))],
+      "watchlistFeed.refresh(在飞锁)",
+    )
     const feed = createWatchlistFeed({ fetchFirst, fetchNext: vi.fn() })
     const p1 = feed.refresh()
     await feed.refresh() // 在飞锁吞掉：不递增代、不发新请求
@@ -144,12 +157,15 @@ describe("createWatchlistFeed", () => {
     vi.useFakeTimers()
     const onUpdate = vi.fn()
     let resolveNext!: (v: WatchlistNovelListResponse) => void
-    const fetchNext = vi
-      .fn()
-      .mockImplementationOnce(
+    const fetchNext = vi.fn()
+    ladder<[string | null], Promise<WatchlistNovelListResponse>>(
+      fetchNext,
+      [
         () => new Promise<WatchlistNovelListResponse>((resolve) => (resolveNext = resolve)),
-      )
-      .mockResolvedValueOnce(page([3], null))
+        () => Promise.resolve(page([3], null)),
+      ],
+      "watchlistFeed.fetchMore(T1 补触发)",
+    )
     const feed = createWatchlistFeed({
       fetchFirst: vi.fn().mockResolvedValue(page([1], "/next")),
       fetchNext,
@@ -182,9 +198,13 @@ describe("createWatchlistFeed", () => {
     // 页面卸载后挂起的补触发不得继续发请求。
     vi.useFakeTimers()
     // 首个 fetchMore 挂起（在飞中），后续调用直接计次（不应发生）
-    const fetchNext = vi
-      .fn()
-      .mockImplementationOnce(() => new Promise<WatchlistNovelListResponse>(() => undefined))
+    const fetchNext = vi.fn()
+    // 只登记 1 次尝试：dispose 后任何再来一次都是「孤儿翻页」，有界阶梯当场点名
+    ladder<[string | null], Promise<WatchlistNovelListResponse>>(
+      fetchNext,
+      [() => new Promise<WatchlistNovelListResponse>(() => undefined)],
+      "watchlistFeed.fetchMore(dispose)",
+    )
     const feed = createWatchlistFeed({
       fetchFirst: vi.fn().mockResolvedValue(page([1], "/next")),
       fetchNext,
@@ -211,14 +231,20 @@ describe("createWatchlistFeed", () => {
     // 重建会话后旧补触发不得用旧会话继续翻页。
     vi.useFakeTimers()
     // 首个 fetchMore 挂起（在飞中）；refresh 后的 fetchMore 不应再发生
-    const fetchNext = vi
-      .fn()
-      .mockImplementationOnce(() => new Promise<WatchlistNovelListResponse>(() => undefined))
+    const fetchNext = vi.fn()
+    ladder<[string | null], Promise<WatchlistNovelListResponse>>(
+      fetchNext,
+      [() => new Promise<WatchlistNovelListResponse>(() => undefined)],
+      "watchlistFeed.fetchMore(refresh 清挂起)",
+    )
+    const fetchFirst = vi.fn()
+    ladder<[], Promise<WatchlistNovelListResponse>>(
+      fetchFirst,
+      [() => Promise.resolve(page([1], "/next")), () => Promise.resolve(page([9], null))],
+      "watchlistFeed.refresh(清挂起)",
+    )
     const feed = createWatchlistFeed({
-      fetchFirst: vi
-        .fn()
-        .mockResolvedValueOnce(page([1], "/next"))
-        .mockResolvedValueOnce(page([9], null)),
+      fetchFirst,
       fetchNext,
     })
     await feed.refresh()
@@ -266,10 +292,12 @@ describe("createWatchlistFeed 首载落定（settled，ADR-0150）", () => {
   it("refresh 重试期间回到未落定，成功后落定", async () => {
     let resolveSlow!: (v: WatchlistNovelListResponse) => void
     const slow = new Promise<WatchlistNovelListResponse>((res) => (resolveSlow = res))
-    const fetchFirst = vi
-      .fn()
-      .mockResolvedValueOnce(page([1], null))
-      .mockImplementationOnce(() => slow)
+    const fetchFirst = vi.fn()
+    ladder<[], Promise<WatchlistNovelListResponse>>(
+      fetchFirst,
+      [() => Promise.resolve(page([1], null)), () => slow],
+      "watchlistFeed.refresh(落定档)",
+    )
     const feed = createWatchlistFeed({ fetchFirst, fetchNext: vi.fn() })
     await feed.refresh()
     expect(feed.settled()).toBe(true)
