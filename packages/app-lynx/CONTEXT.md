@@ -721,7 +721,7 @@ _Avoid_: 用 `navigator.clipboard`（运行时不存在的对象，可选链会�
 用户输入的搜索文本，即 Pixiv API 的 `word` 参数。**只匹配标签**（在不传 `search_target` 时额外并入标题/简介命中）。搜索历史以关键词为单位持久化。
 
 **关键词的两个硬约束（2026-09-27 实测，勿再推翻）**：
-1. **空格是 AND 分隔符，不是普通字符。** `原神 HoYoverse` = 两个标签同时命中（配 `search_target=exact_match_for_tags`）。由此派生一个**已知失配面**：若 `tags[i].name` 自身含空格（如 `川崎 Sera`），按空格拼接传出会被拆成两个标签 → 实测 0 条；`"川崎 Sera"` 加引号**同样无效**（0 条）。**跟随 Pixiv 官方行为即可，不要自创引号语法。**
+1. **空格是 AND 分隔符，不是普通字符。** `原神 HoYoverse` = 两个标签同时命中（**与 `search_target` 档位无关**：插画端默认「标签部分一致」档不传该参数，空格仍是 AND；见「搜索目标档位」）。由此派生一个**已知失配面**：若 `tags[i].name` 自身含空格（如 `川崎 Sera`），按空格拼接传出会被拆成两个标签 → 实测 0 条；`"川崎 Sera"` 加引号**同样无效**（0 条）。**跟随 Pixiv 官方行为即可，不要自创引号语法。**
 2. **标签与画师名不可混搜，二者是互斥通路。** `/v1/search/illust` 的 `word` 只认标签：实测 `原神 <画师名>` = **0 条**（画师名被当标签筛），纯画师名亦 0 条。画师名必须走**独立端点** `/v1/search/user`（实测 `ソーダ豆汁` 在 user 端点命中 1 个用户）。要「看某画师的其他作品」应走 `/v2/illust/related` 或用户主页作品列表，**不是往作品搜索里掺画师名**。
 _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `word`、为含空格标签自造引号语法
 
@@ -732,6 +732,15 @@ _Avoid_: 声称 `word` 支持画师名、把画师名与标签拼进同一个 `w
 2. **`profile_image_urls` 只有 `medium`**（无 `px_16x16` / `px_50x50` / `px_170x170`）⇒ 头像只取 `medium`；`UserRow.vue` 既有 `medium || px_170x170` 回退分支在这条路径上走不到 `medium` 之外（无害冗余）。
 用户没有 `create_date`（`SearchResultItem.date` 恒 `null`），**不参与混排**——scope=user 是单一类型，无需 `mergeSearchResults`。同理 AI 覆盖 / 标签静音两个客户端过滤器对它不适用（无 `illust_ai_type` / `tags`）。
 _Avoid_: 从 user 行读粉丝/作品数（字段不存在）、用 `word` 端点找画师名（标签与画师名互斥，见上）
+
+**搜索目标档位（Search target mode）**【2026-10-17 新增，#1028，spec `docs/specs/search-target-mode.md`】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
+搜索弹层里用户可选的**匹配方式**三档——标签部分一致（`partial`）/ 标签完全一致（`exact`）/ 标题·说明（`title_and_caption`），行位置在筛选折叠区第一行（与官方「検索オプション」同一容器）。⚠️ 它**不是** API 的 `search_target` 原始值（原始值是 `partial_match_for_tags` / `exact_match_for_tags` / `title_and_caption`），两者的映射**两端不对称**：标签部分一致在插画端是**整个参数不传**、在小说端必须**显式发** `partial_match_for_tags`。标题·说明档在小说端**不被识别属推断**（未实测）⇒ 小说端置灰、值保留不发。标签部分一致是默认档，也是唯一大小写归一成立的档（见下条）。scope=user 时整个筛选折叠区已隐藏，用户端点不消费 `search_target`。
+_Avoid_: 按 `word` 是否含空格推导档位（已移除；含空格不再被强制成「标签完全一致」）、在小说端省略 `partial_match_for_tags`、宣称标题·说明档在小说端可用
+
+**查询语法透传（Query syntax passthrough）**【2026-10-17 新增，#1028，spec `docs/specs/search-target-mode.md` §7.2】（本词条为 app-lynx 自有新增，**非**上述逐字搬运内容）：
+搜索词里的**布尔语法由 pixiv 服务端解析**——空格 = AND、`OR` = 或、`-` 前缀 = 排除、`( )` = 嵌套、全角与半角等价（上面「关键词的两个硬约束」的第 1 条即其中一条）。本仓**只把用户原始 `word` 透传**，不做客户端解析。弹层在输入框正下方给一行提示，**只提示、不校验、不拦截输入**。一手实测（2026-10-16，插画 / 小说双端点 × 四个 `search_target` 档全部成立）：`docs/research/verify-query-syntax.sh` + 结论摘要 `docs/research/pixiv-query-syntax-verified-2026-10.md`。
+⚠️ **大小写归一只在标签部分一致 / 不传档成立**——标签完全一致档实测大小写敏感 ⇒ 提示文案**不得承诺「大小写无关」**。
+_Avoid_: 客户端拼装/解析查询串（与服务端语义重复且易漂移）、在提示文案里写「大小写无关」
 
 ### 图床缓存契约（Image host cache contract）
 

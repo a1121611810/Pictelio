@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import zhMisc from '../i18n/locales/zh-CN/misc'
+import enMisc from '../i18n/locales/en/misc'
 
 const source = readFileSync(fileURLToPath(new URL('./SearchSheet.vue', import.meta.url)), 'utf8')
 
@@ -390,5 +391,101 @@ describe('SearchSheet 用户搜索范围（spec search-user-scope §5.4）', () 
   it('渲染降级告警去重集存在（同一 key 只报一次，防列表重渲染刷屏）', () => {
     expect(source).toContain('const warnedRenderFallbacks = new Set<string>()')
     expect(source).toContain('if (warnedRenderFallbacks.has(key)) return')
+  })
+})
+
+// ─── 匹配方式 + 查询语法提示（issue #1027 / spec docs/specs/search-target-mode.md §7）───
+// oracle = spec §7.1（L113-119 形态与置灰）/ §7.2（L123-130 行位、门控、文案与文案纪律）。
+// 档位→请求参数映射与缓存键在 search-core（#1025 落地），本文件只锁组件侧接线。
+describe('SearchSheet 匹配方式行（spec search-target-mode §7.1）', () => {
+  it('置于筛选折叠区第一行：标题 + 三档 chip，且排在「期间」之前', () => {
+    expect(source).toContain("t('searchSheet.targetTitle')")
+    expect(source).toContain('v-for="opt in TARGET_OPTIONS"')
+    expect(source).toContain('filters.target === opt.value')
+    // 行位：目标行起点 < 期间行起点（清除全部行是维度之上的操作条，不参与此序比较）
+    const targetRow = source.indexOf("t('searchSheet.targetTitle')")
+    const periodRow = source.indexOf("t('searchSheet.periodTitle')")
+    expect(targetRow).toBeGreaterThan(-1)
+    expect(periodRow).toBeGreaterThan(targetRow)
+  })
+
+  it('三枚 chip 的档位值与 t() key 齐备（partial / exact / title_and_caption，spec §3.1 联合类型）', () => {
+    const options = /const TARGET_OPTIONS[^=]*=\s*\[[\s\S]*?\n\]/.exec(source)
+    expect(options).not.toBeNull()
+    expect(options![0]).toContain("value: 'partial'")
+    expect(options![0]).toContain("value: 'exact'")
+    expect(options![0]).toContain("value: 'title_and_caption'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.partial'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.exact'")
+    expect(options![0]).toContain("labelKey: 'searchSheet.target.titleAndCaption'")
+    // 档位类型取自 search-core 单点事实源，不在组件里就地重声明联合类型
+    expect(source).toContain('type SearchTargetMode')
+    expect(source).toContain("from '@pictelio/search-core'")
+  })
+
+  it('scope=novel 时 title 档置灰且点击无效：门控复用 illustDimmed，另两档不置灰', () => {
+    // 小说端点不识别 title_and_caption（spec §4/§7.1）⇒ 仅该档 novelDisabled
+    const options = /const TARGET_OPTIONS[^=]*=\s*\[[\s\S]*?\n\]/.exec(source)
+    expect(options![0]).toContain('novelDisabled: true')
+    expect(options![0].match(/novelDisabled: false/g)).toHaveLength(2)
+    // 门控与比例/分辨率同款（illustDimmed = scope === 'novel'）
+    expect(source).toContain("const illustDimmed = computed(() => state.value.scope === 'novel')")
+    expect(source).toContain('return opt.novelDisabled && illustDimmed.value')
+    // 点击被短路
+    expect(source).toContain('@tap="!isTargetDisabled(opt) && setTarget(opt.value)"')
+    expect(source).toContain('function setTarget(v: SearchTargetMode): void {')
+    expect(source).toContain('onFilterChange({ ...filters.value, target: v })')
+  })
+
+  it('置灰不清值：isTargetDisabled 只读不写（值保留，切回插画恢复，spec §7.1）', () => {
+    const gate = /function isTargetDisabled\([\s\S]*?\n\}/.exec(source)
+    expect(gate).not.toBeNull()
+    // 门控函数体内不得出现对 target 的赋值/复位
+    expect(gate![0]).not.toContain('target:')
+    // 且组件内不存在「scope 变 novel 就把 target 打回 partial」的分支
+    expect(source).not.toContain("target: 'partial'")
+  })
+
+  it('筛选变更走 controller.setFilters（复用既有的 onFilterChange 单一入口，即改即搜）', () => {
+    expect(source).toContain('function onFilterChange(next: SearchFilters): void {')
+    expect(source).toContain('controller.setFilters(next)')
+  })
+})
+
+describe('SearchSheet 查询语法提示行（spec search-target-mode §7.2）', () => {
+  it('置于输入框正下方：紧跟输入行 view、词条区之前', () => {
+    const inputRow = source.indexOf('@confirm="onConfirm"')
+    const hintRow = source.indexOf("t('searchSheet.querySyntaxHint')")
+    const historyBlock = source.indexOf('v-if="!keyword.trim()"')
+    expect(hintRow).toBeGreaterThan(inputRow)
+    expect(historyBlock).toBeGreaterThan(hintRow)
+  })
+
+  it('仅 keyword.trim() 非空时显示（idle 态不占位），且不改写输入值', () => {
+    const hint = /<view v-if="keyword\.trim\(\)" class="px-4 mt-1 flex-shrink-0">[\s\S]*?<\/view>/.exec(
+      source,
+    )
+    expect(hint, '未找到绑定 keyword.trim() 的提示行容器').not.toBeNull()
+    expect(hint![0]).toContain("t('searchSheet.querySyntaxHint')")
+    expect(hint![0]).toContain('text-label-small text-outline')
+    // 只提示：不校验、不拦截——提示行内不得出现任何对 keyword 的写入
+    expect(hint![0]).not.toContain('keyword =')
+    expect(hint![0]).not.toContain('keyword.value =')
+  })
+
+  it('文案 = spec §7.2 给定原文；且不承诺「大小写无关」（§7.2 文案纪律）', () => {
+    // oracle = spec L125 字面量
+    expect(zhMisc['searchSheet.querySyntaxHint']).toBe('空格=与 · -排除 · OR=或 · ( )')
+    // §7.2 L130：exact_match_for_tags 档实测大小写敏感，禁止在提示里承诺相反行为
+    expect(zhMisc['searchSheet.querySyntaxHint']).not.toContain('大小写')
+    expect(enMisc['searchSheet.querySyntaxHint'].toLowerCase()).not.toContain('case')
+  })
+
+  it('匹配方式三枚 chip 的 zh 文案 = spec §7.1 给定原文', () => {
+    // oracle = spec L114/L116 字面量
+    expect(zhMisc['searchSheet.targetTitle']).toBe('匹配方式')
+    expect(zhMisc['searchSheet.target.partial']).toBe('标签部分一致')
+    expect(zhMisc['searchSheet.target.exact']).toBe('标签完全一致')
+    expect(zhMisc['searchSheet.target.titleAndCaption']).toBe('标题·说明')
   })
 })

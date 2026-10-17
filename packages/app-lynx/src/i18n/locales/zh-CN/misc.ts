@@ -131,6 +131,13 @@ const zhMisc = {
   "searchSheet.type.manga": "漫画",
   "searchSheet.type.ugoira": "动图",
   "searchSheet.type.illust": "插画",
+  // 匹配方式三档 + 查询语法提示（spec search-target-mode §7.1/§7.2；档位→请求参数映射在 search-core）
+  "searchSheet.targetTitle": "匹配方式",
+  "searchSheet.target.partial": "标签部分一致",
+  "searchSheet.target.exact": "标签完全一致",
+  "searchSheet.target.titleAndCaption": "标题·说明",
+  "searchSheet.targetDimmedHint": "「标题·说明」仅插画范围可用（已设的值会保留）",
+  "searchSheet.querySyntaxHint": "空格=与 · -排除 · OR=或 · ( )",
 
   // ─── NovelExportSheet.vue（小说导出面板；#511 补抽内容摘要行与设置页指引，
   //     NovelExportSheet.template.test.ts 同步改为 t(key) 调用形态 + zh 字典值双断言） ───

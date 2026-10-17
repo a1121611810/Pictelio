@@ -39,6 +39,7 @@ import {
   DEFAULT_SEARCH_FILTERS,
   resolveAiMode,
   type SearchFilters,
+  type SearchTargetMode,
 } from '@pictelio/search-core'
 import type {
   PixivIllust,
@@ -182,6 +183,17 @@ const AI_OPTIONS: { value: SearchFilters['aiOverride']; labelKey: I18nKey }[] = 
   { value: 'all', labelKey: 'searchSheet.ai.all' },
   { value: 'hide', labelKey: 'searchSheet.ai.hide' },
 ]
+/** 匹配方式三档（spec search-target-mode §3.1/§7.1）。档位→请求参数的映射在 search-core，
+ *  本组件只选档；`novelDisabled` = 小说端点不识别该档（spec §4），复用 illustDimmed 置灰形态。 */
+const TARGET_OPTIONS: { value: SearchTargetMode; labelKey: I18nKey; novelDisabled: boolean }[] = [
+  { value: 'partial', labelKey: 'searchSheet.target.partial', novelDisabled: false },
+  { value: 'exact', labelKey: 'searchSheet.target.exact', novelDisabled: false },
+  {
+    value: 'title_and_caption',
+    labelKey: 'searchSheet.target.titleAndCaption',
+    novelDisabled: true,
+  },
+]
 
 function bandLabel(band: { min: number; max: number | null }): string {
   return band.max === null ? `${band.min}+` : `${band.min}-${band.max}`
@@ -216,6 +228,14 @@ function setMinPixels(v: number | null): void {
 }
 function setAiOverride(v: SearchFilters['aiOverride']): void {
   onFilterChange({ ...filters.value, aiOverride: v })
+}
+function setTarget(v: SearchTargetMode): void {
+  onFilterChange({ ...filters.value, target: v })
+}
+/** 该档在当前 scope 是否不可选（scope=novel 时 title 档置灰）。置灰只挡 tap，
+ *  不改 filters.target —— 值保留，切回插画即恢复（与比例/分辨率同款，spec §7.1）。 */
+function isTargetDisabled(opt: (typeof TARGET_OPTIONS)[number]): boolean {
+  return opt.novelDisabled && illustDimmed.value
 }
 function clearAllFilters(): void {
   onFilterChange({ ...DEFAULT_SEARCH_FILTERS })
@@ -491,6 +511,12 @@ onBeforeUnmount(() => {
         </view>
       </view>
 
+      <!-- 查询语法提示（spec search-target-mode §7.2）：服务端已解析 AND(空格)/OR/负号排除/括号，
+           这里只做可发现性提示——**不校验、不拦截输入**。有词才占位（idle 态不留空白行）。 -->
+      <view v-if="keyword.trim()" class="px-4 mt-1 flex-shrink-0">
+        <text class="text-label-small text-outline block">{{ t('searchSheet.querySyntaxHint') }}</text>
+      </view>
+
       <!-- 词条区（idle 且无词：spec D5）：搜索历史 chips（单删 × + 全清入口）/ 无历史提示 -->
       <view v-if="!keyword.trim()" class="flex-shrink-0 px-4 mt-4">
         <view class="flex flex-row items-center justify-between">
@@ -627,6 +653,23 @@ onBeforeUnmount(() => {
       >
         <view v-if="activeFilterCount > 0" class="flex flex-row justify-end">
           <text class="text-label-medium text-primary" @tap="clearAllFilters">{{ t('searchSheet.clearAll') }}</text>
+        </view>
+
+        <!-- 匹配方式（spec §7.1：折叠区第一行，与官方「検索オプション」同容器）：
+             三档 chip；scope=novel 时 title 档置灰且点击无效，值保留（映射在 search-core） -->
+        <view>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.targetTitle') }}</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              v-for="opt in TARGET_OPTIONS"
+              :key="opt.value"
+              :class="chipCls(filters.target === opt.value, isTargetDisabled(opt))"
+              @tap="!isTargetDisabled(opt) && setTarget(opt.value)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.target === opt.value)">{{ t(opt.labelKey) }}</text>
+            </view>
+          </view>
+          <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">{{ t('searchSheet.targetDimmedHint') }}</text>
         </view>
 
         <view>

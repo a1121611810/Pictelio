@@ -371,8 +371,6 @@ export interface PixivCommentReplyResponse {
 
 export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
 
-export type SearchTarget = "partial_match_for_tags" | "exact_match_for_tags" | "title_and_caption";
-
 /** 与 search-core 的同名联合是既有镜像（packages/search-core/src/buildParams.ts），增删档位两处都要改 */
 export type SearchScope = "all" | "illust" | "novel" | "user";
 

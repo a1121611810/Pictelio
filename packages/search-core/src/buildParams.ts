@@ -3,10 +3,10 @@
  *
  * 真值 oracle：docs/research/pixiv-appapi-search-filter-params.md（Pixiv-Shaft 对齐
  * iOS 官方 8.6.5-8.7.3 抓包）。关键规则：
- * - `search_target` 修复（spec §6.1，Shaft #906/#1038）：illust 端单词标签**不传**该参数
- *   （不传 ≡ partial 且并入标题命中；显式传 partial 反而做严格 tag 匹配并忽略 merge 参数）；
- *   novel 端**恒显式传**（不传退化为纯字面匹配、同义词不展开）；含空格多标签两端都传
- *   `exact_match_for_tags`。
+ * - `search_target` 由**用户可选档位**决定（spec docs/specs/search-target-mode.md §4，两端不对称）：
+ *   illust 端 partial → **整个参数不传**（显式传 partial 会转严格标签匹配并忽略
+ *   merge_plain_keyword_results，Shaft #906）；novel 端 partial → **显式发**（不传退化为纯字面
+ *   匹配、同义词不展开，#1038）。novel 端不识别 title_and_caption（该端点不消费，UI 置灰）。
  * - 恒发 `merge_plain_keyword_results=true` / `include_translated_tag_results=true`
  *   （iOS/Shaft/pixez 一致）。`include_potential_violation_works` 维持不传（iOS 默认 false
  *   会隐藏部分作品）。`search_ai_type` 不接入（#479 裁决）。
@@ -19,7 +19,7 @@
  *   第三方实现（pixez / Mako）同款；该端点无 popular-preview 对应物，三档 sort 一律直发。
  */
 import { resolvePeriodRange } from "./period";
-import type { SearchFilters } from "./filters";
+import type { SearchFilters, SearchTargetMode } from "./filters";
 
 export type SearchScope = "all" | "illust" | "novel" | "user";
 export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
@@ -58,14 +58,30 @@ function baseParams(word: string): Record<string, string> {
   };
 }
 
-/** 插画端匹配方式：单词标签 → 不传（undefined 语义）；多标签 → exact（spec §6.1） */
-function illustTargetParam(word: string): string | null {
-  return word.includes(" ") ? "exact_match_for_tags" : null;
-}
+/**
+ * 档位 → `search_target` 原始值映射（spec search-target-mode §4）。**两端不对称，别写反。**
+ * `null` = 该端点不发送此参数。
+ */
+const ILLUST_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
+  partial: null,
+  exact: "exact_match_for_tags",
+  title_and_caption: "title_and_caption",
+};
 
-/** 小说端匹配方式：恒显式传（不传 = 纯字面匹配，#1038） */
-function novelTargetParam(word: string): string {
-  return word.includes(" ") ? "exact_match_for_tags" : "partial_match_for_tags";
+const NOVEL_TARGET_PARAMS: Record<SearchTargetMode, string | null> = {
+  partial: "partial_match_for_tags",
+  exact: "exact_match_for_tags",
+  // 小说端不识别该档（spec §4 证据强度：Mako 枚举只有 partial/exact/text/keyword），置灰不发送
+  title_and_caption: null,
+};
+
+function applyTarget(
+  params: Record<string, string>,
+  table: Record<SearchTargetMode, string | null>,
+  mode: SearchTargetMode,
+): void {
+  const value = table[mode];
+  if (value !== null) params.search_target = value;
 }
 
 /** 期间段：popular-preview 同样接受期间（透传）；收藏数段见 applyBookmark（#478） */
@@ -98,8 +114,7 @@ export function buildIllustSearchRequest(input: BuildSearchRequestInput): BuiltS
   const endpoint = popular ? "/v1/search/popular-preview/illust" : "/v1/search/illust";
   const params = baseParams(word);
   if (!popular) params.sort = sort;
-  const target = illustTargetParam(word);
-  if (target !== null) params.search_target = target;
+  applyTarget(params, ILLUST_TARGET_PARAMS, filters.target);
   applyPeriod(params, filters, now);
   applyBookmark(params, filters, popular);
   if (filters.ratio !== null) params.ratio_pattern = filters.ratio;
@@ -116,7 +131,7 @@ export function buildNovelSearchRequest(input: BuildSearchRequestInput): BuiltSe
   const endpoint = popular ? "/v1/search/popular-preview/novel" : "/v1/search/novel";
   const params = baseParams(word);
   if (!popular) params.sort = sort;
-  params.search_target = novelTargetParam(word);
+  applyTarget(params, NOVEL_TARGET_PARAMS, filters.target);
   applyPeriod(params, filters, now);
   applyBookmark(params, filters, popular);
   // 比例/分辨率是插画专属维度：小说路**永不携带**（即使状态残留——#476 置灰不清值 + #475 §2）

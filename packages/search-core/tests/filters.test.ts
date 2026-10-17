@@ -43,8 +43,25 @@ describe("countActiveFilters / isDefaultFilters", () => {
         ratio: "square",
         minPixels: 1000,
         aiOverride: "all",
+        target: "partial",
       }),
     ).toBe(4);
+  });
+
+  // oracle：spec docs/specs/search-target-mode.md §6「countActiveFilters：非默认档计 1
+  // （筛选入口徽标随之亮）」+ §6「isDefaultFilters 同步纳入 target === 'partial'」
+  it("档位维：partial 不计激活；exact / title_and_caption 各计 1", () => {
+    expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, target: "partial" })).toBe(0);
+    expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, target: "exact" })).toBe(1);
+    expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" })).toBe(1);
+  });
+
+  it("档位非默认即 isDefaultFilters=false（默认键的唯一判据）", () => {
+    expect(isDefaultFilters({ ...DEFAULT_SEARCH_FILTERS, target: "partial" })).toBe(true);
+    expect(isDefaultFilters({ ...DEFAULT_SEARCH_FILTERS, target: "exact" })).toBe(false);
+    expect(isDefaultFilters({ ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" })).toBe(
+      false,
+    );
   });
 });
 
@@ -57,6 +74,7 @@ describe("normalizeFilters（不可信输入逐字段校验，非法回默认）
         ratio: "landscape",
         minPixels: 2000,
         aiOverride: "all",
+        target: "exact",
       }),
     ).toEqual({
       period: { kind: "preset", preset: "6m" },
@@ -64,6 +82,7 @@ describe("normalizeFilters（不可信输入逐字段校验，非法回默认）
       ratio: "landscape",
       minPixels: 2000,
       aiOverride: "all",
+      target: "exact",
     });
   });
 
@@ -96,5 +115,21 @@ describe("normalizeFilters（不可信输入逐字段校验，非法回默认）
     expect(normalizeFilters({ minPixels: 0 }).minPixels).toBeNull();
     expect(normalizeFilters({ aiOverride: "only" }).aiOverride).toBe("follow");
     expect(normalizeFilters({})).toEqual(DEFAULT_SEARCH_FILTERS);
+  });
+
+  // oracle：spec docs/specs/search-target-mode.md §6「normalizeFilters：逐字段校验，
+  // 非法值回 partial（与既有一致回默认的纪律）」+ §3.1「档位名与 API 原始值不是一回事」
+  it("档位逐值校验：三档原样保留；非法值与 API 原始值一律回 partial", () => {
+    for (const mode of ["partial", "exact", "title_and_caption"] as const) {
+      expect(normalizeFilters({ target: mode }).target).toBe(mode);
+    }
+    // 原始 search_target 值不是合法档位名——档位与线上值不可混用
+    expect(normalizeFilters({ target: "partial_match_for_tags" }).target).toBe("partial");
+    expect(normalizeFilters({ target: "exact_match_for_tags" }).target).toBe("partial");
+    expect(normalizeFilters({ target: "keyword" }).target).toBe("partial");
+    expect(normalizeFilters({ target: "text" }).target).toBe("partial");
+    expect(normalizeFilters({ target: "" }).target).toBe("partial");
+    expect(normalizeFilters({ target: 7 }).target).toBe("partial");
+    expect(normalizeFilters({}).target).toBe("partial");
   });
 });

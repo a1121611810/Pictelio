@@ -147,10 +147,26 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     expect(result).toEqual(ILLUST_RESPONSE)
   })
 
-  it("searchIllust 关键词含空格 → search_target=exact_match_for_tags", async () => {
+  // ⚠️ 有意的行为变更（spec docs/specs/search-target-mode.md §5，2026-10-17）：
+  // 含空格的词**不再**自动转 exact_match_for_tags。搜索目标改为用户可选，默认档 partial
+  // 在插画端「整个 search_target 参数不传」——服务端于是把 tag 命中与标题/关键字命中合并返回，
+  // 多词查询结果**变多**（实测 `Rosmontis rosemary`：exact 1 条 / partial 4 条）。
+  // 这是要修的「多词丢关键字命中」，不是退化。发布说明与 commit message 须按 spec §5 标注。
+  it("searchIllust 关键词含空格 → 仍不传 search_target（默认档 partial；档位单点在 search-core）", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     await searchIllust("Fate night")
-    // 空格派生：含空格 → exact_match_for_tags（target 规则单点在 search-core）
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/v1/search/illust?word=Fate+night&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&sort=date_desc",
+      expect.anything(),
+    )
+  })
+
+  it("searchIllust 显式档位 exact → 带 search_target=exact_match_for_tags", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
+    await searchIllust("Fate night", "date_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      target: "exact",
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       "/pixiv-api/v1/search/illust?word=Fate+night&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&sort=date_desc&search_target=exact_match_for_tags",
       expect.anything(),

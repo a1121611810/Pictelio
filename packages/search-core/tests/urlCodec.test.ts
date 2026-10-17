@@ -11,6 +11,7 @@ const FULL = {
   ratio: "portrait" as const,
   minPixels: 1000,
   aiOverride: "hide" as const,
+  target: "partial" as const,
 };
 
 describe("encodeFiltersQuery / decodeFiltersQuery", () => {

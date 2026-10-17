@@ -1,5 +1,6 @@
 /**
- * 缓存键真值表。oracle：spec §6.2（word_scope_sort + 筛选规范段；aiOverride=follow 不落键）。
+ * 缓存键真值表。oracle：spec §6.2（word_scope_sort + 筛选规范段；aiOverride=follow 不落键）
+ * + docs/specs/search-target-mode.md:100-101（档位落键规则）。
  */
 import { describe, expect, it } from "vitest";
 import { buildCacheKey } from "../src/cacheKey";
@@ -47,6 +48,76 @@ describe("buildCacheKey", () => {
       period: { kind: "preset", preset: "1m" },
     });
     expect(a).not.toBe(b);
+  });
+
+  // oracle：docs/specs/search-target-mode.md:100「partial（默认）不落键」
+  it("target=partial 与默认档逐字同键（含骨架断言，禁 ft 段）", () => {
+    const key = buildCacheKey("東方", "all", "date_desc", {
+      ...DEFAULT_SEARCH_FILTERS,
+      target: "partial",
+    });
+    expect(key).toBe(buildCacheKey("東方", "all", "date_desc", DEFAULT_SEARCH_FILTERS));
+    expect(key).toBe("東方_all_date_desc");
+    expect(key).not.toContain("ft=");
+    // 存量非默认筛选的键逐字不变（ft 追加在末尾 ⇒ 升级不撞旧缓存）
+    expect(
+      buildCacheKey("東方", "all", "date_desc", {
+        ...DEFAULT_SEARCH_FILTERS,
+        period: { kind: "preset", preset: "1w" },
+        target: "partial",
+      }),
+    ).toBe("東方_all_date_desc|fp=1w");
+  });
+
+  // oracle：docs/specs/search-target-mode.md:101「非默认落 ft=exact / ft=title_and_caption」
+  it("非默认档落对应 ft 段", () => {
+    expect(
+      buildCacheKey("東方", "all", "date_desc", { ...DEFAULT_SEARCH_FILTERS, target: "exact" }),
+    ).toBe("東方_all_date_desc|ft=exact");
+    expect(
+      buildCacheKey("東方", "all", "date_desc", {
+        ...DEFAULT_SEARCH_FILTERS,
+        target: "title_and_caption",
+      }),
+    ).toBe("東方_all_date_desc|ft=title_and_caption");
+  });
+
+  // 段序 oracle：src/cacheKey.ts 追加顺序 fp/fd → fb → fr → fw → fa → ft（ft 在末尾，
+  // 存量非默认筛选键逐字不变）。
+  it("档位段与其他筛选段共存时键序稳定", () => {
+    expect(
+      buildCacheKey("東方", "illust", "date_desc", {
+        period: { kind: "preset", preset: "1w" },
+        bookmark: BOOKMARK_BANDS[3]!,
+        ratio: "landscape",
+        minPixels: 2000,
+        aiOverride: "hide",
+        target: "exact",
+      }),
+    ).toBe("東方_illust_date_desc|fp=1w|fb=3|fr=landscape|fw=2000|fa=hide|ft=exact");
+    expect(
+      buildCacheKey("東方", "illust", "date_desc", {
+        period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" },
+        bookmark: null,
+        ratio: null,
+        minPixels: null,
+        aiOverride: "follow",
+        target: "title_and_caption",
+      }),
+    ).toBe("東方_illust_date_desc|fd=2026-08-01_2026-08-15|ft=title_and_caption");
+  });
+
+  it("档位维度互异且不与默认档同键（防脏缓存核心断言）", () => {
+    const keys = [
+      buildCacheKey("w", "all", "date_desc", DEFAULT_SEARCH_FILTERS),
+      buildCacheKey("w", "all", "date_desc", { ...DEFAULT_SEARCH_FILTERS, target: "partial" }),
+      buildCacheKey("w", "all", "date_desc", { ...DEFAULT_SEARCH_FILTERS, target: "exact" }),
+      buildCacheKey("w", "all", "date_desc", {
+        ...DEFAULT_SEARCH_FILTERS,
+        target: "title_and_caption",
+      }),
+    ];
+    expect(new Set(keys).size).toBe(3);
   });
 
   // oracle：docs/specs/search-user-scope.md §5.1「cacheKey.ts 无需改动：

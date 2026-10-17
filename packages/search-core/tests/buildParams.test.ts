@@ -2,8 +2,10 @@
  * 参数构建真值表。oracle：docs/research/pixiv-appapi-search-filter-params.md
  * - §1.1/§1.2 基础与筛选参数行（官方 iOS 抓包值）
  * - §3/§4 popular-preview：接受筛选但**无 sort、无分页、收藏数被忽略**
- * - §6.1 search_target 修复：Shaft #906（illust 显式 partial 丢标题命中→不传）、
- *   #1038（novel 不传退化为纯字面匹配→恒显式 partial）
+ * - 档位映射 oracle：docs/specs/search-target-mode.md §4 表（两端不对称）
+ *   + Shaft #906（illust 显式 partial 会丢标题命中 → 改不传）
+ *   + #1038（novel 不传退化为纯字面匹配 → 恒显式 partial）
+ *   + docs/research/verify-query-syntax.sh 一手实测（四档 × 双端点）
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -23,7 +25,7 @@ const input = (over: Partial<Parameters<typeof buildIllustSearchRequest>[0]> = {
 });
 
 describe("buildIllustSearchRequest", () => {
-  it("默认筛选：裸基础参 + 恒发两 bool，单词标签**不传 search_target**（#906）", () => {
+  it("默认筛选：裸基础参 + 恒发两 bool，partial 档**不传 search_target**（#906）", () => {
     const r = buildIllustSearchRequest(input());
     expect(r.endpoint).toBe("/v1/search/illust");
     expect(r.params).toEqual({
@@ -35,12 +37,19 @@ describe("buildIllustSearchRequest", () => {
     });
   });
 
-  it("多标签（含空格）→ 显式 exact_match_for_tags", () => {
+  /**
+   * ⚠️ **有意行为变更**（spec search-target-mode §5）：改前「含空格多词」由 `word.includes(" ")`
+   * 自动派生为 `exact_match_for_tags`；改后档位由用户选定，默认 partial 不再发送该参数
+   * ⇒ 服务端并入关键字/标题命中（实测 `Rosmontis rosemary`：exact 1 条 / partial 4 条）。
+   * 空格语义不变（服务端仍按 AND 解析），变的只是结果集大小。
+   */
+  it("多词 + 默认 partial 档 → **不再自动 exact**，不发送 search_target", () => {
     const r = buildIllustSearchRequest(input({ word: "東方 フラン" }));
-    expect(r.params.search_target).toBe("exact_match_for_tags");
+    expect(Object.keys(r.params)).not.toContain("search_target");
+    expect(r.params.word).toBe("東方 フラン");
   });
 
-  it("热门路由 popular-preview：无 sort；单词标签无 search_target", () => {
+  it("热门路由 popular-preview：无 sort；partial 档无 search_target", () => {
     const r = buildIllustSearchRequest(input({ sort: "popular_desc" }));
     expect(r.endpoint).toBe("/v1/search/popular-preview/illust");
     expect(r.params).toEqual({
@@ -61,6 +70,7 @@ describe("buildIllustSearchRequest", () => {
           ratio: "landscape",
           minPixels: 2000,
           aiOverride: "follow",
+          target: "partial",
         },
       }),
     );
@@ -120,21 +130,26 @@ describe("buildIllustSearchRequest", () => {
 });
 
 describe("buildNovelSearchRequest", () => {
-  it("novel 端恒显式传 partial（单词标签；#1038 同义词展开）", () => {
+  it("novel 端恒显式传 partial（默认档；#1038 同义词展开）", () => {
     const r = buildNovelSearchRequest(input());
     expect(r.endpoint).toBe("/v1/search/novel");
     expect(r.params.search_target).toBe("partial_match_for_tags");
     expect(r.params.sort).toBe("date_desc");
   });
 
-  it("多标签 → exact；比例/分辨率**永不进小说路**（插画专属维度，状态残留也不发）", () => {
+  /**
+   * ⚠️ **有意行为变更**（spec search-target-mode §5）：改前含空格自动 exact；改后多词 + partial
+   * 仍显式发 `partial_match_for_tags`。小说端 partial 档**必须显式发**（不传 = 纯字面匹配）。
+   * 比例/分辨率**永不进小说路**（插画专属维度，状态残留也不发）。
+   */
+  it("多词 + partial 档 → 仍显式 partial（非 exact）；比例/分辨率**永不进小说路**", () => {
     const r = buildNovelSearchRequest(
       input({
         word: "東方 フラン",
         filters: { ...DEFAULT_SEARCH_FILTERS, ratio: "portrait", minPixels: 3000 },
       }),
     );
-    expect(r.params.search_target).toBe("exact_match_for_tags");
+    expect(r.params.search_target).toBe("partial_match_for_tags");
     expect(r.params.ratio_pattern).toBeUndefined();
     expect(r.params.width_min).toBeUndefined();
     expect(r.params.height_min).toBeUndefined();
@@ -156,6 +171,108 @@ describe("buildNovelSearchRequest", () => {
     expect(r.params.bookmark_num_min).toBeUndefined();
     expect(r.params.sort).toBeUndefined();
     expect(r.params.search_target).toBe("partial_match_for_tags");
+  });
+});
+
+/**
+ * 档位 × 端点 真值表（spec search-target-mode §4，**两端不对称**）。
+ * oracle 逐字转写自该表，不从实现反推：
+ * | 档位 | 插画端 | 小说端 |
+ * | partial | 整个参数不传 | 显式发 partial_match_for_tags |
+ * | exact | exact_match_for_tags | exact_match_for_tags |
+ * | title_and_caption | title_and_caption | 端点不识别 → 不发 |
+ * 佐证：Shaft #906 / #1038 + docs/research/verify-query-syntax.sh 实测。
+ *
+ * 基础键集 = baseParams 四项（word/filter/merge/include）+ 非热门恒发 sort，已按字典序写死。
+ */
+const BASE_KEYS = [
+  "filter",
+  "include_translated_tag_results",
+  "merge_plain_keyword_results",
+  "sort",
+  "word",
+];
+const BASE_KEYS_WITH_TARGET = [
+  "filter",
+  "include_translated_tag_results",
+  "merge_plain_keyword_results",
+  "search_target",
+  "sort",
+  "word",
+];
+
+describe("search_target 档位矩阵（spec §4：两端不对称）", () => {
+  it.each([
+    // 档位, 插画端带键?, 插画端值, 小说端带键?, 小说端值
+    ["partial", false, undefined, true, "partial_match_for_tags"],
+    ["exact", true, "exact_match_for_tags", true, "exact_match_for_tags"],
+    ["title_and_caption", true, "title_and_caption", false, undefined],
+  ] as const)(
+    "%s → 插画端 /v1/search/illust + 小说端 /v1/search/novel 的端点与完整参数键集",
+    (mode, illustHasKey, illustValue, novelHasKey, novelValue) => {
+      const filters = { ...DEFAULT_SEARCH_FILTERS, target: mode };
+
+      const illust = buildIllustSearchRequest(input({ filters }));
+      expect(illust.endpoint).toBe("/v1/search/illust");
+      expect(Object.keys(illust.params).toSorted()).toEqual(
+        illustHasKey ? BASE_KEYS_WITH_TARGET : BASE_KEYS,
+      );
+      expect(illust.params.search_target).toBe(illustValue);
+
+      const novel = buildNovelSearchRequest(input({ filters }));
+      expect(novel.endpoint).toBe("/v1/search/novel");
+      expect(Object.keys(novel.params).toSorted()).toEqual(
+        novelHasKey ? BASE_KEYS_WITH_TARGET : BASE_KEYS,
+      );
+      expect(novel.params.search_target).toBe(novelValue);
+    },
+  );
+
+  /**
+   * 反证断言（本票最关键一条）：插画端 partial 档的参数键集里**没有** search_target。
+   * 若将来有人「顺手补全」成显式 partial_match_for_tags，服务端会转严格标签匹配并
+   * 忽略 merge_plain_keyword_results ⇒ 丢失标题/关键字命中（Shaft #906）——即回归。
+   */
+  it("反证：插画端 partial 档**不含** search_target 键（显式发即回归，Shaft #906）", () => {
+    for (const word of ["東方", "東方 フラン", "Rosmontis rosemary"]) {
+      const r = buildIllustSearchRequest(input({ word, filters: DEFAULT_SEARCH_FILTERS }));
+      expect(Object.keys(r.params)).not.toContain("search_target");
+      expect(r.params.search_target).toBeUndefined();
+      expect(r.params.merge_plain_keyword_results).toBe("true");
+    }
+  });
+
+  it("档位与检索词无关：单词/多词在同档下发出同一参数（word 不再派生档位）", () => {
+    for (const word of ["東方", "東方 フラン"]) {
+      expect(
+        buildIllustSearchRequest(
+          input({ word, filters: { ...DEFAULT_SEARCH_FILTERS, target: "exact" } }),
+        ).params.search_target,
+      ).toBe("exact_match_for_tags");
+      expect(
+        buildNovelSearchRequest(
+          input({ word, filters: { ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" } }),
+        ).params.search_target,
+      ).toBeUndefined();
+    }
+  });
+
+  it("热门路由同样携带档位参数（档位不因 popular-preview 变体丢失）", () => {
+    const popular = { ...input(), sort: "popular_desc" as const };
+    const illust = buildIllustSearchRequest({
+      ...popular,
+      filters: { ...DEFAULT_SEARCH_FILTERS, target: "exact" },
+    });
+    expect(illust.endpoint).toBe("/v1/search/popular-preview/illust");
+    expect(illust.params.search_target).toBe("exact_match_for_tags");
+    expect(Object.keys(illust.params)).not.toContain("sort");
+
+    const novel = buildNovelSearchRequest({
+      ...popular,
+      filters: { ...DEFAULT_SEARCH_FILTERS, target: "title_and_caption" },
+    });
+    expect(novel.endpoint).toBe("/v1/search/popular-preview/novel");
+    expect(Object.keys(novel.params)).not.toContain("search_target");
   });
 });
 
