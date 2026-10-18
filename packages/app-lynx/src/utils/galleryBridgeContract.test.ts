@@ -5,7 +5,13 @@
 // 钉死面：
 // ① lynx 桥 PictelioGalleryModule：saveImage（三参既有）/ saveImageTo（四参新增，dir 可选段）
 //    方法名字面量 + 回调双参形态 + LynxRuntimeInitializer 注册；
-// ② TS 适配器 gallerySaver.ts：dir 缺省空串走 saveImage（旧原生包兼容）、非空走 saveImageTo；
+//    ⚠️ 读点现状（#1043 review）：这两个 @LynxMethod 已**无 JS 调用方**——唯一调用者
+//    `gallerySaver.ts` 随死代码删除，Java 侧 `PictelioDownloaderModule` 只用静态
+//    `PictelioGalleryModule.imageLoader`。故本段是「原生 API 注册契约」防线，**不是**
+//    「活链路」防线；彻底删除需同步改 Java 注册与 rspeedy-env 类型声明。
+// ② ~~TS 适配器 gallerySaver.ts 的 dir 分派~~ —— 该 TS 适配器已随死代码清理删除
+//    （保存链早已改走 buildImageTasks + lynxDownloadExecutor 原生下载队列，
+//    gallerySaveAvailable / saveImageToGallery 零生产调用方），断言与源文件读取一并移除；
 // ③ 深模块 GallerySaver：基座常量 RELATIVE_PATH = "Pictures/Pictelio"、subPath 追加形态、
 //    sanitizeFileName 防御性净化规则与 JS sanitizeNameSegment 逐字镜像（双端同规则）；
 // ④ ~~Capacitor 契约同形（ADR-0192 D8）~~ —— #610 起 Capacitor 线整体下线，断言移除；
@@ -37,7 +43,9 @@ const javaDeepModule = readFileSync(
 // #610：WebView/Capacitor 线整体下线，GallerySaverPlugin.java 随之删除。
 // 原 ADR-0192 D8 的「Capacitor 契约同形」断言失去被测对象，
 // 连同其源文件读取一并移除。Lynx 侧（①/③/⑤）断言不受影响，继续钉死。
-const tsAdapter = readFileSync(fileURLToPath(new URL('./gallerySaver.ts', import.meta.url)), 'utf8')
+// TS 侧适配器 gallerySaver.ts 已随死代码清理删除（保存链早已改走 buildImageTasks +
+// lynxDownloadExecutor 原生下载队列，两个导出零生产调用方），其 ② 段断言与
+// tsAdapter 源文件读取随之移除——留着只会读一个不存在的文件。
 const tsNaming = readFileSync(fileURLToPath(new URL('./galleryDownload.ts', import.meta.url)), 'utf8')
 const javaDownloaderModule = readFileSync(
   fileURLToPath(new URL('lynx/java/io/pictelio/app/PictelioDownloaderModule.java', HOST_APP)),
@@ -50,11 +58,11 @@ const javaDownloaderDeep = readFileSync(
 const tsExecutor = readFileSync(fileURLToPath(new URL('./lynxDownloadExecutor.ts', import.meta.url)), 'utf8')
 
 describe('相册保存桥 TS ⇄ Java 契约（ADR-0192 D4/D7）', () => {
-  it('既有三参 saveImage 保持不动（旧调用点兼容）', () => {
+  it('原生桥既有三参 saveImage 签名保持不动（现无 JS 调用方，见文件头 ①）', () => {
     expect(javaModule).toContain('public void saveImage(String url, String fileName, Callback callback)')
   })
 
-  it('新增四参 saveImageTo：dir = JS 展开好的目录段（非模板），带 @LynxMethod', () => {
+  it('新增四参 saveImageTo：dir = 目录段（非模板），带 @LynxMethod', () => {
     expect(javaModule).toContain(
       'public void saveImageTo(String url, String fileName, String dir, Callback callback)',
     )
@@ -63,24 +71,13 @@ describe('相册保存桥 TS ⇄ Java 契约（ADR-0192 D4/D7）', () => {
     expect(annotated).not.toBeNull()
   })
 
-  it('回调双参契约：成功 cb(uri, "")、失败 cb("", msg)——与 TS 判据一致', () => {
+  it('回调双参契约：成功 cb(uri, "")、失败 cb("", msg)', () => {
     expect(javaModule).toContain('callback.invoke(r.uri.toString(), "")')
     expect(javaModule).toContain('callback.invoke("", ')
-    // TS 侧以 err 非空判失败（unquote 后消费）
-    expect(tsAdapter).toContain('unquoteNativeString(err)')
   })
 
-  it('注册存在：LynxRuntimeInitializer 有 PictelioGallery，模块名与 TS 探测键一致', () => {
+  it('注册存在：LynxRuntimeInitializer 有 PictelioGallery', () => {
     expect(javaInitializer).toContain('registerModule("PictelioGallery", PictelioGalleryModule.class)')
-    expect(tsAdapter).toContain('PictelioGallery')
-  })
-
-  it('TS 适配器：dir 缺省空串走 saveImage（字节不变）；非空走 saveImageTo 四参透传', () => {
-    expect(tsAdapter).toContain('saveImageToGallery(url: string, fileName: string, dir = "")')
-    expect(tsAdapter).toContain('mod.saveImage(url, fileName, onDone)')
-    expect(tsAdapter).toContain('mod.saveImageTo(url, fileName, dir, onDone)')
-    // 版本漂移（原生缺 saveImageTo）显式失败，不静默降级平铺
-    expect(tsAdapter).toContain("typeof mod.saveImageTo !== 'function'")
   })
 
   it('深模块基座常量：RELATIVE_PATH = "Pictures/Pictelio"，subPath 追加在基座之后', () => {

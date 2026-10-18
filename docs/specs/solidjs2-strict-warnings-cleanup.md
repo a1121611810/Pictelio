@@ -1,5 +1,13 @@
 # Spec: SolidJS 2 严格模式警告清理（SideNavShell + useContainerWidth + Capacitor web 噪音）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> 本文的 SolidJS/Capacitor 客户端已整包删除，D1-D3 的交付物路径均不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态：implemented（D1–D3 全部落地：`405581df` useContainerWidth 泄漏 / `4235a086` Capacitor web IPC 守卫 / `370ce058` SideNavShell 双向同步；父 issue #422、tickets #423–#425 已关闭。剩余 4 个读点由第二轮 `docs/specs/solidjs2-strict-read-untracked-cleanup.md`（#427）收口）
 - 日期：2026-09-10
 - 关联：ADR-0144（SolidJS 2 迁移，happy-dom 切换）；不在本次新增 ADR，纯迁移遗留修复

@@ -8,10 +8,6 @@
     "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；本文件集中承载该属性的字面量。亮色表 INPUT_PLACEHOLDER_LIGHT_COLOR 逐主题 = .theme-* 亮段 --md-on-surface-variant（bili 为 clamp 值 #5a5f66：令牌值向深至 ≥4.5 的最小步，#1015）；暗色表 = .theme-*.dark 同令牌（#693）。改色只需改 tokens.css——utils/lynxPlatformColors.test.ts 把两张表钉到该生成产物（bili clamp 为人工值守例外）。平台约束登记载体，随本文件保留，删除条件 = 本文件被移除。"
   },
   {
-    "path": "components/RankingEntryCard.vue",
-    "reason": "P2 §3.3：text-white 叠在 --md-scrim-overlay 上（M3 scrim 暗色叠白字，明暗通用）；P0-5 RestrictOverlay / AiOverlay 的 --colorOverlayForeground 迁移已闭环（T4），RankingEntryCard 留 P2 巡检期后续 token 化。当前功能正确。"
-  },
-  {
     "path": "pages/IllustDetail.vue",
     "reason": "P2 §3.3：text-white 在 bg-scrim 页角标（白字叠暗 scrim，明暗通用）。"
   },

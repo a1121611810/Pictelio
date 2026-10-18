@@ -1,5 +1,13 @@
 # Spec：webview 性能四轮 —— A「prefetch 命中跳过 thumb」+ B「switch 压线专项诊断」
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> 本文针对 WebView 运行时的性能优化对象已不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > 前置：三轮报告 `docs/research/webview-perf-round3-report.md`（B1 证伪 + B2 定性）。本轮两个候选并行推进。
 > 研究输入：/tmp/research-prefetch-skip-thumb.md（A 线 file:line 设计）、/tmp/research-switch-jank-diagnosis.md（B 线诊断方案）。
 

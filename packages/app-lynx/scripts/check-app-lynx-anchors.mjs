@@ -6,8 +6,8 @@
 // 仅检查 app-lynx 单测是否全过（防止 commit 304d5f07 之类「T6 测试失真
 // commit message 不实」类问题再次无声推上 main）。
 //
-// 锚点模式参考 packages/app/scripts/check-e2e-anchors.mjs（仓库既有
-// 防线模式，ADR-0097 治理记录）。
+// 锚点模式参考 `check-e2e-anchors`（ADR-0097 治理记录）。原实现
+// `packages/app/scripts/check-e2e-anchors.mjs` 已随 ADR-0203 删除，此处只留模式出处。
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'

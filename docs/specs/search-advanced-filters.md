@@ -113,8 +113,8 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
   src/filters.ts               #   SearchFilters 类型 + 默认值 + 校验（日期/带宽）
   src/buildParams.ts           #   筛选状态 → 端点参数对象（含 scope/排序路由与 §3.4 矩阵）
   src/period.ts                #   预设档 → start/end_date 换算（日本时区当天为界）
-  src/urlCodec.ts              #   筛选状态 ↔ webview URL query 编解码（§6.3）
-  src/cacheKey.ts              #   缓存键构建（word_scope_sort + filters 规范段）
+  src/urlCodec.ts              #   已随 #1043 删除（原：筛选状态 ↔ webview URL query 编解码，§6.3）
+  src/cacheKey.ts              #   已随 #1043 删除（原：缓存键构建 word_scope_sort + filters 规范段）
   tests/                       #   真值表单测（oracle = 研究文档官方抓包值）
 ```
 
@@ -149,7 +149,7 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 
 ### 6.2 缓存键
 
-`word_scope_sort` → `word_scope_sort|<filters 规范段>`（search-core `buildCacheKey` 产出，分隔符 `|`）。规范段各槽：`fp`=期间预设 / `fd`=自定义起止 / `fb`=收藏数带宽序号 / `fr`=比例 / `fw`=最小边 px / `fa`=AI 覆盖（follow 不落键、非 follow 落键）/ **`ft`=搜索目标档位**（默认档 `partial` 不落键；`exact` / `title_and_caption` 落 `ft=exact` / `ft=title_and_caption`，spec `docs/specs/search-target-mode.md` §6）。全默认筛选时省略整段。`ft` **追加在段末尾**，存量非默认筛选的键逐字不变，升级不撞旧缓存。~~webview `inFlightSearchKey` 判重键同步扩展。防脏缓存是正确性硬要求。~~ —— 当轮成立是因为 webview 侧有 `inFlightSearchKey` 消费方；该消费方随 ADR-0203 整包删除，ADR-0132 决策 3 与 `useSearch.ts` 亦写明「搜索结果全局 LRU 缓存不做」⇒ `buildCacheKey` 现**零生产消费方**（2026-10-17 grep 实测），今天不存在会被弄脏的缓存。键形态与「筛选进键」纪律仍按本节维护，属**前瞻性接线**（缓存日后重建时接线即自动正确），可达性逐落点核对见 spec `docs/specs/search-target-mode.md` §6。
+`word_scope_sort` → `word_scope_sort|<filters 规范段>`（原由 search-core `buildCacheKey` 产出，该模块已随 #1043 删除；本节保留键形态作为前瞻性设计记录，分隔符 `|`）。规范段各槽：`fp`=期间预设 / `fd`=自定义起止 / `fb`=收藏数带宽序号 / `fr`=比例 / `fw`=最小边 px / `fa`=AI 覆盖（follow 不落键、非 follow 落键）/ **`ft`=搜索目标档位**（默认档 `partial` 不落键；`exact` / `title_and_caption` 落 `ft=exact` / `ft=title_and_caption`，spec `docs/specs/search-target-mode.md` §6）。全默认筛选时省略整段。`ft` **追加在段末尾**，存量非默认筛选的键逐字不变，升级不撞旧缓存。~~webview `inFlightSearchKey` 判重键同步扩展。防脏缓存是正确性硬要求。~~ —— 当轮成立是因为 webview 侧有 `inFlightSearchKey` 消费方；该消费方随 ADR-0203 整包删除，ADR-0132 决策 3 与 `useSearch.ts` 亦写明「搜索结果全局 LRU 缓存不做」⇒ `buildCacheKey` 在删除前已是**零生产消费方**（2026-10-17 grep 实测；2026-10-18 随 #1043 删除），今天不存在会被弄脏的缓存。键形态与「筛选进键」纪律仍按本节维护，属**前瞻性接线**（缓存日后重建时接线即自动正确），可达性逐落点核对见 spec `docs/specs/search-target-mode.md` §6。
 
 ### 6.3 URL query 键表（webview）
 
@@ -164,7 +164,7 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 
 非法/未知值一律忽略回默认（容忍手改 URL 与旧链接）。详情页返回靠 URL 回填筛选 + LRU 缓存恢复结果（现状机制的延伸，#476 Q5）。
 
-**本表不含 `ft`**（2026-10-17 核对）：URL 编解码 `packages/search-core/src/urlCodec.ts` 没有档位字段，手写 `ft=` 也不被识别（有单测锁定）；且该模块随 webview 客户端删除后**零生产消费方**，属死代码（spec `docs/specs/search-target-mode.md` §2 已列为票外技术债）。⇒ §3.3 的 `target` 行**当前没有 URL 往返路径**，档位只在会话内存活。
+**本表不含 `ft`**（2026-10-17 核对）：原 URL 编解码 `packages/search-core/src/urlCodec.ts`（已随 #1043 删除）没有档位字段，手写 `ft=` 也不被识别（有单测锁定）；该模块在删除前已因 webview 客户端下线而**零生产消费方**。⇒ §3.3 的 `target` 行**当前没有 URL 往返路径**，档位只在会话内存活。
 
 ### 6.4 ADR 动作
 

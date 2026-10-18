@@ -40,17 +40,14 @@
 # 保留原名，防 lynx 侧按类名反射的潜在分支。
 -keep class io.pictelio.app.PictelioImageService { *; }
 
-# ── Room 数据库生成类反射实例化 keep（Release 启动闪退，ADR-0124）──
-# work-runtime 2.10（OTA 慢通道，ADR-0122）经 androidx.startup 的 InitializationProvider
-# 在进程启动时执行 WorkManagerInitializer → WorkManager.getInstance() → Room 打开
-# WorkDatabase；Room 用 Class.forName("<db>_Impl").getDeclaredConstructor() 反射实例化
-# 生成类，R8 静态分析看不到字符串反射调用（同 ADR-0064 Lynx $$PropsSetter 教训），
-# 会剥离其无参构造器 → NoSuchMethodException: <init> [] → Provider 启动异常 → 启动闪退。
-# 实证：模拟器 API 28 覆盖升级 v4.21.0→v4.22.0 必现（该版本 dex 中 WorkDatabase_Impl
-# 的 Direct methods 为空）；加规则后 dex 断言 PUBLIC <init>:()V 存活。
-# 注意：-keep class X 无成员规格只保类名不保成员（ADR-0064 已固化），必须带 <init>()。
--keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep class androidx.work.impl.WorkDatabase_Impl { <init>(); }
+# ── Room / WorkManager 生成类 keep 已删除（2026-10-18，#1043）──
+# 原规则 `-keep class * extends androidx.room.RoomDatabase { <init>(); }` 与
+# `-keep class androidx.work.impl.WorkDatabase_Impl { <init>(); }` 服务的是 WebView 客户端的
+# OTA 慢通道（work-runtime 2.10 经 androidx.startup 拉起 WorkManager → Room）。
+# 该客户端已随 ADR-0203 整包删除：实测 `androidx.work` / `androidx.room` / `WorkManager`
+# / `RoomDatabase` 在本模块的 gradle、Java、Kotlin、toml 内**零引用**（只剩本文件自身的
+# 注释与规则），规则匹配不到任何类 ⇒ 删除。若将来重新引入 Room/WorkManager，需要按
+# ADR-0124 的反射实例化教训**重新加回**（`-keep class X` 无成员规格只保类名不保成员）。
 
 # ── Lynx $$PropsSetter / $$PropsHolder keep（真机 release 白屏 error 990200）──
 # 根因：Lynx SDK 4.0.1 AAR 内 38 个注解生成类（com.lynx.tasm.behavior.ui.* 与

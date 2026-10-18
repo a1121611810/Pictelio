@@ -12,9 +12,15 @@ import { describe, it, expect } from "vitest"
 import zh from "../../../src/i18n/locales/zh-CN/novelTranslate"
 import en from "../../../src/i18n/locales/en/novelTranslate"
 
-/** spec §8 列出的 50 键全集（顺序敏感度=无；用作键穷尽性校验） */
+/**
+ * 当前 74 键全集（顺序敏感度=无；用作键穷尽性校验）。
+ * #1043 清理了 15 个生产侧无消费方的死键（endpoint.titleGroup、action.abort/cached/switchMode、
+ * status.idle/translatingQueued/partial/failed/completed/aborted/progress.label/progress.remaining、
+ * error.retrying/retryingFailed/retryHint）—— 本表此前把它们当活键钉住，等于给死键发免死金牌。
+ * 现在死键由 `tests/noDeadKeys.test.ts`（全量 locale 字典扫描）负责，本表只声明「保留键的集合」。
+ */
 const EXPECTED_KEYS: readonly string[] = [
-  // endpoint (17)
+  // endpoint (48)
   "novelTranslate.endpoint.title",
   "novelTranslate.endpoint.baseUrl.label",
   "novelTranslate.endpoint.baseUrl.hint",
@@ -54,8 +60,6 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.credential.verified",
   "novelTranslate.endpoint.credential.failed",
   "novelTranslate.endpoint.credential.invalidKey",
-  "novelTranslate.action.configure_translate",
-  "novelTranslate.action.retranslate",
   // spec §9.7 翻译授权（ADR-0173 追加）：与内容显示开关独立
   "novelTranslate.endpoint.translateR18",
   "novelTranslate.endpoint.translateR18G",
@@ -64,35 +68,24 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.consent.r18g.title",
   "novelTranslate.endpoint.consent.r18g.body",
   "novelTranslate.endpoint.consent.enable",
-  "novelTranslate.error.r18gBlocked",
   "novelTranslate.endpoint.clear",
   "novelTranslate.endpoint.cache.clear",
   "novelTranslate.endpoint.cache.cleared",
   "novelTranslate.endpoint.cancel",
   "novelTranslate.endpoint.confirmClear",
-  "novelTranslate.endpoint.titleGroup",
-  // action (7)
+  // action (6)
   "novelTranslate.action.start",
-  "novelTranslate.action.abort",
   "novelTranslate.action.retry",
-  "novelTranslate.action.cached",
   "novelTranslate.action.viewOriginal",
   "novelTranslate.action.viewTranslation",
-  "novelTranslate.action.switchMode",
-  // status (10)
-  "novelTranslate.status.idle",
+  "novelTranslate.action.configure_translate",
+  "novelTranslate.action.retranslate",
+  // status (4)
   "novelTranslate.status.pending",
   "novelTranslate.status.translating",
-  "novelTranslate.status.translatingQueued",
-  "novelTranslate.status.partial",
-  "novelTranslate.status.failed",
-  "novelTranslate.status.completed",
-  "novelTranslate.status.aborted",
   "novelTranslate.status.retrying",
   "novelTranslate.status.placeholder_untranslated",
-  "novelTranslate.status.progress.label",
-  "novelTranslate.status.progress.remaining",
-  // error (13)
+  // error (16)
   "novelTranslate.error.network",
   "novelTranslate.error.unauthorized",
   "novelTranslate.error.rateLimit",
@@ -104,13 +97,11 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.error.contentFilter",
   "novelTranslate.error.incomplete",
   "novelTranslate.error.R18Blocked",
+  "novelTranslate.error.r18gBlocked",
   "novelTranslate.error.timeout",
   "novelTranslate.error.canceled",
   "novelTranslate.error.notConfigured",
   "novelTranslate.error.partialFailed",
-  "novelTranslate.error.retrying",
-  "novelTranslate.error.retryingFailed",
-  "novelTranslate.error.retryHint",
 ] as const
 
 /** 从字符串中提取所有 {{xxx}} 占位符名（不区分语种；用于跨语种占位符集合一致性） */
@@ -125,10 +116,11 @@ function extractPlaceholders(s: string): string[] {
 describe('i18n: novelTranslate 字典结构（spec §8）', () => {
   it('zh-CN 与 en 键数与 EXPECTED_KEYS 一致（spec §8 键名实现态）', () => {
     // spec §8 用「示意键名」（endpoint.section.title / baseURL.probe.ok…）描述设计意图；
-    // 实现按 4 子命名空间落为 89 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
+    // 实现按 4 子命名空间落为 74 键 —— 权威口径 = EXPECTED_KEYS（本表 + noDeadKeys 用量守卫）。
     // 历史：47 → 51 → 67（ADR-0173：探测/凭据状态 + 动作键）→ 75（翻译授权 + 同意面板）
     //       → 79（错误码分类补全：insufficient_balance / model_not_found / invalid_request / content_filter）
-    //       → 89（#945：vllm 死状态清除，删 compat.vllm）。
+    //       → 89（#945：vllm 死状态清除，删 compat.vllm）
+    //       → 74（#1043：删 15 个生产侧无消费方的死键，见 EXPECTED_KEYS 上方注释）。
     expect(Object.keys(zh).length).toBe(EXPECTED_KEYS.length)
     expect(Object.keys(en).length).toBe(EXPECTED_KEYS.length)
   })
@@ -163,10 +155,8 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
   })
 
   it('含模板占位符的键 zh-CN 与 en 占位符集合对齐', () => {
-    // 已知含占位符的键（来自 spec §6.1 + §8）：
-    // - novelTranslate.status.progress.label: {{done}} {{total}}
-    // - novelTranslate.status.progress.remaining: {{remaining}}
-    // - novelTranslate.endpoint.credential.verified: {{when}}
+    // #1043 清理后仅剩 1 个含占位符的键：endpoint.credential.verified（{{when}}）。
+    // 被删的 status.progress.label / status.progress.remaining 本身也带占位符，一并消失。
     //
     // code-review S4：此前这里还列了 `endpoint.probe.failed`，但该键已随 #637 死键清理删除
     // → `extractPlaceholders(undefined)` 返回 []，两侧都空 → 断言恒真（占位符守护形同虚设）。
@@ -176,8 +166,8 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     const withPlaceholders = Object.keys(zhDict).filter(
       (k) => extractPlaceholders(zhDict[k]).length > 0,
     )
-    // 至少覆盖 spec §8 已知的 3 个（防「过滤后为空 → 循环空转」的隐性恒真）
-    expect(withPlaceholders.length).toBeGreaterThanOrEqual(3)
+    // 防「过滤后为空 → 循环空转」的隐性恒真；下限 = 当前实际含占位符的键数（#1043 后为 1）
+    expect(withPlaceholders.length).toBeGreaterThanOrEqual(1)
     for (const k of withPlaceholders) {
       const zhPh = extractPlaceholders(zhDict[k]).sort()
       const enPh = extractPlaceholders(enDict[k]).sort()
@@ -185,16 +175,16 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     }
   })
 
-  it('endpoint 49 键 + action 9 键 + status 12 键 + error 19 键 = 89', () => {
+  it('endpoint 48 键 + action 6 键 + status 4 键 + error 16 键 = 74', () => {
     const groups = {
       endpoint: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.endpoint.')),
       action: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.action.')),
       status: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.status.')),
       error: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.error.')),
     }
-    expect(groups.endpoint.length).toBe(49)
-    expect(groups.action.length).toBe(9)
-    expect(groups.status.length).toBe(12)
-    expect(groups.error.length).toBe(19)
+    expect(groups.endpoint.length).toBe(48)
+    expect(groups.action.length).toBe(6)
+    expect(groups.status.length).toBe(4)
+    expect(groups.error.length).toBe(16)
   })
 })

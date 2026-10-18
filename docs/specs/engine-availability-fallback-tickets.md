@@ -1,5 +1,16 @@
 # Tickets: 引擎可用性与降级（spec: docs/specs/engine-availability-fallback.md）
 
+> **⚠️ 存档文档（archive）**：本文对应的引擎可用性与降级机制**已整体下线**。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> T0-T5 指向的降级链路已不存在，`todo（需真机）` 的 T5 不再需要执行。
+> 文中涉及的 `SplashController`、`LynxRuntimeInitializer.isAvailable()`、`EngineRouting` 与 `pictelio_engine_*`
+> 键均已下线（`EngineRouting` / 引擎路由随 #610，其余随
+> [#1043](https://github.com/a1121611810/Pictelio/issues/1043) 死代码审计；`pictelio_engine_*` 键在单引擎包内
+> 已无生产写入方，仅存历史测试锚点）。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 对应 spec 已存档：[`engine-availability-fallback.md`](./engine-availability-fallback.md)。
+
 规则：每个 ticket 声明前置依赖；blocker 未完成不得开工。状态：`todo` / `doing` / `done`。
 
 | # | 标题 | 依赖 | 交付物 | 验收 | 状态 |

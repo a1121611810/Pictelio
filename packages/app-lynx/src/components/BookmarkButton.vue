@@ -9,8 +9,8 @@
 //    （比心形略弱、形成 chip 内部层次）。
 //  - ring 颜色 = chip 内前景色（未收藏 = inverse-on-surface、已收藏 = on-tertiary）。
 // ADR-0112：M3 动效（state-layer 环扩散/收拢 + Expressive spring 弹心）+ 乐观触发。
-// T4 迁移（ADR-0141）：状态机从 primitives/createBookmarkToggle 改为 composable
-// useBookmarkMutation（useMutation 替代 deps.add/remove；getter 形态保持不变 → 模板零变化）。
+// T4 迁移（ADR-0141）：状态机由自建 primitive 迁为 composable useBookmarkMutation
+// （useMutation 替代 deps.add/remove；getter 形态保持不变 → 模板零变化）。
 // T5 双轨收藏（spec docs/specs/bookmark-tags.md D3/D8 + ADR-0160 D4）：
 //  - mutation 可选注入：详情页把页面持有的同一实例传进来（心形快速收藏与收藏面板保存
 //    共用一份状态/计数，避免第二份状态漂移）；列表卡片缺省自建，行为不变。
@@ -70,7 +70,7 @@ const emit = defineEmits<{
   longPress: []
 }>()
 
-// useBookmarkMutation composable（替代 createBookmarkToggle）：
+// useBookmarkMutation composable：
 // - 内部 useMutation 调 apiClient.post → 401 重试走 apiClient seam
 // - onMutate 立即翻转（乐观触发，状态机保持与原 primitive 等价）
 // - onSuccess 350ms 后 emit('change')（动画完成态，ADR-0112 D5）

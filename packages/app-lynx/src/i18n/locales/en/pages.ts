@@ -10,7 +10,6 @@ const enPages = {
   "recommended.charCount": "{{count}} characters",
 
   // IllustList.vue
-  "illustList.title": "Illustrations",
   "illustList.tab.recommend": "Recommended",
   "illustList.tab.follow": "Following",
   "illustList.empty.follow.title": "No followed illustrations",
@@ -96,7 +95,6 @@ const enPages = {
   "novelDetail.end": "— End —",
 
   // NovelList.vue
-  "novels.title": "Novels",
   "novels.tab.recommend": "Recommended",
   "novels.tab.follow": "Following",
   "novels.empty.follow.title": "No followed novels",
@@ -245,7 +243,6 @@ const enPages = {
   "watchlist.processing": "Working…",
 
   // Me.vue
-  "me.title": "Me",
   "me.bookmarks": "My bookmarks",
   "me.watchlist": "Watchlist",
   "me.mypixiv": "My Pixiv",
@@ -313,27 +310,6 @@ const enPages = {
   "muteTags.empty.title": "No muted tags",
   "muteTags.empty.hint": "Long-press a tag on artwork to mute it",
 
-  // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
-  // Code set = EngineRoute.Reason (10 codes) + unknown fallback.
-  // ⚠️ ADR-0203 decision 7 removed the only renderer (Me page effective-state row) — it sat
-  // inside the client-switch group whose v-if is always false in a single-engine package.
-  // Copy and engineState.ts are now consumer-less retained items, and "switched to WebView"
-  // wording can never be true again. Traceability gap explicitly acknowledged in #846
-  // (downgraded to characterization rather than papered over).
-  "engineFallback.reason.preferred": "Running on your preferred engine",
-  "engineFallback.reason.lynx_unavailable": "Lynx isn’t available on this device; WebView is in use",
-  "engineFallback.reason.lynx_known_bad": "Lynx failed before on this version; WebView is in use",
-  "engineFallback.reason.lynx_retry": "WebView unavailable; retrying with Lynx",
-  "engineFallback.reason.webview_unavailable": "WebView unavailable; Lynx is in effect",
-  "engineFallback.reason.a11y_webview": "WebView enabled for accessibility services",
-  "engineFallback.reason.a11y_lynx_last_resort": "WebView unavailable; staying on Lynx for accessibility",
-  "engineFallback.reason.no_engine": "Neither engine is available",
-  "engineFallback.reason.forced_webview": "WebView was forced for this launch",
-  "engineFallback.reason.runtime_failure": "Lynx hit an error; WebView is in use",
-  "engineFallback.reason.unknown": "Engine state unknown",
-  // App.vue fallback banner (word-for-word migration of the legacy zh copy, T4 #556)
-  "engineFallback.legacyBanner":
-    "Your WebView version is too low, so the app ran on the Lynx engine this time; it switches back automatically once WebView is updated.",
   "me.appearance.title": "Appearance",
   "me.appearance.language": "Interface language",
   "me.appearance.languageFollowSystem": "Automatic",
@@ -355,7 +331,6 @@ const enPages = {
   "me.content.showR18": "Show R-18 content",
   "me.content.showR18G": "Show R-18G content",
   "me.content.relatedInjection": "Related works injection",
-  "me.content.rankingEntry": "Rankings entry",
   "me.content.novelIntroFirst": "Show novel intro first",
   "me.content.novelIntroFirstDesc": "When off, tapping a novel goes straight to the text",
   "me.content.ai": "AI works",
@@ -460,14 +435,6 @@ const enPages = {
     "This ranking requires \"Show R-18 works\" to be enabled in your pixiv web settings. Enable it, then come back and retry.",
   "ranking.r18Notice.action": "Open pixiv settings",
   "ranking.r18Notice.retry": "Retry",
-
-  // ── Recommended-feed entry card (spec docs/specs/ranking.md §5.2; #519) ──
-  "ranking.entry.firstBadge": "No. 1",
-  "ranking.entry.viewAll": "See all",
-  "ranking.entry.viewAllAria": "View full rankings",
-  "ranking.entry.collapseAria": "Collapse rankings",
-  "ranking.entry.stripAria": "Rankings entry",
-  "ranking.entry.itemAria": "No.{{rank}}: {{title}}",
 
   // ─── Dimension restructure (2026-10-03): Discover / Updates / Shelf / Advanced ───
   // Top level now groups by the question the user asks, not by medium;

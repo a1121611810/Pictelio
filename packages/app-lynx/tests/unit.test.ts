@@ -7,7 +7,6 @@ import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, sho
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS, runBackGuards, createBackGuardRegistry, evaluateBackRoute, type BackGuard } from '../src/routerCore'
-import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { isOAuthCredsInjected } from '../src/api/auth'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
@@ -499,44 +498,6 @@ describe('authStore 安全：refresh_token 不持久化', () => {
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
     await store.loginWithToken('some-token')
     expect(lsSet).not.toHaveBeenCalled()
-  })
-})
-
-describe('proxyRedact.redactProxyUrl（代理凭据脱敏）', () => {
-  it('http://user:pass@host 去除 userinfo', () => {
-    expect(redactProxyUrl('http://user:secret@proxy.example.com:8080')).toBe(
-      'http://proxy.example.com:8080',
-    )
-  })
-
-  it('scheme-less user:pass@host:port 也能脱敏（防 WHATWG scheme 绕过）', () => {
-    expect(redactProxyUrl('user:secret@proxy.example.com:8080')).toBe(
-      'http://proxy.example.com:8080',
-    )
-  })
-
-  it('scheme-less 无凭据 host:port 正常', () => {
-    expect(redactProxyUrl('127.0.0.1:7897')).toBe('http://127.0.0.1:7897')
-  })
-
-  it('无凭据完整 URL 保留 protocol+host', () => {
-    expect(redactProxyUrl('http://127.0.0.1:7897')).toBe('http://127.0.0.1:7897')
-  })
-
-  it('输出中绝不含 userinfo 片段', () => {
-    const out = redactProxyUrl('user:secret@proxy.example.com:8080')
-    expect(out).not.toContain('user:secret')
-    expect(out).not.toContain('@')
-  })
-
-  it('protocol-relative //user:pass@host 也能脱敏（防空 hostname 绕过）', () => {
-    const out = redactProxyUrl('//user:secret@proxy.example.com:8080')
-    expect(out).not.toContain('user:secret')
-    expect(out).not.toContain('@')
-  })
-
-  it('不可解析输入（坏端口）保守剥离 @ 前缀', () => {
-    expect(redactProxyUrl('user:secret@host:badport')).toBe('host:badport')
   })
 })
 
@@ -2164,10 +2125,9 @@ it('乐观化接缝：消费 useBookmarkMutation 状态机，change 延迟用 BO
   expect(bookmarkBtnVue).toContain("from '../composables/useBookmarkMutation'")
   expect(bookmarkBtnVue).toContain('BOOKMARK_ANIMATION_MS')
   expect(bookmarkBtnVue).toContain('useBookmarkMutation(')
-  // 旧 primitive 仍存在（useWatchlistMutation 工厂模式 + 兼容 Watchlist.vue 旧消费方），
-  // 但 BookmarkButton.vue 不再消费它——通过 import 列表精确断言
-  expect(bookmarkBtnVue).not.toContain("from '../primitives/createBookmarkToggle'")
-  expect(bookmarkBtnVue).not.toContain('createBookmarkToggle(')
+  // 旧 primitive 已随 #1043 删除（T4 只做迁移，删除发生在本批）；此处保留反向断言只为守住「接线方向」——
+  // 若将来再引入同名 primitive 并重新接进按钮，本用例会红
+  expect(bookmarkBtnVue).not.toContain('createBookmarkToggle')
 })
 
 it('心形图标位经 <AppIcon name="favorite_border"> 渲染，模板零裸心形字形（emoji 化风险结构性消失）', () => {

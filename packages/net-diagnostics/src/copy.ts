@@ -1,4 +1,4 @@
-// @pictelio/net-diagnostics — 中文文案单一事实源（两端共享，避免各写一份漂移）
+// @pictelio/net-diagnostics — 中文文案单一事实源（判定层统一引用，避免多处漂移）
 export const HEADLINES: Record<string, string> = {
   ok: "网络连接正常",
   skipped: "自检未执行或能力有损",

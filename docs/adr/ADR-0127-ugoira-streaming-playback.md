@@ -1,6 +1,12 @@
 # ADR-0127: app 侧 ugoira fflate 模式改为流式渐进播放（不依赖 Range）
 
 > 状态：已接受（2026-08-31）
+>
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：本 ADR 第 1 项交付的共享包
+> `createStreamFrameSource`（`packages/ugoira/src/stream.ts`）已随 #1043 删除；其唯一消费层（app 侧
+> `streamUgoiraFrames`）已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 删除。**本 ADR 不再构成对
+> `@pictelio/ugoira` 的现行约束**；正文（含「待办」第 1/2 项）按原样保留，仅供决策史参考。
+>
 > 相关：ADR-0126（range 降级）、ADR-0125（lynx 原生解压写盘）、ADR-0098（双端共享数据层）、
 > `docs/research/ugoira-stream-frames-proto.md`（原型取证，oracle 分支 `prototype/ugoira-stream-frames`）、
 > `docs/research/ugoira-alternative-paths.md`（替代方案矩阵：A 流式 fflate 为第一优先）

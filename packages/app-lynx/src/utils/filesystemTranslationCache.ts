@@ -20,8 +20,6 @@ interface PictelioTranslateCacheModule {
   clear: (cb: (ok: string | null, err: string | null) => void) => void
   /** arity 契约：单参（Java 侧 `stats(Callback)`）—— 见 code-review P9 */
   stats: (cb: (json: string | null, err: string | null) => void) => void
-  /** arity 契约：单参（Java 侧 `getCacheDirPath(Callback)`） */
-  getCacheDirPath: (cb: (path: string) => void) => void
 }
 
 /**

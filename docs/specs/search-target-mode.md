@@ -42,8 +42,9 @@ function illustTargetParam(word: string): string | null {
 - **不做查询语法 UI 构造器**（点按钮拼 `OR`）：服务端已解析，客户端拼串只会重复语义且易漂移。
   本票只给**提示文案**。
 - **不做小说端 `text`（正文搜索）**：pixiv 已于 2021-09 停止该服务（ITmedia / J-CAST）。
-- **不动 `packages/search-core/src/urlCodec.ts`**：它零生产消费方（webview 客户端随 ADR-0203
-  删除后遗留的死代码），本票不扩大死代码面，也不在此清理。
+- ~~**不动 `packages/search-core/src/urlCodec.ts`**~~：该模块已随
+  [#1043](https://github.com/a1121611810/Pictelio/issues/1043) 删除（当时它是 webview 客户端随
+  ADR-0203 删除后遗留的死代码；本票原定不扩大死代码面，也不在此清理，后由死代码审计收口）。
 - 用户搜索（`docs/specs/search-user-scope.md`）不在本票范围。
 
 ## 3. 领域模型
@@ -150,28 +151,28 @@ export interface SearchFilters {
 
 ## 6. 缓存键（**前瞻性接线**——当前无生产消费方）
 
-档位落键规则（`cacheKey.ts`，已实现且有单测）：
+档位落键规则（原 `cacheKey.ts`，已随 #1043 删除；以下规则保留为前瞻性设计记录）：
 
 - `partial`（默认）**不落键**（与默认键逐字相同）
 - 非默认落 `ft=exact` / `ft=title_and_caption`，**追加在末尾**——存量非默认筛选的键逐字不变，升级不撞旧缓存
 
-**可达性现状（2026-10-17 grep 实测）**：本节四条落点里只有一条是活的。
+**可达性现状（2026-10-18 复核）**：本节四条落点里只有一条是活的。
 
 | 落点 | 生产消费方 | 状态 |
 |---|---|---|
-| `buildCacheKey` | **零**——webview 消费方随 ADR-0203 删除；ADR-0132 决策 3 与 `useSearch.ts` 均写明「搜索结果全局 LRU 缓存不做」 | 死代码，口径同 §2 的 `urlCodec.ts` |
-| `isDefaultFilters` | **仅** `cacheKey.ts` 内部 | 随缓存键一并不可达 |
+| `buildCacheKey` | **零**——webview 消费方随 ADR-0203 删除；ADR-0132 决策 3 与 `useSearch.ts` 均写明「搜索结果全局 LRU 缓存不做」 | **已随 #1043 删除**（原为死代码，口径同 §2 的 `urlCodec.ts`） |
+| `isDefaultFilters` | **零**（原仅 `cacheKey.ts` 内部） | **已随 #1043 删除**（导出与单测一并清理） |
 | `countActiveFilters` | `SearchSheet.vue` 的 `activeFilterCount` | **活的**（非默认档点亮筛选入口徽标） |
-| `normalizeFilters` | **仅**死代码 `urlCodec.ts` | 随 §2 的 URL 编解码一并不可达 |
+| `normalizeFilters` | **零**（原仅死代码 `urlCodec.ts`） | **已随 #1043 删除**（导出与单测一并清理） |
 
 ⇒ **今天不存在会被弄脏的缓存**，本条不是「正确性硬要求」而是**前瞻性接线**：缓存日后重建时
 按此规则接线即自动正确，search-core 侧无需回头改。
 
 历史留痕（**不改判、只补前提**）：「防脏缓存是正确性硬要求」这条判断出自 spec
 `search-advanced-filters.md` §6.2 缓存键——当轮成立是因为 webview 侧有 `inFlightSearchKey`
-消费方，该消费方已随 ADR-0203 删除。✅ `cacheKey.ts` 头注释已于 2026-10-17 随本节改写：
-不再宣称「正确性硬要求」，并把裸锚点 `§6.2` 补全为 `search-advanced-filters.md §6.2`
-（裸 `§6.2` 易被读成本 spec 的 §6.2，而那里讲的是别的事）。
+消费方，该消费方已随 ADR-0203 删除。✅ `cacheKey.ts` 头注释已于 2026-10-17 随本节改写
+（不再宣称「正确性硬要求」，并把裸锚点 `§6.2` 补全为 `search-advanced-filters.md §6.2`；
+裸 `§6.2` 易被读成本 spec 的 §6.2，而那里讲的是别的事）；该文件随后已随 #1043 删除。
 
 ## 7. UI（`SearchSheet.vue`）
 
@@ -223,9 +224,9 @@ oracle = §4 表 + `verify-query-syntax.sh` 实测。
 
 `target=partial` 与默认键逐字相同；`exact`/`title` 各带 `ft=` 段。
 
-### 8.3 三个派生谓词
+### 8.3 派生谓词
 
-`isDefaultFilters` / `countActiveFilters` / `normalizeFilters` 三项定向用例。
+`countActiveFilters` 定向用例；`isDefaultFilters` / `normalizeFilters` 已随 #1043 删除（原三项用例一并清理）。
 
 ### 8.4 爆炸半径
 
@@ -255,7 +256,7 @@ oracle = §4 表 + `verify-query-syntax.sh` 实测。
 ## 9. 已知取舍与后续候选
 
 - **`keyword` 档未接**：超官方行为，留单票。
-- **`urlCodec.ts` 死代码未清**：不在本票范围，建议另开技术债票。
+- **`urlCodec.ts` 已随 #1043 删除**：本票当时未清理（不在范围，原建议另开技术债票），后续由死代码审计收口。
 - **提示文案只有一行**：不覆盖 `Xusers入り` 桶标签、尺寸指定（`小/中/大`）、工具指定等
   官方搜索框语法（后三者在 app-api 未实测）。
 - 后续候选：搜索联想 `/v2/search/autocomplete`、`content_type` 作品类别、

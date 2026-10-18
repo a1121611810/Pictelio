@@ -104,7 +104,7 @@
 
 ### 验证闭环
 
-- 单测全绿 + `pnpm check:app-lynx` + `pnpm lint:app-lynx`。
+- 单测全绿 + `pnpm check:app-lynx` + `pnpm lint`（`lint:app-lynx` 已随 ADR-0185 根单配置源删除）。
 - **web-core 预览实测**：左右滑 / 吸附 / 指示器同步 / 滑近末尾自动加载 / 点卡进详情 / 点收藏 / 受限条目不出现 / 开关切换受限即时显示 / 刷新回第一张 / FAB 只有一个刷新。
 - **模拟器 + 真机实测**：Swiper 核心技术为 Lynx 主线程脚本——**原生需验证** `display: linear` + `useMainThreadRef` + 主线程 `requestAnimationFrame` + `runOnBackground`/`runOnMainThread` 在 LynxView 是否可用；tap-vs-drag 真机手感；滑动流畅度（无卡顿）。
 - 真机手动 checklist 交付用户逐项打勾（沿用既有验证闭环要求，用户确认真机通过前不得宣称完成）。

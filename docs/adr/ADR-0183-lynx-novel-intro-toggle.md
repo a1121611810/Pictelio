@@ -19,7 +19,7 @@ ADR-0167 给 Lynx 端全部六个小说入口（小说列表 / 收藏 / 用户�
 ### D1：设备级布尔设置 `novel_intro_first`，默认开
 
 - 键 `novel_intro_first`（设备级、不带 uid：导航偏好属设备/个人习惯，非账号内容授权），默认 `true` = 介绍页先行（保持 ADR-0167 现状为缺省行为，升级零感知）。
-- 归属 `settingsStore`（Pinia），逐字沿用 `relatedInjection` / `rankingEntry` 范式：私有 ref + getter + `setNovelIntroFirst()`（持久化失败 `console.warn("[settingsStore] …")`，禁静默降级）。
+- 归属 `settingsStore`（Pinia），逐字沿用 `relatedInjection` / `rankingEntry` 范式：私有 ref + getter + `setNovelIntroFirst()`（持久化失败 `console.warn("[settingsStore] …")`，禁静默降级）。**订正（2026-10-18，#1043）：`rankingEntry` 已随 T7 lynx 入口下线删除；该范式现存唯一参照是 `relatedInjection`。**
 - 纳入 `BACKUP_DEVICE_KEYS`（设备级设置跨引擎备份恢复域），与同组设备开关一致。
 
 ### D2：单点导航缝隙 `openNovel()`，六入口一体生效

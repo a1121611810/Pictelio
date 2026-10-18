@@ -71,7 +71,8 @@ const _disableUpdateCheck = _isDev
     })()
   : false
 // 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
-// 日志只打印主机部分。逻辑与 src/utils/proxyRedact.ts 的 redactProxyUrl 一致（有单测覆盖）。
+// 日志只打印主机部分。本函数为构建期自足实现（不依赖 src/ 下运行时工具，
+// 因为 lynx 运行时禁 URL 全局，此处仅在 Node 侧构建期执行）。
 const _redactProxyUrl = (url: string): string => {
   try {
     const normalized = url.includes('://') ? url : `http://${url}`

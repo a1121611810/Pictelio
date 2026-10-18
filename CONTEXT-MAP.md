@@ -9,8 +9,8 @@ Pictelio 是多包 monorepo，各包的领域上下文相互分离。本文件�
 | `ugoira` | `packages/ugoira` | **未创建** | 动图（Ugoira）zip 帧处理纯函数（fflate 解压 / Range 切片） |
 | `update-check` | `packages/update-check` | **→** [ADR-0089](docs/adr/ADR-0089-update-check-architecture.md) | 更新检查纯逻辑（版本比较 / version.json 拉取 / 超时兜底） |
 | `novel-export` | `packages/novel-export` | **→** [spec: novel-export](docs/specs/novel-export.md) | 小说导出纯逻辑（提取 / 块解析 / payload / 格式表） |
-| `search-core` | `packages/search-core` | **→** [spec: search-advanced-filters](docs/specs/search-advanced-filters.md) | 搜索纯逻辑（筛选状态 → 请求参数 / URL 编解码 / 缓存键） |
-| `ranking-core` | `packages/ranking-core` | **→** [spec: ranking](docs/specs/ranking.md) | 排行榜纯逻辑（维度目录 / 请求构建 / 缓存键 / 日期函数） |
+| `search-core` | `packages/search-core` | **→** [spec: search-advanced-filters](docs/specs/search-advanced-filters.md) | 搜索纯逻辑（筛选状态 → 请求参数 / 期间换算 / 收藏数兜底 / AI 覆盖；URL 编解码与缓存键已随 #1043 删除） |
+| `ranking-core` | `packages/ranking-core` | **→** [spec: ranking](docs/specs/ranking.md) | 排行榜纯逻辑（维度目录 / 请求构建 / 日期函数；缓存键已随 #1043 删除） |
 | `net-diagnostics` | `packages/net-diagnostics` | **→** [spec: network-self-check](docs/specs/network-self-check.md) | 网络自检纯逻辑（检查项 / 判定 / 文案 / 报告） |
 | `website` | `packages/website` | **未创建** | Astro 落地页（GitHub Pages 部署） |
 

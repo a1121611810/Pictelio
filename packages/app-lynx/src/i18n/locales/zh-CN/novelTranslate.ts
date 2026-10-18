@@ -44,32 +44,21 @@ const zhNovelTranslate = {
   "novelTranslate.endpoint.deleteConfirm": "确认清除已保存的 endpoint 配置？",
   "novelTranslate.endpoint.cancel": "取消",
   "novelTranslate.endpoint.confirmClear": "确认清除",
-  "novelTranslate.endpoint.titleGroup": "翻译",
 
-  // action 子域（按钮文案）
+  // action 子域（按钮文案）—— 消费方：TranslateButton.LABEL_KEYS（4 键）、
+  // TranslateModeSwitch.vue（viewOriginal/viewTranslation）、NovelDetail.vue（configure_translate）
   "novelTranslate.action.start": "翻译本章",
-  "novelTranslate.action.abort": "停止",
   "novelTranslate.action.retry": "重试",
-  "novelTranslate.action.cached": "已缓存",
   "novelTranslate.action.viewOriginal": "原文",
   "novelTranslate.action.viewTranslation": "译文",
-  "novelTranslate.action.switchMode": "切换显示",
   "novelTranslate.action.configure_translate": "配置翻译",
   "novelTranslate.action.retranslate": "重译",
 
   // status 子域（状态机语义）
-  "novelTranslate.status.idle": "未翻译",
   "novelTranslate.status.pending": "准备中",
   "novelTranslate.status.translating": "翻译中",
-  "novelTranslate.status.translatingQueued": "排队中",
-  "novelTranslate.status.partial": "部分译文",
-  "novelTranslate.status.failed": "翻译失败",
-  "novelTranslate.status.completed": "已完成",
-  "novelTranslate.status.aborted": "已取消",
   "novelTranslate.status.retrying": "重试中…",
   "novelTranslate.status.placeholder_untranslated": "〔未翻译〕",
-  "novelTranslate.status.progress.label": "进度 {{done}}/{{total}}",
-  "novelTranslate.status.progress.remaining": "剩余 {{remaining}} 章",
 
   // error 子域（错误呈现）
   "novelTranslate.error.network": "网络不可用",
@@ -96,9 +85,6 @@ const zhNovelTranslate = {
   "novelTranslate.error.canceled": "已取消",
   "novelTranslate.error.notConfigured": "请先在设置中配置 LLM endpoint",
   "novelTranslate.error.partialFailed": "部分段落翻译失败，已用原文填充",
-  "novelTranslate.error.retrying": "重试中…",
-  "novelTranslate.error.retryingFailed": "重试仍失败",
-  "novelTranslate.error.retryHint": "请稍后重试或检查 endpoint 配置",
 } as const;
 
 export default zhNovelTranslate;

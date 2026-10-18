@@ -86,16 +86,10 @@ const THEME_COLOR_KEY = "settings_theme_color"
 const DARK_MODE_KEY = "settings_dark_mode"
 /** 相关作品注入行（spec docs/specs/related-injection.md）：设备级开关，默认开；键与 app 逐字一致 */
 const RELATED_INJECTION_KEY = "related_injection"
-/** 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级开关，默认开；键与 app 逐字一致 */
-const RANKING_ENTRY_KEY = "ranking_entry"
 /** 小说介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级布尔，默认开
  *  （介绍页先行 = ADR-0167 三段式现状，升级零感知）；关闭后六入口点击小说直达正文页。
  *  lynx 专属语义，不跨引擎共享键。 */
 const NOVEL_INTRO_FIRST_KEY = "novel_intro_first"
-/** 引擎自动回退开关（ADR-0164 / spec engine-default-lynx §3）：设备级布尔，缺省开；
- *  只管 Lynx 运行时硬错误是否触发引擎降级（不管预检降级）。键为备份契约的一部分，
- *  唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，TS 侧镜像常量经一致性测试钉住 */
-const AUTO_FALLBACK_ENGINE_KEY = "pictelio_engine_auto_fallback"
 /** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级布尔，默认关；
  *  隐藏系统栏（immersive）——边到边基底之上的 opt-in 沉浸。键与 Java 侧
  *  LynxActivity.KEY_FULLSCREEN_MODE 逐字一致（唯一所有者），经 safeAreaJavaContract 测试钉住 */
@@ -143,9 +137,7 @@ export const BACKUP_DEVICE_KEYS = [
   DARK_MODE_KEY,
   LANGUAGE_KEY,
   RELATED_INJECTION_KEY,
-  RANKING_ENTRY_KEY,
   NOVEL_INTRO_FIRST_KEY,
-  AUTO_FALLBACK_ENGINE_KEY,
   FULLSCREEN_MODE_KEY,
   DOWNLOAD_FILE_TEMPLATE_KEY,
   DOWNLOAD_BY_AUTHOR_DIR_KEY,
@@ -368,11 +360,8 @@ export const useSettingsStore = defineStore("settings", () => {
   /** UI 语言："" = 跟随系统；设备级，未登录也恢复 */
   const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
-  const _rankingEntry = ref(true)
   /** 小说介绍页开关（ADR-0183）：设备级，默认开 = 介绍页先行 */
   const _novelIntroFirst = ref(true)
-  /** 引擎自动回退开关（ADR-0164）：设备级，缺省开（用户设置，进备份域；区别于失败记忆等设备事实） */
-  const _autoFallbackEngine = ref(true)
   /** 全屏模式开关（spec lynx-systembars D5）：设备级，默认关（隐藏系统栏的 opt-in 沉浸） */
   const _fullscreenMode = ref(false)
   /** 下载命名模板（ADR-0192 D1）：设备级，默认 Pictelio_{id}（内存态恒为净化后的值） */
@@ -438,9 +427,7 @@ export const useSettingsStore = defineStore("settings", () => {
   ensureDarkModeInit()
   const language = _language
   const relatedInjection = _relatedInjection
-  const rankingEntry = _rankingEntry
   const novelIntroFirst = _novelIntroFirst
-  const autoFallbackEngine = _autoFallbackEngine
   const fullscreenMode = _fullscreenMode
   const downloadFileTemplate = _downloadFileTemplate
   const downloadByAuthorDir = _downloadByAuthorDir
@@ -556,18 +543,6 @@ export const useSettingsStore = defineStore("settings", () => {
       console.warn("[settingsStore] 相关作品注入开关加载失败（维持默认）", e)
     }
 
-    // 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级，未登录也恢复
-    try {
-      const raw = await prefs().get(RANKING_ENTRY_KEY)
-      if (raw === "true") _rankingEntry.value = true
-      else if (raw === "false") _rankingEntry.value = false
-      else if (raw !== null) {
-        console.warn("[settingsStore] 排行榜入口开关值非法，维持默认 true:", raw)
-      }
-    } catch (e) {
-      console.warn("[settingsStore] 排行榜入口开关加载失败（维持默认）", e)
-    }
-
     // 小说介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级，未登录也恢复
     try {
       const raw = await prefs().get(NOVEL_INTRO_FIRST_KEY)
@@ -578,18 +553,6 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 小说介绍页开关加载失败（维持默认）", e)
-    }
-
-    // 引擎自动回退开关（ADR-0164）：设备级，未登录也恢复
-    try {
-      const raw = await prefs().get(AUTO_FALLBACK_ENGINE_KEY)
-      if (raw === "true") _autoFallbackEngine.value = true
-      else if (raw === "false") _autoFallbackEngine.value = false
-      else if (raw !== null) {
-        console.warn("[settingsStore] 引擎自动回退开关值非法，维持默认 true:", raw)
-      }
-    } catch (e) {
-      console.warn("[settingsStore] 引擎自动回退开关加载失败（维持默认）", e)
     }
 
     // 全屏模式开关（spec lynx-systembars D5）：设备级，未登录也恢复
@@ -1106,27 +1069,12 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] 相关作品注入开关写入失败", e))
   }
 
-  function setRankingEntry(enabled: boolean): void {
-    _rankingEntry.value = enabled
-    void prefs()
-      .set(RANKING_ENTRY_KEY, String(enabled))
-      .catch((e) => console.warn("[settingsStore] 排行榜入口开关写入失败", e))
-  }
-
   /** 小说介绍页开关（ADR-0183）：导航偏好属设备/个人习惯，非账号内容授权，不区分 uid */
   function setNovelIntroFirst(enabled: boolean): void {
     _novelIntroFirst.value = enabled
     void prefs()
       .set(NOVEL_INTRO_FIRST_KEY, String(enabled))
       .catch((e) => console.warn("[settingsStore] 小说介绍页开关写入失败", e))
-  }
-
-  /** 引擎自动回退开关（ADR-0164）：双端共享键（Java 侧 EnginePrefs 同读此键） */
-  function setAutoFallbackEngine(enabled: boolean): void {
-    _autoFallbackEngine.value = enabled
-    void prefs()
-      .set(AUTO_FALLBACK_ENGINE_KEY, String(enabled))
-      .catch((e) => console.warn("[settingsStore] 引擎自动回退开关写入失败", e))
   }
 
   /**
@@ -1443,17 +1391,9 @@ export const useSettingsStore = defineStore("settings", () => {
         if (raw !== "true" && raw !== "false") return false
         setRelatedInjection(raw === "true")
         return true
-      case RANKING_ENTRY_KEY:
-        if (raw !== "true" && raw !== "false") return false
-        setRankingEntry(raw === "true")
-        return true
       case NOVEL_INTRO_FIRST_KEY:
         if (raw !== "true" && raw !== "false") return false
         setNovelIntroFirst(raw === "true")
-        return true
-      case AUTO_FALLBACK_ENGINE_KEY:
-        if (raw !== "true" && raw !== "false") return false
-        setAutoFallbackEngine(raw === "true")
         return true
       case FULLSCREEN_MODE_KEY:
         if (raw !== "true" && raw !== "false") return false
@@ -1602,9 +1542,7 @@ export const useSettingsStore = defineStore("settings", () => {
     resolvedDark,
     language,
     relatedInjection,
-    rankingEntry,
     novelIntroFirst,
-    autoFallbackEngine,
     fullscreenMode,
     downloadFileTemplate,
     downloadByAuthorDir,
@@ -1635,9 +1573,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setDarkMode,
     setLanguage,
     setRelatedInjection,
-    setRankingEntry,
     setNovelIntroFirst,
-    setAutoFallbackEngine,
     setFullscreenMode,
     setDownloadFileTemplate,
     setDownloadByAuthorDir,

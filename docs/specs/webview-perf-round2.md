@@ -1,5 +1,13 @@
 # webview 性能二轮 spec：T4 Query 持久化 + T1 渐进加载 + X1 拦截链路（#357）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> 本文针对 WebView 运行时的性能优化对象已不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 > **【模拟器结论，不可直接外推真机】** 全部验收基于模拟器 pictelio_ui（Android 14 / WebView 113，720×1280）。
 > 本文是实施唯一依据，参数与文件路径全部定死，实施者不做设计决策。三份研究设计的完整证据链（file:line 级）已由研究代理输出并归档于本文件 §5 摘要 + git 历史中的研究记录。
 

@@ -25,7 +25,7 @@ _Avoid_: AI 内容（与 AI 翻译混淆）
 AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明底 + AI 徽章（纯 AI 显示「AI」，AI 辅助显示「AI辅助」）+ 文案，无交互。形态对齐 R18 受限卡（插画方形图区 / `RestrictedNovelCard` 小说高度），但**不实现 absolute 遮罩**（list-item 内高度测量约束，见「遮罩」词条）。
 
 **AI 模式（AI filter mode）**【跨上下文】：
-`show | mask | only`，账号级设置 `ai_filter_mode_${uid}`。`mask` 在 app-lynx 落地为 AI 遮罩卡；`only` 完全过滤移除非 AI 作品（app-lynx 唯一的 AI 过滤态）；`show` 不处理。谓词与术语与 app 侧互镜像（详见 `packages/app/CONTEXT.md`）。
+`show | mask | only`，账号级设置 `ai_filter_mode_${uid}`。`mask` 在 app-lynx 落地为 AI 遮罩卡；`only` 完全过滤移除非 AI 作品（app-lynx 唯一的 AI 过滤态）；`show` 不处理。谓词与术语原与 app 侧互镜像——**原词条随 ADR-0203 删除，现行事实源即本节**。
 
 ### 覆盖层与命中测试（Overlay & hit-testing）
 
@@ -44,7 +44,7 @@ AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明�
 ### 作品标识（Work indicators）
 
 **动图（Ugoira）/ 多图（Multi-page）**：
-跨上下文共享概念，判定条件与 app 侧一致（`type === 'ugoira'` / `page_count > 1`，独立判定、允许并存、动图在前）。详见 `packages/app/CONTEXT.md`。
+跨上下文共享概念，判定条件与 app 侧一致（`type === 'ugoira'` / `page_count > 1`，独立判定、允许并存、动图在前）。原词条随 ADR-0203 删除，**现行事实源即本节**。
 
 **类型徽章行（Type badge row）**：
 列表卡片上标识动图/多图的流内徽章行，位于图片下方、标题上方，仅在有标识时渲染。M3 assist-chip 形态：`<AppIcon>` 图标 + 纯文字（动图 / N 图）、`bg-secondary-container`、`text-label-medium`、`md-shape-small` 圆角。图标走 Material Symbols 子集字体（ADR-0208），**不再**用 unicode 符号 —— 符号会被平台渲成彩色 emoji，且不经统一图标门禁。统一由公共组件 `IllustTypeBadgeRow` 渲染，各瀑布流页面接入。
@@ -131,7 +131,7 @@ _Avoid_: 在轮播 slide 内渲染 `<text>` 承载的 scrim（真机非首 slide
 ### 沉浸卡（Immersive card）【2026-10-13 新增，#1004】
 
 **沉浸卡（immersive card）**：
-把信息（标题 / 作者 / 徽章 / 操作）叠在**作品图**上的大图卡，底部一道渐变 scrim 承载文字。三个消费点：推荐页作品卡（`Recommended.vue`）、排行榜入口卡（`RankingEntryCard.vue`）、小说介绍页（`NovelIntro.vue`）。
+把信息（标题 / 作者 / 徽章 / 操作）叠在**作品图**上的大图卡，底部一道渐变 scrim 承载文字。两个消费点：推荐页作品卡（`Recommended.vue`）、小说介绍页（`NovelIntro.vue`）。（原第三个消费点「排行榜入口卡 `RankingEntryCard.vue`」已随 #1043 删除——它只挂在那条生产不可达的 `/illusts` 路由下。）
 判据必须**绝对**：文字压在不可预测的作品图上，「渐变在该处有多深」不可能对所有图同时成立，所以相对断言（比当前底色深多少）在底色接近某值时退化成恒真。正确口径是文字色与一块**稳定底色**（`bg-inverse-surface` + `rounded-lg`，须开在标题元素**之前**）组成 ≥ AA 4.5 的对比度。常驻门禁 `tests/immersiveScrimContrast.test.ts`；台账见 `docs/adr/glossary-md3-alignment.md` §13.8.1。
 **发现判据 = 该 `.vue` 用了 `var(--md-scrim-overlay)`**（#1004）：门禁自己遍历源码树，与登记清单做**双向相等**断言（漏网与过期都暴露），新增即入判。
 _Avoid_：拿底色块形状（`bg-inverse-surface` + `rounded-lg`）当**发现**判据——形状是约定不是定义，全仓在用 5 种 `rounded-*`，换档位就会失效 · 把「列表卡」「受限卡」「轮播 scrim 页面级遮罩」当成沉浸卡（形态相近但不是同一物）· 只写注释说「新增要手动登记」而不做集合夹逼
@@ -259,7 +259,7 @@ _Avoid_: 调度器中混入帧渲染时序（渲染层问题见「动图帧呈�
 与全量路径（`ugoiraExtract`）并存：缓存命中（帧完整）时流式启动一次 poll 全量交付；失败/中断
 保留已写盘帧（下次命中）。与 app 侧「流式取帧/渐进播放」（ADR-0127）语义对齐：都是「首批帧
 就绪即播」，区别在本端数据源为 Java 流式写盘（file:// 帧，二进制零进 JS 堆，ADR-0037 保持）。
-_Avoid_: 用共享包 `createStreamFrameSource` 做原生渐进（LynxFetchModule 无流式 body + 渲染要求 file:// 落盘，JS 拿不到流）
+_Avoid_: 试图用 JS 侧渐进取帧做原生渐进（LynxFetchModule 无流式 body + 渲染要求 file:// 落盘，JS 拿不到流）；曾经承担该设想的共享包 `createStreamFrameSource` 已随 #1043 删除
 
 **动图帧呈现（frame presentation）【2026-08-31，跨上下文】**
 帧切换时「把当前帧画到屏幕」的渲染层行为。Lynx `<image>` 默认在**新一次加载发起前清除已展示的图片资源**——帧切换快于解码（ugoira delay 20~80ms）时画面在「图↔空白」间高频交替（播放闪烁）；官方属性 `defer-src-invalidation`（default false）改为**新加载成功后才清除旧图**，即官方给出的闪烁解法（lynxjs.org `<image>` 文档原文；2026-08-31 原型实测：基线 325 帧中 4 次空白过渡，加属性后 374 帧 0 空白，证据见 `docs/research/ugoira-playback-flicker-range-proto.md`）。
@@ -268,13 +268,13 @@ _Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停�
 
 **帧提取模式（frame extract mode）**：
 `ugoiraMode` 设置项的两个取值：`fflate`（默认，JS 全量解压）与 `range`（Range 流式取帧）。**当前仅 web 模式生效**——原生模式走解压写盘管线，`ugoiraMode` 对其无意义；设置项保留用于 web 模式（Me 页切换）。web 模式 range 失败（非 206 / 长度不符 / 网络错）自动**降级 fflate** 并 `console.warn`（禁止静默降级，2026-08-31 与 app 侧对齐）。
-_Avoid_: 混淆「流式取帧」与「Range 流式取帧」——共享包 `createStreamFrameSource`（ADR-0127，走全量 200 通道增量解压）本端暂不消费（原生走 Java 解压写盘、web 保持全量），语义见 `packages/app/CONTEXT.md`
+_Avoid_: 混淆「流式取帧」与「Range 流式取帧」——前者（共享包 `createStreamFrameSource`，ADR-0127 全量 200 通道增量解压）**已随 #1043 删除**，本端从未消费；本端只有后者：原生走 Java 解压写盘、web 保持全量
 
 **直连模式（Direct access）**【2026-09-06 新增】：
-跨上下文共享概念——图片/API/OAuth 刷新三层的免梯网络通路（IP 直连 + 无 SNI TLS），实现在双引擎共享的 Java 传输层，lynx 客户端自动获得，JS 侧仅设置开关入口。术语详见 `packages/app/CONTEXT.md`「网络直连」。
+跨上下文共享概念——图片/API/OAuth 刷新三层的免梯网络通路（IP 直连 + 无 SNI TLS），实现在 Java 传输层（`android-host`），lynx 客户端自动获得，JS 侧仅设置开关入口。术语原在 `packages/app/CONTEXT.md`「网络直连」（该文件随 ADR-0203 删除）。
 
 **图床下载源（Image host download source）**【2026-09-06 新增】：
-跨上下文共享概念——图床模式（单一/负载均衡/最快 IP）在缓存 miss 时决定实际取数渠道，决策收敛在双引擎共享的 Java 下载层，lynx 静态图与 ugoira zip 自动继承 webview 侧配置的图床（lynx 无设置 UI）。术语详见 `packages/app/CONTEXT.md`「图床」。
+跨上下文共享概念——图床模式（单一/负载均衡/最快 IP）在缓存 miss 时决定实际取数渠道，决策收敛在 Java 下载层的 `ImageHostConfig`（ADR-0143 D1 深模块），lynx 静态图与 ugoira zip 自动继承其决策。配置键空间沿用 `CapacitorStorage` **存量用户数据**（ADR-0050，一字不改），lynx 侧无设置 UI。术语原在 `packages/app/CONTEXT.md`「图床」（该文件随 ADR-0203 删除）。
 
 **代理路径与原生 fetch（proxy path vs native fetch）【2026-08-31 新增】**：
 `/pixiv-img/` 相对路径在原生 LynxView 模式下**不是合法 fetch 目标**（LynxFetchModule 拒绝无 scheme URL，issue #218）；原生模式的图片/文件下载 URL 必须是绝对 CDN URL（`https://i.pximg.net/...`）且**必须带 `Referer: https://app-api.pixiv.net/` 头**（无 Referer → 403，原型 A 方案实测）。

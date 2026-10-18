@@ -97,7 +97,7 @@ P1-1 / P1-2：替换 `rgba(...)` 字面量为 `var(--md-scroll-indicator)` / `va
 - [x] `AiOverlay.vue` / `RestrictOverlay.vue` 文本颜色走 `--colorOverlayForeground` token
 - [x] `ScrollIndicator.vue` / `PagePickerSheet.vue` 硬编码 rgba 替换为 token
 - [x] `tests/hardcodeColorGate.test.ts` 入测试集，新违规红测
-- [x] `pnpm check:app-lynx` + `pnpm test:app-lynx` + `pnpm lint:app-lynx` 全绿
+- [x] `pnpm check:app-lynx` + `pnpm test:app-lynx` + `pnpm lint`（`lint:app-lynx` 已随 ADR-0185 删除）全绿
 - [x] commit message 符合 Conventional Commits
 
 ## 7. Out of Scope

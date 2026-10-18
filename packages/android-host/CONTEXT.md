@@ -14,7 +14,7 @@ _Avoid_: 客户端、app 层（「宿主」不含运行客户端之意）
 | 模块 | 职责 |
 | --- | --- |
 | `LynxActivity` | 入口 Activity；`SplashScreen.installSplashScreen()` 必须在 `super.onCreate()` 之前（ADR-0201） |
-| `LynxRuntimeInitializer` / `PictelioAppLynx` | 引擎预热与可用性回退；预热与路由**必须**共用 `EngineRouting.resolve`（ADR-0164） |
+| `LynxRuntimeInitializer` / `PictelioAppLynx` | Lynx runtime 初始化单点与 Application 入口：`ensureInitialized` 幂等，`PictelioAppLynx.onCreate` 与 `LynxActivity` 进程复用兜底共用；单引擎下无引擎探测/回退决策（`EngineRouting` 随 #610、`isAvailable()` 随 #1043 删除） |
 | `PictelioApiModule` | Pixiv API 出网唯一通道 → `PixivApiCore`（401 自动刷新 + 防死循环） |
 | `PictelioImageService` | `/pixiv-img/` 图片代理服务（见「图片代理」） |
 | `PictelioSecureStorageModule` | refresh_token 存取 → `SecureStorageCompat`（Keystore） |

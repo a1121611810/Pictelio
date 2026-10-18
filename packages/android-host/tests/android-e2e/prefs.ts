@@ -276,9 +276,9 @@ export function forceStopApp(serial: string): void {
  * 通过 am start 启动主入口 Activity。
  *
  * 单引擎布局下 `E2E_FLAVOR` 缺省 `single`，唯一入口恒为 `LynxActivity`；
- * `full` / `webview` 分支只留在 `env.mainActivityFor` 的纯函数映射里（供单测覆盖），
- * 运行时由 `env.ts` 的「非 single 即显式抛错」守卫挡住——`build.gradle` 已无
- * `productFlavors`，不存在可跑那两个 flavor 的包。
+ * `full` / `webview` 由 `env.ts` 的「非 single 即显式抛错」守卫挡住——`build.gradle` 已无
+ * `productFlavors`，不存在可跑那两个 flavor 的包，其入口 Activity 类
+ * （`MainActivity` / `MainActivityWebview`）也已随 WebView 客户端整包删除。
  */
 export function startMainActivity(serial: string): void {
   runOrThrow(

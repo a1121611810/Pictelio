@@ -1,6 +1,7 @@
 // ─── 作品图片保存编排（spec docs/specs/image-save-download.md §4）───
-// 与 app 包 utils/galleryDownload.ts 同源复制（双端同语义惯例，对齐 resolvePageSrcs）；
-// 纯函数 + 注入 saveOne（IO 边界在 utils/gallerySaver.ts），node 可测（测试硬约束 #1）。
+// 与已删除的 WebView 客户端 `packages/app/utils/galleryDownload.ts` 同源（双端同语义惯例，
+// 对齐 resolvePageSrcs）；`packages/app` 已随 ADR-0203 删除，本文件是唯一现存实现。
+// 纯函数（无 IO），node 可测（测试硬约束 #1）。
 import type { PixivIllust } from '../api/types'
 import type { DownloadTaskDraft, UgoiraFrameTiming } from './downloadQueueCore'
 
@@ -112,8 +113,8 @@ const unknownPlaceholderWarned = new Set<string>()
 
 /**
  * 空段占位符的**模板层**剥离（#757）：净化后为空的 {title}/{author} 连同紧邻连接符一并从
- * 模板里删掉，使 `{title}_{id}` 在 title 缺失时得 `{id}`——单存链 saveIllustPages 的 ctx
- * title 恒空且不传 author，不剥就会静默落盘 `_123456.jpg` / `-123456.jpg`。
+ * 模板里删掉，使 `{title}_{id}` 在 title 缺失（无题作品或调用方不传 title）时得 `{id}`，
+ * 否则会静默落盘 `_123456.jpg` / `-123456.jpg`。
  *
  * 连接符两侧都要吃：段落在模板首部时（`{title}_{id}`）残段是其后继，在尾部时（`{id}_{title}`）
  * 是其前驱，只吃一侧会在另一侧留下孤立连接符。
@@ -269,62 +270,6 @@ export function originalPageUrls(illust: PixivIllust): string[] {
     return illust.meta_pages.map((p) => p.image_urls.original ?? p.image_urls.large)
   }
   return [illust.meta_single_page.original_image_url ?? illust.image_urls.large]
-}
-
-export interface SaveOutcome {
-  saved: number
-  failures: Array<{ page: number; message: string }>
-}
-
-/**
- * 顺序批量保存选中页（spec §4）：单张失败不中断批次，逐张完成后回调进度，
- * 失败明细 console.warn（无静默降级）并由调用方以状态文本汇报聚合结果。
- * naming.template 透传命名模板展开（与队列链同一命名纯函数，spec D6）；缺省字节不变。
- */
-export async function saveIllustPages(opts: {
-  /** 选中的 0-based 页号 */
-  pages: number[]
-  /** 页号 → 官方原图 URL（缺失视为该页失败，计入 failures） */
-  urlForPage: (page: number) => string | undefined
-  illustId: number
-  /** IO 边界（原生桥），测试注入 */
-  saveOne: (url: string, fileName: string) => Promise<void>
-  onProgress?: (done: number, total: number, page: number) => void
-  /** 命名选项（单存链当前仅消费 template——相册保存无作者目录维度） */
-  naming?: TaskNamingOptions
-}): Promise<SaveOutcome> {
-  const outcome: SaveOutcome = { saved: 0, failures: [] }
-  const total = opts.pages.length
-  let done = 0
-  const template = opts.naming?.template
-  for (const page of opts.pages) {
-    const url = opts.urlForPage(page)
-    if (!url) {
-      outcome.failures.push({ page, message: '无可用原图 URL' })
-      console.warn(`[galleryDownload] 第 ${page + 1} 页保存失败: 无可用原图 URL`)
-    } else {
-      const fileName =
-        template === undefined
-          ? buildSaveFileName(opts.illustId, total > 1 ? page : undefined, url)
-          : buildSaveFileNameFromTemplate(template, {
-              id: opts.illustId,
-              title: "",
-              page: total > 1 ? page : 0,
-              pageCount: total > 1 ? 2 : 1,
-            }, url)
-      try {
-        await opts.saveOne(url, fileName)
-        outcome.saved++
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        outcome.failures.push({ page, message })
-        console.warn(`[galleryDownload] 第 ${page + 1} 页保存失败:`, e)
-      }
-    }
-    done++
-    opts.onProgress?.(done, total, page)
-  }
-  return outcome
 }
 
 /**

@@ -1,5 +1,9 @@
 <script setup lang="ts">
 // 插画分类页（/illusts）：推荐/关注两个子 tab，waterfall 双列插画卡。
+// #1043：推荐 tab 首屏的「排行榜入口大卡」（`RankingEntryCard.vue`）与 Me 页的
+// `rankingEntry` 开关已随死代码清理删除——该卡只在 `/illusts` 可达时才被渲染，而本路由
+// 当前**无生产入口**（`navigate('/illusts')` 零命中；benchNav 双重门死）。若日后给本路由
+// 恢复入口，需一并从 #1043 之前的提交取回该卡与开关，否则推荐 tab 会缺首屏入口。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'illusts' })
 import { computed, ref, onMounted, onUnmounted, onActivated } from 'vue'
@@ -29,7 +33,6 @@ import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import { useHeroSource } from '../composables/heroTransition'
 import RefreshableList from '../components/RefreshableList.vue'
-import RankingEntryCard from '../components/RankingEntryCard.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { t } from '../i18n'
 
@@ -267,10 +270,6 @@ onUnmounted(() => {
       :model-value="mode"
       @change="switchMode"
     />
-
-    <!-- 排行榜入口大卡（spec docs/specs/ranking.md §5.1）：推荐 tab 内容链之前；
-         开关关闭时不渲染（不建数据源） -->
-    <RankingEntryCard v-if="mode === 'recommend' && settings.rankingEntry" :refresh-epoch="refreshEpoch" />
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；
          触发不依赖 loading 标志（IFR 首帧用初始状态绘制，未落定即骨架） -->

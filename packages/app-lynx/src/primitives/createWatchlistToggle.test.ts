@@ -1,5 +1,5 @@
 // oracle：docs/specs/app-lynx-novel-series-watchlist.md §US7（createWatchlistToggle
-// 镜像 createBookmarkToggle：deps 注入 add/remove + busy 锁 + error 槽 + 失败回滚；
+// seam 形态：deps 注入 add/remove + busy 锁 + error 槽 + 失败回滚；
 // 成功后写 watchlistStore.setWatchState 由页面层 onChange 承接）
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createWatchlistToggle } from "./createWatchlistToggle"

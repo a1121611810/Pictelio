@@ -1,5 +1,6 @@
-// galleryDownload 保存编排单测（spec docs/specs/image-save-download.md §4/§6）。
-// 与 app 包 tests/unit/utils/galleryDownload.test.ts 同源同规格（双端差分对齐）：
+// galleryDownload 命名/URL 纯函数单测（spec docs/specs/image-save-download.md §4/§6）。
+// 原「与 app 包同源同规格」的对照源已随 ADR-0203 删除（`packages/app` 整包下线），
+// 本文件现为唯一实现的事实源：
 // oracle = spec §3 D3 文件名字面规则 + 原 IllustDetail originalImageUrls 语义
 // （多页 meta_pages original ?? large / 单页 meta_single_page ?? large，真实响应字段结构）。
 import { describe, expect, it, vi } from "vitest"
@@ -16,7 +17,6 @@ import {
   originalPageUrls,
   sanitizeLimitedSegment,
   sanitizeNameSegment,
-  saveIllustPages,
 } from "./galleryDownload"
 import { toIllustId, toUserId } from "../api/id"
 import type { PixivIllust } from "../api/types"
@@ -112,88 +112,6 @@ describe("originalPageUrls", () => {
     expect(originalPageUrls(makeIllust({ page_count: 1, meta_pages: [], meta_single_page: {} }))).toEqual([
       "https://i.pximg.net/img-master/l.jpg",
     ])
-  })
-})
-
-describe("saveIllustPages 编排器（spec §4）", () => {
-  it("顺序逐张保存，文件名单页/多页形态正确；进度逐张回调", async () => {
-    const saveOne = vi.fn().mockResolvedValue(undefined)
-    const onProgress = vi.fn()
-    const outcome = await saveIllustPages({
-      pages: [1, 0],
-      illustId: 123456,
-      urlForPage: (p) => originalPageUrls(makeIllust())[p],
-      saveOne,
-      onProgress,
-    })
-    expect(saveOne.mock.calls.map((c) => c[1])).toEqual(["Pictelio_123456_p1.jpg", "Pictelio_123456_p0.png"])
-    expect(outcome).toEqual({ saved: 2, failures: [] })
-    expect(onProgress.mock.calls).toEqual([
-      [1, 2, 1],
-      [2, 2, 0],
-    ])
-  })
-
-  it("单张失败不中断批次；失败计入 failures 且 console.warn 可见", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-    const saveOne = vi.fn().mockImplementation((url: string) =>
-      url.includes("_p0") ? Promise.reject(new Error("HTTP 404")) : Promise.resolve(),
-    )
-    const outcome = await saveIllustPages({
-      pages: [0, 1],
-      illustId: 123456,
-      urlForPage: (p) => originalPageUrls(makeIllust())[p],
-      saveOne,
-    })
-    expect(saveOne).toHaveBeenCalledTimes(2)
-    expect(outcome.saved).toBe(1)
-    expect(outcome.failures).toEqual([{ page: 0, message: "HTTP 404" }])
-    expect(warn).toHaveBeenCalled()
-    warn.mockRestore()
-  })
-
-  it("无可用 URL 的页计入失败（不静默跳过）；空选 no-op", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-    const saveOne = vi.fn().mockResolvedValue(undefined)
-    const outcome = await saveIllustPages({
-      pages: [5],
-      illustId: 123456,
-      urlForPage: () => undefined,
-      saveOne,
-    })
-    expect(saveOne).not.toHaveBeenCalled()
-    expect(outcome.failures).toEqual([{ page: 5, message: "无可用原图 URL" }])
-    expect(await saveIllustPages({ pages: [], illustId: 1, urlForPage: () => "", saveOne })).toEqual({
-      saved: 0,
-      failures: [],
-    })
-    warn.mockRestore()
-  })
-
-  it("naming.template 端到端：单存链与队列链共用同一命名纯函数；缺省与默认逐字节一致", async () => {
-    const saveOne = vi.fn().mockResolvedValue(undefined)
-    const url = "https://i.pximg.net/img-original/single.jpg"
-    // 自定义模板：展开净化后的占位符（{p} 单页剥离连接符残段）
-    await saveIllustPages({
-      pages: [0],
-      illustId: 123456,
-      urlForPage: () => url,
-      saveOne,
-      naming: { template: "{id}_p{p}" },
-    })
-    expect(saveOne.mock.calls[0]?.[1]).toBe("123456.jpg")
-    // 多页：模板不含 {p} 自动追加 _p<页号>（与默认后缀同形）
-    await saveIllustPages({
-      pages: [0],
-      illustId: 123456,
-      urlForPage: () => url,
-      saveOne,
-      naming: { template: "X_{id}" },
-    })
-    expect(saveOne.mock.calls[1]?.[1]).toBe("X_123456.jpg")
-    // 缺省 naming/template → buildSaveFileName 硬编码默认路径，字节不变
-    await saveIllustPages({ pages: [0], illustId: 123456, urlForPage: () => url, saveOne })
-    expect(saveOne.mock.calls[2]?.[1]).toBe("Pictelio_123456.jpg")
   })
 })
 

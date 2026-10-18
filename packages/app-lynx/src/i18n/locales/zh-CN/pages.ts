@@ -10,7 +10,6 @@ const zhPages = {
   "recommended.charCount": "{{count}} 字",
 
   // ─── IllustList.vue（插画分类页） ───
-  "illustList.title": "插画",
   "illustList.tab.recommend": "推荐",
   "illustList.tab.follow": "关注",
   "illustList.empty.follow.title": "暂无关注插画",
@@ -98,7 +97,6 @@ const zhPages = {
   "novelDetail.end": "— 完 —",
 
   // ─── NovelList.vue（小说分类页） ───
-  "novels.title": "小说",
   "novels.tab.recommend": "推荐",
   "novels.tab.follow": "关注",
   "novels.empty.follow.title": "暂无关注小说",
@@ -247,7 +245,6 @@ const zhPages = {
   "watchlist.processing": "处理中…",
 
   // ─── Me.vue（个人中心/设置页） ───
-  "me.title": "我的",
   "me.bookmarks": "我的收藏",
   "me.watchlist": "追更列表",
   "me.mypixiv": "好P友",
@@ -315,25 +312,6 @@ const zhPages = {
   "muteTags.empty.title": "暂无静音标签",
   "muteTags.empty.hint": "长按作品标签即可静音",
 
-  // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案
-  //     码集 = EngineRoute.Reason 全 10 码 + unknown 兜底。
-  //     ⚠️ ADR-0203 决策 7 删除了唯一的渲染方（Me 页生效双态行）——它挂在客户端切换
-  //     组的 v-if 内，单引擎包恒不渲染。文案与 engineState.ts 一并成为无消费方保留项，
-  //     且「已改用 WebView」类表述在 WebView 客户端删除后永不可能为真。
-  //     该溯源缺口已由 #846 显式认领（降级为 characterization，不掩盖）。
-  "engineFallback.reason.preferred": "按首选引擎运行",
-  "engineFallback.reason.lynx_unavailable": "Lynx 引擎在本机不可用，已改用 WebView",
-  "engineFallback.reason.lynx_known_bad": "Lynx 在本版本曾运行失败，已改用 WebView",
-  "engineFallback.reason.lynx_retry": "WebView 不可用，重试 Lynx",
-  "engineFallback.reason.webview_unavailable": "WebView 不可用，本次以 Lynx 生效",
-  "engineFallback.reason.a11y_webview": "已为无障碍服务启用 WebView",
-  "engineFallback.reason.a11y_lynx_last_resort": "WebView 不可用，无障碍服务下仍以 Lynx 兜底",
-  "engineFallback.reason.no_engine": "两个引擎均不可用",
-  "engineFallback.reason.forced_webview": "本次已强制使用 WebView",
-  "engineFallback.reason.runtime_failure": "Lynx 运行出错，已改用 WebView",
-  "engineFallback.reason.unknown": "引擎状态未知",
-  // App.vue 降级提示条（ADR-0153 既有文案逐字迁移，T4 #556 i18n 化）
-  "engineFallback.legacyBanner": "WebView 版本过低，本次已改用 Lynx 引擎运行；更新 WebView 后将自动恢复。",
   "me.appearance.title": "外观",
   "me.appearance.language": "界面语言",
   "me.appearance.languageFollowSystem": "跟随系统",
@@ -355,7 +333,6 @@ const zhPages = {
   "me.content.showR18": "显示 R-18 内容",
   "me.content.showR18G": "显示 R-18G 内容",
   "me.content.relatedInjection": "相关作品注入",
-  "me.content.rankingEntry": "排行榜入口",
   "me.content.novelIntroFirst": "小说先进介绍页",
   "me.content.novelIntroFirstDesc": "关闭后，点击小说将直接进入正文",
   "me.content.ai": "AI 作品",
@@ -458,14 +435,6 @@ const zhPages = {
     "此榜单需账号在 pixiv 网页端开启「显示 R-18 作品」后才可浏览。开启后返回本页重试。",
   "ranking.r18Notice.action": "前往 pixiv 设置",
   "ranking.r18Notice.retry": "重试",
-
-  // ── 推荐流入口大卡（spec docs/specs/ranking.md §5.2；#519）──
-  "ranking.entry.firstBadge": "第 1 名",
-  "ranking.entry.viewAll": "全部",
-  "ranking.entry.viewAllAria": "查看完整排行榜",
-  "ranking.entry.collapseAria": "收起排行榜",
-  "ranking.entry.stripAria": "排行榜入口",
-  "ranking.entry.itemAria": "第{{rank}}名：{{title}}",
 
   // ─── 维度重构（2026-10-03）：发现 / 更新 / 书架 / 高级 ───
   // 顶层由「媒介维度」改为「用户要回答的问题维度」，媒介降为「发现」页内二级。

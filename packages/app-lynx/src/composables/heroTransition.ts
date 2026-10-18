@@ -13,7 +13,8 @@
 // 这三条在生产代码里都已被 ADR-0211 决策 1/2 消费并标注「已验证」：
 //   · `transform`  → GlassCard.vue:51（跟手回弹，`transition: transform var(--durationNormal) …`）
 //   · `width`/`height` → M3Switch.vue:33（`press({property:'width'})` + `press({property:'height'})`）
-//   · `opacity`     → RankingEntryCard.vue:164
+//   · `opacity`     → pages/Ranking.vue:236（`pressOpacity.transition`；同源消费方还有
+//                     GlobalFab / RefreshableList / TagNeighbors / NovelIntro）
 // 刻意**不**过渡 `left` / `top`：那是定位属性，本仓无任何实证消费点，而 ADR-0210 的纪律是
 // 「未验证的路径要么取证后再用、要么不用」。
 // ⇒ 覆盖层用**静态 `left/top` 落在起点**（不参与过渡），用 `transform: translate(dx,dy)` 走到终点，

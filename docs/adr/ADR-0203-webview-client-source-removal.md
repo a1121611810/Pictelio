@@ -125,6 +125,29 @@ Capacitor 插件**，运行时本就不可用。Lynx 侧对全部其余能力均
 已分别由 #846（oracle 溯源断链，已显式降级为 characterization）与
 #847（`differential/` → `contract/`）处理完毕。
 
+> **订正（2026-10-18，#1040 / #1043）**：上段「不授权」的前提**已不成立**，该保留项已删除。
+>
+> 前提为何失效：本 ADR 自己删掉了这两项的唯一写入方——`EnginePrefs` /
+> `EngineFallbackNotice` 两个 Java 类随 WebView 线一并移除。删除前的实测证据：
+> `grep --include=*.java packages/android-host` 对 `EnginePrefs|KEY_STATE|
+> pictelio_engine_state|EngineRouting|EngineFallbackNotice` **零命中**；
+> `readEngineState()` 全仓无调用方；`consumeEngineFallbackNotice()` 读的
+> `pictelio_engine_fallback_notice` 无任何写入方 ⇒ `App.vue` 的降级横幅恒不渲染。
+>
+> ⇒ 适用本 ADR `:127-130` 自订的删除纪律（「不可达 + 无其他调用方 + 前提已被删除」
+> 三者同时成立），删除获授权。随本次一并删除：`engineState.ts` +
+> `engineState.test.ts` + `engineFallbackNotice.ts` + `engineFallbackNotice.test.ts` +
+> `engineFallbackStore.ts`、`App.vue` 的 store 接线与横幅模板块、
+> `AdvancedSettings.vue` 的相关注释，以及 zh-CN/en 各 11 个 `engineFallback.reason.*`
+> + `engineFallback.legacyBanner`（共 24 条）。
+>
+> 同批删除（本 ADR 上文点名的另一半）：`settingsStore.autoFallbackEngine` 及其键
+> `pictelio_engine_auto_fallback`——零生产消费方，oracle `Java EnginePrefs.KEY_AUTO_FALLBACK`
+> 同样随 WebView 线消失；连带从 `BACKUP_DEVICE_KEYS` 移除，故**存量备份里若含该键，
+> 恢复时归入 `skipped`**（单引擎下该设置已无意义，属正常退役）。
+>
+> #846 认领的「溯源断链」随本次删除一并消解（不再是 characterization，而是移除）。
+
 > 首版此处写的是「已如实记入遗留债务」而**仓库中查无该记录**——code-review 判为空头承诺。
 > 文档里写「已挂账」不构成挂账，**issue 号才是**。
 

@@ -1,40 +1,31 @@
 #!/bin/bash
 # ─── 真机 Lynx client 端到端自动化验证（#51/#59） ───
-# 用法: ./lynx-device-check.sh [--rebuild]
-# 流程: 确保 lynx 模式 → 启动 → 自动登录（.env token）→ 校验推荐页图片加载
+# 用法: ./lynx-device-check.sh
+# 流程: 清 refresh_token → 启动 .LynxActivity → 自动登录（.env token）→ 校验推荐页图片加载
 # 前置: adb 已连真机；packages/app-lynx/.env 含 PIXIV_REFRESH_TOKEN；APK 已安装
 set -euo pipefail
 cd "$(dirname "$0")/.."   # 定位到 packages/app-lynx（.env 所在）
 
 PKG="io.pictelio.app"
-ANALYZE="node -e ''"  # placeholder
 ANALYZE_PY="scripts/lynx-screen-analyze.py"
 TOKEN=$(grep -oE '^PIXIV_REFRESH_TOKEN=.*' .env | head -1 | cut -d= -f2-)
 if [ -z "$TOKEN" ]; then echo "❌ .env 缺 PIXIV_REFRESH_TOKEN"; exit 1; fi
 adb get-state >/dev/null 2>&1 || { echo "❌ 无设备连接"; exit 1; }
 
-echo "── 1. 确保 client_kind=lynx + 清 refresh_token（消除启动恢复挂起干扰） ──"
-# 保留 CapacitorStorage.xml 其他键，仅设置 pictelio_client_kind
+echo "── 1. 清 refresh_token（消除启动恢复挂起干扰） ──"
+# 单引擎后不再写 pictelio_client_kind：该键的 Java 写方与 TS 读者均已随单引擎化删除。
+# 清 refresh_token：避免启动时 restoreToken → Native OAuth 交换挂起 → 登录页渲染异常/定位失败（#53 实测）
 adb shell "run-as $PKG sh -c '
-  mkdir -p shared_prefs
-  F=shared_prefs/CapacitorStorage.xml
-  if [ -f \$F ] && grep -q pictelio_client_kind \$F; then
-    sed -i \"s|<string name=\\\"pictelio_client_kind\\\">[^<]*</string>|<string name=\\\"pictelio_client_kind\\\">lynx</string>|\" \$F
-  else
-    printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n    <string name=\\\"pictelio_client_kind\\\">lynx</string>\n</map>\n\" > \$F
-  fi
-  # 清 refresh_token：避免启动时 restoreToken → Native OAuth 交换挂起 → 登录页渲染异常/定位失败（#53 实测）
   S=shared_prefs/WSSecureStorageSharedPreferences.xml
   if [ -f \$S ]; then
     sed -i \"\|<string name=\\\"capacitor-storage_refresh_token\\\">|d\" \$S
   fi'" 2>/dev/null
-adb shell "run-as $PKG cat shared_prefs/CapacitorStorage.xml" 2>/dev/null | grep -o "pictelio_client_kind[^<]*<" | head -1
 
 echo "── 2. 重启 app ──"
 adb logcat -c
 adb shell am force-stop $PKG
 sleep 1
-adb shell am start -n $PKG/.MainActivity >/dev/null
+adb shell am start -n $PKG/.LynxActivity >/dev/null
 sleep 8
 
 echo "── 3. 等待页面稳定（blank=恢复中，images=已登录，login=登录页） ──"

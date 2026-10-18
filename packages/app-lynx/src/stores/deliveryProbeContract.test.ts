@@ -65,9 +65,6 @@ const TRIGGER_CODE = stripComments(
 const LANDING_CODE = stripComments(
   safeRead(new URL('../utils/deliveryProbeLanding.ts', import.meta.url)),
 )
-const REPORT_CODE = stripComments(
-  safeRead(new URL('../utils/deliveryProbeReport.ts', import.meta.url)),
-)
 const ROUTER_CODE = stripComments(safeRead(new URL('../router.ts', import.meta.url)))
 const TAP_ACTIVITY_CODE = stripComments(
   safeRead(
@@ -431,33 +428,6 @@ describe('送达通道触达探测 · JS↔Java 契约（spec notification-deliv
         reset,
         '重置用 emptyCounts() 整体替换 ⇒ startedAt 被清成 null',
       ).not.toMatch(/counts\.value\s*=\s*emptyCounts\(\)/)
-    })
-
-    it('⚠️ 报告不得把「无数据」说成 0%（#941 口径诚实）', () => {
-      expect(REPORT_CODE, '未找到报告模块').not.toBe('')
-      // 分母为 0 ⇒ rate 必须是 null；写成 0 会被读成「发了但没人点」
-      expect(
-        REPORT_CODE,
-        '点击率用 0 冒充「无数据」⇒ 探测器故障会被读成用户拒绝',
-      ).toMatch(/rate:\s*number\s*\|\s*null/)
-      expect(
-        REPORT_CODE,
-        'no-data 必须是独立 verdict，不能复用 not-clicked',
-      ).toMatch(/"no-data"/)
-      // 权限三种状态：查不到 ≠ 未授予。
-      // ⚠️ 断言必须锚在**行为**上（null 分支真的映射到 unknown），不能只搜 "unknown" 字样 ——
-      //   那个词在类型声明里也有，删掉实现里的映射仍然全绿（变异实测）。
-      expect(
-        REPORT_CODE,
-        'permissionGranted === null 未映射到 "unknown" ⇒ 「查不到」被当成「未授予」',
-      ).toMatch(/permissionGranted\s*===\s*null\s*\?\s*"unknown"/)
-      // 比率文本：null 分支不得输出 0%
-      expect(
-        REPORT_CODE,
-        'rateText 的 null 分支输出 0% ⇒ 无数据被读成「没人点」',
-      ).toMatch(/if \(rate === null\) return\s*"[^"]*无法计算[^"]*"/)
-      // 报告必须自带冷热不可分的声明（#940 已证伪四种判据）
-      expect(REPORT_CODE, '报告未声明点击数无法区分冷热').toContain("无法区分")
     })
 
     it('⚠️ 计数里不得再出现冷/热分类字段（#940 实施期结论：不可判定）', () => {

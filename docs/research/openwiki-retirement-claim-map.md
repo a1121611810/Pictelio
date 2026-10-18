@@ -9,7 +9,7 @@
 |---|---|---|
 | 「纯推模式首帧必丢」（viewport-geometry-and-motion:149） | `packages/app-lynx/src/utils/safeArea.ts:63-65`（逐字）+ :95 | 已有 |
 | `'root'` 模式是「静默破版脚枪」（同页:174） | commit `d52223bf` message（逐字） | 已有 |
-| 样本天花板 ≈14/周分不出 20% vs 40%（notifications-and-delivery-probe:160） | `docs/specs/notification-delivery-probe.md:136-137` + ADR-0220 §3 + `deliveryProbeReport.ts:49,52` | 已有 |
+| 样本天花板 ≈14/周分不出 20% vs 40%（notifications-and-delivery-probe:160） | `docs/specs/notification-delivery-probe.md:136-137` + ADR-0220 §3 | 已有 |
 | CI 门禁拓扑（quickstart:218-233） | `.github/workflows/openwiki-update.yml:131-138` 注释（随链路一并删除，无损失） | 无损失 |
 | 路由 28/29（viewport-geometry-and-motion:171-172） | `packages/app-lynx/src/router.ts` 实为 **27/28** | **openwiki 计数错误，删除=修正** |
 | E2E 只能靠像素断言（testing/overview:193） | 编码于 driver + 12 spec；显式陈述已补入 `docs/testing/conventions.md`（T4） | 已转移 |

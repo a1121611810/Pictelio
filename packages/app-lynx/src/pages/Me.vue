@@ -102,7 +102,7 @@ const settings = useSettingsStore()
 const notificationStore = useNotificationStore()
 // 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
 const watchLaterStore = useWatchLaterStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, novelIntroFirst, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
 
 
 
@@ -546,9 +546,6 @@ function toggleR18G() {
 function toggleRelatedInjection() {
   settings.setRelatedInjection(!relatedInjection.value)
 }
-function toggleRankingEntry() {
-  settings.setRankingEntry(!rankingEntry.value)
-}
 // 小说先进介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：一键翻转，setter 自带持久化
 function toggleNovelIntroFirst() {
   settings.setNovelIntroFirst(!novelIntroFirst.value)
@@ -960,21 +957,8 @@ function pickAppearanceMode(mode: DarkModeId) {
           />
         </view>
 
-        <!-- 排行榜入口开关（spec docs/specs/ranking.md §5.8）：设备级，默认开 -->
-        <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="ME_A11Y_LABELS.rankingEntryToggle"
-          @tap="toggleRankingEntry"
-        >
-          <text class="text-title-medium text-surface-on">{{ t('me.content.rankingEntry') }}</text>
-          <M3Switch
-            :checked="rankingEntry"
-          />
-        </view>
-
         <!-- 小说先进介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级，默认开；
-             描述两行式照 autoFallback 行范式（行级 @tap 翻转 + M3Switch，ADR-0179 组件） -->
+             描述两行式照本页既有 M3 开关行范式（行级 @tap 翻转 + M3Switch，ADR-0179 组件） -->
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
           :accessibility-element="A11Y_ELEMENT_ENABLED"

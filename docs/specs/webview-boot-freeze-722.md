@@ -1,5 +1,13 @@
 # Spec: webview 引擎已登录启动冻结（#722）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> 本文描述的 WebView 引擎启动路径已不存在，文中的 Fixed 结论只对已删除的引擎成立。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态: **Fixed（2026-09-25 收口，commit 2364d255；设备 6/6 冷启动验证）**
 - 日期: 2026-09-25
 - 关联: [#722](https://github.com/a1121611810/Pictelio/issues/722)、[ADR-0186](../adr/ADR-0186-vite-plus-1rc-regression-campaign.md)、[glossary-toolchain-regression.md](../adr/glossary-toolchain-regression.md)

@@ -13,13 +13,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APK_PATH,
-  APP_PACKAGE,
   E2E_FLAVOR,
   ENTRY_ACTIVITIES,
   LYNX_ACTIVITY,
   MAIN_ACTIVITY,
   apkRelativePath,
-  mainActivityFor,
   resolveE2eFlavor,
   type E2eFlavor,
 } from "../env";
@@ -62,19 +60,15 @@ describe("apkRelativePath", () => {
   });
 });
 
-describe("mainActivityFor", () => {
-  it("single → LynxActivity（单引擎下 MainActivity 类不存在）", () => {
-    expect(mainActivityFor("single", APP_PACKAGE)).toBe("io.pictelio.app.LynxActivity");
+describe("MAIN_ACTIVITY / ENTRY_ACTIVITIES（单引擎，无 flavor 维度）", () => {
+  it("MAIN_ACTIVITY 恒为 LynxActivity，且绝不是已删除的 MainActivity", () => {
+    expect(MAIN_ACTIVITY).toBe("io.pictelio.app.LynxActivity");
+    expect(MAIN_ACTIVITY).toBe(LYNX_ACTIVITY);
+    expect(MAIN_ACTIVITY.endsWith(".MainActivity")).toBe(false);
   });
 
-  it("full / webview → 各自的 WebView 入口类", () => {
-    expect(mainActivityFor("full", APP_PACKAGE)).toBe("io.pictelio.app.MainActivity");
-    expect(mainActivityFor("webview", APP_PACKAGE)).toBe("io.pictelio.app.MainActivityWebview");
-  });
-
-  it("single 与 LYNX_ACTIVITY 常量一致（阳性对照）", () => {
-    expect(mainActivityFor("single", APP_PACKAGE)).toBe(LYNX_ACTIVITY);
-    expect(mainActivityFor("single", APP_PACKAGE)).not.toBe(mainActivityFor("full", APP_PACKAGE));
+  it("ENTRY_ACTIVITIES 只有唯一入口（不存在第二选项）", () => {
+    expect(ENTRY_ACTIVITIES).toEqual([LYNX_ACTIVITY]);
   });
 });
 
@@ -87,15 +81,6 @@ describe("模块级派生态（本测试进程未设 ANDROID_E2E_FLAVOR ⇒ 走 
   it("APK_PATH 指向单引擎产物，且与 full 布局路径不同", () => {
     expect(APK_PATH.endsWith("/apk/debug/app-debug.apk")).toBe(true);
     expect(APK_PATH).not.toContain("/apk/full/");
-  });
-
-  it("MAIN_ACTIVITY 即 LynxActivity（不是已删除的 MainActivity）", () => {
-    expect(MAIN_ACTIVITY).toBe("io.pictelio.app.LynxActivity");
-    expect(MAIN_ACTIVITY.endsWith(".MainActivity")).toBe(false);
-  });
-
-  it("ENTRY_ACTIVITIES 去重后只剩一个入口（单引擎无降级路径）", () => {
-    expect(ENTRY_ACTIVITIES).toEqual(["io.pictelio.app.LynxActivity"]);
   });
 });
 

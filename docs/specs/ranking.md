@@ -1,11 +1,28 @@
 # Spec: 排行榜（插画榜；双端：app webview + app-lynx）
 
-- 状态：implemented（2026-09-13 当日实施于分支 `feat/solidjs-2-migration`，7 工单 #513–#519 全落地：`31de4de0`→`fe505d53`→`97d191d8`→`9fc21b01`→`f7761853`→`a87e2bd6`→`fbe2046f`；门禁 `check:all` / `test:all` 全绿（app 186 文件 1747 用例 + lynx 92 文件 1221 用例 + 共享包）；仓库级双轴 code-review 复审：1 Blocking（lynx 设备级键未入备份域）+ 4 Should-fix 全部修复（`5cbcc308`/`eb494255`），复审零 Blocking。**遗留**：Android 模拟器 E2E 套件在本机被既有环境问题阻断（chromedriver 113.0.5672.63 为 113 线最后一版、无与设备 WebView 113.0.5672.136 匹配的构建 → `disconnected: not connected to DevTools`；模拟器 DNS 探测失败；`fab-hit-testing` 期望 720x1280 而套件自动选中 1080x2160 的 `pictelio_ui`），失败面全部在引擎切换/网络自检等既有路径，非排行榜；spec §8 四项实测验证项、§9 扩展路径）
+- 状态：implemented（2026-09-13 当日实施于分支 `feat/solidjs-2-migration`，7 工单 #513–#519 全落地：`31de4de0`→`fe505d53`→`97d191d8`→`9fc21b01`→`f7761853`→`a87e2bd6`→`fbe2046f`；门禁 `check:all` / `test:all` 全绿（app 186 文件 1747 用例 + lynx 92 文件 1221 用例 + 共享包）；仓库级双轴 code-review 复审：1 Blocking（lynx 设备级键未入备份域）+ 4 Should-fix 全部修复（`5cbcc308`/`eb494255`），复审零 Blocking。**遗留**：Android 模拟器 E2E 套件在本机被既有环境问题阻断（chromedriver 113.0.5672.63 为 113 线最后一版、无与设备 WebView 113.0.5672.136 匹配的构建 → `disconnected: not connected to DevTools`；模拟器 DNS 探测失败；`fab-hit-testing` 期望 720x1280 而套件自动选中 1080x2160 的 `pictelio_ui`），失败面全部在引擎切换/网络自检等既有路径，非排行榜；spec §8 四项实测验证项、§9 扩展路径）；**T7 lynx 入口已下线（2026-10-18，#1043，见下方订正）**
 - 日期：2026-09-13
 - 关联：原型归档 commit `58170a2b`（入口形态 A/B/C 与 ①/②/③）、`6a2b20fc`（范围层级 S1/S2/S3）；入口形态与范围均已在原型上裁决
 - 端点事实：`/v1/illust/ranking`（**非** `/v1/ranking/illust`），响应顶层 `illusts` + `next_url`，条目**无 rank 字段**，单页 30 条
 - 工单：spec [#512](https://github.com/a1121611810/Pictelio/issues/512) / T1 [#513](https://github.com/a1121611810/Pictelio/issues/513)（ranking-core）/ T2 [#514](https://github.com/a1121611810/Pictelio/issues/514)（webview 页面骨架）/ T3 [#515](https://github.com/a1121611810/Pictelio/issues/515)（webview 维度+日期）/ T4 [#516](https://github.com/a1121611810/Pictelio/issues/516)（webview 入口+开关）/ T5 [#517](https://github.com/a1121611810/Pictelio/issues/517)（lynx 页面骨架）/ T6 [#518](https://github.com/a1121611810/Pictelio/issues/518)（lynx 维度+日期）/ T7 [#519](https://github.com/a1121611810/Pictelio/issues/519)（lynx 入口+开关）
 - 依赖链：`#513 → (#514 → #515, #514 → #516)` 与 `#513 → (#517 → #518, #517 → #519)`；webview 与 lynx 两条支线在 #513 之后可并行
+
+> **订正（2026-10-18，#1043）：T7 lynx 入口已下线。**
+>
+> T7 [#519](https://github.com/a1121611810/Pictelio/issues/519) 交付的 lynx 端「入口（entry）」
+> 已随死代码清理删除。删除对象：`components/RankingEntryCard.vue`、`Me.vue` 的 `rankingEntry`
+> 设备级开关、`settingsStore` 的 `ranking_entry` 键（含备份域）、`primitives/rankingEntryState.ts`。
+>
+> **下线依据**：该入口的唯一渲染宿主是 `pages/IllustList.vue`（路由 `/illusts`）。在单引擎客户端中，
+> `/illusts` **无生产入口**——全仓 `navigate('/illusts')` 与 `push('/illusts')` 零命中，
+> 唯一导航表项 `pictelioBenchNavIllust` 被 `BENCH_NAV=1`（生产恒 false）与 `BuildConfig.DEBUG`
+> 双重门死。宿主不可达 ⇒ 入口与其开关不可达。产品决策：确认下线，不恢复。
+>
+> **不受影响**：榜单页 `/ranking`（活入口 = `Updates.vue` 空态出口）、`@pictelio/ranking-core`、
+> §5.3–§5.7 的榜单页语义、§5.8 的「入口内即时收起」在 webview 侧的历史描述。
+>
+> **恢复条件**：若日后给 `/illusts` 恢复生产入口，须一并从 #1043 之前的提交取回上述四项，
+> 并删除本条订正。`pages/IllustList.vue` 头部留有同样的恢复提示。
 
 ## 1. 背景与目标
 
@@ -128,12 +145,12 @@ interface RankingQuery {
 ### 5.1 入口渲染位置
 
 - **webview**：推荐 Feed（`IllustFeedPanel`，`recommended` tab × 插画内容类型）列表**第一张卡之前**。仅在排行榜开关开启时渲染；收起后当次挂载不再显示（刷新/重进恢复）。
-- **lynx**：插画页（`IllustList.vue`）推荐 tab 的瀑布流 `<list>` **之前**（子 tab 行的下方、刷新容器内）。同样受开关与收起控制。
+- **lynx**（**已下线，#1043**）：插画页（`IllustList.vue`）推荐 tab 的瀑布流 `<list>` **之前**（子 tab 行的下方、刷新容器内）。同样受开关与收起控制。
 
 ### 5.2 入口内容（固定「日榜 · 今日」）
 
 - webview：标题行「今日排行 Top 20」+「全部 ›」+「收起」；横向滚动 20 张方形缩略图，左上角名次角标（前 3 名品牌色强调）。
-- lynx：第 1 名全幅背景（`62vw` 高）+ 底部渐变 scrim + 左下「第 1 名」徽章 / 榜名 / 标题 / 作者 + 右侧第 2/3 名缩略 +「全部 ›」。
+- lynx（**已下线，#1043**）：第 1 名全幅背景（`62vw` 高）+ 底部渐变 scrim + 左下「第 1 名」徽章 / 榜名 / 标题 / 作者 + 右侧第 2/3 名缩略 +「全部 ›」。
 - **入口不提供维度切换**（裁决 #9）：原型中 lynx 大卡顶部的 mini 维度行按此裁决移除。
 - 入口不跟随榜单页的选择（裁决 #22 用户故事）：永远是日榜 + 今日。
 
@@ -168,8 +185,8 @@ interface RankingQuery {
 
 ### 5.8 退出口（裁决 #8）
 
-- **持久开关**（设备级，默认**开**）：沿用 `related_injection` 的既有模式（`settingsStore.define` + 两端设置页各一行）。关闭后入口不渲染，但榜单页路由仍可达（深链/历史记录）。
-- **入口内即时收起**：webview 标题行的「收起」（原型已有）；lynx 大卡补一个同语义收起。收起不持久化。
+- **持久开关**（设备级，默认**开**）：沿用 `related_injection` 的既有模式（`settingsStore.define` + 两端设置页各一行）。关闭后入口不渲染，但榜单页路由仍可达（深链/历史记录）。**lynx 侧已下线（#1043）：`ranking_entry` 键与 Me 页开关均已删除；webview 侧描述随该客户端删除（ADR-0203）一并失效。**
+- **入口内即时收起**：webview 标题行的「收起」（原型已有）；lynx 大卡补一个同语义收起。收起不持久化。**lynx 侧随入口下线（#1043），仅存历史。**
 
 ### 5.9 刷新与缓存会话语义
 
@@ -187,7 +204,7 @@ interface RankingQuery {
 |---|---|
 | `RANK_MODES` | §3.2 目录的单一事实源：`{ id, apiMode, labelKey }[]`，含展示顺序 |
 | `buildRankingRequest({ mode, date })` | → `{ path: "/v1/illust/ranking", params }`；`date = null` 时不传 `date`；统一 `filter` 参数口径 |
-| `rankingCacheKey({ mode, date })` | 缓存/查询键分段，两端共用以免键漂移 |
+| ~~`rankingCacheKey({ mode, date })`~~ | **已随 #1043 删除**（原：缓存/查询键分段；删除前已无生产消费方，历史契约保留供追溯） |
 | `shiftDate(iso, deltaDays)` / `isDateString(v)` / `formatRankingDate(iso)` | 日期加减与校验；lynx 无 Intl，格式化必须手写，两端共用同一份避免日期串天 |
 
 **不放进这个包**：任何平台 UI、任何网络调用、任何过滤逻辑（过滤沿用各端既有链）。

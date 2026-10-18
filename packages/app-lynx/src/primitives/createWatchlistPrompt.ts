@@ -1,7 +1,7 @@
 // ─── 追更询问编排 primitive（spec §US4） ───
 // 深模块：预取 + generation-gate 竞态防护 + 触发判定接线 + 弹窗状态机全部内收，
 // 页面（NovelDetail）只喂滚动事件、把 requestBack 接进返回守卫、按状态渲染弹窗。
-// deps 注入（对齐 createBookmarkToggle 风格），node 可单测——测试用假 deps，
+// deps 注入，node 可单测——测试用假 deps，
 // 不碰真实 API 模块。
 //
 // ADR-0189 D5「跨入口 reactive cache」：watchAdded = reactive cache 优先 → API 预取结果 → null。

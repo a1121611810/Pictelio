@@ -513,19 +513,6 @@ public class PictelioTranslateCacheModuleTest {
         assertTrue("missRate 必须为 JSON null（不再伪造 0）", obj.isNull("missRate"));
     }
 
-    @Test
-    public void getCacheDirPath_returnsAbsolutePath() throws Exception {
-        CapturedCallback cb = new CapturedCallback();
-        // arity 契约（code-review P9）：单参签名，与 JS 侧 `getCacheDirPath(cb)` 对齐
-        invokeLynxMethod("getCacheDirPath", cb);
-        assertTrue(cb.awaitMs(2000));
-        String path = (String) cb.valueRef.get();
-        assertNotNull(path);
-        assertTrue(
-                "cacheDir 路径必须含子目录名 " + PictelioTranslateCacheModule.CACHE_SUBDIR,
-                path.endsWith("/" + PictelioTranslateCacheModule.CACHE_SUBDIR));
-    }
-
     // ─────────────────── 工具 ───────────────────
 
     /**

@@ -191,7 +191,7 @@ export function buildUserSearchRequest(input: {
 
 **不发**其余筛选参数（`bookmark_num_*` / `ratio_pattern` / `width_*` / `start_date` / `end_date` / `search_ai_type`）。**证据强度**：实测未发这些参数且响应正常 + 第三方实现（pixez `getSearchUser` 只发 `word`；Mako `UserSearchEngine` 只发 `filter` + `word`）。⚠️ 这批参数**仍未做反向实验**——`foo=bar` 的 200 只证明「未识别的参数名被忽略」，不能外推到这些参数。不发的理由是第三方共识 + 零证据表明它们在用户端生效，**不是已实测的硬约束**；若将来实测发现可发，属增强不属修复。
 
-`cacheKey.ts` 无需改动：`${word}_${scope}_${sort}` 对 `"user"` 天然成立。
+~~`cacheKey.ts` 无需改动~~：该模块已随 #1043 删除；原结论（`${word}_${scope}_${sort}` 对 `"user"` 天然成立）保留为历史记录。
 
 ### 5.2 api 层（薄传输）
 
@@ -266,7 +266,7 @@ export function searchUserNext(url, signal?): Promise<PixivUserSearchResponse>
 
 ## 8. 测试与验收（oracle 溯源）
 
-1. **search-core**：`buildUserSearchRequest` 真值表（端点 + 参数集合 = `{word, filter, sort}`，断言**不含** `search_target` / `bookmark_num_min`）；`buildCacheKey(word, "user", sort, DEFAULT)` = `word_user_sort`。
+1. **search-core**：`buildUserSearchRequest` 真值表（端点 + 参数集合 = `{word, filter, sort}`，断言**不含** `search_target` / `bookmark_num_min`）；~~`buildCacheKey(word, "user", sort, DEFAULT)` = `word_user_sort`~~ —— **已随 #1043 删除**（缓存键模块在删除前已零生产消费方；历史期望值保留供追溯）。
    oracle = 本 spec §3 实测请求 + pixivpy L576-596。
 2. **契约测试**（测试硬约束 2）：用 `__fixtures__/search-users.json` **真实样例**反序列化，断言三类元素的必填字段全部存在——**锁死 §3.1 的「零缺失」结论，防止后续误删类型字段**。
    ⚠️ **取样必须跨条**（逐条形态见 §3.1 与 §10）：`user_previews[0]` 是**纯插画**条，只能断言 `user_previews[0].illusts[0]` 与 `user_previews[0].user`；小说侧须先用 `user_previews.find((p) => (p.novels ?? []).length > 0)` 定位**纯小说**条再取 `novels[0]`——**`user_previews[0].novels` 是空数组，`user_previews[0].novels[0]` 这条路径不存在**。

@@ -1,12 +1,10 @@
 apply plugin: 'com.android.application'
 
-// OTA web bundle 验签公钥（#248/#249）：raw 32B 的 base64，与 ~/.pictelio-keys/ota-ed25519
-// 私钥同对（指纹记录见 docs/research/ota-ed25519-android.md §4.2）。公开物可入库；
-// 构建期长度校验防手滑截断（签名失败在运行期才暴露就晚了）。
-def otaPublicKeyB64 = "ST/sQxNxrrZXOWwiuKdqqp79p3njn6MvIMWwJQTXWQY="
-if (java.util.Base64.getDecoder().decode(otaPublicKeyB64).length != 32) {
-    throw new GradleException("OTA_ED25519_PUBLIC_KEY_B64 must decode to exactly 32 raw bytes")
-}
+// OTA web bundle 验签公钥已随 WebView 客户端整包删除（ADR-0203）一并移除：OTA 自更新
+// 只服务已不存在的 web bundle，其验签链（bcprov 依赖 + 验签代码）早已不在——本文件
+// 曾保留 `otaPublicKeyB64` 常量 + 构建期长度校验 + `OTA_ED25519_PUBLIC_KEY_B64`
+// buildConfigField，但三者合并后仍是**零读点**配置（2026-10-18 实测：全仓无 Java 读方，
+// 也无 bcprov 依赖）。历史设计见 docs/specs/ota-web-bundle.md。
 
 android {
     namespace = "io.pictelio.app"
@@ -26,14 +24,17 @@ android {
         // 下两行是脚本回写的结果，核对事实源而非核对这里：app-lynx 6.9.1 → 60901。
         versionCode 60901
         versionName "6.9.1"
-        buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         // 沙盒 #610：client flavor 维度下线（WebView/Capacitor 线整体删除），
         // 入口写死 Lynx。占位符机制保留但不再按 flavor 注入。
         manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
         // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）。
-        // ADR-0164：CLIENT_KINDS[0] 是 Java 侧缺省引擎的单一事实来源。
-        // 单引擎后取值塌缩为 {"lynx"}，但**机制与消费方一律保留**——
-        // WebView 线是暂时下线后重写（非永久废弃），重写回归时该机制原样可用。
+        // ⚠️ 当前**零读点**（2026-10-18 实测）：唯一 Java 读者原本是
+        // `LynxRuntimeInitializer.isAvailable()` → `clientKindsContainLynx()`，两者已随
+        // 引擎回退子系统删除（#1043）；全仓 Java/TS/测试均无 `CLIENT_KINDS` 读方，
+        // `[0]` 下标读点也为零 ⇒ ADR-0164「CLIENT_KINDS[0] 是缺省引擎单一事实源」已不成立。
+        // **刻意保留而非删除**：ADR-0062 / ADR-0164 仍以它为契约，删除须先订正 ADR
+        // （审计 dead-subsystem-audit-2026-10.md:246 将其归为「待确认」，不计入死配置）。
+        // 清理路径见 docs/specs/lynx-only-sandbox.md:64「机制清除，但 ADR-0164 本身不重开」。
         buildConfigField "String[]", "CLIENT_KINDS", '{"lynx"}'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

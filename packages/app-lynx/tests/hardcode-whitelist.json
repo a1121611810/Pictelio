@@ -88,10 +88,6 @@
     "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
   },
   {
-    "path": "primitives/createBookmarkToggle.ts",
-    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
-  },
-  {
     "path": "primitives/createGlobalFab.ts",
     "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
   },
@@ -148,10 +144,6 @@
     "reason": "zh 契约常量（UI 已走 i18n key，契约测试钉原文）"
   },
   {
-    "path": "utils/deliveryProbeReport.ts",
-    "reason": "触达探测报告的**诊断性结论文本**（面向跑探测的测试负责人，不进产品 UI）。进 i18n 字典等于把探测诊断文案塞进所有用户的包——ADR-0220 D4/D13 明确这套东西只服务单用户验证。"
-  },
-  {
     "path": "utils/downloadManager.ts",
     "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
   },
@@ -165,10 +157,6 @@
   },
   {
     "path": "utils/galleryDownload.ts",
-    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
-  },
-  {
-    "path": "utils/gallerySaver.ts",
     "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
   },
   {

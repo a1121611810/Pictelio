@@ -2,8 +2,8 @@
 // 依据 docs/research/ugoira-playback-alternatives.md §3/§7：
 // Pixiv ugoira zip 条目为 store（未压缩）模式，帧字节位置可由
 // 「本地文件头偏移 + 30 + nameLen + extraLen」直接算出——取帧无需解压。
-// 本包为零网络/零框架依赖的纯函数层：双端（pictelio-app / app-lynx）
-// 通过 pnpm workspace 引用同一份代码；下载与渲染由各端负责。
+// 本包为零网络/零框架依赖的纯函数层：pictelio-app-lynx（唯一客户端；WebView 客户端
+// 已随 ADR-0203 删除）通过 pnpm workspace 引用；下载与渲染由客户端负责。
 import { unzipSync, inflateSync } from "fflate";
 
 // ─── 类型 ───
@@ -35,9 +35,6 @@ const CENTRAL_SIG = 0x02014b50;
 const LOCAL_SIG = 0x04034b50;
 /** EOCD 固定部分 22 字节 + 注释最大 65535——尾部最多扫这么多 */
 const EOCD_MAX_SCAN = 22 + 65535;
-
-const COMP_STORE = 0;
-const COMP_DEFLATE = 8;
 
 // ─── 工具 ───
 
@@ -124,23 +121,7 @@ export function parseZipCentralDir(
   return entries;
 }
 
-// ─── 3. store 模式取帧（Range 模式：按偏移切片） ───
-
-/**
- * 计算条目数据的字节偏移（本地文件头 30 字节 + nameLen + extraLen）。
- * 校验本地文件头签名与条目范围。
- */
-export function computeFrameOffset(zipBytes: Uint8Array, entry: UgoiraZipEntry): number {
-  assertRange(zipBytes, entry.offset, 30, "本地文件头");
-  if (readU32(zipBytes, entry.offset) !== LOCAL_SIG) {
-    throw new Error(`ugoira: 本地文件头签名错误 @${entry.offset}`);
-  }
-  const nameLen = readU16(zipBytes, entry.offset + 26);
-  const extraLen = readU16(zipBytes, entry.offset + 28);
-  const dataOff = entry.offset + 30 + nameLen + extraLen;
-  assertRange(zipBytes, dataOff, entry.compSize, "帧数据");
-  return dataOff;
-}
+// ─── 3. Range 模式：本地文件头偏移计算 ───
 
 /**
  * 从本地文件头片段（Range 模式单独取 30 字节）计算数据偏移。
@@ -157,44 +138,6 @@ export function computeFrameOffsetFromLocal(localHeader: Uint8Array): number {
   const nameLen = readU16(localHeader, 26);
   const extraLen = readU16(localHeader, 28);
   return 30 + nameLen + extraLen;
-}
-
-/**
- * 取单个条目帧字节。
- * store（compMethod=0）直接切片；deflate（8）用 fflate inflateSync 解压
- * （ZIP 条目是 raw deflate 流，非 zlib 格式——unzlibSync 会解错）。
- * 其他压缩方法不支持。
- */
-export function sliceStoreFrame(zipBytes: Uint8Array, entry: UgoiraZipEntry): Uint8Array {
-  const dataOff = computeFrameOffset(zipBytes, entry);
-  if (entry.compMethod === COMP_STORE) {
-    return zipBytes.slice(dataOff, dataOff + entry.compSize);
-  }
-  if (entry.compMethod === COMP_DEFLATE) {
-    const raw = zipBytes.subarray(dataOff, dataOff + entry.compSize);
-    return inflateSync(raw);
-  }
-  throw new Error(`ugoira: 不支持的压缩方法 ${entry.compMethod}`);
-}
-
-/**
- * 按 fileOrder（元数据 frames[].file 顺序）从 zip 切片出帧字节数组。
- * 缺文件抛错（契约破坏，禁止静默降级）。
- */
-export function sliceFrames(
-  zipBytes: Uint8Array,
-  entries: UgoiraZipEntry[],
-  fileOrder: string[],
-): Uint8Array[] {
-  const byName = new Map<string, UgoiraZipEntry>();
-  for (const e of entries) byName.set(e.name, e);
-  const frames: Uint8Array[] = [];
-  for (const name of fileOrder) {
-    const entry = byName.get(name);
-    if (!entry) throw new Error(`ugoira: zip 缺少帧文件 ${name}`);
-    frames.push(sliceStoreFrame(zipBytes, entry));
-  }
-  return frames;
 }
 
 // ─── 4. fflate 全量解压（方案 B 默认路径） ───
@@ -221,5 +164,3 @@ export function unzipFrames(zipBytes: Uint8Array, fileOrder: string[]): Uint8Arr
 export function deflateInflate(bytes: Uint8Array): Uint8Array {
   return inflateSync(bytes);
 }
-
-export * from "./stream.js";

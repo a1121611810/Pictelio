@@ -18,7 +18,6 @@
 //   - pages/Recommended.vue    综合推荐流卡片
 //   - pages/IllustList.vue     插画分类流卡片
 //   - pages/Following.vue      关注流卡片
-//   - components/RankingEntryCard.vue 排行榜条目卡片
 import { t } from '../i18n'
 
 /** Pixiv 对无标题作品返回的字面哨兵串（API 侧兜底，未本地化） */

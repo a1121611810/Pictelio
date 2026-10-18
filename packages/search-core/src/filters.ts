@@ -1,8 +1,8 @@
 /**
  * 筛选状态规范类型与常量（spec docs/specs/search-advanced-filters.md §3.1）。
  *
- * 本包是双端单点事实源（#480 拍板：共享包单点，替代 ADR-0132 逐字镜像约定）。
- * 所有函数零 IO——请求构建/编解码/换算的副作用（fetch、路由跳转）归各端传输层。
+ * 本包是单端（app-lynx）单点事实源（#480 拍板：共享包单点，替代 ADR-0132 逐字镜像约定）。
+ * 所有函数零 IO——请求构建/换算的副作用（fetch、路由跳转）归 app-lynx 传输层。
  */
 
 /** 期间预设档：1d=今天 / 1w=最近 7 天含今天 / 1m·6m·1y=日历回退 */
@@ -65,32 +65,6 @@ export const BOOKMARK_BANDS: readonly BookmarkBand[] = [
   { min: 1000, max: null },
 ];
 
-const PERIOD_PRESETS: ReadonlySet<PeriodPreset> = new Set(["1d", "1w", "1m", "6m", "1y"]);
-const RATIO_PATTERNS: ReadonlySet<RatioPattern> = new Set(["landscape", "portrait", "square"]);
-const AI_OVERRIDES: ReadonlySet<AiOverride> = new Set(["follow", "all", "hide"]);
-const SEARCH_TARGET_MODES: ReadonlySet<SearchTargetMode> = new Set([
-  "partial",
-  "exact",
-  "title_and_caption",
-]);
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function isDateString(v: unknown): v is string {
-  return typeof v === "string" && DATE_RE.test(v);
-}
-
-export function isDefaultFilters(f: SearchFilters): boolean {
-  return (
-    f.period.kind === "any" &&
-    f.bookmark === null &&
-    f.ratio === null &&
-    f.minPixels === null &&
-    f.aiOverride === "follow" &&
-    f.target === "partial"
-  );
-}
-
 /** 激活筛选维数（搜索栏入口徽标；#476 Q6：无值即默认，不计「显式不过滤」态） */
 export function countActiveFilters(f: SearchFilters): number {
   let n = 0;
@@ -101,70 +75,4 @@ export function countActiveFilters(f: SearchFilters): number {
   if (f.aiOverride !== "follow") n += 1;
   if (f.target !== "partial") n += 1;
   return n;
-}
-
-/**
- * 归一化：URL 等**不可信输入**逐字段校验，非法一律回默认（spec §6.3「非法值一律忽略」）。
- * 此处不做时钟相关校验（end ≤ 今天在 period.resolvePeriodRange 构建时判定）。
- */
-export function normalizeFilters(raw: {
-  period?: unknown;
-  bookmark?: unknown;
-  ratio?: unknown;
-  minPixels?: unknown;
-  aiOverride?: unknown;
-  target?: unknown;
-}): SearchFilters {
-  // ── period ──
-  let period: SearchPeriod = { kind: "any" };
-  const p = raw.period as
-    | { kind?: unknown; preset?: unknown; start?: unknown; end?: unknown }
-    | undefined;
-  if (p && p.kind === "preset" && PERIOD_PRESETS.has(p.preset as PeriodPreset)) {
-    period = { kind: "preset", preset: p.preset as PeriodPreset };
-  } else if (
-    p &&
-    p.kind === "custom" &&
-    isDateString(p.start) &&
-    isDateString(p.end) &&
-    (p.start as string) <= (p.end as string)
-  ) {
-    period = { kind: "custom", start: p.start as string, end: p.end as string };
-  }
-
-  // ── bookmark：接受带宽序号（URL fb）或带宽对象（store 内部） ──
-  let bookmark: BookmarkBand | null = null;
-  const b = raw.bookmark;
-  if (typeof b === "number" && Number.isInteger(b) && b >= 0 && b < BOOKMARK_BANDS.length) {
-    bookmark = { ...BOOKMARK_BANDS[b] };
-  } else if (
-    b &&
-    typeof b === "object" &&
-    typeof (b as BookmarkBand).min === "number" &&
-    ((b as BookmarkBand).max === null || typeof (b as BookmarkBand).max === "number")
-  ) {
-    bookmark = { min: (b as BookmarkBand).min, max: (b as BookmarkBand).max };
-  }
-
-  // ── ratio ──
-  const r = raw.ratio;
-  const ratio: RatioPattern | null = RATIO_PATTERNS.has(r as RatioPattern)
-    ? (r as RatioPattern)
-    : null;
-
-  // ── minPixels：正整数（px 下限） ──
-  const w = raw.minPixels;
-  const minPixels: number | null = typeof w === "number" && Number.isInteger(w) && w > 0 ? w : null;
-
-  // ── aiOverride ──
-  const a = raw.aiOverride;
-  const aiOverride: AiOverride = AI_OVERRIDES.has(a as AiOverride) ? (a as AiOverride) : "follow";
-
-  // ── target ──
-  const t = raw.target;
-  const target: SearchTargetMode = SEARCH_TARGET_MODES.has(t as SearchTargetMode)
-    ? (t as SearchTargetMode)
-    : "partial";
-
-  return { period, bookmark, ratio, minPixels, aiOverride, target };
 }

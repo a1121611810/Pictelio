@@ -2,8 +2,9 @@
 // lynx 新代码的 URL 域名解析唯一入口：任何需要 hostname 的业务一律经本函数，
 // 禁用 URL 全局（new URL / .hostname）。
 // 存量迁移挂账（review P1-1，先于本收口存在，语义为 fail-closed 无现行功能破坏）：
-// api/client.ts isTrustedPixivHost、utils/imageUrl.ts isTrustedImageHost、
-// utils/proxyRedact.ts redactProxyUrl —— 迁移前本函数的「唯一」指 lynx 新代码面。
+// api/client.ts isTrustedPixivHost、utils/imageUrl.ts isTrustedImageHost —— 迁移前本函数
+// 的「唯一」指 lynx 新代码面。第三处 utils/proxyRedact.ts redactProxyUrl 同批迁入后已随
+// 2026-10-18 死代码清理删除（WebView 期代理配置面遗留，生产零消费方）。
 //
 // Oracle（期望值出处，禁止从实现反推）：
 // - lynx 运行时事实（取证 2026-09-15，模拟器 logcat 实证，ADR-0163）：URL 全局 polyfill
@@ -63,7 +64,6 @@ export function extractHostname(url: string): string | null {
 
 /**
  * 提取 http(s) 绝对 URL 的 authority（去 userinfo，**保留端口**）。
- * 供需要 host:port 形态的调用方使用（如 proxyRedact 的脱敏输出），
  * 与 extractHostname（去端口）共用同一解析正则与形态校验——平台事实与禁用 URL 全局
  * 的约束同前。非 http(s) 或非绝对 URL、authority 形态不合规均返回 null。
  */

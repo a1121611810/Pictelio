@@ -33,8 +33,4 @@ describe("formatReport", () => {
     expect(out).not.toContain("super.secret.token");
     expect(out).toContain("[REDACTED]");
   });
-
-  it("reports skip for route instead of omitting it", () => {
-    expect(formatReport(input)).toContain("网络直连路由");
-  });
 });

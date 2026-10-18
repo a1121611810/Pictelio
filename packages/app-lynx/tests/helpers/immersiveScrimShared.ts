@@ -66,9 +66,9 @@ export const PALETTES: Palette[] = (() => {
   }
   return out
 })()
-// ── 三个消费点：门禁要确认它们**真的用上**了稳定底色 ────────────────────────
+// ── 全部消费点（`CONSUMERS`）：门禁要确认它们**真的用上**了稳定底色 ──────────
 //
-// ⚠️ 这里**不能**用 `toContain('bg-inverse-surface')`：三个文件里都还有**别的**、
+// ⚠️ 这里**不能**用 `toContain('bg-inverse-surface')`：每个消费文件里都还有**别的**、
 //    与 scrim 无关的 inverse 元素（NovelIntro 的导出面板就在用），`toContain`
 //    会被那些无关命中满足掉 —— 删掉 scrim 底色照样绿。
 //    判据必须是结构性的：**底色块出现在标题元素之前**。
@@ -79,11 +79,6 @@ export const CONSUMERS = [
     rel: '../src/pages/Recommended.vue',
     // 标题元素的类串（本身已含 text-inverse-on-surface，故同时验证文字色走了配对）
     titleMarker: 'text-title-large font-semibold text-inverse-on-surface',
-  },
-  {
-    name: '排行榜入口卡',
-    rel: '../src/components/RankingEntryCard.vue',
-    titleMarker: 'text-title-medium font-medium text-inverse-on-surface',
   },
   {
     name: '小说介绍页',
@@ -104,7 +99,7 @@ export const CONSUMERS = [
  *
  * 底色块的形状约定（**不可放宽**）：**同一个元素**的 class 里同时出现
  * `bg-inverse-surface` 与 `rounded-lg`。
- * ⚠️ 不能只找 bg-inverse-surface：三个消费点里都还有**别的**、与 scrim 无关的
+ * ⚠️ 不能只找 bg-inverse-surface：各消费点里都还有**别的**、与 scrim 无关的
  *    inverse 元素（NovelIntro 的导出面板就带 rounded-[var(--md-shape-medium)] +
  *    bg-inverse-surface），只找颜色会被那些无关命中满足掉 —— 删掉 scrim 底色照样绿。
  *    rounded-lg 是引入底色块时一并落的形状，正好把两者区分开。
@@ -250,10 +245,9 @@ export function colourTokenViolation(
  *    正是这条**组合路径**，两处各拼一遍的话，真门禁把其中一步删掉验收组仍会绿。
  *
  * ⚠️⚠️ **必须先 `templateBlock` 收窄到 `<template>` 块**（#1005 轮 review 实测，S5）：
- *    `extractTagContaining` 内部只 `stripComments`，**不剥 `<script>` 块**。三个消费点的
+ *    `extractTagContaining` 内部只 `stripComments`，**不剥 `<script>` 块**。各消费点的
  *    SFC 布局都是 `<script>` 在第 1 行、`<template>` 在后（NovelIntro 1 / 337、
- *    Recommended 1 / 360、RankingEntryCard 1 / 109）⇒ **script 里的同 needle 字面量必然排在
- *    真标签之前**。
+ *    Recommended 1 / 360）⇒ **script 里的同 needle 字面量必然排在真标签之前**。
  *    实测：往 `<script setup>` 里塞一行同 needle 的标签字面量，再给真标题追加第二个颜色类
  *    ⇒ **本函数返回 script 字面量里那个标签**，两条颜色判据**一条都没红**，唯一红的是旧顺序
  *    断言且**根因指错**（`idx 58` = script 内的 needle）。

@@ -92,7 +92,7 @@ loadDetail(id) → illust (PixivIllust)
   - `slideSrcs` 解析逻辑若抽纯函数（如 `resolvePageSrcs`）——medium/large/original 档位映射 + original 兜底（oracle：`resolveQualityUrl` 既有测试语义）。
 - **组件行为**：CoverImage 深模块扩展的渲染行为（角标/修正高度/占位）归 web-core/真机验证闭环（既有惯例：三态渲染行为归验证闭环，纯逻辑归单测）。
 - **红线测试**：`packages/app-lynx/tests/unit.test.ts` 现有断言（RefreshableList 结构、IllustTypeBadgeRow 绑定等）确认无 IllustDetail 翻页相关断言（已查，无破坏）。
-- **回归**：CoverImage 默认行为回归（现有调用方零影响）；`pnpm check:app-lynx` / `pnpm lint:app-lynx` / `pnpm test:app-lynx`。
+- **回归**：CoverImage 默认行为回归（现有调用方零影响）；`pnpm check:app-lynx` / `pnpm lint`（`lint:app-lynx` 已随 ADR-0185 删除）/ `pnpm test:app-lynx`。
 
 ## 6. 验证清单（web-core + 模拟器/真机）
 

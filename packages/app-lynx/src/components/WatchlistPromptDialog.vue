@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
         >
           <text class="text-label-large font-medium text-primary">{{ t('watchlistPrompt.decline') }}</text>
         </view>
-        <!-- busy 禁用态：opacity-40 + tap 守卫（防连点，对齐 createBookmarkToggle busy 语义） -->
+        <!-- busy 禁用态：opacity-40 + tap 守卫（防连点，对齐 useBookmarkMutation busy 语义） -->
         <view
           class="h-[10.667vw] px-4 flex items-center justify-center"
           :class="[pressColor.className, busy ? 'opacity-40' : 'active:bg-layer-pressed-primary']"

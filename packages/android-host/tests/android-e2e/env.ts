@@ -74,31 +74,27 @@ if (E2E_FLAVOR !== "single") {
 /** debug APK 产物路径（随 flavor 变化） */
 export const APK_PATH = resolve(APP_ROOT, apkRelativePath(E2E_FLAVOR));
 
-/** App 包名与主入口 Activity（按 flavor 变化；冒烟测试断言目标） */
+/** App 包名（APK 路径按 flavor 变化；入口恒为 LynxActivity。冒烟测试断言目标） */
 export const APP_PACKAGE = "io.pictelio.app";
 export const LYNX_ACTIVITY = `${APP_PACKAGE}.LynxActivity`;
 
-/** flavor → 主入口 Activity 全限定类名 */
-export function mainActivityFor(flavor: E2eFlavor, pkg: string): string {
-  if (flavor === "webview") return `${pkg}.MainActivityWebview`;
-  if (flavor === "full") return `${pkg}.MainActivity`;
-  return `${pkg}.LynxActivity`;
-}
+/**
+ * 主入口 Activity。单引擎下 Lynx 是唯一引擎，入口恒为 LynxActivity——APK 里
+ * **不存在** MainActivity / MainActivityWebview 两个类（随 WebView 客户端整包删除，
+ * ADR-0203），仍按 `io.pictelio.app.MainActivity` 拉起会在 `am start` 阶段直接失败。
+ *
+ * 历史上这里按 flavor 分派（`mainActivityFor(flavor, pkg)`）；两个非 single 分支随
+ * ADR-0203 失去对应类后只剩恒等映射，该函数在 #1043 一并删除。`E2eFlavor` 仍由上方
+ * 毒丸守卫与 `apkRelativePath` 使用，未失去意义。
+ */
+export const MAIN_ACTIVITY = LYNX_ACTIVITY;
 
 /**
- * 主入口 Activity。`single` 布局下 Lynx 是唯一引擎，入口即 LynxActivity——
- * 单引擎 APK 里**不存在** MainActivity / MainActivityWebview 两个类，
- * 仍按 `io.pictelio.app.MainActivity` 拉起会在 `am start` 阶段直接失败。
+ * 全部可能的入口 Activity。单引擎布局下唯一入口恒为 LynxActivity——full 包
+ * MainActivity 的低 WebView 降级路径（ADR-0153）已随 WebView 客户端整包删除，
+ * session 就绪等待不存在「任一入口」的第二选项。
  */
-export const MAIN_ACTIVITY = mainActivityFor(E2E_FLAVOR, APP_PACKAGE);
-
-/**
- * 全部可能的入口 Activity。低 WebView 设备上 full 包的 MainActivity 会在
- * onCreate 内立即 finish 并路由/降级（ADR-0153），session 就绪等待必须接受
- * 「任一入口」而非单一 MainActivity。单引擎布局下两者重合，去重避免重复等待。
- */
-export const ENTRY_ACTIVITIES: readonly string[] =
-  MAIN_ACTIVITY === LYNX_ACTIVITY ? [LYNX_ACTIVITY] : [MAIN_ACTIVITY, LYNX_ACTIVITY];
+export const ENTRY_ACTIVITIES: readonly string[] = [LYNX_ACTIVITY];
 
 /** 复用本机固定 AVD（ADR-0061：不新建/删除）。pictelio_ui（android-34）优先：
  *  WebView ≥ 85（项目 minWebviewVersion），可真实运行 App；pictelio_low（android-28）

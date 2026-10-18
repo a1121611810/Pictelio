@@ -3,7 +3,7 @@ import { ref } from 'vue'
 /**
  * 追更切换状态机（issue #225 / spec app-lynx-novel-series-watchlist §US7）。
  *
- * 镜像 createBookmarkToggle 的 seam 形态（deps 注入 + busy 锁 + error 槽），
+ * seam 形态：deps 注入 + busy 锁 + error 槽（同族 primitive createWatchlistPrompt），
  * 差异：无动画延迟（列表取消追更无 delight 动效），onChange 在 API 成功后即触发。
  *
  * 语义：

@@ -15,13 +15,14 @@
 // ## 这道门禁**不能**抓什么（显式登记，防下一个人把「全绿」读成「这类问题不存在」）
 //
 // 1. **不再全仓扫描**。新出现的行内动作若落在遮挡带内，本门禁**不会**红 —— 扫描能力已随
-//    几何估算一并删除。已覆盖的是下方**三组共 7 处已登记站点**（`LEADING_SITES` 4 +
-//    `LEADING_FOLLOW_ACTIONS` 2 + `DISMISS_SITE` 1）。债务登记 `BAND_DEBT` 已于 2026-10-12
+//    几何估算一并删除。已覆盖的是下方**两组共 6 处已登记站点**（`LEADING_SITES` 4 +
+//    `LEADING_FOLLOW_ACTIONS` 2）。债务登记 `BAND_DEBT` 已于 2026-10-12
 //    清空（票 #950 / #951 结清）：新豁免必须同时登记进 `BAND_DEBT` 与 ADR-0221 §4
 //    「刻意不处理」表，缺任一项「债务清零」那条即红。
 // 2. **不做几何判定**，只判源码顺序与对齐写法；遮挡带自身的像素锚点由 `tests/fabGeometry.test.ts` 承担。
-// 3. **只看那 7 处登记站点**（文件见下方 `LEADING_SITES` / `LEADING_FOLLOW_ACTIONS` /
-//    `DISMISS_SITE` 三组）。其它文件里等价的已修写法若被改回行尾，本门禁不红。
+// 3. **只看那 6 处登记站点**（文件见下方 `LEADING_SITES` / `LEADING_FOLLOW_ACTIONS` 两组）。
+//    （原第三组 `DISMISS_SITE` 随 #1043 删除 `RankingEntryCard.vue` 退场。）
+//    其它文件里等价的已修写法若被改回行尾，本门禁不红。
 //    未覆盖面可复算（外部复核 2026-10-12 订正：此前此处写的是「约 27 处 / 15 个文件」，
 //    该数字来自二手报告、无推导命令，按两种口径都复算不出来 —— 已删除）：
 //      $ grep -rlE "justify-between|justify-end|ml-auto|flex-row-reverse|order-(first|last|[0-9]+)|right-[0-9a-z[]" \
@@ -273,7 +274,8 @@ const BAND_DEBT: readonly {
 }[] = [
   // ✅ **当前为空**（2026-10-12，票 #950 / #951 结清）。
   //
-  // 曾经的四条登记，两条真债已修（见下方 LEADING_FOLLOW_ACTIONS 与 DISMISS_SITE），
+  // 曾经的四条登记，两条真债已修（见下方 LEADING_FOLLOW_ACTIONS；第三条 `DISMISS_SITE`
+  // 随 #1043 删除 `RankingEntryCard.vue` 一并退场，删后无被测对象故整组移除），
   // 一条**验伪为误报**：`src/pages/UserHome.vue` 的「关注数 / 粉丝数 chip」按 ADR-0221 §4 的
   // 措辞本就只写「非破坏性导航 chip」、**从未声称「同带重叠」**——是 #951 票面把它们
   // 归进「三者均落在 GlobalFab 遮挡带内」时顺带算进去的。静态算：卡片 `m-3 p-3.5` ⇒
@@ -307,18 +309,6 @@ const LEADING_FOLLOW_ACTIONS = [
     content: 'data-testid="illust-detail-author"',
   },
 ] as const
-
-/**
- * 榜单卡「收起 ✕」的定位（票 #951）：它不是行内 flex 动作而是 `absolute` 浮层，
- * 故不适用上面两组的源码顺序判据，单独钉**靠右即错**。
- * 原 `right-2` 使按钮横跨 84.3–95.0vw，正落在带内；改 `left-2` 后左上角无冲突
- * （左下信息块 `bottom-3`、2/3 名竖排 `bottom-3 right-2.5`）。
- */
-const DISMISS_SITE = {
-  file: 'src/components/RankingEntryCard.vue',
-  marker: '@tap.stop="dismissed = true"',
-  left: 'class="absolute left-2 top-2',
-} as const
 
 describe('ADR-0221 决策 2 · 带内债务登记', () => {
   it('债务登记为空（#950 / #951 已结清；新增登记须同步本断言与 ADR-0221 §4）', () => {
@@ -425,20 +415,6 @@ describe('ADR-0221 决策 2 · 关注开关行首化（票 #950 / #951）', () =
       ).not.toMatch(/<text[^>]*>\s*\{\{\s*(?:isFollowed|following)/)
     }
   })
-
-  it('榜单卡「收起 ✕」不靠右（票 #951）', () => {
-    const tpl = templateOf(readPkg(DISMISS_SITE.file))
-    const actionAt = tpl.indexOf(DISMISS_SITE.marker)
-    expect(actionAt, `${DISMISS_SITE.file}：找不到收起按钮`).toBeGreaterThanOrEqual(0)
-    const tag = openTagAt(tpl, actionAt)
-    // 两侧都认 `"` 作边界：`class="absolute top-2 right-2"` 的 `right-2` 后面是 `"` 而非空白，
-    // 只认空白会让「收起按钮改回右浮层」这个回归漏过去（同 TRAILING_PUSH 的漏网区）
-    expect(
-      tag,
-      `${DISMISS_SITE.file}：收起按钮带 right-* 定位 ⇒ 它回到 GlobalFab 遮挡带内（票 #951）。请改用 left-*。`,
-    ).not.toMatch(/(?:^|[\s"])right-[^"\s]+(?=[\s"]|$)/)
-    expect(tag, `${DISMISS_SITE.file}：收起按钮未用 left-* 定位（锚点已变，请同步本文件）`).toContain(DISMISS_SITE.left)
-  })
 })
 
 // ═══════════════ 判别力自检（阳性对照）═══════════════
@@ -470,7 +446,7 @@ const 已迁行首 = [
  *  这条专门封住「测量范围」这个自由度 —— 判据必须只量动作元素**自己**的开标签。
  *  反例即外部复核的攻击 A：`openTagAt(tpl, actionAt)` 一旦被换成 `tpl`，这里会被后段那处
  *  无关的 `right-*` 替它续命（已修站点的豁免静默存活），而当时的自检**仍然全绿**。
- *  真实危害不是假想：`RankingEntryCard.vue` 模板里本来就有 `right-[30vw]`（:141）与
+ *  真实危害不是假想：已删除的 `RankingEntryCard.vue`（#1043）模板里本来就有 `right-[30vw]`（:141）与
  *  `right-2.5`（:152）两处与收起 ✕ 无关的令牌。 */
 const 远处有尾推令牌 = [
   '<view class="flex flex-row items-center">',
@@ -517,7 +493,7 @@ describe('门禁判别力自检 · 阳性对照（防「全绿 = 无事发生」
     // 极性被上一条钉住；这一条钉的是**测量范围的下界**。把 `openTagAt(tpl, actionAt)` 换成
     // `tpl`（量得太宽）会让判据变松，而当时的两条单行夹具分辨不出来 —— 因为它们的尾推令牌
     // 恰好就在动作元素自身。判据变松正是 #957 要杀的方向：已修站点的豁免静默续命。
-    // 真实危害不是假想：`RankingEntryCard.vue:141/152` 本就有两处与收起 ✕ 无关的 `right-*`
+    // 真实危害不是假想：已删除的 `RankingEntryCard.vue`（#1043）:141/152 本就有两处与收起 ✕ 无关的 `right-*`
     // 令牌（夹具即照此构造）。
     //
     // ⚠️ **刻意不钉住「量得太窄」那一侧**（如改量行根：外部复核实测该变异仍全绿）。那一侧是

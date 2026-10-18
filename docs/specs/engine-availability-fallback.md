@@ -1,8 +1,13 @@
 # Spec: 引擎可用性与降级（WebView 不可用时优先 Lynx）
 
 > **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
-> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，Pictelio 自此为
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为
 > **Lynx 单引擎**客户端；本文的「WebView 不可用 → Lynx」降级链路与 `full` 包三场景验收**整体下线**。
+> 文中涉及的 `SplashController`、`LynxRuntimeInitializer.isAvailable()`、`EngineRouting` 与 `pictelio_engine_*`
+> 键均已下线（`EngineRouting` / 引擎路由随 #610，其余随
+> [#1043](https://github.com/a1121611810/Pictelio/issues/1043) 死代码审计；`pictelio_engine_*` 键在单引擎包内
+> 已无生产写入方，仅存历史测试锚点）。
 > **正文按原样保留，仅供决策史参考，不代表当前状态。**
 > 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
 > [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。

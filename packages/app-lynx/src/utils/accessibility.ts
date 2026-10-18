@@ -72,9 +72,7 @@ export const ME_A11Y_LABELS = {
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
   relatedInjectionToggle: '相关作品注入开关',
-  rankingEntryToggle: '排行榜入口开关',
   novelIntroFirstToggle: '小说先进介绍页开关',
-  // 引擎自动回退开关（ADR-0164 / #555：Me 客户端卡 M3 switch 行）
   // 全屏模式开关（spec lynx-systembars D5：Me 客户端卡 M3 switch 行）
   fullscreenMode: '全屏模式开关',
   // 网络组（ADR-0199 D4 / #779 T2：Me 网络卡组标题 + 限流退避开关行 + 三个档位行容器）

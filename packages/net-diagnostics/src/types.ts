@@ -1,9 +1,9 @@
 // @pictelio/net-diagnostics — 共享契约类型（零平台依赖）
-// 两个客户端（WebView / Lynx）与 Java 探测层都以此为准；UI 只渲染，不自行判定。
+// Lynx 客户端（app-lynx）与 Java 探测层都以此为准；UI 只渲染，不自行判定。
 
-export type DiagPlatform = "android" | "ios" | "web";
-export type DiagEngine = "webview" | "lynx";
-export type DiagLayer = "device" | "route" | "dns" | "tcp" | "tls" | "http" | "edge";
+export type DiagPlatform = "android" | "web";
+export type DiagEngine = "lynx";
+export type DiagLayer = "device" | "dns" | "tcp" | "tls" | "http" | "edge";
 export type DiagStatus = "ok" | "warn" | "fail" | "skipped";
 export type DiagAttribution =
   | "none"

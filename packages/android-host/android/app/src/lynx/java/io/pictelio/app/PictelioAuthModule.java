@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
  *   <li>{@code loginWithRefreshToken(token, cb)}：成功 {@code cb(userInfoJson, "")}；
  *       失败 {@code cb("", errMsg)}。userInfoJson 含 userId/userName/userAccount/
  *       profileImageUrls/refreshToken（**不含 access_token**——只进 Java 堆）</li>
- *   <li>{@code setAccessToken(token)}：备用 push（JS 直登录路径）；无回调</li>
  *   <li>{@code clearTokens(cb)}：登出清 Java 堆 token；成功 {@code cb("", "")}</li>
  * </ul>
  */
@@ -87,12 +86,6 @@ public class PictelioAuthModule extends LynxModule {
                 callback.invoke("", "登录失败: " + msg);
             }
         });
-    }
-
-    /** 备用：JS 直登录（web 模式 OAuth 结果）后 push access_token 到 Java 堆 */
-    @LynxMethod
-    public void setAccessToken(String token) {
-        PixivApiCore.accessToken = token;
     }
 
     /** 登出：清 Java 堆 token（access_token 与 refresh_token） */

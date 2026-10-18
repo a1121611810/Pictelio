@@ -159,6 +159,10 @@ const TEXT_EXT = new Set([
 /**
  * 存量格式契约字面量（ADR-0203 §存量格式契约「不可动」+ ADR-0050）。
  * ⚠️ 这些是**必须保留**的，不是待清理的；改动会让已安装用户读不到 refresh_token 与全部设置。
+ *
+ * 与下方的 `CLIENT_SWITCH_*`（历史锚点）不同：本组是**活契约断言**——
+ * Java 生产代码仍在读写这些字面量，不是「守卫一个已删除的对象」。
+ * 不要因为字样里有 Capacitor 就把它们当历史残留一起删。
  */
 const PERSISTED_FORMAT_LITERALS = [
   { literal: "capacitor-storage_", owner: "安全存储前缀常量（SecureStorageCompat.PREFIX）" },
@@ -215,10 +219,15 @@ const HOST_ASSETS = [
  * 客户端切换能力的残留面（不变量 8；ADR-0203 §决策 7「WebView 下线后单态收敛」）。
  *
  * 背景：WebView 客户端是「webview ↔ lynx 双客户端切换」的唯一切换对象。它被删除后，
- * 整个 clientSwitch 能力失去存在依据——运行时虽已被 `CLIENT_KINDS={"lynx"}` 门控为
- * 不可达（`supportsClientSwitch` 返回 false，整张切换卡片不渲染），但源码、Java 原生
- * 方法与 UI 文案会继续留在树里并被打进 APK bundle（含失实文案 "SolidJS + Capacitor"）。
+ * 整个 clientSwitch 能力失去存在依据——历史上曾由 `CLIENT_KINDS={"lynx"}` 门控为
+ * 不可达（`supportsClientSwitch` 返回 false，整张切换卡片不渲染；该运行期读点已随
+ * 单引擎清理删除），但源码、Java 原生方法与 UI 文案会继续留在树里并被打进 APK bundle
+ * （含失实文案 "SolidJS + Capacitor"）。
  * 「不可达」不等于「已下线」——残留会误导 grep APK 的人，也会在日后被误当作可用功能。
+ *
+ * ⚠️ 本组（`CLIENT_SWITCH_*`）是**历史锚点**，不是活能力断言：
+ * 它守卫的是「已经删除的能力不得复活」，全部为负面断言，不声称切换能力仍可用。
+ * 保留理由：删掉它们等于把「WebView 重写回归时静默恢复切换入口」变成无人拦截的变更。
  */
 const CLIENT_SWITCH_STORE_REL = "src/stores/clientSwitchStore.ts";
 
@@ -231,8 +240,8 @@ const CLIENT_SWITCH_REF_RE =
 
 /**
  * Java 侧切换专用方法（`PictelioAppModule` 内）。
- * ⚠️ 判据只认这 4 个**方法签名**；`PictelioAppModule` 其余 10 个 `@LynxMethod`
- * 是通用能力（视口/退出/安全区/深色模式/分享/诊断…），有 9–11 处调用，**必须保留**。
+ * ⚠️ 判据只认这 4 个**方法签名**；`PictelioAppModule` 其余 9 个 `@LynxMethod`
+ * 是通用能力（视口/退出/安全区/深色模式/外链/HTTP/调试构建…），有真实 TS 调用点，**必须保留**。
  */
 const CLIENT_SWITCH_JAVA_METHODS = [
   "setClientKind",
@@ -245,6 +254,11 @@ const CLIENT_SWITCH_JAVA_METHODS = [
  * 配对正面锚点（不变量 8 的「防糊弄」半边）。
  * 没有它，「把 PictelioAppModule 整份删掉」和「把 Me.vue 整页删掉」都会让
  * 所有负面断言转绿——那是事故不是修好。数字取自删除前的实测值，留足下限余量。
+ *
+ * ⚠️ 本数组只对 Java 单文件做方法签名计数，**不扫 JS 侧**：它能证明「方法还在」，
+ * 不能证明「还有人在调」。故只登记**有真实 TS 调用点**的通用方法。
+ * `exportDiagLog` 曾是本表的假活锚点（Java 实现完整、`src/**` 零调用），
+ * 随死代码删除后已从本表移除；新增锚点前必须先给出 TS 调用点证据。
  */
 const CLIENT_SWITCH_POSITIVE_ANCHORS = [
   { method: "getViewportSize", minHits: 1, owner: "通用：视口尺寸" },
@@ -252,7 +266,6 @@ const CLIENT_SWITCH_POSITIVE_ANCHORS = [
   { method: "getSafeAreaInsets", minHits: 1, owner: "通用：安全区内边距" },
   { method: "applyDarkModePreference", minHits: 1, owner: "通用：深色模式同步" },
   { method: "openUrl", minHits: 1, owner: "通用：外链打开" },
-  { method: "exportDiagLog", minHits: 1, owner: "通用：诊断日志导出" },
 ] as const;
 
 /**

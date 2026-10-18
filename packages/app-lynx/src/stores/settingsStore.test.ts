@@ -1081,27 +1081,20 @@ describe('settingsStore 备份原语（T7 m3：exportRawValues / importRawValues
     expect(uncovered).toEqual([])
   })
 
-  it('exportRawValues 含 related_injection / ranking_entry（设备级开关）', async () => {
-    prefsModule(new Map<string, string>([
-      ['related_injection', 'false'],
-      ['ranking_entry', 'false'],
-    ]))
+  it('exportRawValues 含 related_injection（设备级开关）', async () => {
+    prefsModule(new Map<string, string>([['related_injection', 'false']]))
     const raw = await store.exportRawValues()
     expect(raw.related_injection).toBe('false')
-    expect(raw.ranking_entry).toBe('false')
   })
 
-  it('importRawValues 写回 related_injection / ranking_entry（非法值跳过）', async () => {
+  it('importRawValues 写回 related_injection（非法值跳过）', async () => {
     prefsModule(new Map<string, string>())
     const res = await store.importRawValues({
       related_injection: 'false',
-      ranking_entry: 'false',
       related_injection_bogus: 'bogus',
     })
     expect(store.relatedInjection).toBe(false)
-    expect(store.rankingEntry).toBe(false)
     expect(res.applied).toContain('related_injection')
-    expect(res.applied).toContain('ranking_entry')
     expect(res.skipped).toContain('related_injection_bogus')
   })
 })
@@ -1164,98 +1157,9 @@ describe("settingsStore.relatedInjection（spec #486）", () => {
   })
 })
 
-// ranking_entry 设备级开关（spec docs/specs/ranking.md §5.8；#519：加载/非法值/写入）
-describe("settingsStore.rankingEntry（spec #519）", () => {
-  function prefsModule(map: Map<string, string>) {
-    env.native = true
-    env.modules = {
-      PictelioPrefs: {
-        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
-          cb(map.has(k) ? JSON.stringify(map.get(k)!) : '', null),
-        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
-          map.set(k, v)
-          cb(null)
-        },
-        prefsRemove: (k: string, cb: (e: string | null) => void) => {
-          map.delete(k)
-          cb(null)
-        },
-      },
-    }
-  }
-
-  beforeEach(() => {
-    env.native = false
-    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
-    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
-    setActivePinia(createPinia())
-    store = useSettingsStore()
-  })
-
-  it("默认开启", () => {
-    expect(store.rankingEntry).toBe(true)
-  })
-
-  it("loadSettings 读取失败 → warn 可见、维持默认（禁静默降级，硬约束 #1）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    vi.mocked(idbGet).mockImplementation(async (key: string) => {
-      if (key === "ranking_entry") throw new Error("read fail")
-      return null
-    })
-    await store.loadSettings()
-    expect(store.rankingEntry).toBe(true)
-    await vi.waitFor(() =>
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), expect.anything()),
-    )
-    warnSpy.mockRestore()
-  })
-
-  it("prefs 写入失败 → warn 可见（不抛出，硬约束 #1）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    env.native = true
-    env.modules = {
-      PictelioPrefs: {
-        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
-        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("storage full"),
-        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
-      },
-    }
-    store.setRankingEntry(true)
-    await vi.waitFor(() =>
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), expect.anything()),
-    )
-    warnSpy.mockRestore()
-  })
-
-  it("setRankingEntry 持久化到 prefs（键 ranking_entry）", async () => {
-    const map = new Map<string, string>()
-    prefsModule(map)
-    store.setRankingEntry(false)
-    await vi.waitFor(() => expect(map.get("ranking_entry")).toBe("false"))
-    expect(store.rankingEntry).toBe(false)
-  })
-
-  it("loadSettings 从 prefs 恢复持久化开关", async () => {
-    const map = new Map<string, string>([["ranking_entry", "false"]])
-    prefsModule(map)
-    await store.loadSettings()
-    expect(store.rankingEntry).toBe(false)
-  })
-
-  it("loadSettings 非法值不覆盖当前值（warn 可见，禁静默降级）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    const map = new Map<string, string>([["ranking_entry", "bogus"]])
-    prefsModule(map)
-    await store.loadSettings()
-    expect(store.rankingEntry).toBe(true)
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), "bogus")
-    warnSpy.mockRestore()
-  })
-})
-
 // novel_intro_first 设备级开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：
 // 默认开 = 介绍页先行（ADR-0167 三段式现状）；关闭后六入口点击小说直达正文页。
-// 导航偏好属设备/个人习惯，非账号内容授权 → 设备级（键不带 uid），与 rankingEntry 同范式。
+// 导航偏好属设备/个人习惯，非账号内容授权 → 设备级（键不带 uid），与 relatedInjection 同范式。
 describe("settingsStore.novelIntroFirst（spec #711 / ADR-0183）", () => {
   function prefsModule(map: Map<string, string>) {
     env.native = true
@@ -1368,118 +1272,10 @@ describe("settingsStore.novelIntroFirst（spec #711 / ADR-0183）", () => {
   })
 })
 
-// 引擎自动回退开关（ADR-0164 / #555 T3）：设备级布尔缺省开；键 pictelio_engine_auto_fallback
-// 与 app 侧逐字一致（唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，字面量已核对引擎源码）。
-// 期望值 oracle = spec engine-default-lynx §3 键表（缺省 true，值域 "true"/"false"）。
-describe("settingsStore.autoFallbackEngine（ADR-0164）", () => {
-  /** prefs seam（与前述 describe 同款 mock：native Callback 值带 JSON 引号） */
-  function prefsModule(map: Map<string, string>) {
-    env.native = true
-    env.modules = {
-      PictelioPrefs: {
-        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
-          cb(map.has(k) ? JSON.stringify(map.get(k)!) : "", null),
-        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
-          map.set(k, v)
-          cb(null)
-        },
-        prefsRemove: (k: string, cb: (e: string | null) => void) => {
-          map.delete(k)
-          cb(null)
-        },
-      },
-    }
-  }
-
-  beforeEach(() => {
-    env.native = true
-    env.modules = {}
-    userRef().value = null
-    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
-    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
-    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
-    setActivePinia(createPinia())
-    store = useSettingsStore()
-  })
-
-  it("默认开启（缺省 true，spec §3）", () => {
-    expect(store.autoFallbackEngine).toBe(true)
-  })
-
-  it("loadSettings 从 prefs 恢复 \"false\"", async () => {
-    prefsModule(new Map<string, string>([["pictelio_engine_auto_fallback", "false"]]))
-    await store.loadSettings()
-    expect(store.autoFallbackEngine).toBe(false)
-  })
-
-  it("loadSettings 非法值 → 维持默认 true + warn（禁静默降级）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    prefsModule(new Map<string, string>([["pictelio_engine_auto_fallback", "yes"]]))
-    await store.loadSettings()
-    expect(store.autoFallbackEngine).toBe(true)
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("引擎自动回退"), "yes")
-    warnSpy.mockRestore()
-  })
-
-  it("loadSettings 读取失败 → 维持默认 true + warn（硬约束 #1/#3）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    // dev 模式 idb 抛异常 → loadSettings catch 分支（native 读失败由 adapter resolve(null) + warn，见 WebDAV 读取失败用例）
-    env.native = false
-    vi.mocked(idbGet).mockImplementation(async (key: string) => {
-      if (key === "pictelio_engine_auto_fallback") throw new Error("read fail")
-      return null
-    })
-    await store.loadSettings()
-    expect(store.autoFallbackEngine).toBe(true)
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("引擎自动回退开关加载失败"),
-      expect.anything(),
-    )
-    warnSpy.mockRestore()
-  })
-
-  it("setAutoFallbackEngine 持久化 String(enabled)（native 路径，键 pictelio_engine_auto_fallback）", async () => {
-    const map = new Map<string, string>()
-    prefsModule(map)
-    store.setAutoFallbackEngine(false)
-    await vi.waitFor(() => expect(map.get("pictelio_engine_auto_fallback")).toBe("false"))
-    expect(store.autoFallbackEngine).toBe(false)
-  })
-
-  it("prefs 写入失败 → 内存态已更新 + warn 可见（不抛出，硬约束 #3）", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    env.native = true
-    env.modules = {
-      PictelioPrefs: {
-        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
-        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("disk full"),
-        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
-      },
-    }
-    store.setAutoFallbackEngine(false)
-    expect(store.autoFallbackEngine).toBe(false)
-    await vi.waitFor(() =>
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("引擎自动回退"), expect.anything()),
-    )
-    warnSpy.mockRestore()
-  })
-
-  it("applyRawKey：importRawValues 写回合法值、非法值跳过", async () => {
-    prefsModule(new Map<string, string>())
-    const res = await store.importRawValues({
-      pictelio_engine_auto_fallback: "false",
-      pictelio_engine_auto_fallback_bogus: "bogus",
-    })
-    expect(store.autoFallbackEngine).toBe(false)
-    expect(res.applied).toContain("pictelio_engine_auto_fallback")
-    expect(res.skipped).toContain("pictelio_engine_auto_fallback_bogus")
-  })
-})
-
 // 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级默认关 + 原生即时切换。
 // oracle = spec D5 + Java LynxActivity.KEY_FULLSCREEN_MODE（键字面量经 safeAreaJavaContract 钉住）。
 describe("settingsStore.fullscreenMode（spec lynx-systembars D5）", () => {
-  /** prefs seam（同 autoFallbackEngine describe 的 mock：native Callback 值带 JSON 引号） */
+  /** prefs seam（同前述 describe 的 mock：native Callback 值带 JSON 引号） */
   function prefsModule(map: Map<string, string>) {
     env.native = true
     env.modules = {
@@ -1618,7 +1414,10 @@ describe("settingsStore.fullscreenMode（spec lynx-systembars D5）", () => {
 // 快照/optout/取证键/一次性通知键都是本机事实），不得进备份域。分区实现事实：backupCore
 // partitionKeys 对未知键一律落入 deviceKeys（无独立排除集），lynx 侧守卫 = 备份域白名单
 // （exportRawValues 只读 BACKUP_DEVICE_KEYS + 账号级键；importRawValues 只认 applyRawKey
-// 分支）。键字面量 oracle = Java EnginePrefs.KEY_*（已核对引擎源码）+ engineFallbackNotice.ts。
+// 分支）。键字面量 oracle 已随引擎回退子系统删除而失效（#1040/#1043）：
+// 原 oracle = Java EnginePrefs.KEY_* + engineFallbackNotice.ts，二者均已不存在。
+// 本 describe 现只守「白名单实现不误纳任意键」这一条不变量，键清单本身留作
+// 历史锚点——那 5 个键在单引擎包内已无任何写入方。
 describe("settingsStore 引擎设备事实键备份域排除（ADR-0164）", () => {
   /** 引擎设备事实/协议键（恢复跨设备是错；ADR-0164 spec §3） */
   const ENGINE_FACT_KEYS = [
@@ -1696,7 +1495,7 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
     vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
   })
 
-  // ── 键契约（ranking_entry 先例：exportRawValues/importRawValues 键清单断言）──
+  // ── 键契约（related_injection 先例：exportRawValues/importRawValues 键清单断言）──
 
   it("backupAccountKeys 含 mute_tags_42", () => {
     expect(backupAccountKeys(42)).toContain("mute_tags_42")
@@ -2152,7 +1951,7 @@ describe("settingsStore — 下载命名模板与按作者建目录（ADR-0192�
 // 已在 ../api/client mock 工厂中替换为 spy）即时生效。
 // IO 边界双路径（硬约束 #1）：装载成功 + 非法值/IO 失败降级 warn（禁静默降级）。
 describe("settingsStore.rateLimitBackoff（ADR-0199 D4）", () => {
-  /** prefs seam（与 autoFallbackEngine describe 同款 mock：native Callback 值带 JSON 引号） */
+  /** prefs seam（同前述 describe 的 mock：native Callback 值带 JSON 引号） */
   function prefsModule(map: Map<string, string>) {
     env.native = true
     env.modules = {

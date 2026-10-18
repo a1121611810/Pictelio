@@ -1,8 +1,11 @@
 // 命名模板「空段残段不得静默」不变量单测（#757）。
 //
-// 缺陷：saveIllustPages 的命名 ctx 把 title 写死 "" 且不传 author，含 {title}/{author} 的
-// 模板在该链展开成空段，连接符残段（`_123456.jpg` / `-123456.jpg`）既不剥离也无告警。
-// 同一展开内核对 {p} 单页已有模板层剥离——本文件钉住 title/author 两段的对称处置。
+// 历史缺陷：已删除的单存链 `saveIllustPages`（#1043）把命名 ctx 的 title 写死 "" 且不传
+// author，含 {title}/{author} 的模板在该链展开成空段，连接符残段（`_123456.jpg` /
+// `-123456.jpg`）既不剥离也无告警。该链已删，但**剥离规则仍是活的**：队列链
+// `buildImageTasks` 的 `namingCtxFor` 直接透传 `illust.title`，而 title 允许是空串或
+// 全空白（见 `utils/artworkTitle.ts` 头注），此时同样会展开出空段。本文件钉住
+// title/author 两段的对称处置，不随单存链退场。
 //
 // 核心风险（= 剥离必须在**模板层**）：值替换后清洗会把「真实标题自带的尾部下划线」
 // 当成残段吃掉。断言「suffix_」逐字保留即为该风险的门禁。
@@ -10,7 +13,6 @@ import { describe, expect, it, vi } from "vitest"
 import {
   buildSaveFileNameFromTemplate,
   DEFAULT_DOWNLOAD_TEMPLATE,
-  saveIllustPages,
   type SaveNamingContext,
 } from "./galleryDownload"
 import { toIllustId, toUserId } from "../api/id"
@@ -111,29 +113,5 @@ describe("命名模板：空段残段在模板层剥离（#757）", () => {
     expect(
       buildSaveFileNameFromTemplate(DEFAULT_DOWNLOAD_TEMPLATE, noAuthorCtx(makeSingleIllust("", "画师名")), url),
     ).toBe("Pictelio_123456.jpg")
-  })
-})
-
-describe("saveIllustPages 编排器：恒空 ctx 不再静默产出残段（#757 缺陷现场）", () => {
-  const run = (template: string, saveOne: (url: string, fileName: string) => Promise<void>) =>
-    saveIllustPages({
-      pages: [0],
-      illustId: 123456,
-      urlForPage: () => url,
-      saveOne,
-      naming: { template },
-    })
-
-  it("{title}_{id} / {author}-{id} 在单存链落盘名不带连接符残段", async () => {
-    const saveOne = vi.fn().mockResolvedValue(undefined)
-    await run("{title}_{id}", saveOne)
-    await run("{author}-{id}", saveOne)
-    expect(saveOne.mock.calls.map((c) => c[1])).toEqual(["123456.jpg", "123456.jpg"])
-  })
-
-  it("缺省模板（无占位符）路径逐字节不变", async () => {
-    const saveOne = vi.fn().mockResolvedValue(undefined)
-    await saveIllustPages({ pages: [0], illustId: 123456, urlForPage: () => url, saveOne })
-    expect(saveOne.mock.calls[0]?.[1]).toBe("Pictelio_123456.jpg")
   })
 })

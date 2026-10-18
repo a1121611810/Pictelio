@@ -1,5 +1,13 @@
 # Spec: SolidJS 2 STRICT_READ_UNTRACKED 清零（图床读点洪水 + 两个单发 + E2E 零警告防线）
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。WebView 客户端已随
+> [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 **v6.3.0** 下线，其源码与依赖随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除，Pictelio 自此为 **Lynx 单引擎**客户端；
+> 本文的 SolidJS 客户端已整包删除，文中交付物路径均不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 - 状态：implemented（2026-09-10 落地：T1 五点 untrack 标注 `#428`、T2 E2E 零警告通用防线 `#429`，父 issue #427 已关闭）
 - 日期：2026-09-10
 - 关联：`docs/specs/solidjs2-strict-warnings-cleanup.md`（第一轮，D1-D3 已随 405581df/4235a086/370ce058 落地）；ADR-0144（SolidJS 2 迁移）；本轮不新增 ADR（纯 dev 诊断标注，无架构取舍）

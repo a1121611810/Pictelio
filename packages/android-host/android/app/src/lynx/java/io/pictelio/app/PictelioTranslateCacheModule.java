@@ -48,7 +48,6 @@ import java.util.concurrent.Executors;
  *   <li>{@code deleteItem(key, cb)}：成功 {@code cb("")}（无论文件是否存在）</li>
  *   <li>{@code clear(cb)}：成功 {@code cb("")}（清空整个缓存目录 + manifest）</li>
  *   <li>{@code stats(cb)}：成功 {@code cb(json, "")}（{@code {entryCount, totalBytes, hitRate, missRate}}）</li>
- *   <li>{@code getCacheDirPath(cb)}：成功 {@code cb(path)}（调试用：暴露 cacheDir 绝对路径）</li>
  * </ul>
  *
  * <p>本模块是测试友好的：所有静态核心方法（{@link #cacheDir} / {@link #keyToFilename} /
@@ -334,19 +333,6 @@ public class PictelioTranslateCacheModule extends LynxModule {
 
     // ─────────────────── @LynxMethod 暴露面 ───────────────────
 
-    /**
-     * 调试用：暴露 cacheDir 绝对路径（路径不携带用户数据，仅目录位置）。
-     *
-     * <p>arity 契约（code-review P9）：JS 侧调 `getCacheDirPath(cb)`（单参）。Lynx 的
-     * `@LynxMethod` 在参数个数不匹配时会把函数塞进 String 槽、Callback 置 null → 调用即崩
-     * （本类 javadoc 已记「Callback 对 null 崩」）。故这里用**无参**签名，由 Lynx 把
-     * 唯一的函数实参绑到 Callback 上——与仓库既有 `getEndpoint(Callback)` 同形。
-     */
-    @LynxMethod
-    public void getCacheDirPath(Callback callback) {
-        callback.invoke(myCacheDir().getAbsolutePath());
-    }
-
     @LynxMethod
     public void getItem(String key, Callback callback) {
         try {
@@ -460,8 +446,10 @@ public class PictelioTranslateCacheModule extends LynxModule {
     /**
      * 缓存统计。
      *
-     * <p>arity 契约（code-review P9）：JS 侧调 `stats(cb)`（单参）。同 {@link #getCacheDirPath}
-     * 的理由，用无参签名。
+     * <p>arity 契约（code-review P9）：JS 侧调 `stats(cb)`（单参）。Lynx 的 `@LynxMethod`
+     * 在参数个数不匹配时会把函数塞进 String 槽、Callback 置 null → 调用即崩
+     * （本类 javadoc 已记「Callback 对 null 崩」），故这里用无参签名，由 Lynx 把唯一的
+     * 函数实参绑到 Callback 上——与仓库既有 `getEndpoint(Callback)` 同形。
      *
      * <p>code-review S6：此前返回 `hitRate: 0` / `missRate: 0` 硬编码伪造值（注释自认
      * 「JS 侧维护」但 JS 从未覆盖）——暴露假数据比不暴露更糟。现改为返回

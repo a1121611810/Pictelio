@@ -5,7 +5,7 @@ import type { DiagInput, ProbeOutcome } from "../src/types";
 function base(overrides: Partial<DiagInput> = {}): DiagInput {
   return {
     platform: "android",
-    engine: "webview",
+    engine: "lynx",
     appVersion: "0.0.0-test",
     device: { transports: ["wifi"], validated: true, captivePortal: false, metered: false },
     probes: [
@@ -29,12 +29,6 @@ describe("evaluate", () => {
     const r = evaluate(base());
     expect(r.overall).toBe("ok");
     expect(r.attribution).toBe("none");
-  });
-
-  it("route is always skipped with an explicit reason", () => {
-    const route = evaluate(base()).checks.find((c) => c.id === "route");
-    expect(route?.status).toBe("skipped");
-    expect(route?.detail).toContain("移除");
   });
 
   it("no transport -> device fail", () => {

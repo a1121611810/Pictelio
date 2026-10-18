@@ -11,7 +11,6 @@ import { useNotificationStore } from './stores/notificationStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
-import { useEngineFallbackStore } from './stores/engineFallbackStore'
 import { t } from './i18n'
 import { appearanceClasses } from './utils/appearanceClasses'
 import { apiClient } from './api/client'
@@ -34,8 +33,6 @@ function muteTagHintText(): string {
     ? t('muteTag.muteFailedHint')
     : t('muteTag.mutedHint', { name: hint.name })
 }
-// 引擎降级说明（ADR-0153）：WebView 不可用时原生写入一次性键，首帧消费后展示可关闭提示
-const engineFallback = useEngineFallbackStore()
 
 // T3 启动健康检查（ADR-0141 / T3 ticket）：
 // - 替代 T1 spike 的裸 useQuery（用 T2 实施的 useApiQuery helper 包装）
@@ -123,7 +120,6 @@ onMounted(() => {
 })
 
 onMounted(() => {
-  void engineFallback.check()
   void initRouter()
   // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本
   // 直接打开强制更新页（无中间提示层）
@@ -259,8 +255,7 @@ const routeTransition = useRouteTransition()
            而 web-core 预览**不复刻**该默认（产物 CSS 里 `box-sizing` 命中 0 次，无 CSS 重置，
            靠 UA 默认）⇒ 两套渲染器观感分叉。
            引用该结论的**实际 10 个文件**（`grep -rln pb-18 packages/app-lynx/src/` 实测，
-           计数 11 含本文件自身；⚠️ 别再把 `RankingEntryCard.vue` 算进去——本轮它的注释
-           已改写为 `pb-3` 议题，不再引用本坑）：
+           计数 11 含本文件自身）：
            `utils/topInset.ts:29`、`components/PageTopBar.vue:50`、
            `pages/DownloadManager` / `NetworkCheck` / `Me` / `Login` / `PlatformCheck` /
            `Watchlist` / `NovelDetail` / `UpdatePage`。
@@ -291,18 +286,6 @@ const routeTransition = useRouteTransition()
          v-if 卸载 = 关闭即重置（keyword/结果清空，历史保留）。
          返回键：openSearch 时 store 已 registerModal(closeSearch)（ADR-0066 后进先出）。 -->
     <SearchSheet v-if="searchSheet.isOpen" />
-    <!-- 引擎降级提示（ADR-0153）：整条可点关闭（原生 LynxView hit-testing 不识别
-         pointer-events，胶囊定位而非全宽盒——ADR-0123；点条即 dismiss） -->
-    <view
-      v-if="engineFallback.notice"
-      class="absolute z-50"
-      style="left: 50vw; top: 20vw; transform: translate(-50%, 0)"
-      @click="engineFallback.dismiss()"
-    >
-      <view class="bg-surface-container-high rounded-[var(--md-shape-medium)] px-5 py-4 shadow-[var(--md-elevation-3)]">
-        <text class="text-body-medium text-surface-on">{{ t('engineFallback.legacyBanner') }}</text>
-      </view>
-    </view>
     <!-- 系统返回根路由提示（ADR-0066）：根路由双击退出的提示条。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角。
          [lynx:fix] 无全宽盒（ADR-0123）：原生 LynxView hit-testing 不识别 pointer-events，

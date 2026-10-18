@@ -1,18 +1,14 @@
 // ─── @pictelio/ugoira 纯函数单测 ───
 // 核心：手工构造 store zip（字节级可控，独立于实现），验证
-// EOCD/中央目录解析、store 切片、fflate 一致性、签名/越界拒绝、deflate fallback。
+// EOCD/中央目录解析、本地头偏移计算、fflate 解压、签名/越界拒绝、deflate fallback。
 import { describe, it, expect } from "vitest";
 import { zipSync, deflateSync } from "fflate";
 import {
   parseZipEocd,
   parseZipCentralDir,
-  computeFrameOffset,
   computeFrameOffsetFromLocal,
-  sliceStoreFrame,
-  sliceFrames,
   unzipFrames,
   deflateInflate,
-  type UgoiraZipEntry,
 } from "../src/index";
 
 // ─── 手工构造 store zip（未压缩条目） ───
@@ -149,76 +145,14 @@ describe("parseZipCentralDir", () => {
   });
 });
 
-describe("computeFrameOffset / sliceStoreFrame", () => {
-  it("store 条目按本地头偏移切片，帧字节与输入一致", () => {
-    const zip = buildStoreZip(THREE_FRAMES);
-    const eocd = parseZipEocd(zip);
-    const entries = parseZipCentralDir(zip, eocd.cdOffset, eocd.cdSize);
-    entries.forEach((e, i) => {
-      const off = computeFrameOffset(zip, e);
-      // 本地头 30 + nameLen + 数据
-      const expectedOff = e.offset + 30 + e.name.length;
-      expect(off).toBe(expectedOff);
-      const frame = sliceStoreFrame(zip, e);
-      expect(Array.from(frame)).toEqual(Array.from(THREE_FRAMES[i]!.data));
-    });
-  });
-
-  it("本地文件头签名错误 → 抛错", () => {
-    const zip = buildStoreZip(THREE_FRAMES);
-    const bad: UgoiraZipEntry = {
-      name: "x.png",
-      offset: 5,
-      compMethod: 0,
-      compSize: 3,
-      uncompSize: 3,
-    };
-    expect(() => computeFrameOffset(zip, bad)).toThrow("本地文件头");
-  });
-
-  it("帧数据越界 → 抛错", () => {
-    const zip = buildStoreZip(THREE_FRAMES);
-    const bad: UgoiraZipEntry = {
-      name: "x.png",
-      offset: 0,
-      compMethod: 0,
-      compSize: 99999,
-      uncompSize: 99999,
-    };
-    expect(() => computeFrameOffset(zip, bad)).toThrow("越界");
-  });
-});
-
-describe("sliceFrames（store 按 fileOrder）", () => {
-  it("按元数据顺序取帧，乱序 fileOrder 也正确", () => {
-    const zip = buildStoreZip(THREE_FRAMES);
-    const eocd = parseZipEocd(zip);
-    const entries = parseZipCentralDir(zip, eocd.cdOffset, eocd.cdSize);
-    const frames = sliceFrames(zip, entries, ["frame_2.png", "frame_0.png", "frame_1.png"]);
-    expect(Array.from(frames[0]!)).toEqual(Array.from(THREE_FRAMES[2]!.data));
-    expect(Array.from(frames[1]!)).toEqual(Array.from(THREE_FRAMES[0]!.data));
-    expect(Array.from(frames[2]!)).toEqual(Array.from(THREE_FRAMES[1]!.data));
-  });
-
-  it("缺文件 → 抛错（禁止静默降级）", () => {
-    const zip = buildStoreZip(THREE_FRAMES);
-    const eocd = parseZipEocd(zip);
-    const entries = parseZipCentralDir(zip, eocd.cdOffset, eocd.cdSize);
-    expect(() => sliceFrames(zip, entries, ["missing.png"])).toThrow("缺少帧文件");
-  });
-});
-
 describe("unzipFrames（fflate 全量解压，方案 B）", () => {
-  it("与 sliceFrames 结果字节级一致（store zip）", () => {
+  it("store zip 按 fileOrder 逐帧取回字节（与 fixture 构造字节一致）", () => {
     const zip = buildStoreZip(THREE_FRAMES);
     const order = ["frame_0.png", "frame_1.png", "frame_2.png"];
-    const viaFflate = unzipFrames(zip, order);
-    const eocd = parseZipEocd(zip);
-    const entries = parseZipCentralDir(zip, eocd.cdOffset, eocd.cdSize);
-    const viaSlice = sliceFrames(zip, entries, order);
-    expect(viaFflate).toHaveLength(3);
-    viaFflate.forEach((f, i) => {
-      expect(Array.from(f)).toEqual(Array.from(viaSlice[i]!));
+    const frames = unzipFrames(zip, order);
+    expect(frames).toHaveLength(3);
+    frames.forEach((f, i) => {
+      expect(Array.from(f)).toEqual(Array.from(THREE_FRAMES[i]!.data));
     });
   });
 
@@ -238,65 +172,6 @@ describe("deflate fallback", () => {
     const frames = unzipFrames(deflated, ["frame_0.png", "frame_1.png"]);
     expect(Array.from(frames[0]!)).toEqual([1, 2, 3, 4]);
     expect(Array.from(frames[1]!)).toEqual([9, 9, 9]);
-  });
-
-  it("sliceStoreFrame 遇 deflate 条目用 inflateSync fallback（raw deflate）", () => {
-    // 构造单个 deflate 条目的手工 zip（ZIP 条目是 raw deflate——deflateSync 输出，非 zlibSync）
-    const raw = new Uint8Array([7, 8, 9, 10]);
-    const compressed = deflateSync(raw);
-    // 复用 buildStoreZip 结构但把条目压缩方法标记为 8、数据换为 compressed
-    // 简化：直接构造最小 zip（本地头 + deflate 数据 + 中央目录 + EOCD）
-    const parts: number[] = [];
-    const localOff = parts.length;
-    const frameName = "frame_0.png"; // 11 字符
-    u32(0x04034b50, parts);
-    u16(20, parts);
-    u16(0, parts);
-    u16(8, parts); // method=deflate
-    u16(0, parts);
-    u16(0, parts);
-    u32(0, parts);
-    u32(compressed.length, parts);
-    u32(raw.length, parts);
-    u16(frameName.length, parts);
-    u16(0, parts); // nameLen / extraLen
-    nameBytes(frameName, parts);
-    for (const b of compressed) parts.push(b);
-    const cdStart = parts.length;
-    u32(0x02014b50, parts);
-    u16(20, parts);
-    u16(20, parts);
-    u16(0, parts);
-    u16(8, parts);
-    u16(0, parts);
-    u16(0, parts);
-    u32(0, parts);
-    u32(compressed.length, parts);
-    u32(raw.length, parts);
-    u16(frameName.length, parts);
-    u16(0, parts);
-    u16(0, parts);
-    u16(0, parts);
-    u16(0, parts);
-    u32(0, parts);
-    u32(localOff, parts);
-    nameBytes(frameName, parts);
-    const cdSize = parts.length - cdStart;
-    u32(0x06054b50, parts);
-    u16(0, parts);
-    u16(0, parts);
-    u16(1, parts);
-    u16(1, parts);
-    u32(cdSize, parts);
-    u32(cdStart, parts);
-    u16(0, parts);
-    const zip = new Uint8Array(parts);
-
-    const eocd = parseZipEocd(zip);
-    const entries = parseZipCentralDir(zip, eocd.cdOffset, eocd.cdSize);
-    expect(entries[0]!.compMethod).toBe(8); // deflate
-    const frame = sliceStoreFrame(zip, entries[0]!);
-    expect(Array.from(frame)).toEqual(Array.from(raw));
   });
 });
 
@@ -322,17 +197,10 @@ describe("computeFrameOffsetFromLocal（T4 Range 本地头片段）", () => {
     // 取第一条本地头 30 字节
     const local = zip.subarray(0, 30);
     const off = computeFrameOffsetFromLocal(local);
-    // frame_0.png 11 字符 + extra 0
+    // 独立 oracle：frame_0.png 11 字符 + extra 0（ZIP 格式规范：30 + nameLen + extraLen）。
+    // #1043 前此处还有一条与全量 `computeFrameOffset` 的交叉断言；该函数已随 store 切片簇
+    // 删除，交叉断言随之消失。留下这条不依赖实现的期望值，避免用实现反推实现。
     expect(off).toBe(30 + 11);
-    // 与全量 computeFrameOffset 一致
-    const entry: UgoiraZipEntry = {
-      name: "frame_0.png",
-      offset: 0,
-      compMethod: 0,
-      compSize: 5,
-      uncompSize: 5,
-    };
-    expect(off).toBe(computeFrameOffset(zip, entry));
   });
 
   it("片段过短或签名错误 → 抛错", () => {

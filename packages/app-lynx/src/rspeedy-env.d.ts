@@ -148,7 +148,6 @@ declare global {
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void
-      setAccessToken(token: string): void
       clearTokens(callback: (arg1: string, arg2: string) => void): void
     }
     PictelioApi: {

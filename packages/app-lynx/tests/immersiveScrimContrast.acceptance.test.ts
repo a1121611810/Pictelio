@@ -71,7 +71,7 @@ import {
       // `CONSUMERS` 常量（#1012 洞 2 的修复前行为）—— 验收组 **57/57 照样全绿**。
       // 本条用 source-scan 把「真门禁真的接上了」变成产物自证的断言。
       const file = fs.readFileSync(path.resolve(__dirname, 'immersiveScrimContrast.test.ts'), 'utf-8')
-      const gateStart = file.indexOf("describe('三个消费点确实用上了稳定底色")
+      const gateStart = file.indexOf("describe('全部消费点确实用上了稳定底色")
       expect(gateStart, '消费点 describe 必须存在').toBeGreaterThan(-1)
       // 本验收组的 describe 排在真门禁**之后**，用它当右边界 ⇒ 切出的正是真门禁那段。
       // #1009 拆分后：消费点 describe 是真门禁文件里的**最后一个** describe（其后只有 #891
@@ -183,7 +183,7 @@ import {
       expect(judgePlate(PLATE_OK), '合法底色块不应判红').toBeUndefined()
     })
 
-    it('【characterization】三个真消费点的标题与底色块**恰好各一个**颜色令牌（真门禁的输入本身合规）', () => {
+    it('【characterization】全部真消费点的标题与底色块**恰好各一个**颜色令牌（真门禁的输入本身合规）', () => {
       for (const c of CONSUMERS) {
         const src = stripVueComments(fs.readFileSync(path.resolve(__dirname, c.rel), 'utf-8'))
         const titleClass = titleTagClassOf(src, c.titleMarker) ?? ''

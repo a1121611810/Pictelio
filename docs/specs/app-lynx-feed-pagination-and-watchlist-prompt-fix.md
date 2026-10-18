@@ -68,7 +68,7 @@
 
 **取证通道（已实现并模拟器验证，2026-08-29）**：不再用截图读横幅——改「日志记录 + 我的页一键导出」：
 - `src/debug/t0Diag.ts`：历史环形缓冲（带时间戳，最近 500 条）+ `t0Export()`
-- 「我的」页新增「导出诊断日志」入口 → 原生 `PictelioApp.exportDiagLog`（写 app 外部私有目录 `files/diag/diag-<ts>.txt`，adb 可 pull）+ Android 分享面板（微信/邮件/复制，真机最省事）
+- 「我的」页新增「导出诊断日志」入口 → 原生 `PictelioApp.exportDiagLog`（写 app 外部私有目录 `files/diag/diag-<ts>.txt`，adb 可 pull）+ Android 分享面板（微信/邮件/复制，真机最省事）——**该入口与 `exportDiagLog` 已随 #1043 删除**（`src/debug/` 探针同批清理，符合本 spec「探针随 T3 收尾移除」的约定）
 - 用户操作流：复现问题（滑动/读小说）→ 去「我的」→ 导出 → 分享发回
 
 **真机实测内容**（T0 打点已覆盖）：

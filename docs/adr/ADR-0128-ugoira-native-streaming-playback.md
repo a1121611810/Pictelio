@@ -1,6 +1,11 @@
 # ADR-0128: lynx 原生模式 ugoira 首次播放改为流式渐进（Java 边下边解压写盘 + 拉模式分批交付）
 
 > 状态：已接受（2026-08-31）
+>
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：文中作为「明确排除」对照的共享包
+> `createStreamFrameSource` 已随 #1043 删除。本 ADR 的决策是 lynx 原生流式（Java 边下边解压写盘），不依赖该模块，
+> 现行约束不受影响；正文按原样保留。
+>
 > 相关：ADR-0125（原生解压写盘管线）、ADR-0127（app 侧 JS 流式渐进，共享包）、ADR-0037（图片二进制零进 JS 堆）、
 > `docs/research/ugoira-native-streaming-proto.md`（原型取证，oracle 分支 `prototype/ugoira-native-streaming`）
 

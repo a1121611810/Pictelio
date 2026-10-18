@@ -1,6 +1,6 @@
 // ─── useBookmarkMutation composable（ADR-0112 + ADR-0141 D8 / T4 mutations）───
 //
-// 替代 createBookmarkToggle primitive（spec T4 决策）：
+// 由 primitives 层的自建状态机迁为 composable（spec T4 决策）：
 // - 外层状态机（bookmarked/count/busy/errorMsg）与原 primitive 完全等价
 // - 内部 API 调用从 deps.add/remove 升级为 useMutation
 //   - onMutate 立即翻转（乐观触发）
@@ -8,7 +8,7 @@
 //   - onSuccess 350ms 后触发 onChange（动画完成态）
 // - 异常静息不 throw：不破坏 ui 渲染，由 caller 用 errorMsg 读
 //
-// API 形态与 createBookmarkToggle 完全相同（getter + toggle()）：
+// API 形态（getter + toggle()）：
 //   const { bookmarked, count, busy, errorMsg, toggle } = useBookmarkMutation(
 //     illustId,
 //     initialBookmarked,
@@ -95,7 +95,7 @@ export function useBookmarkMutation(
   const { illustId, initialBookmarked, initialCount, onChange, targetKind = 'illust' } = options
   const isNovel = targetKind === 'novel'
 
-  // ─── 响应式状态（与原 createBookmarkToggle 一致） ───
+  // ─── 响应式状态 ───
   const bookmarked = ref(initialBookmarked)
   const count = ref(Math.max(0, initialCount))
   const busy = ref(false)

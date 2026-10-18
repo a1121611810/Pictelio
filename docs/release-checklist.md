@@ -215,7 +215,7 @@ GitHub Release 已发布完成。
 
 除既有构建/签名/上传步骤外，每次发版前必须完成以下各项：
 
-1. ⚠️ **原「双引擎转换清单」前提已消失，待重新定义**（单引擎化后无法执行）：`docs/agents/qa-transition-checklist.md` 的 R1-R4 全部以 webview 引擎存在为前提（其前置条件原文写「full 包即可」），现无 webview 可切换 ⇒ **该清单不可执行**。替代 gate 待 [#805](https://github.com/a1121611810/Pictelio/issues/805) 重新定义。⚠️ **在重新定义前本项视为未设防，不得当作「已过」**。重新定义时须注意：R1-R4 每行都源自一个真实缺陷回归，**逐行判定「该缺陷在单引擎下是否仍可能复现」，不可整份丢弃**。
+1. ⚠️ **原「双引擎转换清单」前提已消失，待重新定义**（单引擎化后无法执行）：`docs/agents/qa-transition-checklist.md` 的 R1-R4 全部以 webview 引擎存在为前提（其前置条件原文写「full 包即可」），现无 webview 可切换 ⇒ **该清单不可执行**。替代 gate 待 [#805](https://github.com/a1121611810/Pictelio/issues/805) 重新定义。⚠️ **在重新定义前本项视为未设防，不得当作「已过」**。重新定义时须注意：R1-R4 每行都源自一个真实缺陷回归，**逐行判定「该缺陷在单引擎下是否仍可能复现」，不可整份丢弃**。设计侧同口径见 [`docs/specs/qa-defense-lines.md`](specs/qa-defense-lines.md) §3.T1（2026-10-18 订正）。
 2. **pre-release 分阶段发布**：GitHub Releases 先以 pre-release 标记发布（beta 通道），挂 ≥3 天收集真机反馈后再转 stable（`gh release edit <tag> --prerelease=false`，或在 Release 页面取消 pre-release 勾选）。本项目不经 Play 分发，pre-release 标记即分阶段发布（ADR-0163「发布侧适配」）。
 3. **发布中发现缺陷先登记再修**：转换矩阵覆盖范围内的任何缺陷，先在 `docs/agents/qa-transition-checklist.md` 登记（标记回归行或新增矩阵行），再进入修复流程，确保修复自带回归防线。
 4. ⚠️ **原「引擎降级取证（ADR-0164）」已失效**（单引擎化后无法执行）：`specs/engine-fallback-matrix.spec.ts` 的 M1–M3' 四格取证全部测「Lynx 不可用 → 降级到 WebView」，现无 WebView 可降 ⇒ **四格均不再适用**。其中的取证键消除断言（`unzip -p <apk> 'classes*.dex' | grep -c pictelio_debug_force_lynx_unavailable` 必须为 0）**已成假绿**——该键已随引擎机制从生产代码删除，全仓仅剩 app-lynx 的测试里一处字符串残留（`packages/app-lynx/src/stores/settingsStore.test.ts` 的备份键名单），**恒为 0 恒过，不再具备「发布包含测试后门」的检出能力**。替代 gate 待 [#805](https://github.com/a1121611810/Pictelio/issues/805) 重新定义；在其之前本项**不得计为已过**。

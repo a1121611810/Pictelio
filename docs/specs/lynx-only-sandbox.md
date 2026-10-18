@@ -1,5 +1,11 @@
 # Lynx 单引擎沙盒规范（去 Capacitor 化）
 
+> **⚠️ 存档文档（archive）**：本文是 #609 声称已落盘但实际丢失的 spec 的重建版，记录 #610 单引擎化
+> 执行前的沙盒计划；所描述的沙盒验证与随后的生产迁移均已完成，Pictelio 现为 **Lynx 单引擎**客户端。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) /
+> [`ADR-0203`](../adr/ADR-0203-webview-client-source-removal.md)。
+
 > **本文件是 #609 声称已落盘但实际丢失的 spec 的重建版**（2026-09-28）。
 > 丢失根因：原 spec 只作为 **worktree `pixivizer-lynx-only` 的未跟踪文件**存在，**从未 commit**，worktree 删除后不可恢复（核查证据见 #606 的评论）。
 > 本次重建**逐条标注来源**：`[票]` = 来自仍存的 GitHub 票；`[码]` = 本次对代码实测核对；`[重建]` = 依据前两者推导，**需领域确认**。

@@ -135,8 +135,8 @@ export class AndroidE2eDriver {
 
   /**
    * 显式等待当前 Activity 属于期望集合。
-   * 低 WebView 设备（pictelio_low）上 full 包 MainActivity 会立即 finish 并降级到
-   * LynxActivity（ADR-0153），就绪等待用「任一入口」而非单一 MainActivity。
+   * 单引擎布局下入口恒为 LynxActivity——full 包 MainActivity 的低 WebView 降级路径
+   * 已随 WebView 客户端整包删除（ADR-0153），故实际传入的集合只含一个入口。
    */
   async waitForAnyActivity(activities: readonly string[], timeoutMs = 60_000): Promise<void> {
     await this.raw.waitUntil(
@@ -149,10 +149,10 @@ export class AndroidE2eDriver {
     );
   }
 
-  /** 当前前台 Activity 短名（如 .MainActivity / .LynxActivity） */
+  /** 当前前台 Activity 全限定名（Appium 可能回短名，返回前已按 APP_PACKAGE 归一） */
   async currentActivity(): Promise<string> {
     const activity = await this.raw.getCurrentActivity();
-    // Appium 返回 ".MainActivity" 或全限定名，统一归一化为全限定短比较
+    // Appium 返回 ".LynxActivity" 或全限定名，统一归一化为全限定短比较
     return activity.startsWith(".") ? `${APP_PACKAGE}${activity}` : activity;
   }
 

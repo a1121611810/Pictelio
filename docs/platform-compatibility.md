@@ -45,12 +45,19 @@
 
 `variables.gradle` 中 `minSdkVersion = 28` 在编译时写入 APK 的 `AndroidManifest.xml`。安装时 Android 系统的 `PackageManagerService` 校验该值，低于 28 的设备直接拒绝，显示系统标准提示。
 
-### 引擎决策与双向降级（应用内，ADR-0164）
+### 引擎决策与双向降级（应用内，ADR-0164）——已下线（#610 / #1043）
 
-**缺省引擎为 Lynx**（`pictelio_client_kind` 缺省语义翻转，仅 full 包可感知）。启动决策收敛在 `io.pictelio.app.engine.EngineRouting`（单一决策模块，`PictelioApp` 预热与 `MainActivity` 路由共用同一 `resolve`）：
+> **本节已存档**：Pictelio 现为 **Lynx 单引擎**，不存在「引擎探测 / 缺省引擎 / 双向降级」概念。
+> `EngineRouting` 已随 [#610](https://github.com/a1121611810/Pictelio/issues/610) 删除；
+> `LynxRuntimeInitializer.isAvailable()` 与引擎回退子系统已随
+> [#1043](https://github.com/a1121611810/Pictelio/issues/1043) 删除。Lynx 初始化单点现为
+> `LynxRuntimeInitializer.ensureInitialized()`（`PictelioAppLynx.onCreate` 与 `LynxActivity` 共用）。
+> 以下为 ADR-0164 时期的历史记录。
+
+**历史口径（ADR-0164 时期）**：**缺省引擎为 Lynx**（`pictelio_client_kind` 缺省语义翻转，仅 full 包可感知）。启动决策收敛在 `io.pictelio.app.engine.EngineRouting`（单一决策模块，`PictelioApp` 预热与 `MainActivity` 路由共用同一 `resolve`；该类已删除）：
 
 - **WebView 探测**：`WebViewAvailability`（framework API）取主版本号，阈值 `OAuthConfig.MIN_WEBVIEW_VERSION`（85）；无法获取版本号（-1）**放行**（fail-open，避免误杀非标准 WebView 实现）——口径与历史版本一致
-- **Lynx 探测**：`LynxRuntimeInitializer.isAvailable()`（包能力含 lynx ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）
+- **Lynx 探测**：`LynxRuntimeInitializer.isAvailable()`（包能力含 lynx ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）——**已随 #1043 删除，现行无「探测」概念**
 - **双向降级**：首选 Lynx 而预检不可用 → 本次以 WebView 生效（写生效状态快照，**不改写首选**）；首选 WebView 而 WebView 过低且 Lynx 可用 → 本次以 Lynx 生效（ADR-0153 保持）
 - **运行时硬错误**（bundle 加载失败 / 致命渲染错误 9902·990200·InstantiationException）：自动回退 WebView 一次并写**失败记忆**（versionCode 精确匹配，应用升级自动遗忘）；**10s 加载超时不自动跳**（手动错误页）。设备级开关 `pictelio_engine_auto_fallback`（缺省开）控制运行时自动跳
 - **无障碍回退**：系统无障碍服务启用 ∧ 两引擎均可用 → 以 WebView 生效；WebView 不可用时仍以 Lynx 兜底

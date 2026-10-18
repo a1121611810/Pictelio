@@ -96,14 +96,6 @@ function deviceView(input: DiagInput): DiagCheckView {
 function probeView(input: DiagInput, id: string): DiagCheckView {
   const desc = CHECK_PLAN.find((c) => c.id === id)!;
   const base = { id: desc.id, layer: desc.layer, title: desc.title };
-  if (desc.disabledReason) {
-    return {
-      ...base,
-      status: "skipped",
-      detail: "已跳过：" + desc.disabledReason,
-      attribution: "unknown",
-    };
-  }
   const p = probeById(input, id);
   if (!p) {
     return {
@@ -234,7 +226,6 @@ function summarize(checks: DiagCheckView[], input: DiagInput): DiagReport {
 export function evaluate(input: DiagInput): DiagReport {
   const checks: DiagCheckView[] = [
     deviceView(input),
-    probeView(input, "route"),
     probeView(input, "dns"),
     probeView(input, "tcp"),
     probeView(input, "tls"),

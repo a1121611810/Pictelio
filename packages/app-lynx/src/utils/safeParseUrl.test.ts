@@ -7,8 +7,9 @@
 //   /pixiv-api 代理路径先 startsWith 放行再走断言）。
 // 源级防线：本工具是 lynx 新代码的 URL 域名解析唯一入口，禁 URL 全局（lynx `.hostname` 为
 // undefined，取证 2026-09-15，ADR-0163）——剥注释后断言无 `new URL(`。
-// 迁移守卫（review P1-1 清账）：三处存量裸 URL 全局（client.ts / imageUrl.ts /
-// proxyRedact.ts）已迁入本模块，源级断言防回流。
+// 迁移守卫（review P1-1 清账）：存量裸 URL 全局（client.ts / imageUrl.ts）已迁入本模块，
+// 源级断言防回流。同批的第三处 utils/proxyRedact.ts 迁入后已随 2026-10-18 死代码清理
+// 删除（WebView 期代理配置面遗留，生产零消费方），故不再纳入本守卫。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -66,7 +67,7 @@ describe('extractHostname 非 http(s) 与相对路径（收口契约：返回 nu
   })
 })
 
-// ── extractAuthority（保留端口，供 proxyRedact 等 host:port 形态消费；review P1-1 迁移新增）──
+// ── extractAuthority（保留端口，供需要 host:port 形态的调用方消费；review P1-1 迁移新增）──
 describe('extractAuthority（authority 解析：去 userinfo、保留端口）', () => {
   it('保留端口；无端口时即 host', () => {
     expect(extractAuthority('http://proxy.example:7897/path')).toBe('proxy.example:7897')
@@ -123,7 +124,7 @@ describe('safeParseUrl.ts 源级守卫（lynx URL 全局不可用防线）', () 
   })
 })
 
-describe('迁移守卫：三处存量裸 URL 全局已收口（review P1-1 清账，ADR-0163）', () => {
+describe('迁移守卫：存量裸 URL 全局已收口（review P1-1 清账，ADR-0163）', () => {
   /** 剥注释后断言（注释会提到 new URL——需剥离，同 *.template.test.ts 惯例） */
   const strip = (relPath: string) =>
     readFileSync(fileURLToPath(new URL(relPath, import.meta.url)), 'utf8')
@@ -133,7 +134,6 @@ describe('迁移守卫：三处存量裸 URL 全局已收口（review P1-1 清�
   it.each([
     ['../api/client.ts', 'isTrustedPixivHost'],
     ['../utils/imageUrl.ts', 'isTrustedImageHost'],
-    ['./proxyRedact.ts', 'redactProxyUrl'],
     // 新增（ADR-0172 §3）：翻译层的 Azure 判定曾用 new URL(...).hostname —— 在 lynx 上
     // .hostname 为 undefined → Azure endpoint 被静默判为非 Azure。已改走 extractHostname。
     ['../api/translate.ts', 'isAzureBaseURL'],

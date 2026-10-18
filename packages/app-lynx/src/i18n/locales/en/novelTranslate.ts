@@ -46,32 +46,22 @@ const enNovelTranslate = {
   "novelTranslate.endpoint.deleteConfirm": "Clear saved endpoint configuration?",
   "novelTranslate.endpoint.cancel": "Cancel",
   "novelTranslate.endpoint.confirmClear": "Clear",
-  "novelTranslate.endpoint.titleGroup": "Translation",
 
-  // action subdomain
+  // action subdomain (button labels) — consumers: TranslateButton.LABEL_KEYS (4 keys),
+  // TranslateModeSwitch.vue (viewOriginal/viewTranslation), NovelDetail.vue (configure_translate)
   "novelTranslate.action.start": "Translate chapter",
-  "novelTranslate.action.abort": "Stop",
   "novelTranslate.action.retry": "Retry",
-  "novelTranslate.action.cached": "Cached",
   "novelTranslate.action.viewOriginal": "Original",
   "novelTranslate.action.viewTranslation": "Translation",
-  "novelTranslate.action.switchMode": "Switch display",
   "novelTranslate.action.configure_translate": "Configure translation",
   "novelTranslate.action.retranslate": "Retranslate",
 
-  // status subdomain
-  "novelTranslate.status.idle": "Not translated",
+  // status subdomain (state machine semantics) — consumers: TranslateButton.LABEL_KEYS.translating,
+  // TranslateButton.vue (retrying), SettingsEndpoint.vue (pending), NovelDetail.vue + novelTranslateStore.ts (placeholder_untranslated)
   "novelTranslate.status.pending": "Preparing",
   "novelTranslate.status.translating": "Translating",
-  "novelTranslate.status.translatingQueued": "Queued",
-  "novelTranslate.status.partial": "Partial translation",
-  "novelTranslate.status.failed": "Translation failed",
-  "novelTranslate.status.completed": "Completed",
-  "novelTranslate.status.aborted": "Cancelled",
   "novelTranslate.status.retrying": "Retrying…",
   "novelTranslate.status.placeholder_untranslated": "〔Untranslated〕",
-  "novelTranslate.status.progress.label": "Progress {{done}}/{{total}}",
-  "novelTranslate.status.progress.remaining": "{{remaining}} chapters remaining",
 
   // error subdomain
   "novelTranslate.error.network": "Network unavailable",
@@ -97,9 +87,6 @@ const enNovelTranslate = {
   "novelTranslate.error.canceled": "Cancelled",
   "novelTranslate.error.notConfigured": "Please configure the LLM endpoint in Settings first",
   "novelTranslate.error.partialFailed": "Some paragraphs failed; original text used as fallback",
-  "novelTranslate.error.retrying": "Retrying…",
-  "novelTranslate.error.retryingFailed": "Retry failed",
-  "novelTranslate.error.retryHint": "Try again later or check your endpoint configuration",
 } as const satisfies Record<NovelTranslateKey, string>;
 
 export default enNovelTranslate;

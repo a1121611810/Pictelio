@@ -34,8 +34,9 @@
    - (a) 原生 `<list>` 结构变更（插入/删除/替换）→ 必须有 epoch 防御或结构规避 + 设备 spike 记录（ADR-0162）；
    - (b) Lynx 平台全局 API 新用法（`new URL`、新全局对象、新 bridge）→ 必须有设备探针记录 + 源级守卫；
    - (c) init-only props 组件接入新宿主形态 → 必须有宿主矩阵测试或显式 remount 契约注释。
-2. **`docs/agents/qa-transition-checklist.md`**（新文件）：发版前双引擎转换清单（手工版转换矩阵），按 §4 矩阵表逐行给出「操作步骤 + 内容断言 + 预期结果」；头部注明「每行源自真实缺陷或防线 spec，发版前必过」。
-3. **`docs/release-checklist.md`**：追加「发版前 QA 防线」节：引用 qa-transition-checklist 全过；GitHub Releases 先发 **pre-release**（beta 通道）挂 ≥3 天转 stable；发现缺陷先在矩阵登记再修。
+2. **`docs/agents/qa-transition-checklist.md`**（新文件）：发版前双引擎转换清单（手工版转换矩阵），按 §4 矩阵表逐行给出「操作步骤 + 内容断言 + 预期结果」；头部注明「每行源自真实缺陷或防线 spec」。
+   ⚠️ **2026-10-18 订正**：单引擎化（#610）后该清单 R1-R4 全部以 webview 引擎存在为前提，**不可执行**；现行口径见 [`docs/release-checklist.md`](../release-checklist.md)「发版前 QA 防线」第 1 项——替代 gate 待 #805 重新定义，重新定义前视为未设防，**不再要求「发版前必过」**。
+3. **`docs/release-checklist.md`**：追加「发版前 QA 防线」节：登记 qa-transition-checklist 的现行状态（待 #805 重新定义，重新定义前视为未设防）；GitHub Releases 先发 **pre-release**（beta 通道）挂 ≥3 天转 stable；发现缺陷先在矩阵登记再修。
 
 ### T2 转换矩阵 spec（android-e2e，P1）
 
