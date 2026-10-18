@@ -32,17 +32,17 @@
 #   - 结论 = 上述链条叠加，任一环缺失即该场景 FAIL。
 #
 # 已知坑（实测/先例，改动脚本前先读）：
-#   1. APK 全变体：必须用 apk/full/debug/app-full-debug.apk（full = webview+lynx 双 client）。
-#      旧包 apk/debug/app-debug.apk 是基础变体产物，装错会测到错误的返回行为。
+#   1. 单引擎唯一产物：apk/debug/app-debug.apk（脚本默认 APK_PATH；flavor 维度已随
+#      #610/ADR-0203 下线）。原 full/基础变体之分已删，不存在「装错变体测错行为」面。
 #   2. `am start -S` 不可靠（Activity 路由 + Splash 时序竞态）：一律 force-stop + am start，
 #      本脚本统一 relaunch() 幂等准备。
 #   3. 屏幕分辨率：`adb shell wm size` 探测；所有坐标按「宽度比例」缩放（lynx 布局 vw 单位
 #      ——与宽度成正比；纵向同样按宽度换算，flow-check 同款注释）。
 #   4. ANR/卡死先例：模拟器无响应时 `adb reboot` 后等待 boot 完成再跑（脚本不自动处理）。
-#   5. benchNav（ADR-0136）当前仅在 lynx-only APK + BENCH_NAV=1 bundle 下可用：
-#      full 包 MainActivity 路由到 LynxActivity 时新建 Intent 不转发 --es 参数；
-#      且默认构建的 bundle 无 __BENCH_NAV__（无 pictelioBenchNav 字符串）。脚本已内置
-#      自动探测（APK bundle strings 扫描），有则优先 benchNav，无则 UI 点击兜底。
+#   5. benchNav（ADR-0136）：单引擎后 launcher 恒为 LynxActivity，直达命令仍以已删除的
+#      .MainActivity 为目标——当前必失败（S1/S4 回落 UI 点击；S6 在 BENCH_NAV bundle
+#      下判 FAIL）。另默认构建的 bundle 无 __BENCH_NAV__（无 pictelioBenchNav 字符串）；
+#      脚本已内置自动探测（APK bundle strings 扫描），有则优先 benchNav，无则 UI 点击兜底。
 #   6. logcat 无产品侧系统返回标记日志（handleSystemBack 无 console 输出）：
 #      判定以截图+焦点为主，logcat 仅作「桥已触发」的辅助证据（见上）。
 #   7. S5 登出：Me.vue 当前迁移 WIP 树存在 `resetHistory is not defined`（未 import）→
@@ -241,18 +241,6 @@ fab_center() { px fab-center "$1" 2>/dev/null || echo '{"x":0,"y":0}'; }
 # 页面非空判定（blank=白屏/加载中；login=需登录）
 page_ready() { [ "$1" != "blank" ] && [ "$1" != "login" ]; }
 
-# ─── 幂等准备：确保 lynx client 状态（run-as 写 CapacitorStorage prefs） ───
-set_client_kind_lynx() {
-  # 与 MainActivity 分发、flow-check 同款：debug 包可 run-as；full 包默认 webview 必须改
-  if adb shell "run-as $APP_ID sh -c '
-    mkdir -p shared_prefs
-    printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n    <string name=\\\"pictelio_client_kind\\\">lynx</string>\n</map>\n\" > shared_prefs/CapacitorStorage.xml' 2>/dev/null"; then
-    ok "client kind = lynx（CapacitorStorage.xml 已写）"
-  else
-    warn "run-as 写 prefs 失败（需 debug 包；将按已安装状态继续）"
-  fi
-}
-
 # ─── 自助登录（token 从 .env 读 PIXIV_REFRESH_TOKEN） ───
 TOKEN=""
 [ -f .env ] && TOKEN=$(grep -oE '^PIXIV_REFRESH_TOKEN=.*' .env | head -1 | cut -d= -f2- || true)
@@ -291,7 +279,8 @@ relaunch() {
   local p ch i
   adb shell am force-stop "$APP_ID" || true
   sleep 1.5
-  # full 包 launcher=MainActivity（路由到 LynxActivity）；lynx-only 包 launcher=LynxActivity
+  # 单引擎：launcher 恒为 LynxActivity（manifest 占位符写死；MainActivity 入口分发已随 #610/ADR-0203 删除）。
+  # 下方 MainActivity 尝试是历史兜底——当前必失败，回落 LynxActivity。
   adb shell am start -n "$APP_ID/.MainActivity" >/dev/null 2>&1 \
     || adb shell am start -n "$APP_ID/.LynxActivity" >/dev/null 2>&1
   say "   …等待首屏（bundle 加载 + 登录态恢复）"
@@ -369,7 +358,8 @@ wait_content() {
 # 进入详情 = 推荐页全宽首卡点击（实测 720x1280 下 (350,380) 命中；R18 遮罩吞点击 → 重试多位置）
 enter_detail() {
   local shot_path i chev ch
-  # ① benchNav（ADR-0136）：仅当 bundle 含钩子标记才尝试（full 包 extra 实际被丢弃，自动落到 ②）
+  # ① benchNav（ADR-0136）：仅当 bundle 含钩子标记才尝试（单引擎后直达命令指向已删除的
+  #    .MainActivity → 必落到 ②）
   if bundle_has_benchnav; then
     say "   …尝试 benchNav illust（bundle 含钩子标记）"
     adb shell am start --es benchNav illust -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
@@ -382,7 +372,7 @@ enter_detail() {
     fi
     warn "benchNav 未生效（chevron=${chev:-?}）→ UI 点击兜底"
   fi
-  # ② UI 点击兜底（full 包默认路径）：先等首卡图片渲染完成再点击
+  # ② UI 点击兜底（单引擎下 S1/S4 的实际可达路径）：先等首卡图片渲染完成再点击
   wait_content
   for pos in "360 380" "270 500" "540 550"; do
     set -- $pos
@@ -574,8 +564,8 @@ run_s5() {
 
 # ─── 场景 6：/update、/error（meta.backBehavior:'exit'）返回键直接退出 ───
 # 前置：产品侧必须有外部触发通道（benchNav 新增 update/error 目标，ADR-0136 同款）。
-# 当前产品代码无此通道（full 包 Intent 参数丢弃 + 默认 bundle 无 __BENCH_NAV__ +
-# 版本检查 URL 固定为 GitHub 无法设备侧伪造）→ 本场景默认 SKIP（记录原因，不计失败）。
+# 当前产品代码无此通道（benchNav 直达命令指向已删除的 MainActivity + 默认 bundle 无
+# __BENCH_NAV__ + 版本检查 URL 固定为 GitHub 无法设备侧伪造）→ 本场景默认 SKIP（记录原因，不计失败）。
 run_s6() {
   say "═══ S6 /update、/error meta-exit（返回键直接退出） ═══"
   if ! bundle_has_benchnav; then
@@ -643,7 +633,7 @@ if [ "$SKIP_INSTALL" != "1" ]; then
 else
   say "   …SKIP_INSTALL=1（使用已安装包）"
 fi
-set_client_kind_lynx
+# 单引擎后无需预置 client kind（pictelio_client_kind，2026-10-18）：该键无任何生产读点，原 set_client_kind_lynx 已删。
 
 # 场景依次运行（各自独立 relaunch，某场景失败不中断后续——聚合成败汇报）
 run_scenario() {

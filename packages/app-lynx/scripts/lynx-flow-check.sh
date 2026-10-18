@@ -60,7 +60,10 @@ sx() { echo $(( $1 * WM_W / 1080 )); }   # 横向（基准 1080）
 sy() { echo $(( $1 * WM_W / 1080 )); }   # 纵向（lynx vw 布局 → 同样按宽度比例）
 echo "   屏幕: ${WM_W}x${WM_H}（坐标按基准 1080x2400 缩放）"
 
-echo "════ 0. 重置（client=lynx + 清 token） ════"
+echo "════ 0. 重置（清 prefs + 清 token） ════"
+# 单引擎后 pictelio_client_kind 无读点，2026-10-18 已删该键写入（先例 lynx-device-check.sh:16）。
+# 本步原意保留：「重置 prefs」= CapacitorStorage 覆写成空 map（与旧写法覆盖整份文件等价），
+# 「清 token」= 删 WSSecureStorage 里的 refresh_token（见下方 run-as 段）。
 # ⚠️ 必须**前置守卫**：第 0 步靠 `run-as` 改 SharedPreferences，而 run-as 只对
 # debuggable 包可用。装的是 release 包时它在 `set -e` 下**静默终止整条脚本**——
 # 屏幕上只多一行步骤标题，看起来像脚本本身坏了（2026-10-18 实测踩到）。
@@ -72,7 +75,7 @@ fi
 adb shell "run-as $PKG sh -c '
   mkdir -p shared_prefs
   F=shared_prefs/CapacitorStorage.xml
-  printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n    <string name=\\\"pictelio_client_kind\\\">lynx</string>\n</map>\n\" > \$F
+  printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n</map>\n\" > \$F
   S=shared_prefs/WSSecureStorageSharedPreferences.xml
   # ⚠️ 必须写成显式 if + 末尾 exit 0：`[ -f ... ] && sed ...` 在文件不存在时整条
   #   返回 1；新装包（尚无 secure storage 文件）会触发 `set -e` **静默终止整条脚本**。
