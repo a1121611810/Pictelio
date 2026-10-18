@@ -1,5 +1,13 @@
 # 移除「页面风格」设置并固定为 Fluent —— 功能规格
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。它服务的是**已随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端
+> （`/settings` 的「页面风格」维度：`fluent`/`card`、键 `page_style_theme`、`--pageCard*` 令牌族）；
+> 该设置维度与实现载体均已不存在，Pictelio 现为 **Lynx 单引擎**客户端，app-lynx 无「页面风格」概念。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前设置形态见 [`ADR-0203`](../adr/ADR-0203-webview-client-source-removal.md) 与
+> [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md)。
+
 > 来源：grill-with-docs 会话（Q1–Q10 全部确认）
 > 状态：ready-for-implement（tickets 见 `docs/specs/remove-page-style-setting-tickets.md`）
 > 日期：2026-09-10

@@ -1,5 +1,13 @@
 # 全局 Tab 玻璃视觉语言（Glass Tab Visual Language）—— 功能规格
 
+> **⚠️ 存档文档（archive）**：本文描述的形态**从未在 Lynx 客户端实施**——它针对的是**已随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端
+> （Fluent 令牌、`components/*.tsx` 路径与 WebView `backdrop-filter` 兼容前提）；该设计只在
+> WebView 客户端落地过，未迁移到现产品。Pictelio 现为 **Lynx 单引擎**客户端，lynx 的玻璃形态
+> （GlassCard 等）见 [`app-lynx-frosted-glass.md`](./app-lynx-frosted-glass.md)。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md)。
+
 > 来源：grill-with-docs 会话（Q1–Q5 已全部确认）；效果基准：Liquid Glass 三档原型（thread `019fc60e`）+ `docs/research/liquid-glass-app-lynx-feasibility.md`（worktree eff5 / 主 checkout 深度版）
 > 状态：ready-for-tickets（待用户确认后进入 to-tickets 拆分）
 

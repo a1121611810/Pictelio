@@ -1,5 +1,14 @@
 # Spec: 路由层从 TanStack Router 迁移到 @solidjs/router
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已下线**的形态。迁移对象是**已随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端
+> （SolidJS + TanStack Router）；Pictelio 现为 **Lynx 单引擎**客户端，当前唯一客户端路由库是
+> vue-router（`packages/app-lynx/src/router.ts` → `routerCore.ts`），`@solidjs/router` 已不在
+> 任何 package.json 中。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 当前路由事实见 [`ADR-0203`](../adr/ADR-0203-webview-client-source-removal.md) 与
+> [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。
+
 ## Problem Statement
 
 Pictelio 的用户在 app 启动后（login → home）首先看到白屏，直到 recommended API 请求完成后页面才突然出现。这是 TanStack Router 的 SolidJS 适配器内部架构导致的：

@@ -5,9 +5,9 @@
 > **Lynx 单引擎**客户端；本文描述的 **OTA web bundle 发布通道**（构建 web 产物 → Ed25519 签名 →
 > 三件套上传 GitHub Release）**已整体下线**。
 > **正文按原样保留，仅供决策史参考，不代表当前状态。**
-> ⚠️ **与当前状态的偏差**：`packages/app/src/**` 的 OTA **消费层代码**（`otaService.ts` /
-> `native/Ota.ts` / `GateOverlay.tsx` 等）与 `@pictelio/update-check` 的 web bundle API
-> **一行未删、原样留存**，与本文描述的「web 修复可不经 APK 重装」存在偏差。
+> ⚠️ **与当前状态的偏差（2026-10-18 订正）**：`packages/app/src/**` 的 OTA **消费层代码**
+> （`otaService.ts` / `native/Ota.ts` / `GateOverlay.tsx` 等）与 `@pictelio/update-check` 的
+> web bundle API **已随 ADR-0203 删除**；此前「一行未删、原样留存」的记录已作废。
 > 当前 OTA 通道事实见 [`ADR-0202`](../adr/ADR-0202-ota-web-bundle-channel-retirement.md)；
 > 单引擎事实见 [`ADR-0201`](../adr/ADR-0201-single-engine-facade-consolidation.md) 与
 > [`glossary-single-engine-facade`](../adr/glossary-single-engine-facade.md)。

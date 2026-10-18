@@ -1,5 +1,12 @@
 # Tickets: 移除「页面风格」设置并固定为 Fluent（spec: docs/specs/remove-page-style-setting.md）
 
+> **⚠️ 存档文档（archive）**：本文是**已下线**形态的票据记录。票据所依赖的 WebView 客户端
+> `/settings`「页面风格」维度（`page_style_theme` / `--pageCard*`）已随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 整包删除；T0–T5 已完成，
+> T6 剩余的人工走查对象已不存在。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 对应 spec 已存档：[`remove-page-style-setting.md`](./remove-page-style-setting.md)。
+
 规则：每个 ticket 声明前置依赖；blocker 未完成不得开工。状态：`todo` / `doing` / `done`。
 
 | # | 标题 | 依赖 | 交付物 | 验收 | 状态 |

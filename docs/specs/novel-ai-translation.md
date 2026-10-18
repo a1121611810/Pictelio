@@ -1,5 +1,13 @@
 # 小说 AI 翻译功能（MVP）—— 功能规格
 
+> **⚠️ 存档文档（archive）**：本文描述的是**已被取代**的形态。该实现属于**已随
+> [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端
+> （`api/translate.ts` / `primitives/createNovelTranslator.ts` / `translationCache` /
+> CapacitorHttp 等）；app-lynx 的小说翻译是**从零重建的独立新栈**，现行规格见
+> [`app-lynx-novel-translation.md`](./app-lynx-novel-translation.md)。
+> **正文按原样保留，仅供决策史参考，不代表当前状态。**
+> 删除事实见 [`ADR-0203`](../adr/ADR-0203-webview-client-source-removal.md)。
+
 > 来源：wayfinder 地图 #20（决策 #21–#25 全部已解决）；调研：`docs/research/novel-ai-translation-feasibility.md`（v3）、`docs/research/novel-ai-translation-code-facts.md`、`docs/research/deepseek-facts.md`、`docs/research/deepseek-api-docs-summary.md`；UI 原型：`docs/prototypes/novel-translation-prototype.html`
 > 状态：ready-for-agent
 
