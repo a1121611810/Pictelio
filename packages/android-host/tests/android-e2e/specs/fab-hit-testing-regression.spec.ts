@@ -353,7 +353,7 @@ describe.skipIf(SKIPPED)(
       await loginViaDevIntent(serial);
 
       // ── 阶段 B：干净重启进已登录主界面 ──
-      // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx
+      // client_kind 无需播种：单引擎下入口恒为 LynxActivity，原 getClientKind 归一逻辑已随 ADR-0203 决策 7 删除
       forceStopApp(serial);
       runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
       startMainActivity(serial);
@@ -372,7 +372,7 @@ describe.skipIf(SKIPPED)(
       try {
         if (!serial) return;
         forceStopApp(serial);
-        // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+        // 单引擎布局下无「默认引擎」可恢复（原 client_kind 归一逻辑已随 ADR-0203 决策 7 删除），
         // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       } catch {
         // 收尾失败不阻断

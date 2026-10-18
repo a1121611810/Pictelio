@@ -8,7 +8,8 @@
  *
  * ⚠️ 单引擎化后（#610）：`pictelio_client_kind` **不再决定任何行为**——
  * `MainActivity` 分发器与引擎路由均已删除，唯一入口是 launcher `LynxActivity`，
- * 且 `PictelioAppModule.getClientKind` 会把任何写入值归一为 lynx（ADR-0062）。
+ * 原 `PictelioAppModule.getClientKind` 归一逻辑已随 ADR-0203 决策 7 删除（该方法不再存在），
+ * `pictelio_client_kind` 在生产代码中已无读方。
  * 因此播种该键的工具（`writeClientKind`）与相关引擎状态快照工具（`ENGINE_KEYS` /
  * `parseEngineState` / `readEngineState` / `pollEngineState`）**均已删除**——
  * 前者无被测行为（写入值被归一，断言恒真），后者的 spec

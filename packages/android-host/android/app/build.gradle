@@ -27,15 +27,6 @@ android {
         // 沙盒 #610：client flavor 维度下线（WebView/Capacitor 线整体删除），
         // 入口写死 Lynx。占位符机制保留但不再按 flavor 注入。
         manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
-        // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）。
-        // ⚠️ 当前**零读点**（2026-10-18 实测）：唯一 Java 读者原本是
-        // `LynxRuntimeInitializer.isAvailable()` → `clientKindsContainLynx()`，两者已随
-        // 引擎回退子系统删除（#1043）；全仓 Java/TS/测试均无 `CLIENT_KINDS` 读方，
-        // `[0]` 下标读点也为零 ⇒ ADR-0164「CLIENT_KINDS[0] 是缺省引擎单一事实源」已不成立。
-        // **刻意保留而非删除**：ADR-0062 / ADR-0164 仍以它为契约，删除须先订正 ADR
-        // （审计 dead-subsystem-audit-2026-10.md:246 将其归为「待确认」，不计入死配置）。
-        // 清理路径见 docs/specs/lynx-only-sandbox.md:64「机制清除，但 ADR-0164 本身不重开」。
-        buildConfigField "String[]", "CLIENT_KINDS", '{"lynx"}'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

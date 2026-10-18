@@ -17,7 +17,7 @@
  *   ⇒ Appium 永远等不到 WEBVIEW context，DOM 定位（fluent-switch checked、
  *   `[aria-label=设置]` 等）全部失效；
  * - 两条 client 切换用例（切 lynx / 切回 webview）：唯一入口恒为 LynxActivity，
- *   writeClientKind 写入的值被归一为 lynx（恒真断言，无被测行为）；
+ *   writeClientKind 写入的值已无归一逻辑可断言（原 getClientKind 已随 ADR-0203 决策 7 删除）；
  * - 孤儿键 age_confirmed / is_adult 清理：仅 webview 侧 loadAccountR18 有此语义，
  *   app-lynx 侧 grep 0 命中（阳性对照：show_r18 同法命中 3 个文件）⇒ 实现与防线
  *   一并随 webview 客户端消失，断言随之删除。

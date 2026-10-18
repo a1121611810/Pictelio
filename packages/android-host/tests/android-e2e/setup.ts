@@ -109,9 +109,9 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
   }
 
   // 单引擎化后**不再播种 pictelio_client_kind**：MainActivity 分发器已随 #610 删除，
-  // 唯一入口是 launcher LynxActivity，且 PictelioAppModule.getClientKind 会把任何
-  // 写入值归一为 lynx（CLIENT_KINDS 塌缩为 {"lynx"}）。继续播种 webview 只会让每个
-  // spec 的基线里都躺着一个必然被归一化的陈旧值，误导后来者以为 webview 仍是基线。
+  // 唯一入口是 launcher LynxActivity；原 PictelioAppModule.getClientKind 归一逻辑已随
+  // ADR-0203 决策 7 删除（该方法不再存在），生产代码已无该键读方。继续播种 webview 只会让每个
+  // spec 的基线里都躺着一个无人消费的陈旧值，误导后来者以为 webview 仍是基线。
 
   const appium = await ensureAppiumServer();
 

@@ -81,7 +81,7 @@ describe.skipIf(!ENABLED)("WebDAV 备份 lynx 原生链路（模拟器）", () =
 
     forceStopApp(ctx.serial);
     // ⚠️ #819 删除了 writeClientKind(...,"lynx")：单引擎下入口恒为 LynxActivity，
-    // PictelioAppModule.getClientKind 把任何写入值归一为 lynx（ADR-0062）——
+    // 原 PictelioAppModule.getClientKind 归一逻辑已随 ADR-0203 决策 7 删除（该方法不再存在）——
     // 该写入无被测行为、断言恒真（与 lynx-network-check / fab / lynx-bookmark-tags 同批处置）。
     writePrefKey(ctx.serial, "settings_webdav_enabled", "true");
     writePrefKey(ctx.serial, "settings_webdav_url", DAV_URL);

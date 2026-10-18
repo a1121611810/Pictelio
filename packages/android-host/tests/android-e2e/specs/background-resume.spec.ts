@@ -61,7 +61,7 @@ describe("android-e2e 缩小恢复：退后台→点桌面图标→仍为原实�
   beforeAll(async () => {
     ctx = await setupAndroidE2e();
     // 单引擎布局：launcher 入口恒为 LynxActivity，无需预置 client_kind
-    // （CLIENT_KINDS 已塌缩为 {lynx}，写入任何值都会被归一为 lynx）
+    // （CLIENT_KINDS 字段已删除、原 getClientKind 归一逻辑已随 ADR-0203 决策 7 删除）
     forceStopApp(ctx.serial);
     startMainActivity(ctx.serial);
   }, 600_000);

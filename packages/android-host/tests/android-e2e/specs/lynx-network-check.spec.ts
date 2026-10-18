@@ -49,8 +49,8 @@ describe("android-e2e app-lynx 网络自检", () => {
     await buildDebugApk();
     await installApk(serial);
     runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], 60_000);
-    // client_kind 无需播种：单引擎布局下入口恒为 LynxActivity，写入值一律被归一为 lynx，
-    // 原来的 writeClientKind 断言恒真、无被测行为（#610 后删除）。
+    // client_kind 无需播种：单引擎布局下入口恒为 LynxActivity；原 getClientKind 归一逻辑
+    // 已随 ADR-0203 决策 7 删除，原来的 writeClientKind 断言无被测行为（#610 后删除）。
     forceStopApp(serial);
     runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
     // 清 logcat 后带 benchNav 深链启动；benchNav extra 由 LynxActivity 自行读取
@@ -71,7 +71,7 @@ describe("android-e2e app-lynx 网络自检", () => {
 
   afterAll(() => {
     try {
-      // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+      // 单引擎布局下无「默认引擎」可恢复（原 client_kind 归一逻辑已随 ADR-0203 决策 7 删除），
       // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       forceStopApp(serial);
     } catch {

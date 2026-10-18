@@ -48,7 +48,7 @@ describe("Lynx 客户端启动即渲染（白屏回归）", () => {
     await buildDebugApk(); // ANDROID_E2E_SKIP_BUILD=1 时跳过
     await installApk(serial);
     // 基线清空 + 启动。单引擎布局：launcher 入口恒为 LynxActivity，
-    // 无需预置 client_kind（CLIENT_KINDS 已塌缩为 {"lynx"}）。
+    // 无需预置 client_kind（CLIENT_KINDS 字段已删除、该键生产代码无读方）。
     runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], 60_000);
     forceStopApp(serial);
     // 清 logcat 基线，捕获本次启动的渲染错误（若有）

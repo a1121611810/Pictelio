@@ -15,7 +15,7 @@
  *      `am start --es pictelio_dev_refresh_token` → `applyDevIntentHooks()` 持久化并登录，
  *      门禁 BuildConfig.DEBUG）——单引擎化后 webview 登录页已不存在（APK 内无 WebView），
  *      原「webview 注入 → 切 lynx 种子恢复」两段式随之失效；client_kind 亦无需播种
- *      （单引擎下入口恒为 LynxActivity，写什么都归一为 lynx）
+ *      （单引擎下入口恒为 LynxActivity，原 getClientKind 归一逻辑已随 ADR-0203 决策 7 删除）
  *   3. **benchNav 深链直达详情页**
  *      （`--es benchNav illust-detail --es benchNavIllustId <id>`，#542 建成的通道，
  *      取代 bookmark-tags spec 的「轮播首卡点击进入」像素定位法）
