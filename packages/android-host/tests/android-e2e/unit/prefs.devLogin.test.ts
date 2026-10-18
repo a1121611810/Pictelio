@@ -4,7 +4,8 @@
  *
  * 背景：单引擎化后 webview 登录页不存在，spec 的登录只能走
  * `LynxActivity.applyDevIntentHooks()` 的 refresh_token 钩子
- * （oracle：LynxActivity.java:697-706，门禁 BuildConfig.DEBUG）。
+ * （oracle：LynxActivity 的 `applyDevIntentHooks`，其首句即 BuildConfig.DEBUG 闸门；
+ * 刻意不写行号——行号会随重构腐坏）。
  *
  * 期望值来源：**真实 Pixiv refresh_token 的字符形态**（本项目 token 为 43 字符
  * 的 URL-safe base64 串，实测含 `_` / `-`）+ shell 单引号包裹的设备侧转义规则，
@@ -66,8 +67,10 @@ describe("devLoginIntentArgs", () => {
   });
 
   it("默认带 force_r18 extra（否则受限作品渲染灰占位、像素判据恒等）", () => {
-    // oracle = tools/verify-translation.sh:47 与 tools/README.md:42 的既有用法；
-    // 消费侧 LynxActivity.java:103 → settingsStore.ts:797 读 dev_force_r18 键
+    // oracle = tools/verify-translation.sh 与 tools/README.md:42 里既有的下发写法；
+    // 消费侧：原生 LynxActivity 的 DEV_EXTRA_FORCE_R18 extra → settingsStore 的
+    // applyDevSeed("dev_force_r18", ...) 读该键。**两处都刻意不写行号**——行号会随
+    // 重构腐坏（本文件此前就因写死 `LynxActivity.java:697-706` 而指向了无关代码）。
     expect(devLoginIntentArgs("T")).toEqual(
       expect.arrayContaining(["--es", "pictelio_dev_force_r18", "true"]),
     );

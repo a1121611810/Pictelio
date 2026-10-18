@@ -110,7 +110,7 @@ public class LynxActivity extends AppCompatActivity {
      * 读到该键后强制 _translateR18 / _translateR18G = true。
      *
      * <p>⚠️ 与 {@link #DEV_EXTRA_FORCE_R18} **刻意分离**：前者是「允许看见受限内容」，
-     * 本者是「允许把受限正文发给第三方 LLM」（spec §9.7 / ADR-0173 D3）。真实产品里这是
+     * 本者是「允许把受限正文发给第三方 LLM」（spec §9.7 / ADR-0173 D4b）。真实产品里这是
      * 用户视角的两个独立决定；合成一个 extra 会让「切一下查看偏好」就把受限内容变得可外发。
      *
      * <p>落点选设备级扁平键而非账号级 {@code settings_translate_r18g_${uid}}：intent 到达时
@@ -752,7 +752,7 @@ public class LynxActivity extends AppCompatActivity {
      *       同契约，无 JS 端特殊处理）。</li>
      *   <li>{@code pictelio_dev_force_translate_r18}：任意值（任何非空字符串视为 true）时写
      *       {@link #DEV_FORCE_TRANSLATE_R18_PREFS_KEY} = "true"。JS 端 settingsStore.loadSettings
-     *       读到后强制「允许翻译 R18/R18G」授权谓词（spec §9.7 / ADR-0173 D3）。真机验证
+     *       读到后强制「允许翻译 R18/R18G」授权谓词（spec §9.7 / ADR-0173 D4b）。真机验证
      *       R18G 章节需要它——否则闸门在请求发出前就拦下，验证通道无法取证。与上一条
      *       {@code pictelio_dev_force_r18} 是两个独立键，不可合并（合并即等于「切查看偏好
      *       就获得外发授权」）。</li>

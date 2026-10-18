@@ -45,7 +45,7 @@ dev intent hooks（全部 `BuildConfig.DEBUG` 门禁，release 包不含）：
 | `benchNav`                                          | 直达页面（`novel` = 小说列表等，见 LynxActivity）                 |
 
 ⚠️ `pictelio_dev_force_r18` 与 `pictelio_dev_force_translate_r18` **不是同一个开关，不可互相替代**
-（spec §9.7 / ADR-0173 D3）：
+（spec §9.7 / ADR-0173 D4b）：
 
 | 开关                        | 覆盖的决定                  | 缺它会怎样                                     |
 | --------------------------- | --------------------------- | ---------------------------------------------- |

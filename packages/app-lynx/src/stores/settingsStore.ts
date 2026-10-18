@@ -23,6 +23,7 @@ import {
 } from "../api/rateLimitBackoff"
 import { useAuthStore } from "./authStore"
 import { unquoteNativeString } from "../utils/tokenStorage"
+import { resolveDebugBuild } from "../utils/debugBuild"
 import { setLocale, followSystemLocale } from "../i18n"
 import type { ImageQuality } from "../utils/imageQuality"
 import type { UgoiraExtractMode } from "../api/ugoira"
@@ -262,6 +263,35 @@ function devPrefs(): PrefsStorage {
  *  seam 单源，禁止第二处 hand-roll native/idb 分流。 */
 export function prefs(): PrefsStorage {
   return isNativeMode() ? nativePrefs() : devPrefs()
+}
+
+/**
+ * dev 播种键读点（#1035）：**仅 debug 构建生效**。
+ *
+ * 为什么闸门必须在**读侧**：写侧虽有 `BuildConfig.DEBUG` 早退，但 debug 与 release
+ * 共用 applicationId 与同一份 SharedPreferences，`adb install -r` 不清数据 ⇒ 同一设备
+ * 先装 debug 播种过、再覆盖装 release，release 会读到残留键。
+ *
+ * 为什么判定**先于**读键：`resolveDebugBuild` fail closed（证不出来即 false），
+ * 拿不到判定就根本不读键，**不得** fall through 到无闸门的读——那等于把
+ * 「判据不可用」当成「放行」。
+ *
+ * 构建谓词由入参承接而非在函数体内直接取模块导入——**这是本函数的调用契约，不是
+ * 「已具备的替换能力」**：目前两个生产调用点都传 `resolveDebugBuild`，单测也没有
+ * 替换这个参数（它们在更低一层替换桥桩，那比替换本参数更强：走的仍是生产接线）。
+ * 参数化只是把「谓词从哪来」显式化，避免将来在函数体内另接一个隐式来源。
+ */
+async function applyDevSeed(
+  key: string,
+  isDebug: () => Promise<boolean>,
+  apply: () => void,
+): Promise<void> {
+  if (!(await isDebug())) return
+  try {
+    if ((await prefs().get(key)) === "true") apply()
+  } catch (e) {
+    console.warn(`[settingsStore] dev hook ${key} 读取失败（忽略）`, e)
+  }
 }
 
 /** 迁移：账号键缺失且老键存在 → 播种 → 删老键（先写后删，幂等） */
@@ -793,17 +823,14 @@ export const useSettingsStore = defineStore("settings", () => {
     // 持久化比事件总线更可靠：bundle 渲染竞态不会丢（loadSettings 总会读到），登出→重登录后
     // 仍生效（键跨会话持久），JS 挂载时序无关。键名与 Java 端 LynxActivity.DEV_FORCE_R18_PREFS_KEY
     // 逐字一致，唯一所有者 = Java 端，TS 侧镜像常量（契约测试如需可后续钉住）。
-    try {
-      const devForce = await prefs().get("dev_force_r18")
-      if (devForce === "true") {
-        _showR18.value = true
-        _showR18G.value = true
-      }
-    } catch (e) {
-      console.warn("[settingsStore] dev hook dev_force_r18 读取失败（忽略）", e)
-    }
+    //
+    // ⚠️ 读侧闸门 = **仅 debug 构建**（#1035）。存量同形键、本键与翻译授权键同受此闸门。
+    await applyDevSeed("dev_force_r18", resolveDebugBuild, () => {
+      _showR18.value = true
+      _showR18G.value = true
+    })
 
-    // Dev hook：强制打开「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D3）。
+    // Dev hook：强制打开「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 **D4b**）。
     // 与上方 dev_force_r18 **刻意分离**：「允许看见受限内容」≠「允许把受限正文发给第三方
     // LLM」。两个开关是用户视角下的两个独立决定，故此处不读 dev_force_r18、也不共用键——
     // 共用会让「切一下查看偏好」就把受限内容变得可外发（红线）。
@@ -815,26 +842,16 @@ export const useSettingsStore = defineStore("settings", () => {
     // 键由 LynxActivity.applyDevIntentHooks 在 BuildConfig.DEBUG 门禁下写入
     // （pictelio_dev_force_translate_r18 extra）。
     //
-    // ⚠️ **「release 构建不写该键」只在写侧成立，读侧没有任何对应门禁**。debug 与
-    // release 的 applicationId 同为 io.pictelio.app，`adb install -r` 不清
-    // SharedPreferences ⇒ 同一设备先装 debug 播种过、再覆盖装 release，**本分支会命中**，
-    // 于是受限正文被发往第三方 LLM——而用户从未做过外发授权。
-    //
-    // 为什么这里不加门禁：`__DEV__` 在 debug APK 上也是 production
-    // （见 router.ts 关于 benchNav 的同款记录），原生 BuildConfig.DEBUG 目前**没有
-    // 暴露给 JS**，所以 JS 侧没有可用的「是否 debug 构建」判定。真正的修法是给 debug
-    // 加 `applicationIdSuffix`（根治，影响面大）或把 DEBUG 经原生模块暴露给 JS。
-    // 存量同形键 `dev_force_r18` 一样（且已上线），本键只是把它从「允许看见」扩到
-    // 「允许外发」。已显式挂账见 #1035——**别把写侧门禁读成读侧也安全**。
-    try {
-      const devForceTranslate = await prefs().get("dev_force_translate_r18")
-      if (devForceTranslate === "true") {
-        _translateR18.value = true
-        _translateR18G.value = true
-      }
-    } catch (e) {
-      console.warn("[settingsStore] dev hook dev_force_translate_r18 读取失败（忽略）", e)
-    }
+    // ⚠️ 读侧闸门（#1035 修复）：debug 与 release 共用 applicationId 与同一份
+    // SharedPreferences，`adb install -r` 不清数据 ⇒ 同一设备先装 debug 播种过、再覆盖装
+    // release，残留键会被 release 读到，受限正文随即被发往第三方 LLM——而用户从未做过
+    // 外发授权。写侧的 `BuildConfig.DEBUG` 早退**只**保证 release 不写，证不了 release
+    // 不读。闸门由 `resolveDebugBuild`（原生 BuildConfig.DEBUG，fail closed）提供。
+    // **别把写侧闸门读成读侧也安全。** 存储层隔离另见 #1037。
+    await applyDevSeed("dev_force_translate_r18", resolveDebugBuild, () => {
+      _translateR18.value = true
+      _translateR18G.value = true
+    })
   }
 
   function setShowR18(enabled: boolean): void {

@@ -322,7 +322,7 @@ export function devLoginIntentArgs(
   // 既没有真实像素（像素判据恒等），又点不进去（导航断言必败）。项目内已有先例：
   // tools/verify-translation.sh:47 与 tools/README.md:42 都带这个 extra。
   if (forceR18) args.push("--es", DEV_EXTRA_FORCE_R18, "true");
-  // 播种「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D3）。**默认关闭**：
+  // 播种「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D4b）。**默认关闭**：
   // 翻译闸门在真机上照常工作，只有显式要验受限章节翻译的用例才该打开它——
   // 默认打开会让「未授权仍被拦」这条契约在 e2e 链路上再也验不到。
   // 与 forceR18 是两个独立开关（看见 ≠ 允许外发），任一不得连带另一个。

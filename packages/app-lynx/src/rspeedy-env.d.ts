@@ -127,6 +127,24 @@ declare global {
        * 回调契约：成功 cb(null)；失败 cb(errMsg)。未持有 Activity 引用时静默成功（无宿主可下发）。
        */
       applyDarkModePreference(callback: (err: string | null) => void): void
+      /**
+       * 当前是否为 debug 构建（#1035）：cb(BuildConfig.DEBUG) 裸布尔值，异常 cb(false)。
+       *
+       * 存在理由：dev 播种键（dev_force_r18 / dev_force_translate_r18）写侧有
+       * BuildConfig.DEBUG 早退，但读侧原本无构建判定——debug 与 release 共用
+       * applicationId 与同一份 SharedPreferences，adb install -r 不清数据，
+       * 故 debug 播种的键会被 release 读到。
+       *
+       * 读取时机：**冷启动任意阶段均可调用**。与同接口的其它方法不同，本方法
+       * 不依赖 Activity 引用、不依赖布局完成、不依赖已挂载的 LynxContext——
+       * 它只读编译期常量。这条性质对后续维护者重要：`loadSettings` 在冷启动路由
+       * 初始化里调用它，**若日后有人给它加上任何宿主状态依赖，dev 播种会静默
+       * fail closed 且无可见原因**（表现为「dev extra 明明下发了却没生效」）。
+       *
+       * ⚠️ 契约：**不可用必须按 false 处理**（fail closed），不得 fall through 到
+       * 无闸门的读。`__DEV__` 不能替代本宏——它在 debug APK 上也是 false。
+       */
+      isDebugBuild(callback: (isDebug: boolean) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

@@ -15,6 +15,7 @@ import { ref, effect } from "vue"
 import { setActivePinia, createPinia } from "pinia"
 import { useSettingsStore, BACKUP_DEVICE_KEYS, backupAccountKeys, parseMuteTagsRaw } from "./settingsStore"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
+import { resetDebugBuildCacheForTest } from "../utils/debugBuild"
 import {
   DEFAULT_RATE_LIMIT_BACKOFF_CONFIG,
   RATE_LIMIT_BASE_DELAY_MS_OPTIONS,
@@ -67,6 +68,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 let store: ReturnType<typeof useSettingsStore>
 
 beforeEach(() => {
+  // 构建判定进程内记忆化（BuildConfig.DEBUG 是编译期常量）：跨用例必须重置，
+  // 否则首个 native 用例缓存的 false 会短路后续用例的桩——本文件将来若要断言
+  // dev 播种生效，忘记这行会得到一个「闸门明明开着却不放行」的假红。
+  resetDebugBuildCacheForTest()
   setActivePinia(createPinia())
   store = useSettingsStore()
 })

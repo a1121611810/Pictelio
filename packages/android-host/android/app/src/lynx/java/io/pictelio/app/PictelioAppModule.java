@@ -22,6 +22,8 @@ import com.lynx.tasm.behavior.LynxContext;
  *       （#692：外观三态运行时重下发——状态栏图标 + splash 持久化主题）</li>
  *   <li>{@code exportDiagLog(text, cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}
  *       （T0-DIAG 临时通道：无可用分享应用时日志已写盘，回调可读提示而非失败）</li>
+ *   <li>{@code isDebugBuild(cb)}：{@code cb(BuildConfig.DEBUG)} 裸布尔值；异常
+ *       {@code cb(false)}（#1035：dev 播种键读侧闸门的构建类型来源，fail closed）</li>
  * </ul>
  */
 public class PictelioAppModule extends LynxModule {
@@ -58,6 +60,35 @@ public class PictelioAppModule extends LynxModule {
 
     private Context appContext() {
         return ((LynxContext) mContext).getContext();
+    }
+
+    /**
+     * 当前是否为 debug 构建（#1035 读侧闸门的构建类型来源）。
+     *
+     * <p>为什么需要它：dev 播种键（{@code dev_force_r18} / {@code dev_force_translate_r18}）
+     * 的**写侧**有 {@code BuildConfig.DEBUG} 早退，但客户端读侧原本无任何构建判定。debug 与
+     * release 共用同一 applicationId 与同一份 SharedPreferences，{@code adb install -r} 不清
+     * 数据，故 debug 播种的键会被 release 读到——受限正文随即被放行外发。
+     *
+     * <p>本方法返回**裸布尔值**，自身不做任何判定：调用方需要区分「确认是 debug 构建」与
+     * 「本方法不可用」，后者必须 fail closed 为 false（见调用侧契约）。
+     *
+     * <p>回调契约：{@code cb(BuildConfig.DEBUG)}。同步返回、无异步分支；异常亦
+     * {@code cb(false)}。兜底那次 {@code invoke} 单独包 try——否则它自身抛错会穿出
+     * {@code @LynxMethod}，把「fail closed」变成「抛到 JS」。
+     */
+    @LynxMethod
+    public void isDebugBuild(Callback callback) {
+        try {
+            callback.invoke(BuildConfig.DEBUG);
+        } catch (Exception e) {
+            Log.w(TAG, "isDebugBuild 回传失败（按非 debug 处理）", e);
+            try {
+                callback.invoke(false);
+            } catch (Exception fallbackError) {
+                Log.w(TAG, "isDebugBuild 兜底回传同样失败（客户端将永挂，依赖 Lynx Callback 契约）", fallbackError);
+            }
+        }
     }
 
     /**
