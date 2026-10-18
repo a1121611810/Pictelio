@@ -128,7 +128,7 @@ ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/dom
 - **PixivApiPlugin 网关** → ADR-0037 + `packages/app-lynx/src/api/`
 - **图片流水线两层缓存**（内存层 / 磁盘层）→ ADR-0222（现行编号）+ ADR-0143（缓存键恒官方 URL）；演进史见 ADR-0090（**历史编号**，其「三层」层 B 已随 ADR-0203 删除）。词汇层见 `packages/android-host/CONTEXT.md`「图片代理」节
 - **Android 原生集成**（返回键、`/pixiv-img/` 图片代理（`PictelioImageService`）、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`（词汇层见 `packages/android-host/CONTEXT.md`）
-- **引擎决策（ADR-0164）**：缺省 Lynx；硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键；10s 加载超时永不自动跳
+- **单引擎路由（ADR-0164 状态行 / ADR-0201）**：Lynx 是唯一渲染引擎，入口 `LynxActivity.java`；原预热/路由共用与双向降级机制已随 #610 删除；10s 加载超时只落错误页、永不自动跳（`LynxActivity.LOAD_TIMEOUT_MS`）
 - **安全存储**（refresh_token 走 Keystore，首启迁移）→ `SecureStorageCompat`（android-host main/java）
 - **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `packages/app-lynx/src/primitives/` + 对应 ADR
 - **更新检查**（GitHub API + `/github-api` 代理）→ `packages/app-lynx/src/stores/updateStore.ts` + `@pictelio/update-check`
@@ -234,11 +234,12 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **位置**：客户端 `packages/app-lynx/{src,tests}/**`；宿主 `packages/android-host/tests/{unit,android-e2e}/**`；编写约定详版 = `docs/testing/conventions.md`（本节为摘要）
 - **E2E 编排**：android-e2e 12 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/android-host/tests/android-e2e/specs/`
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
+- **改代码前先查门禁索引**：[`docs/research/gate-index-by-subject-2026-10.md`](docs/research/gate-index-by-subject-2026-10.md)「改 X → 只看这几个测试」；配套的锚点审计与字面量普查同目录。**不据此删门禁**——盘点证明 156/158 有书面锚点，见下
 
 ### 门禁边界（#539 拍板，2026-09-15）
 
 - **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
-- **任务缓存只给 `check:all` 开（`--cache`），`test:all` 必须不缓存**：`vp` 的 `run.cache = { scripts: false, tasks: true }` 使 script 默认不缓存。**测试门禁一旦缓存命中 = 测试根本没跑、只重放日志——绿灯是假的**（本仓反复在消灭的假绿）。改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`。
+- **`check:all` / `test:all` 一律不带 `--cache`（2026-10-18 实测订正，原口径「缓存只给 check:all 开」已作废）**：`vp run --cache` 会把 `run.cache = { scripts: false }` 的默认**覆盖成 script 也缓存**，实测 `check:all` 在**工作区有必然类型错误**时仍 `8/8 cache hit (100%)` 并以 exit 0 通过（新文件与改已被跟踪的文件都不失效）⇒ 门禁空转、绿灯是假的。去掉 `--cache` 后 runner 打印 `⊘ cache disabled` 并真正执行。**任何门禁一旦缓存命中 = 根本没跑、只重放日志**（本仓反复在消灭的假绿）。改这两个脚本前先读 `node_modules/vite-plus/docs/config/run.md`。
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
 ### 测试硬约束（违反视为架构违规；详版见 `docs/testing/conventions.md`，编号一一对应）

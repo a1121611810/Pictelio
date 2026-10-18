@@ -18,7 +18,7 @@
 ## 二、`AGENTS.md` 命令表未覆盖的工具
 
 - `test:mutation`（Stryker，仅 ugoira + update-check）—— `package.json:40`
-- `dev:all` / `build:all` / `preview:all`（多包并行）；`check:all` 带 `--cache`、**`test:all` 不带** —— `package.json:14,19,24,29,43`
+- `dev:all` / `build:all` / `preview:all`（多包并行）；`check:all` 与 `test:all` **都不带 `--cache`**（带则 script 也进缓存 ⇒ 门禁空转假绿）—— `package.json:14,19,24,29,43`
 - `release:android-host:transition`（过渡期发布分支固定 `release/transition-6.2.0`）—— `package.json:51`
 - `sync:app-lynx-bundle`、`kill:all` —— `package.json:54,57`
 - 宿主包独有：`appium:setup`、`sync:android-version`、`sync:credentials` —— `packages/android-host/package.json`
