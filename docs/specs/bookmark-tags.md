@@ -1,4 +1,7 @@
-# Spec: 插画收藏加标签（双端）
+# Spec: 插画收藏加标签（原双端；webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 客户端已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除；正文 webview 侧设计
+> （D7 Fluent 面板、差分测试、验收实证）为历史记录，现行契约只覆盖 app-lynx。
 
 > 架构决策：ADR-0160（双轨收藏 + 收藏面板 + 覆盖式编辑）；统一术语：`docs/adr/glossary-bookmark-tags.md`（**收藏标签**/**作品标签**/**标签库**/**收藏面板**/**快速收藏**/**双轨收藏**/**覆盖式编辑**/**预填**/**可见性**均以术语表为准）。
 > 调研：`docs/research/bookmark-tags-similar-clients.md`（API 契约六实现差分）、`docs/research/bookmark-tags-ux-patterns.md`（UX 模式）。

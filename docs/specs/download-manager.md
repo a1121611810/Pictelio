@@ -200,7 +200,7 @@ ugoira 源 = Pixiv ZIP（PNG/JPG 帧 + `animation.json` 时序）。格式 → �
 - [ ] 详情页原保存入口改为入队 + 提示「到下载页查看」，并可跳转。
 - [ ] ugoira 可按全局设置的 6 种格式之一下载并落盘（GIF/MP4/WebP/APNG/ZIP/TAR）。
 - [ ] 队列跨重启恢复（`downloading` 降级 paused）；损坏数据可见 warn。
-- [ ] 门禁全绿：`check:all` / `lint` / `test:app` / `test:app-lynx` / Java 单测 / `fmt:check`。
+- [ ] 门禁全绿：`check:all` / `lint` / ~~`test:app`~~（已随 ADR-0203 删除）/ `test:app-lynx` / Java 单测 / `fmt:check`。
 
 ## 11. Grill 澄清与假设记录（用户未逐条应答，可推翻）
 

@@ -1,4 +1,7 @@
-# Spec: 作品类型标识（动图/多图）跨端统一
+# Spec: 作品类型标识（动图/多图）统一（Lynx 单端；webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 客户端已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除；本文「双端统一」与
+> App 侧（Fluent 2）实现为历史记录，现行契约只覆盖 app-lynx。
 
 - 关联 ADR：ADR-0113
 - 术语：`packages/app/CONTEXT.md` 与 `packages/app-lynx/CONTEXT.md` 的「作品标识」节（动图 / 多图 / 类型角标 / 类型徽章行）

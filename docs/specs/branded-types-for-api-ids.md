@@ -109,7 +109,9 @@ export function toChapterId(raw: number): ChapterId { return raw as ChapterId; }
 2. **工厂函数签名**：每个 ID 一个 `function toXxxId(raw: number): XxxId`，body 仅 `return raw as XxxId`（运行时无操作；纯类型层边界）。
 3. **跨端策略**：**双端 byte-identical 复制**——`packages/app/src/api/id.ts` 与 `packages/app-lynx/src/api/id.ts` 内容完全一致；沿 P1 `assertNever` 决策；项目「双端差分对齐」惯例。
 
-### app（packages/app）
+   **订正（2026-10-18，单引擎）：** 现仅 `packages/app-lynx/src/api/id.ts` 一份；app 侧副本已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除。
+
+### app（packages/app；已随 ADR-0203 删除，仅存历史）
 
 4. **新增** `packages/app/src/api/id.ts`：5 个 `declare const XxxIdBrand: unique symbol;` + 5 个 `type XxxId = number & { ... }` + 5 个 `function toXxxId(raw: number): XxxId { return raw as XxxId; }` + module-level doc 解释意图与边界规则。
 5. **改造** `packages/app/src/api/types.ts`：

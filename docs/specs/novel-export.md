@@ -181,7 +181,7 @@ app 的 `utils/novelBlocks.ts` 与 `api/novel.ts` 的 `parseNovelBlocks`/`parseI
 
 ## 7. UI
 
-### 7.1 app（SolidJS / Fluent）
+### 7.1 app（SolidJS / Fluent；已随 ADR-0203 删除，仅存历史）
 
 - **设置页**：新卡片 `SettingsExport.tsx`（注册进 `SettingsSections`，置于「下载」之后）：格式 chip 组（9 项，复用 `SettingsDownload` 的 segmented 视觉）+ 三项 `<fluent-switch>` 开关行。
 - **详情页入口**：`NovelFooterNav` pill 行新增「导出」（新 prop `onExport`；有正文时才渲染）。
@@ -228,7 +228,7 @@ start（lynx）   : start(id, sourceUrl, fileName, "novel", targetFormat, frames
 - [ ] 内容开关生效（关元数据/封面/插图后产物对应缺失；文本格式退化为链接）。
 - [ ] EPUB 通过 EPUBCheck（或等价的「mimetype 首条 stored + well-formed XML」结构断言）；DOCX 可被 Word/WPS 打开；PDF CJK 不丢字且可选中。
 - [ ] 队列：进度、暂停/停止/删除、跨重启恢复、下载页分享对导出文件可用。
-- [ ] 门禁全绿：`check:all` / `lint` / `test:app` / `test:app-lynx` / Java 单测 / `fmt:check`。
+- [ ] 门禁全绿：`check:all` / `lint` / ~~`test:app`~~（已随 ADR-0203 删除）/ `test:app-lynx` / Java 单测 / `fmt:check`。
 
 ## 11. Grill 澄清记录（用户逐条应答，2026-09）
 

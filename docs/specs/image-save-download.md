@@ -78,7 +78,7 @@ saveIllustPages({ illust, pages: number[], saveOne, onProgress })
 
 ## 5. UI 行为
 
-### app（SolidJS / Fluent）
+### app（SolidJS / Fluent；已随 ADR-0203 删除，仅存历史）
 
 | 面                         | 行为                                                                                                                                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -116,7 +116,7 @@ saveIllustPages({ illust, pages: number[], saveOne, onProgress })
 - [ ] lynx：同三场景（原生 LynxView）
 - [ ] 批量中途单张失败 → 不中断、末尾可见失败汇报
 - [ ] ugoira 作品不显示保存入口
-- [ ] 全部门禁绿：`check:all` / `lint` / `test:app` / `test:app-lynx` / Java 单测 / `fmt:check`
+- [ ] 全部门禁绿：`check:all` / `lint` / ~~`test:app`~~（已随 ADR-0203 删除）/ `test:app-lynx` / Java 单测 / `fmt:check`
 
 ## 8. 假设记录（用户未应答 Grill，可推翻）
 

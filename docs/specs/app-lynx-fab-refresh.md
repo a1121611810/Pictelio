@@ -82,7 +82,7 @@ async function refreshFeed() {
 
 ## 原生回滚（T1'）
 
-1. 弃未提交改动：`git checkout -- packages/app/android/app/build.gradle packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java`
+1. 弃未提交改动（**历史步骤**；`packages/app` 已随 ADR-0203 删除，勿执行）：~~`git checkout -- packages/app/android/app/build.gradle packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java`~~
 2. rebase drop T1：`git rebase --onto 918f731^ 918f731`（918f731 未推送；T2/T3/docs 提交不触碰 build.gradle/proguard，预期零冲突）
 3. 回滚面清单（回滚后以下显式声明均应不存在）：
    - build.gradle：`xelement-refresh`（lynx/full 两行）、`viewpager2`（两行）、`verifyPinnedAars` 任务（66 行整段）

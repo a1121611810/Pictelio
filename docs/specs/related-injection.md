@@ -1,4 +1,7 @@
-# Spec: 相关作品注入行（双端：app webview + app-lynx）
+# Spec: 相关作品注入行（原双端；webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 客户端已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除；§5.1 webview 实现与
+> §6.2 跨端差分测试为历史记录，现行契约只覆盖 app-lynx。
 
 - 状态：implemented（2026-09-12 当日实施于分支 `feat/related-injection`，7 commits 3f773575..d232e4c8；门禁 check:all / test:all（app 1673 + lynx 1154 + 其余包）/ lint:all 全绿；仓库级双轴 code-review 首轮 PASS-with-comments → 复审修复 commit d232e4c8 → 复审 PASS。遗留：模拟器/真机视觉批次（lynx 横滑降级行为、行高观感）挂账于 #490）
 - 日期：2026-09-12

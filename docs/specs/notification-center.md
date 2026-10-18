@@ -1,7 +1,10 @@
 # Spec：通知中心（Notification Center）
 
 > 状态：implemented（2026-09-26，双端落地 + code-review 三轮闭环零阻塞）｜ 日期：2026-09-26 ｜ 依据：ADR-0188 + `docs/adr/glossary-notification-center.md`
-> 双端范围：webview（packages/app）+ lynx（packages/app-lynx）｜ API oracle：2026-09-26 真实抓包（脱敏 fixture 随测试落库）+ Pixiv-Shaft 一手实现交叉
+> 双端范围：webview（packages/app，已随 ADR-0203 删除）+ lynx（packages/app-lynx，现行）｜ API oracle：2026-09-26 真实抓包（脱敏 fixture 随测试落库）+ Pixiv-Shaft 一手实现交叉
+>
+> **订正（2026-10-18，单引擎）：** webview 客户端已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除；正文 webview 侧实现
+> （§5/§6/§7/§8）为历史记录，现行契约只覆盖 app-lynx。
 
 ## Problem Statement
 

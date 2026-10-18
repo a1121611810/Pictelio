@@ -31,8 +31,8 @@ app-lynx 小说列表卡片的标签是硬截断：永远只显示前 3 个（No
 
 ## Implementation Decisions
 
-- 不改 webview（packages/app）。
-- **纯算法模块**（标签折叠算法）：与 packages/app/src/components/home/adaptiveTagFit.ts 同语义；修正一处 gap 漏算（贪心条件需计入「最后一个 chip 与 +N 之间的 gap」）。输入 chipWidths[] / plusWidth / containerWidth（+ gap / minPartial），输出 { visible, remaining, partialWidth }。
+- 不改 webview（WebView 客户端已随 ADR-0203 删除；本约束为历史记录）。
+- **纯算法模块**（标签折叠算法）：与**原 webview 对照实现**（`packages/app/src/components/home/adaptiveTagFit.ts`，已随 ADR-0203 删除）同语义（历史依据）；修正一处 gap 漏算（贪心条件需计入「最后一个 chip 与 +N 之间的 gap」）。输入 chipWidths[] / plusWidth / containerWidth（+ gap / minPartial），输出 { visible, remaining, partialWidth }。
 - **测量原语**：包装 lynx.createSelectorQuery()，**逐元素 select('#id').invoke({ method: 'boundingClientRect' }) 后链式 exec()**（一次 exec 提交全部）。**禁止** selectAll().invoke()（双端 code 5）。测量入口可注入假 query 以便单测 IO 边界（参照 utils/viewportSizeBridge.ts 的注入模式）。
 - **测量原语的错误策略**：仅对「无 createSelectorQuery / 回调超时 / 矩形缺失」降级并 console.warn；query 工厂自身抛错视为编程错误，直接向上 reject，不吞掉（失败路径显式可见，锚测试硬约束 #3）。
 - **列表标签组件**：单行；先渲染全部 chip（overflow-hidden 裁切）→ 测量 → 按结果渲染「可见 chip +（可选）截断 chip +（可选）+N」。**禁止** list-item 内 absolute 隐藏测量层。
@@ -53,14 +53,14 @@ app-lynx 小说列表卡片的标签是硬截断：永远只显示前 3 个（No
 
 ## Out of Scope
 
-- 不改 webview。
+- 不改 webview（客户端已删除，历史约束）。
 - 不改轮播 TagChipRow 的固定 3+N。
 - 不改 IllustDetail 标签行（已可点、可换行全量）。
 - 不给 Bookmarks / UserHome 小说卡新增标签。
 - 不修 GlassCard.vue 的 SelectorQuery 既有 bug（建议另开 issue）。
 - 不做「点击标签展开全部」的内联展开（+N 走详情）。
 - **不做旋转/横竖屏重排**：LynxActivity 声明了 configChanges（orientation|screenSize…）→ 旋转不重建 Activity；app-lynx 无 viewport-resize 推送通道（PictelioApp.getViewportSize 为一次性查询，ADR-0131），且 vue-lynx 不回收 list cell。故旋转后容器变宽不会触发重算——列为后续平台能力任务（US7 已收窄为「重新挂载即重算」）。
-- **不修 webview 的 adaptiveTagFit 末位 gap 漏算**：本次只改 app-lynx；两端在该边界**有意分叉**（ADR-0149 决策 6），不做差分等价测试。
+- **不修 webview 的 adaptiveTagFit 末位 gap 漏算**：本次只改 app-lynx；两端在该边界**有意分叉**（ADR-0149 决策 6），不做差分等价测试（webview 侧已随 ADR-0203 删除，分叉对象不存在）。
 
 ## Further Notes
 

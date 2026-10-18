@@ -68,6 +68,8 @@ Pictelio 已在 `tsconfig.json` 开 `strict + noUnusedLocals + noUnusedParameter
 
 1. **工具位置**：**两份**——`packages/app/src/utils/assertNever.ts`（app 端，27 行）与 `packages/app-lynx/src/utils/assertNever.ts`（app-lynx 端，27 行复制）。byte-identical 实现，仅 doc-comment 中的 `@see` 与所在包路径同步。
 
+   **订正（2026-10-18，单引擎）：** 现仅 `packages/app-lynx` 一份；app 侧副本已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除（本节其余「双端复制」表述为历史记录）。
+
    **为什么复制而非跨包 import**（决策记录于本规范末尾「Spec 修订历史」节）：
    - **inline `throw` 不提供编译期防御**：worker 实测发现 vue-tsc 把 `default: throw new Error(...)` 视为"已处理所有剩余"，类型窄化在 default 停止；只有 `assertNever(value: never): never` 的 `never` 入参才能在联合拓宽时触发 TS2345。inline throw 等于把 P1 防御价值砍掉一半。
    - **跨包 import 违反"双端差分对齐"惯例**：项目已有 5 份 `AiFilterMode`（含 `@pictelio/search-core` / app / app-lynx / 两个 fixture）、2 份 `DownloadStatus`（app / app-lynx 各一）独立维护；引入跨包 import 等于单点破坏差分对齐约定。
@@ -161,7 +163,7 @@ Pictelio 已在 `tsconfig.json` 开 `strict + noUnusedLocals + noUnusedParameter
 **回归验证**（2026-09-21，commit `aeb92843`）：
 - vue-tsc 报 `error TS2345: Argument of type '"rate_limited"' is not assignable to parameter of type 'never'.`（与 app 端 T2 同形态）
 - `pnpm check:app-lynx` exit 0
-- byte-identical diff：`diff packages/app/src/utils/assertNever.ts packages/app-lynx/src/utils/assertNever.ts` 退出 0
+- byte-identical diff：`diff packages/app/src/utils/assertNever.ts packages/app-lynx/src/utils/assertNever.ts` 退出 0（**历史命令**；`packages/app` 已随 ADR-0203 删除，不可执行）
 
 **Code-review BLOCKER 闭环**（修复 2026-09-21）：
 - 原 BLOCKING：spec §1/§9 与 PR 实施不一致

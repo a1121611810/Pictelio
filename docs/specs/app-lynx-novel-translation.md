@@ -5,7 +5,7 @@
 - 关联：wayfinder map #617 / #644 / ADR-0169（Responses API 请求构造）/ ADR-0170（chunked pipeline 与重试）/ ADR-0171（缓存键与模型档位）/ ADR-0172（PrimJS 运行时 API 面）/ ADR-0173（端点探测与凭据验证）/ **ADR-0174（Java 终态测试契约）** / **ADR-0175（filesystem cache 通道）** / **ADR-0176（per-stream keying）** / **ADR-0177（gradle variant gate）** / **ADR-0178（重试 + partial UI 形态参数）** / prototype #624（endpoint 配置 + 失败 UX 视觉定型）/ 调研产物 `research/openai-responses-api.md`（#622）/ `research/lynx-async-iterator-support.md`（#623）/ `research/llm-endpoint-compatibility.md`（#625）/ `research/deepseek-streaming-api.md`（#622 旁证）/ `research/app-lynx-translation-java-contract-test-mechanism.md`（#646）/ `research/app-lynx-translation-cross-stream-contamination.md`（#649）
 - 工单：tickets 由 to-tickets 阶段产出（不在本 spec 内）
 
-> 本 spec **完全限定在 app-lynx 客户端**（`packages/app-lynx/`），不动 webview 端（`packages/app/`）任何翻译栈；不复用 webview 端的 `createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts`；不抽共享包。可参考 webview 端的**抽象边界**（provider 接口形态、缓存键设计、policy 决策点），但不直接搬运实现。
+> 本 spec **完全限定在 app-lynx 客户端**（`packages/app-lynx/`），不动 webview 端（`packages/app/`，已随 ADR-0203 删除）任何翻译栈；不复用 webview 端的 `createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts`；不抽共享包。可参考 webview 端的**抽象边界**（provider 接口形态、缓存键设计、policy 决策点），但不直接搬运实现。
 
 ---
 
@@ -33,7 +33,7 @@ app-lynx 客户端目前**没有小说翻译功能**——webview 端已有完�
 
 复用 wayfinder map #617 的 Out of scope，**严格不扩展**：
 
-1. **webview 端的翻译栈**：`packages/app/src/` 的 `createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts` **保持原状**，不迁移到新抽象、不共享 prompt、不抽取代码。
+1. **webview 端的翻译栈**：原 `packages/app/src/` 的 `createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts` **已随 ADR-0203 删除**，不迁移到新抽象、不共享 prompt、不抽取代码。
 2. **抽 `@pictelio/novel-translate` 共享包**：用户明确只做 app-lynx 端；将来如需共享，重新开新 map + 新 ADR。
 3. **chat/completions 旧协议支持**：当前只走 OpenAI Responses API `/v1/responses`；如未来需要回退支持 chat/completions（如 OpenRouter 用户诉求），作为**单独 ticket + 单独 map** 处理，不在本 spec 范围内。
 4. **`@pictelio/novel-export` 包改动**：翻译结果纳入导出现在不做（双语导出 vs 单语导出的 UX 复杂度需独立立项）；后续 map 处理。
@@ -813,7 +813,7 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 
 ## 10. 测试基线
 
-> 严格遵守项目「测试硬约束」（`packages/app/tests/TESTING.md`）：IO 边界 / 契约测试 / 静默降级 / oracle 溯源。
+> 严格遵守项目「测试硬约束」（`docs/testing/conventions.md`）：IO 边界 / 契约测试 / 静默降级 / oracle 溯源。
 
 ### 10.1 vitest 单测（environment: 'node'）
 

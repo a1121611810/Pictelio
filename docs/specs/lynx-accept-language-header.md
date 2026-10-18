@@ -57,16 +57,16 @@ TS execute()/executeRaw() web 分支                          [变更④]
 | E3 | 旧 APK + 新 JS / 新 APK + 旧 JS | 均正常（语言经 prefs 不经桥；JS 侧不读该头） |
 | E4 | 429 退避 / 401 刷新重放（ADR-0199） | 正交不受影响——重试请求经同一 `execute`，语言头同样携带 |
 | E5 | 非 Pixiv 域请求（`shouldAttachAuth`=false 路径） | 头照加（UA/Referer 同姿势，无域差别） |
-| E6 | `PixivApiCore` 其他调用方（webview `PixivApiPlugin`、诊断探针 `NetDiagProbe`；OAuth 端点走 PictelioAuth 自有通道，不经本方法） | 走 5 参旧签名 → `null` → 不加头，行为零变化 |
+| E6 | `PixivApiCore` 其他调用方（诊断探针 `NetDiagProbe`；OAuth 端点走 PictelioAuth 自有通道，不经本方法；原 webview `PixivApiPlugin` 已随 ADR-0203 删除） | 走 5 参旧签名 → `null` → 不加头，行为零变化 |
 
 ## 5. 变更清单
 
 | 文件 | 变更 |
 |---|---|
-| `packages/app/android/app/src/main/java/io/pictelio/app/PixivApiCore.java` | ③ 新增 6 参重载（`acceptLanguage` 可空）；旧 5 参委托 |
-| `packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` | ①② request 内解析语言 + 传参；`resolveAcceptLanguage` 纯静态函数 |
+| `packages/android-host/android/app/src/main/java/io/pictelio/app/PixivApiCore.java` | ③ 新增 6 参重载（`acceptLanguage` 可空）；旧 5 参委托 |
+| `packages/android-host/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` | ①② request 内解析语言 + 传参；`resolveAcceptLanguage` 纯静态函数 |
 | `packages/app-lynx/src/api/client.ts` | ④ web 分支 headers 加 `Accept-Language: locale.value`（execute + executeRaw 两处） |
-| `packages/app/android/app/src/test/java/io/pictelio/app/PictelioAcceptLanguageTest.java` | 新增：解析五分支 + 重载委托/MockWebServer 头断言 |
+| `packages/android-host/android/app/src/test/java/io/pictelio/app/PictelioAcceptLanguageTest.java` | 新增：解析五分支 + 重载委托/MockWebServer 头断言 |
 | `packages/app-lynx/src/api/client.test.ts` | 增：web 通道头断言 + locale 切换断言 |
 
 ## 6. 验收条件

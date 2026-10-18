@@ -1,4 +1,8 @@
-# Spec: WebDAV 备份（双端：app webview + app-lynx）
+# Spec: WebDAV 备份（原双端；webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 客户端已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除；正文 webview 侧传输层
+> （§4 的 `WebDavPlugin` / `MainActivity` 注册）与「双端各一」设置区块为历史记录，
+> 现行契约只覆盖 app-lynx。
 
 - 状态：ready-for-implementation（2026-09；决策经 wayfinder 地图 #455 收敛，#456~#460 全闭）
 - 日期：2026-09
