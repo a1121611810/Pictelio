@@ -2,7 +2,7 @@
 
 - 状态：approved for implementation（2026-09-16，ADR-0163 拍板）
 - 关联：ADR-0162/0112/0107（lynx list 结构变更三态）；`docs/research/industry-qa-practices-runtime-interaction-defects.md`；#374（存在性判定口径，本 spec 修订为内容断言）
-- 分发事实：**不经 Play**（GitHub Releases APK + webview OTA）；android-e2e 不进每-PR CI（#539），本 spec 全部 e2e 产物定位为**发版前必跑 + 大 PR 手动触发**
+- 分发事实：**不经 Play**（GitHub Releases APK）；webview OTA 通道已随 [ADR-0202](../adr/ADR-0202-ota-web-bundle-channel-retirement.md) 下线。android-e2e 不进每-PR CI（#539），本 spec 全部 e2e 产物定位为**发版前必跑 + 大 PR 手动触发**
 
 ## 0. 术语
 
@@ -24,7 +24,7 @@
 - 不引入 Pact / Storybook / Play 生态任何工具
 - 不改变 android-e2e「不进每-PR CI」的既有裁决（#539）
 - 不做 Sentry/错误监控接入（需账号 + lynx 捕获行为探针，单独立项）
-- 不做 webview OTA 之外的 lynx bundle OTA
+- 不做 lynx bundle OTA（webview OTA 通道已随 ADR-0202 下线）
 
 ## 3. 方案
 
@@ -40,7 +40,7 @@
 
 ### T2 转换矩阵 spec（android-e2e，P1）
 
-新文件 `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵**现为 3 行**（每行 = 一个已收口缺陷的回归，全部 Lynx）：
+新文件 `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵**现为 3 行**（每行 = 一个已收口缺陷的回归，全部 Lynx）：
 
 | 行 | 表面 | 动作序列 | 内容断言（禁存在性） |
 |----|------|----------|---------------------|
@@ -89,7 +89,7 @@
 ### T4 平台一致性自检页（app-lynx，P2-a）
 
 1. **收口**：新增 `src/utils/safeParseUrl.ts`——`extractHostname(url): string | null`（http(s) authority 正则，去 userinfo/端口；与 `api/search.ts` 现行实现同构并迁移过去复用）；`search.ts` 改为从该工具导入。
-2. **自检页**：新增 `src/pages/PlatformCheck.vue`（路由 `/platform-check`，**不进任何导航入口**，仅 benchNav 钩子可达——对齐 DebugImage 先例）。矩阵项（每项 PASS/FAIL + 实际值）：
+2. **自检页**：新增 `src/pages/PlatformCheck.vue`（路由 `/platform-check`，生产入口 = 高级设置页行（`AdvancedSettings.vue`）；benchNav 钩子亦可直达——对齐 DebugImage 先例）。矩阵项（每项 PASS/FAIL + 实际值）：
    - URL：`new URL('https://app-api.pixiv.net/x').hostname` 是否等于 `'app-api.pixiv.net'`（预期 FAIL——记录平台事实）
    - URL：`safeParseUrl` 同输入解析结果（预期 PASS——收口函数对照）
    - `URLSearchParams` 基本序列化/反序列化往返
@@ -117,6 +117,6 @@
 
 - 矩阵行扩展：收藏页、关注列表、排行榜、多图详情
 - 错误监控接入（Sentry + lynx 捕获探针）
-- lynx bundle OTA 化（对齐 webview 快慢双通道）
+- lynx bundle OTA 化（webview 快慢双通道已随 ADR-0202 下线，无对齐对象）
 - 转换矩阵脚本化触发器（`pnpm qa:matrix` 一键）
 - **存量裸 URL 全局迁移（review P1-1，已清账 2026-09-16）**：`api/client.ts isTrustedPixivHost`、`utils/imageUrl.ts isTrustedImageHost`、`utils/proxyRedact.ts redactProxyUrl` 三处已迁至 `utils/safeParseUrl`（`extractHostname` / `extractAuthority`）；接缝同步补 WHATWG 对齐的形态校验（非法 host/port → null，防纯正则解析相对 URL 构造**放松**白名单语义，安全方向 fail-closed）；迁移守卫 = `safeParseUrl.test.ts` 三文件无裸 `new URL(` 断言

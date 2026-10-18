@@ -7,7 +7,7 @@
 
 ## 1. Problem Statement
 
-lynx 客户端（缺省引擎）只有亮色界面：夜间/弱光环境刺眼；系统切暗后应用不跟随，与系统其它应用观感割裂。ADR-0152 做主题色时明确将「暗色/亮暗跟随」另行立项——本 spec 即该立项。webview 客户端已有明暗主题但**不投任何对齐/互通**（webview 按计划将弃用，已记入 AGENTS.md 注意事项）。
+lynx 客户端（缺省引擎）只有亮色界面：夜间/弱光环境刺眼；系统切暗后应用不跟随，与系统其它应用观感割裂。ADR-0152 做主题色时明确将「暗色/亮暗跟随」另行立项——本 spec 即该立项。webview 客户端已有明暗主题但**不投任何对齐/互通**（webview 客户端已随 ADR-0203 删除）。
 
 ## 2. Solution
 
@@ -132,7 +132,7 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 ### 4.8 原生接线与机器防线（#692 review 修复轮终态）
 
-**原生输入源接线**（`packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java`）：
+**原生输入源接线**（`packages/android-host/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java`）：
 
 | 项 | 终态 |
 |---|---|
@@ -161,7 +161,7 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 ## 5. Out of Scope
 
-- webview 客户端任何改动（已记入 AGENTS.md「按计划将弃用」）
+- webview 客户端任何改动（客户端已随 ADR-0203 删除）
 - 跨引擎设置共享 / 数据迁移
 - 账号级外观偏好
 - 定时/地理位置自动切换

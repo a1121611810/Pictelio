@@ -1,4 +1,8 @@
-# Spec: 排行榜（插画榜；双端：app webview + app-lynx）
+# Spec: 排行榜（插画榜；Lynx 单引擎，webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 侧（§1 目标、§3.1 术语、§5.1/§5.2/§5.6、§6.2 整节、
+> §7 测试表、§9 扩展路径）描述的是**已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端，仅为历史记录；
+> 现行契约只覆盖 app-lynx 与 `@pictelio/ranking-core`。
 
 - 状态：implemented（2026-09-13 当日实施于分支 `feat/solidjs-2-migration`，7 工单 #513–#519 全落地：`31de4de0`→`fe505d53`→`97d191d8`→`9fc21b01`→`f7761853`→`a87e2bd6`→`fbe2046f`；门禁 `check:all` / `test:all` 全绿（app 186 文件 1747 用例 + lynx 92 文件 1221 用例 + 共享包）；仓库级双轴 code-review 复审：1 Blocking（lynx 设备级键未入备份域）+ 4 Should-fix 全部修复（`5cbcc308`/`eb494255`），复审零 Blocking。**遗留**：Android 模拟器 E2E 套件在本机被既有环境问题阻断（chromedriver 113.0.5672.63 为 113 线最后一版、无与设备 WebView 113.0.5672.136 匹配的构建 → `disconnected: not connected to DevTools`；模拟器 DNS 探测失败；`fab-hit-testing` 期望 720x1280 而套件自动选中 1080x2160 的 `pictelio_ui`），失败面全部在引擎切换/网络自检等既有路径，非排行榜；spec §8 四项实测验证项、§9 扩展路径）；**T7 lynx 入口已下线（2026-10-18，#1043，见下方订正）**
 - 日期：2026-09-13
@@ -194,7 +198,7 @@ interface RankingQuery {
 - 下拉刷新 = 重取当前 `(mode, date)` 第一页。
 - 从榜单进入作品详情再返回：停留在榜单页，滚动位置由平台既有机制承担（webview `scrollRestoration` / lynx `KeepAlive`）。
 
-## 6. 双端实现设计
+## 6. 端侧实现设计（webview 侧已随 ADR-0203 删除）
 
 ### 6.1 共享纯函数包 `@pictelio/ranking-core`（唯一新增的缝）
 
@@ -209,7 +213,7 @@ interface RankingQuery {
 
 **不放进这个包**：任何平台 UI、任何网络调用、任何过滤逻辑（过滤沿用各端既有链）。
 
-### 6.2 webview（pictelio-app）
+### 6.2 webview（pictelio-app；已随 ADR-0203 删除，仅存历史）
 
 - **数据层**：TanStack Query，每 `(mode, date)` 一个查询键；分页走 `next_url`。
   - **关键约束**：**不得**用 `createTQFeedStore` 的 merge 路径——它对 items 做 `sortByDate` + 去重，会按 `create_date` 重排，**直接毁掉名次顺序**。走单源分页即可。
@@ -256,5 +260,5 @@ interface RankingQuery {
 
 ## 10. 进一步说明
 
-- **原型是本节决策的主要来源**：两端入口形态与范围层级均由 throwaway 原型裁决，归档于 commit `58170a2b` / `6a2b20fc`。正式实现落地时，原型文件（`packages/app/src/components/home/RankingPrototype.tsx`、`packages/app-lynx/src/components/RankingPrototype.vue`）与其挂载点、`utils/devFlag.ts`、`hardcode-whitelist.json` 中的原型豁免条目**应一并移除**。
+- **原型是本节决策的主要来源**：两端入口形态与范围层级均由 throwaway 原型裁决，归档于 commit `58170a2b` / `6a2b20fc`。正式实现落地时，原型文件（`packages/app/src/components/home/RankingPrototype.tsx`、`packages/app-lynx/src/components/RankingPrototype.vue`）与其挂载点、`utils/devFlag.ts`、`hardcode-whitelist.json` 中的原型豁免条目**应一并移除**。（2026-10-18 复核：两原型文件与挂载点均已不存在，本条待办已随 ADR-0203/#1043 收口，无需执行。）
 - **不建议新增 ADR 的点**：维度目录、缓存 TTL、入口条数等都属于可从本 spec 追溯的实现细节。**建议记 ADR 的点**：只有一条——「排行榜不新增导航分类，而是以 feed 内融合入口 + 独立榜单页承载，且两端采用不同融合形态」。理由：难以回退（信息架构决策）、不看上下文会奇怪（为什么两端不一样、为什么不做成 tab）、存在真实取舍（新 tab vs 融合入口；两端统一形态 vs 各自最优）。

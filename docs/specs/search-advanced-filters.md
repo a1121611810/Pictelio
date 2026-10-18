@@ -1,4 +1,9 @@
-# Spec: 搜索高级筛选（双端：app webview + app-lynx）
+# Spec: 搜索高级筛选（Lynx 单引擎；webview 侧已随 ADR-0203 删除）
+
+> **订正（2026-10-18，单引擎）：** webview 侧（§4 双端薄传输层的 webview 分支、§5.6 URL 同步、
+> §6.3「URL query 键表（webview）」、§7 的 webview 验收记录、§8 的 agent-browser 用例）描述的是
+> **已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端；`urlCodec` / `cacheKey` 模块已随 #1043 删除。
+> 现行契约只覆盖 app-lynx 与 `@pictelio/search-core`。
 
 - 状态：implemented（2026-09-12 终审通过并当日实施于分支 `feat/search-advanced-filters`，9 commits；门禁 check:all/test:all/lint:all 全绿 + 仓库级双轴 code-review 复审；遗留：agent-browser 筛选主流程 E2E 用例与 lynx 折叠区真机批次，见 §8。后续修订：2026-10-16 搜索范围增第四档「用户」（§3.2 增 `scope=user` 列与说明）；2026-10-17 搜索目标改用户可选档位、删除含空格 → exact 派生 ⇒ §3.1 增 `target` 字段、§3.2/§3.3 增「匹配方式」行、§6.1 该行划线并指向新 spec、§6.2 补 `ft=` 段、§7 不可达路径声明改写；**同日证据订正 §3.2 / §3.3：小说端 `title_and_caption` 由「不识别（推断，未实测）」升级为「实测被拒（HTTP 400 / 0 条）」**——置灰保值挡的是一次 400，放宽需显式决策）
 - 日期：2026-09-12
@@ -151,7 +156,7 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 
 `word_scope_sort` → `word_scope_sort|<filters 规范段>`（原由 search-core `buildCacheKey` 产出，该模块已随 #1043 删除；本节保留键形态作为前瞻性设计记录，分隔符 `|`）。规范段各槽：`fp`=期间预设 / `fd`=自定义起止 / `fb`=收藏数带宽序号 / `fr`=比例 / `fw`=最小边 px / `fa`=AI 覆盖（follow 不落键、非 follow 落键）/ **`ft`=搜索目标档位**（默认档 `partial` 不落键；`exact` / `title_and_caption` 落 `ft=exact` / `ft=title_and_caption`，spec `docs/specs/search-target-mode.md` §6）。全默认筛选时省略整段。`ft` **追加在段末尾**，存量非默认筛选的键逐字不变，升级不撞旧缓存。~~webview `inFlightSearchKey` 判重键同步扩展。防脏缓存是正确性硬要求。~~ —— 当轮成立是因为 webview 侧有 `inFlightSearchKey` 消费方；该消费方随 ADR-0203 整包删除，ADR-0132 决策 3 与 `useSearch.ts` 亦写明「搜索结果全局 LRU 缓存不做」⇒ `buildCacheKey` 在删除前已是**零生产消费方**（2026-10-17 grep 实测；2026-10-18 随 #1043 删除），今天不存在会被弄脏的缓存。键形态与「筛选进键」纪律仍按本节维护，属**前瞻性接线**（缓存日后重建时接线即自动正确），可达性逐落点核对见 spec `docs/specs/search-target-mode.md` §6。
 
-### 6.3 URL query 键表（webview）
+### 6.3 URL query 键表（webview；已随 ADR-0203/#1043 删除，仅存历史记录）
 
 | 键 | 值 | 示例 |
 |---|---|---|

@@ -72,8 +72,8 @@
   | 全部 | `loadRecommended` + `loadRecommendedNovels`（`time-merge`） | `Recommended.vue:98-110` 原样 |
   | 插画 | `loadRecommended` | `IllustList.vue:63-76` 的 `recommend` 分支 |
   | 小说 | `loadRecommendedNovels` | `NovelList.vue:50-60` |
-- **路由**：`/illusts` `/novels` **保留**（深链/benchNav/回退），只是不再出现在导航。
-- ⚠️ **不动**：`/ranking` 入口卡（`RankingEntryCard`）留在「全部」二级内，不动它。
+- **路由**：`/illusts` `/novels` **保留**（仅 benchNav 调试通道；生产无入口，「深链/回退」理由已于 2026-10-18 证伪，见 ranking spec 的 T7 订正），只是不再出现在导航。
+- ⚠️ **已变更**：`/ranking` 入口卡（`RankingEntryCard`）已随 #1043 删除（原「不动」表述作废）。
 
 ### 2.2 更新（**新建页**，是本次改动的主体）
 
