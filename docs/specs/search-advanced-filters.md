@@ -1,7 +1,7 @@
 # Spec: 搜索高级筛选（Lynx 单引擎；webview 侧已随 ADR-0203 删除）
 
-> **订正（2026-10-18，单引擎）：** webview 侧（§4 双端薄传输层的 webview 分支、§5.6 URL 同步、
-> §6.3「URL query 键表（webview）」、§7 的 webview 验收记录、§8 的 agent-browser 用例）描述的是
+> **订正（2026-10-18，单引擎）：** webview 侧（§4 双端薄传输层的 webview 分支、§5 第 6 条「URL 同步（仅 webview）」、
+> §6.3「URL query 键表（webview）」、§8 测试与验收中的 webview 验收记录与 agent-browser 用例）描述的是
 > **已随 [ADR-0203](../adr/ADR-0203-webview-client-source-removal.md) 删除**的 WebView 客户端；`urlCodec` / `cacheKey` 模块已随 #1043 删除。
 > 现行契约只覆盖 app-lynx 与 `@pictelio/search-core`。
 

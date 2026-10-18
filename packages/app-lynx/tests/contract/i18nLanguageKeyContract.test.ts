@@ -8,7 +8,7 @@
 //   ② 需求侧 spec：docs/specs/i18n.md §设置键（键名与值域的唯一需求出处）
 //
 // oracle 溯源：
-//   - 键名 `settings_language` 与值域 `"" | "zh-CN" | "en"` = spec docs/specs/i18n.md:53
+//   - 键名 `settings_language` 与值域 `"" | "zh-CN" | "en"` = spec docs/specs/i18n.md:57
 //   - Java 读侧接线与 Accept-Language 解析 = ADR-0200 D1/D2/D5
 //   - 401 重试透传 = ADR-0200 D5 + spec docs/specs/lynx-accept-language-header.md
 //   （401 刷新真路径在 JVM 单测不可达——OAuth AUTH_URL 为编译期常量内联会打真实网络——
@@ -45,7 +45,7 @@ const API_CORE = readFileSync(
 const LYNX_STORE = readFileSync(resolve(pkgRoot, 'app-lynx/src/stores/settingsStore.ts'), 'utf-8')
 const I18N_SPEC = readFileSync(resolve(repoRoot, 'docs/specs/i18n.md'), 'utf-8')
 
-/** spec 声明的值域（docs/specs/i18n.md:53「值域 `"" | "zh-CN" | "en"`」） */
+/** spec 声明的值域（docs/specs/i18n.md:57「值域 `"" | "zh-CN" | "en"`」） */
 const SPEC_VALUES = ['', 'zh-CN', 'en']
 
 /** 从 TS/Java 源码提取「键常量 = 字面量」的值（形如 `KEY = "settings_language"`） */
@@ -55,7 +55,7 @@ function keyLiteral(source: string, keyIdent: string): string | undefined {
 
 describe('settings_language 契约：Lynx ↔ Java 读侧 ↔ spec', () => {
   it('三侧读到同一个键名（spec 钉住字面量，TS 与 Java 各自提取后比对）', () => {
-    // oracle = spec docs/specs/i18n.md:53 —— 需求侧单一出处
+    // oracle = spec docs/specs/i18n.md:57 —— 需求侧单一出处
     expect(I18N_SPEC).toContain('`settings_language`')
 
     const specKey = I18N_SPEC.match(/`([a-z_]*language[a-z_]*)`/)?.[1]

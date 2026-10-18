@@ -116,7 +116,7 @@ export const routes: RouteRecordRaw[] = [
   // 「高级」：承接原「我的」里的调试/自检项（网络自检 / 限流退避调参 / 平台一致性自检），
   //   使业务入口行与调试行不再平级混排（决策 4 = B：只搬调试项，账号区与外观区不动）。
   { path: '/advanced', name: 'advanced', component: AdvancedSettings, meta: { requiresAuth: true, topInset: 'self' } },
-  // 插画/小说列表页**保留路由**（深链 / benchNav / 从二级页返回的回退目标），但不再出现在导航：
+  // 插画/小说列表页**保留路由**（仅 benchNav 调试通道，生产无入口；「深链 / 回退目标」理由已证伪，见 docs/specs/ranking.md T7 订正），但不再出现在导航：
   //   媒介已降为「发现」页内二级（M3：同主题的并列视角属 Tabs，不属顶级导航目的地）。
   { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true, topInset: 'self' } },
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true, topInset: 'self' } },
