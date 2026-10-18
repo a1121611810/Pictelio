@@ -2,7 +2,7 @@
 //
 // 一个模块吃掉：引擎事件解析 → 索引切片 → 异步测矩（含代际防竞态）→ 定位 → 五条收起路径
 // → 动作执行（复制 / 搜索）与反馈。**框架无关**：不 import Vue / Pinia / lynx 全局，
-// 全部依赖注入（房屋先例 createWatchlistPrompt / createBookmarkToggle），node 直接可测。
+// 全部依赖注入（房屋先例 createWatchlistPrompt），node 直接可测。
 //
 // 关键不变式（spec §ID 不变式 1-10，违反即回归）：
 //   1 索引即身份：start/end 是该段**渲染文本**的 UTF-16 码元下标（设备实证：某段 35 码元 /

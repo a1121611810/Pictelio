@@ -50,9 +50,21 @@
   "excludedKeys": ["show_r18_12345"],
   "deviceKeys": { "settings_ugoira_mode": "fflate" },
   "accountKeys": { "show_r18g_12345": "true", "ai_filter_mode_12345": "show" },
-  "sets": { "blocked_users": [], "report_records": [] }
+  "sets": { "blocked_user_ids": [], "reported_ids": [] }
 }
 ```
+
+> **`sets` 键名口径（2026-10-18 订正）**：两个键名以 app 侧 `BACKUP_SET_KEYS`
+> （原 `packages/app/src/services/backupWiring.ts:34`）为准，是 `blocked_user_ids` / `reported_ids`；
+> 本文此前示例写的 `blocked_users` / `report_records` **从未在任何实现或抓包中存在过**，属臆造名。
+> 交叉印证：`ADR-0187` §背景与 `docs/adr/glossary-tag-mute.md` 均以 `blocked_user_ids`
+> 指称屏蔽用户这一存量键。
+>
+> **跨引擎不对称（勿把示例当 lynx 现状读）**：本节示例是 **app 侧**产出的快照形态。
+> app-lynx 侧无屏蔽/举报 store，`collect()` 恒返回 `sets: {}`
+> （`packages/app-lynx/src/services/backupWiring.ts:53-54`），与 §3.1「屏蔽列表 / 举报记录」进备份域
+> 的描述是同一条规则的两种落点。恢复方向同样不对称：lynx 侧 `apply()` 只写回 `apply` 键，
+> `sets` 无落点即被丢弃（`backupWiring.ts:56-58`）。
 
 引擎无关单文件；恢复端按自身已知键过滤（app/lynx 各自不认识的键跳过）。
 

@@ -1,7 +1,7 @@
 // 正文选中会话深模块单测（spec docs/specs/app-lynx-novel-text-selection.md §Implementation Decisions）。
 //
-// oracle：spec §ID 不变式 1-10 逐条 + 设备实证（docs/research/lynx-text-selection-device-probe.md：
-// 事件形状 {target.id, detail.{start,end}}、start === -1 为清空、索引是段落文本下标）。
+// oracle：spec §ID 不变式 1-10 逐条（事件形状与 start === -1 见不变式 1 与 ADR-0165 背景第 4 条；
+// 索引是段落文本下标见不变式 1「索引即身份」）。
 // 依赖全部注入假件 → 不需要 vi.mock，也不需要 vue-lynx 渲染器（仓库无渲染器）。
 import { describe, expect, it, vi } from 'vitest'
 import {

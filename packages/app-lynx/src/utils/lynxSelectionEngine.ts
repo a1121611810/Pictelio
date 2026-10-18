@@ -3,7 +3,7 @@
 // 唯一职责：把 Lynn 引擎的 selector query 世界（内容区 **dp**）翻译成接口契约的 **vw** 世界
 // （1 = 1% 内容宽），并把「内容宽校准」「失败原因分类」「尽力清选」收在这一层。
 // 纯核（createTextSelection / selectionToolbarGeometry）永不接触 dp/density —— 实证踩过
-// 「用 px 宽换算 → 菜单落在屏幕上部」（docs/research/lynx-text-selection-device-probe.md 坑 5）。
+// 「用 px 宽换算 → 菜单落在屏幕上部」（spec 不变式 4 末句记录的探针实证）。
 import { measureRects, type SelectorQuery, type SelectorQueryFactory } from '../primitives/measureRects'
 import { measureTextRect } from '../primitives/measureTextRect'
 import type { MeasureOutcome, SelectionEnginePort } from '../primitives/createTextSelection'

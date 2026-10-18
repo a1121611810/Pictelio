@@ -1,6 +1,6 @@
 // NovelDetail 正文选中接线的源级守卫（spec docs/specs/app-lynx-novel-text-selection.md §Testing Decisions）。
 // oracle：① 设备实证坑 1——`custom-context-menu` 等三条属性**必须静态字面量**，动态布尔绑定会被
-// vue-lynx 吞掉（docs/research/lynx-text-selection-device-probe.md，FF2 vs GG 对照）；
+// vue-lynx 吞掉（spec Testing Decisions「模板源级守卫」条；ADR-0165 决策 1）；
 // ② 索引即身份（spec 不变式 1）→ 节点 id 必须来自会话的 paragraphId；
 // ③ 滚动收起走 BT 信号（MT 信号本构建不派发）→ list 必须 :scroll-event-throttle="0" + @scroll；
 // ④ 工具栏在 root 内、list 之后（DOM 顺序即层序，ADR-0123 不铺全屏层）。

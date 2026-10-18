@@ -2,7 +2,7 @@
 //
 // 输入单位一律 **vw**（1 = 1% 内容宽）：dp→vw 换算在适配器层（utils/lynxSelectionEngine.ts）完成，
 // 纯核永不接触 dp/px/density —— 实证踩过「用 px 宽换算 → 菜单落在屏幕上部」
-// （docs/research/lynx-text-selection-device-probe.md 坑 5）。
+// （spec 不变式 4 末句记录的探针实证）。
 //
 // 定位规则（spec）：水平居中于选区 → 左侧夹取防贴边；优先置于选区**上方**；
 // 上方空间不足（顶部越界）→ 翻转到**下方**；`style` 为 left/top vw + translate，

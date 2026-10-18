@@ -28,7 +28,11 @@ Pictelio 缺一个"这里有点意思，回头再看"的轻量暂存能力。现
 去重键 = `(WorkKind, id)`：同 id 插画与小说是两条（现实中同 id 跨类型不冲突，键仍带 kind 保证稳健）。重复添加 → 轻提示「已在稍后看」（不报错、不刷新位置）。新条目**前插**（最新在前），`addedAt` 记录加入时刻。
 
 **D3 容量上限 500——超出丢最旧 + 模块前缀 console.warn（禁静默降级）。**
-上限常量 500；插入后超限则从尾部（最旧）弹出直至满足，并 `console.warn('[watchLater] 容量已满，丢弃最旧条目 …')`。对齐测试硬约束 #3：降级必须可见，不做静默截断。500 的量级依据：以"日加 10 条、月清一次"的高频使用画像，500 条 ≈ 一个半月缓冲，远超正常使用，又把 JSON 体积压在几十 KB 级。
+上限常量 500；插入后超限则从尾部（最旧）弹出直至满足，并 `console.warn('[watchLaterStore] 容量已满，丢弃最旧条目 …')`。
+
+> **订正（2026-10-18）**：本行原文写作 `[watchLater]`，与实现不符——
+> `packages/app-lynx/src/stores/watchLaterStore.ts:97/:102/:105` 三处均用 `[watchLaterStore]`，
+> 仓内 `[watchLater]` 零命中。已按实现订正，实现与测试无需改动。对齐测试硬约束 #3：降级必须可见，不做静默截断。500 的量级依据：以"日加 10 条、月清一次"的高频使用画像，500 条 ≈ 一个半月缓冲，远超正常使用，又把 JSON 体积压在几十 KB 级。
 
 **D4 持久化——账号级键 `watch_later_${uid}`，复用 PrefsStorage seam，值为 JSON 字符串数组。**
 键名 `watch_later_${uid}`（ADR-0103 账号级模式：双端逐字同键的契约预留，值语义 = 快照条目 JSON 数组字符串）。读写经 `settingsStore` 的 PrefsStorage seam：原生 `PictelioPrefs` → SharedPreferences "CapacitorStorage"；web-core dev → idbKV（`prefs()` 按 `isNativeMode()` 分流，零新通道）。解析失败（损坏/非法 JSON）→ 模块前缀 `console.warn` + 空列表兜底（`parseMuteTagsRaw` 先例，禁静默降级）。

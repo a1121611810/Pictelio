@@ -1,7 +1,9 @@
 // 选中引擎适配器单测（spec docs/specs/app-lynx-novel-text-selection.md §ID 5 / 不变式 4）。
 // oracle：① 单位换算 = 设备实证「rect 单位 = 内容区 dp，与 boundingClientRect 同源」
-// （node w=329dp ↔ 987px；docs/research/lynx-text-selection-device-probe.md ④）；
-// ② vw = dp / 内容宽(dp) × 100（1 = 1% 内容宽；坑 5 复盘：用 px 宽换算菜单会落在屏幕上部）。
+// （spec docs/specs/app-lynx-novel-text-selection.md 不变式 4；
+//  ADR-0165 背景第 3 条：索引是 UTF-16 码元且可能落在代理对中间）；
+// ② vw = dp / 内容宽(dp) × 100（1 = 1% 内容宽；spec 不变式 4 末句
+// 「探针里正是用错基准导致菜单落在屏幕上部」）。
 import { describe, expect, it, vi } from 'vitest'
 import type { SelectorQuery, SelectorQueryFactory } from '../primitives/measureRects'
 import { createLynxSelectionEngine } from './lynxSelectionEngine'

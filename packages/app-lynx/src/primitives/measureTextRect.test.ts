@@ -1,6 +1,6 @@
 // measureTextRect IO 边界单测（AGENTS.md 测试硬约束 1：外部数据源必须成功 + 失败双路径）。
 // oracle：① 平台约束来自 measureRects/ADR-0149（逐 id select、exec 链式、超时 warn）；
-// ② 失败码 code:1 与「全量 range 必失败」来自设备实证（docs/research/lynx-text-selection-device-probe.md ③）。
+// ② 失败码 code:1 与「全量 range 必失败」来自设备实证（spec 不变式 3 末段；ADR-0165 背景第 3 条）。
 import { describe, expect, it, vi } from 'vitest'
 import type { SelectorQuery, SelectorQueryFactory } from './measureRects'
 import { measureTextRect } from './measureTextRect'

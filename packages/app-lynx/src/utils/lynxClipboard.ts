@@ -5,7 +5,7 @@
 //
 // 原生契约（PictelioClipboardModule.java）：cb("1", "") / cb("", errMsg)，**无 null**。
 // web-core 预览：无 NativeModules → 显式失败（warn + reject），**绝不假成功**（#568 教训）。
-// 探测模式对齐 utils/gallerySaver.ts（调用期探测，不吃模块加载顺序）。
+// 探测模式为调用期探测，不吃模块加载顺序。
 import { unquoteNativeString } from './tokenStorage'
 
 export interface ClipboardNative {
@@ -35,7 +35,7 @@ export function createLynxClipboard(native: ClipboardNative): (text: string) => 
     })
 }
 
-/** 探测原生模块（web-core 无 NativeModules；裸全局与 globalThis 双通道，同 gallerySaver） */
+/** 探测原生模块（web-core 无 NativeModules；裸全局与 globalThis 双通道） */
 function nativeModule(): ClipboardNative | null {
   const nm =
     (typeof NativeModules !== 'undefined' ? NativeModules : undefined) ??

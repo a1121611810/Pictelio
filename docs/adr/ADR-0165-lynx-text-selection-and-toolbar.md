@@ -2,7 +2,17 @@
 
 - 状态：accepted
 - 日期：2026-09-17
-- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、取证报告 `docs/research/lynx-text-selection-device-probe.md`（分支 `probe/text-selection-559`，含实现期复验证据与探针页）、`packages/app-lynx/CONTEXT.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
+- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、`packages/app-lynx/CONTEXT.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
+
+> **订正（2026-10-18）**：本行原引用取证报告
+> `docs/research/lynx-text-selection-device-probe.md`（分支 `probe/text-selection-559`），
+> 该文件在仓内**不存在**——这是本行**唯一**的悬空引用。
+> 关联行里的 6 处代码溯源文件（`lynxSelectionEngine.{ts,test.ts}`、
+> `selectionToolbarGeometry.ts`、`createTextSelection.test.ts`、`measureTextRect.test.ts`、
+> `novelDetailSelection.template.test.ts`）**均存在且有效**（2026-10-18 复核），本次未动。
+> 证据本身**未丢失**——本 ADR「背景」节第 1-5 条与 spec 不变式 1-4 已逐条记录全部设备实证结论。
+> 故按「引用指错、证据在别处」处置：改指本 ADR 与 spec，不重建取证报告。
+> 若日后要恢复该报告（真机复验用），按 ADR 评审流程新开条目。
 
 ## 背景
 
