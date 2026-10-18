@@ -2,6 +2,8 @@
 
 Status: accepted
 
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：本文的对象是**已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 删除的 WebView 客户端**——Fluent 令牌、`components/*.tsx` 路径、WebView `backdrop-filter` 兼容前提均属该客户端；该设计**从未在 Lynx 客户端实施**（全仓无 `GlassTabBar` / `glass-tab-*` 生产引用）。**本文不再构成现行约束**，正文按 ADR 惯例原样保留，作为决策史。存档说明见 `docs/specs/glass-tab-visual-language.md` 横幅；lynx 现行玻璃形态见 `docs/specs/app-lynx-frosted-glass.md`。
+
 应用内五处 tab 控件（底部导航胶囊、顶栏内容类型切换、Feed 子标签栏、用户作品分段切换）原本各自为政、视觉不统一。经 Liquid Glass 三档原型验证（thread `019fc60e`，详见 `docs/specs/glass-tab-visual-language.md`），决定全局 Tab 采用 **A+ 档**：磨砂玻璃容器（`backdrop-filter` + `--colorNeutralBackgroundAlpha` tint + 顶部内高光）+ 激活项浮起玻璃胶囊；指针跟随高光仅限底部导航胶囊（300ms gentle，`prefers-reduced-motion` 时关闭）；**不做** SVG 折射/色差与 WebGL 弹性形变；Feed 卡片、详情页、阅读器不上玻璃。
 
 理由：`backdrop-filter` 仅用于小面积静态面，避免滚动 Feed 上 SVG filter 每帧重绘与 WebGL 的成本；Android WebView（≥85）是主目标平台，A+ 档全平台行为一致，无 iOS 折射兼容损失。

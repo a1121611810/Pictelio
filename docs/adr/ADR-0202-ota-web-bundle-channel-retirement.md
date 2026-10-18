@@ -4,6 +4,11 @@
 
 accepted（2026-09-29）
 
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：**决策 1（发布侧下线）仍生效；决策 2（保留消费侧，一行不删）已失效。**
+> - 发布侧：`packages/android-host/scripts/release.mjs` 仍显式拒绝 `--web-only` / `--min-web`（`RETIRED_FLAGS`），三件套打包/签名脚本已不存在。
+> - 消费侧：`packages/app` 整包已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 决策 2 删除（T10，#842，commit `c08a0e64`），`packages/app/src/**` 的 OTA 消费层随之不存在；`@pictelio/update-check` 的 web bundle API（`isBelowMin` / `WebBundleMeta` / `parseWebBundle` / `CheckResult.minWebVersion` / `CheckResult.webBundle`）已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 决策 4 移除，该包现只服务 APK 更新检查。
+> - 标题中「消费层留存」是当时的形态，正文按 ADR 惯例原样保留，作为决策史。存档说明见 `docs/specs/ota-web-bundle.md` 横幅。
+
 ## 背景
 
 WebView 客户端已随 [#610](https://github.com/a1121611810/Pictelio/issues/610) 于 v6.3.0 整体下线，

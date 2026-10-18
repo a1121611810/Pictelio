@@ -4,6 +4,8 @@
 - 日期：2026-09-10
 - 关联：ADR-0069（`--pageCard*` 挂账来源）、ADR-0029（themeStore 主题归属）、ADR-0097（机器防线治理）、`docs/specs/remove-page-style-setting.md`
 
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：本文的对象（WebView `/settings` 的「页面风格」维度：`fluent`/`card`、键 `page_style_theme`、`--pageCard*` 令牌族）已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 整包删除，移除动作在 WebView 客户端内已完成；app-lynx 从无「页面风格」概念，当前 `packages/` 生产代码零 `page_style_theme` / `pageStyle` / `page-card` / `--pageCard*` 引用。**本文不再构成现行约束**，正文按 ADR 惯例原样保留，作为决策史。存档说明见 `docs/specs/remove-page-style-setting.md` 横幅。
+
 ## 背景
 
 `/settings` 的「主题与风格」区块长期提供两个**相互独立**的维度：

@@ -4,6 +4,8 @@
 - **日期**：2026-09-19
 - **关联**：wayfinder map #617（app-lynx 端小说翻译）/ spec #618 §4.5 §9.5 §9.6 §9.8 §9.9 §9.10 / ADR-0050（lynx 持久化 + IndexedDB）/ ADR-0051（lynx 双通道）/ ADR-0103（跨引擎设置键）/ ADR-0167（lynx novel intro 三段式——ADR 模板）/ ADR-0169（待办：Responses API 请求构造）/ ADR-0170（待办：chunked pipeline 与重试）
 
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：**本文决策本体仍生效**——缓存键 6 元组、`translations` store、LRU 200、FNV-1a 与「`done` 之前永不写」等仍按现行实现维护（`packages/app-lynx/src/utils/translationCache.ts` / `idbKV.ts`）。本文唯一失效面是**对比对象**：文中「不复用 webview 端 `translationCache.ts`」及「与 webview 端同基线 / 对齐」的参照，其对象 `packages/app/src/translationCache.ts` 已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 整包删除——该对比仅存历史依据，不构成现行约束。正文按 ADR 惯例原样保留。
+
 ---
 
 ## 背景

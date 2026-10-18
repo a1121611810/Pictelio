@@ -5,6 +5,11 @@
 **决策者**：团队成员
 **背景**：R18/R18G 开关在 webview 与 lynx 两 client 各存各的互不同步、且非账号维度；用户要求两 client 开关同步 + 从账号维度持久化，并顺带移除年龄确认功能。
 
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：本文**部分失效、部分仍生效**，不可整份判死：
+> - **已失效**：本文的「跨 client（webview ↔ lynx）同步」目标，以及决策 2（webview 侧 `settingsStore` 的 `defineFactory` seam）——WebView 客户端已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 删除，不存在第二个 client；决策 1 的前提「引擎切换是 Activity 级重启」亦随单引擎化消失。决策 6 的 webview 侧单测与「切引擎后开关一致」契约 E2E 随之不存。
+> - **仍生效**：决策 1 的账号级键 `show_r18_${uid}` / `show_r18g_${uid}`、介质 SharedPreferences `"CapacitorStorage"` 与「播种新键 → 删老键」迁移语义（`packages/app-lynx/src/stores/settingsStore.ts` 现行实现，含账号级单测）；决策 3 的 `PrefsStorage` seam + 双 adapter；决策 4 的 `PictelioPrefsModule`（JVM 单测在库；键格式/介质/迁移契约另由 `settings-sync-contract` Android E2E 以真实 SharedPreferences 断言）；决策 5「移除年龄门」的结论（现行代码无本地年龄门）。
+> - 正文按 ADR 惯例原样保留，作为决策史。
+
 ---
 
 ## 背景
