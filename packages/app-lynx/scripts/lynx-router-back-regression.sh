@@ -39,10 +39,11 @@
 #   3. 屏幕分辨率：`adb shell wm size` 探测；所有坐标按「宽度比例」缩放（lynx 布局 vw 单位
 #      ——与宽度成正比；纵向同样按宽度换算，flow-check 同款注释）。
 #   4. ANR/卡死先例：模拟器无响应时 `adb reboot` 后等待 boot 完成再跑（脚本不自动处理）。
-#   5. benchNav（ADR-0136）：单引擎后 launcher 恒为 LynxActivity，直达命令仍以已删除的
-#      .MainActivity 为目标——当前必失败（S1/S4 回落 UI 点击；S6 在 BENCH_NAV bundle
-#      下判 FAIL）。另默认构建的 bundle 无 __BENCH_NAV__（无 pictelioBenchNav 字符串）；
-#      脚本已内置自动探测（APK bundle strings 扫描），有则优先 benchNav，无则 UI 点击兜底。
+#   5. benchNav（ADR-0136）：直达目标 = 单引擎 launcher `.LynxActivity`（build.gradle 的
+#      manifestPlaceholders 写死；原 .MainActivity 入口分发已随 #610/ADR-0203 删除）。
+#      benchNav 能否生效取决于 bundle 是否注入 __BENCH_NAV__（默认构建无 pictelioBenchNav
+#      字符串）——脚本已内置自动探测（APK bundle strings 扫描），有则优先 benchNav，
+#      无则 S1/S4 回落 UI 点击；S6 另因产品无 update/error 目标默认 SKIP。
 #   6. logcat 无产品侧系统返回标记日志（handleSystemBack 无 console 输出）：
 #      判定以截图+焦点为主，logcat 仅作「桥已触发」的辅助证据（见上）。
 #   7. S5 登出：Me.vue 当前迁移 WIP 树存在 `resetHistory is not defined`（未 import）→
@@ -279,10 +280,11 @@ relaunch() {
   local p ch i
   adb shell am force-stop "$APP_ID" || true
   sleep 1.5
-  # 单引擎：launcher 恒为 LynxActivity（manifest 占位符写死；MainActivity 入口分发已随 #610/ADR-0203 删除）。
-  # 下方 MainActivity 尝试是历史兜底——当前必失败，回落 LynxActivity。
-  adb shell am start -n "$APP_ID/.MainActivity" >/dev/null 2>&1 \
-    || adb shell am start -n "$APP_ID/.LynxActivity" >/dev/null 2>&1
+  # 单引擎：launcher 恒为 .LynxActivity（build.gradle 的 manifestPlaceholders 写死；
+  # 原 .MainActivity 入口分发已随 #610/ADR-0203 删除）。
+  # ⚠️ 不能写成「.MainActivity || .LynxActivity」兜底：am start 对不存在的 Activity 虽报
+  # Error type 3，但返回 exit 0 ⇒ 第二条永远不执行（2026-10-18 review 在模拟器实测）。
+  adb shell am start -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
   say "   …等待首屏（bundle 加载 + 登录态恢复）"
   p="blank"
   for i in $(seq 1 15); do
@@ -358,11 +360,11 @@ wait_content() {
 # 进入详情 = 推荐页全宽首卡点击（实测 720x1280 下 (350,380) 命中；R18 遮罩吞点击 → 重试多位置）
 enter_detail() {
   local shot_path i chev ch
-  # ① benchNav（ADR-0136）：仅当 bundle 含钩子标记才尝试（单引擎后直达命令指向已删除的
-  #    .MainActivity → 必落到 ②）
+  # ① benchNav（ADR-0136）：仅当 bundle 含钩子标记才尝试；直达目标 = launcher
+  #    .LynxActivity（原 .MainActivity 已随 #610/ADR-0203 删除）。失败则落到 ②
   if bundle_has_benchnav; then
     say "   …尝试 benchNav illust（bundle 含钩子标记）"
-    adb shell am start --es benchNav illust -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
+    adb shell am start --es benchNav illust -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
     sleep 8
     shot_path=$(shot bench_after)
     chev=$(chevron_dark "$shot_path")
@@ -564,8 +566,8 @@ run_s5() {
 
 # ─── 场景 6：/update、/error（meta.backBehavior:'exit'）返回键直接退出 ───
 # 前置：产品侧必须有外部触发通道（benchNav 新增 update/error 目标，ADR-0136 同款）。
-# 当前产品代码无此通道（benchNav 直达命令指向已删除的 MainActivity + 默认 bundle 无
-# __BENCH_NAV__ + 版本检查 URL 固定为 GitHub 无法设备侧伪造）→ 本场景默认 SKIP（记录原因，不计失败）。
+# 当前产品代码无此通道（benchNav 无 update/error 目标 + 默认 bundle 无 __BENCH_NAV__ +
+# 版本检查 URL 固定为 GitHub 无法设备侧伪造）→ 本场景默认 SKIP（记录原因，不计失败）。
 run_s6() {
   say "═══ S6 /update、/error meta-exit（返回键直接退出） ═══"
   if ! bundle_has_benchnav; then
@@ -583,7 +585,7 @@ run_s6() {
     say "   …benchNav $label"
     adb shell am force-stop "$APP_ID" || true
     sleep 1.5
-    adb shell am start --es benchNav "$tgt" -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
+    adb shell am start --es benchNav "$tgt" -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
     sleep 8
     local shot_path chev p focus
     shot_path=$(shot "s6_${tgt}_page")

@@ -1,8 +1,8 @@
-// ─── 根门禁脚本「不得启用 vp run 缓存」防线（handoff §5.1 头号建议；AGENTS.md「门禁边界」机器化）───
+// ─── 根门禁脚本「不得启用 vp run 缓存」防线（AGENTS.md「门禁边界」机器化）───
 //
 // ## 为什么有这条门禁（判据来源 / oracle 溯源）
 //
-// 事故实证（2026-10-18 交接文档 §2.1；同一口径已固化进 AGENTS.md「门禁边界」）：
+// 事故实证（同一口径已固化进 AGENTS.md「门禁边界」）：
 // 根 `check:all` 曾带 `--cache`。`vp run --cache` 会把 `run.cache = { scripts: false }` 的默认
 // **覆盖成 script 也缓存**（语义依据 = `node_modules/vite-plus/docs/config/run.md` §`run.cache`：
 // 默认 `{ scripts: false, tasks: true }`，`cache: true` 同时打开 task 与 script 缓存；CLI 侧
@@ -47,9 +47,11 @@
 //    `run: { cache: { scripts: true } }` 或 `run.cache: true`（run.md §`run.cache`），script 缓存
 //    被**配置**打开 —— 此时脚本里没有 `--cache` 也照样缓存，本门禁仍绿。它守的是
 //    「命令行没开缓存」，**不守**「缓存没被开」。
-// 3. 其它根脚本（`lint:all` / `fmt` / `build:all` / `dev:all` / 各包裸命令…）被加缓存开关抓不到
-//    —— 只守 AGENTS.md「门禁边界」点名、且 CI 直接执行的两个脚本（ci.yml 的
-//    "Type check (all packages)" 与 "Run unit tests" 两步）。
+// 3. 其它 vp run 脚本（`build:all` / `dev:all` / 各包裸命令…）被加缓存开关抓不到 —— 只守
+//    AGENTS.md「门禁边界」点名、且 CI 直接执行的两个 vp run 脚本（ci.yml 的
+//    "Type check (all packages)" 与 "Run unit tests" 两步）。`lint:all` 不在判据面是因为
+//    `vp lint` 本身没有 `--cache` 开关（`--cache` 属 `vp run`，无同类缓存假绿面），
+//    不是因为「不守 lint 门禁」。
 // 4. **子脚本 / 包脚本级 cache 抓不到**：根 check:all 委派各包 `check`；若某包脚本内部再嵌套
 //    `vp run --cache`，或把 check 改成 `vite.config.ts` 的 task 并配 `cache: true`
 //    （task 默认就缓存，run.md §`cache`），本门禁看不见。**最贴近的同类盲区**是根 scripts 的
@@ -207,7 +209,7 @@ function evaluateGateScripts(scripts: Record<string, string> | undefined): GateV
       problems.push(
         `[缓存使能] scripts.${name} 含 ${rendered}：vp run --cache 会把 run.cache.scripts=false 的` +
           `默认覆盖成脚本也缓存（run.md §run.cache），缓存命中 = 没跑、只重放日志 ⇒ 假绿` +
-          `（handoff §2.1 实证 8/8 cache hit 仍 exit 0）。删掉它，runner 应打印 ⊘ cache disabled。`,
+          `（AGENTS.md「门禁边界」实证 8/8 cache hit 仍 exit 0）。删掉它，runner 应打印 ⊘ cache disabled。`,
       );
     }
     if (filterValues.length < MIN_FILTER_HITS) {
@@ -267,7 +269,7 @@ function expectCacheHit(
   }
 }
 
-describe("真实仓库：check:all / test:all 不得启用 vp run 缓存（handoff §2.1 / AGENTS.md 门禁边界）", () => {
+describe("真实仓库：check:all / test:all 不得启用 vp run 缓存（AGENTS.md 门禁边界）", () => {
   it("核心判据：两脚本的缓存使能 token = 0", () => {
     for (const name of GATE_SCRIPT_NAMES) {
       expect(
