@@ -312,6 +312,18 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 // ─── 单块 provider 执行：消费 AsyncIterator 收集段落译文 ───
 
 /**
+ * 流式回调：`(chunk, chunkStart)`。
+ *
+ * <p>`chunkStart` 是该块在**原段落数组**里的起始下标（`range.start`）—— 块内
+ * `paragraphIndex` 从 0 重新计数，caller store 必须靠它还原绝对段落序号。
+ *
+ * <p>为什么由本层提供而不是 caller 反查：块切片的唯一身份是区间，不是文本。
+ * 章节里出现重复段落（散文常见）时，任何「用块首段文本反查偏移」的猜测都会错位；
+ * 曾经的 `CHUNK_OFFSET` 实现正因此把 partial 译文整体前移（#1033）。
+ */
+export type ChunkStreamListener = (chunk: TranslationChunk, chunkStart: number) => void
+
+/**
  * 把 provider.translate() 返回的 AsyncIterator<TranslationChunk> 消费为段落译文。
  *
  * 行为：
@@ -323,8 +335,9 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * - 用户中断（signal.aborted）→ 抛 AbortError，caller 静默退出。
  *
  * 回调：`onChunk`（可选）— 每收到 provider chunk 时转发给 caller（含 delta / cached
- * / done / error / reasoning_delta），caller store 据此更新 translatedParagraphs
- * （spec §7.2 状态机转移）。AbortSignal 触发后不再 emit 任何 chunk。
+ * / done / error / reasoning_delta），并附上本块的 `range.start`；caller store 据此
+ * 把块内序号还原成绝对段落序号、更新 translatedParagraphs（spec §7.2 状态机转移）。
+ * AbortSignal 触发后不再 emit 任何 chunk。
  *
  * @returns 与 range 等长的段落译文 + 缺口/溢出计数。计数不是内部诊断：caller 用它决定
  * 本块能否算「全译完」——`fallbackCount > 0` 的块不得让章节收敛到 completed
@@ -337,7 +350,7 @@ export async function fetchChunkViaProvider(
   request: TranslationRequest,
   config: LlmEndpointConfig,
   signal: AbortSignal,
-  onChunk?: (chunk: TranslationChunk) => void,
+  onChunk?: ChunkStreamListener,
 ): Promise<AlignResult> {
   const iter = provider.translate(request, config, signal)
   const deltas: Array<{ paragraphIndex: number; text: string }> = []
@@ -349,7 +362,7 @@ export async function fetchChunkViaProvider(
       const { value, done } = await iter.next()
       if (done) break
       const chunk = value as TranslationChunk
-      onChunk?.(chunk)
+      onChunk?.(chunk, range.start)
       switch (chunk.type) {
         case 'delta':
           deltas.push({ paragraphIndex: chunk.paragraphIndex, text: chunk.text })
@@ -444,7 +457,7 @@ export interface NovelTranslatorHandle {
     request: TranslationRequest,
     config: LlmEndpointConfig,
     signal: AbortSignal,
-    onChunk?: (chunk: TranslationChunk) => void,
+    onChunk?: ChunkStreamListener,
   ): Promise<{ status: TranslationStatus; paragraphs: string[] }>
 }
 
@@ -468,7 +481,8 @@ export interface NovelTranslatorHandle {
  *   { novelId: 1, chapterId: '1', paragraphs: ['...'], options: { xRestrict: 0 } },
  *   { baseURL: '...', apiKey: '...', model: '...' },
  *   new AbortController().signal,
- *   (chunk) => console.log(chunk),
+ *   (chunk, chunkStart) => console.log(chunk, chunkStart),
+ *   // 写回原段落数组要用 chunkStart + chunk.paragraphIndex —— 块内序号从 0 重新计数
  * )
  * ```
  */
@@ -485,7 +499,7 @@ export function createNovelTranslator(
       request: TranslationRequest,
       config: LlmEndpointConfig,
       signal: AbortSignal,
-      onChunk?: (chunk: TranslationChunk) => void,
+      onChunk?: ChunkStreamListener,
     ): Promise<{ status: TranslationStatus; paragraphs: string[] }> {
       if (request.paragraphs.length === 0) {
         return { status: 'completed', paragraphs: [] }

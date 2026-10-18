@@ -373,6 +373,34 @@ describe('fetchChunkViaProvider delta 收集与重装配（#948）', () => {
     expect(seen.filter((c) => c.type === 'delta')).toHaveLength(2)
   })
 
+  it('onChunk 第二个入参 = 该块的 range.start（store 据此还原绝对段落序号，#1033）', async () => {
+    // 块内序号从 0 起，provider 不可能知道自己在原数组里的位置 —— 偏移的唯一权威
+    // 来源是调用方持有的 range。此前 onChunk 只带 chunk，store 只能靠「块首段文本
+    // 反查」这种猜测寻址（重复文本即错位，#1033）。
+    const seen: Array<{ text: string; start: number }> = []
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '译一' },
+        { paragraphIndex: 1, text: '译二' },
+      ],
+    })
+    await fetchChunkViaProvider(
+      { start: 5, end: 7 },
+      ['原文5', '原文6'],
+      provider,
+      { ...SAMPLE_REQUEST, paragraphs: ['原文5', '原文6'] },
+      SAMPLE_CONFIG,
+      controller.signal,
+      (c, start) => {
+        if (c.type === 'delta') seen.push({ text: c.text, start })
+      },
+    )
+    expect(seen).toEqual([
+      { text: '译一', start: 5 },
+      { text: '译二', start: 5 },
+    ])
+  })
+
   it('cached chunk → 走既有对齐路径（防御性补齐数量）', async () => {
     const provider = mockProvider({ cached: ['缓存1', '缓存2'] })
     const result = await fetchChunkViaProvider(
@@ -578,6 +606,31 @@ describe('createNovelTranslator 主入口（8 状态判定）', () => {
     // 收到至少 1 个 delta + 1 个 done chunk
     expect(chunks.length).toBeGreaterThanOrEqual(2)
     expect(chunks.some((c) => c.type === 'done')).toBe(true)
+  })
+
+  it('多段落块时 onChunk 的 chunkStart = 各块 range.start，而非块序号（#1033）', async () => {
+    // maxChunkChars=8 ⇒ 5 段 3 字被切成 {0,2}{2,4}{4,5} ⇒ range.start = 0,2,4，
+    // 而块序号是 0,1,2。刻意避开「每块 1 段」的布局 —— 那时 start 与序号恒等，
+    // 换成块序号也能全绿，判别力为零。
+    // 并发 3，完成顺序不确定 ⇒ 断言取 set 而非序列。
+    const starts = new Set<number>()
+    const provider = mockProvider({
+      indexedDeltas: [
+        { paragraphIndex: 0, text: '译' },
+        { paragraphIndex: 1, text: '译' },
+      ],
+    })
+    const translator = createNovelTranslator({ provider, maxChunkChars: 8 })
+    const result = await translator.translate(
+      SAMPLE_REQUEST,
+      SAMPLE_CONFIG,
+      controller.signal,
+      (c, start) => {
+        if (c.type === 'delta') starts.add(start)
+      },
+    )
+    expect(result.status).toBe('completed')
+    expect(starts).toEqual(new Set([0, 2, 4]))
   })
 
   // ─── #948：native 形态（带段落序号的 delta）走到主入口 ───

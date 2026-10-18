@@ -370,10 +370,11 @@ export function mapEventToChunk(event: ResponsesEventBase): TranslationChunk | n
   // 主消费：output_text.delta
   if (type === 'response.output_text.delta') {
     const text = event.delta ?? ''
-    // paragraphIndex 从 `[N]` 锚定前缀解析：delta 形态上不一定含 `[N]`（增量可能跨段），
-    // 但模型按 spec 提示按行对齐；典型实现 = provider 内部在切块完成后注入锚定。
-    // 本 primitive 层不解析锚定（chunked pipeline 在 `createNovelTranslator` 注入）；
-    // 此处给 paragraphIndex = 0（占位），上层 consumer 须用 chunk.metadata 替换。
+    // 本 primitive 层不解析 `[N]` 锚定（native 桥在 Java 侧 `buildInput` 按切片逐段
+    // 加 `[i]` 前缀，由 `TranslationSseParser` 还原成带序号的 delta_all）。
+    // web-core 预览的流式事件形态上不一定含 `[N]`（增量可能跨段），此处给
+    // paragraphIndex = 0（占位）；下游 `reassembleDeltas` 以「是否出现非零序号」
+    // 判定序号可信，不可信时退回按空行拆段（见 createNovelTranslator.ts）。
     return { type: 'delta', paragraphIndex: 0, text }
   }
 

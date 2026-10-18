@@ -1635,3 +1635,120 @@ describe('endpoint 配置（spec §6.1）', () => {
     warn.mockRestore()
   })
 })
+
+// ─────────────────── #1033：块偏移寻址（partial 增量译文不得错位） ───────────────────
+//
+// 缺陷背景：store 曾用非枚举符号 `CHUNK_OFFSET` 把块起始偏移挂在**块级子请求**上，
+// 却从**顶层 request** 读回 ⇒ 恒 `undefined` ⇒ `?? 0`。而 partial 终态的渲染源
+// 是 onChunk 逐帧累积出来的 `translatedParagraphs`（不是 pipeline 用 `range.start`
+// 组装的权威 `result.paragraphs`），于是**失败块之后的所有译文整体前移**：
+// 段 0 的位置堆着几块的译文、真正译出的尾段反而渲染成〔未翻译〕。
+// `completed` 走权威结果，不受影响 —— 所以这条防线只钉 partial 路径。
+
+describe('#1033：块偏移寻址（partial 增量译文不得错位）', () => {
+  /**
+   * 按**块切片的形状**派发 provider 桩，不用调用序号。
+   *
+   * <p>键 = `首段首字符 + 切片长度`。并发度 3 下块的完成顺序不确定，按序号派发
+   * 会把响应静默派给错误的块（与 T2/#762 同纪律：序号是误诊放大器）。
+   * 之所以不用纯文本：#1033 的第二个形态就是要**证明**文本不可用于寻址，
+   * 派发键若也依赖文本，两者会互相掩盖。
+   */
+  const dispatchByShape = (
+    handlers: Record<string, () => AsyncIterator<TranslationChunk>>,
+  ): void => {
+    mocks.providerIter.mockImplementation((_sig?: AbortSignal, sub?: { paragraphs: string[] }) => {
+      const slice = sub?.paragraphs ?? []
+      const key = `${(slice[0] ?? '').slice(0, 1)}#${slice.length}`
+      const handler = handlers[key]
+      if (!handler) throw new Error(`未预期的块形状：${key}`)
+      return handler()
+    })
+  }
+
+  it('多块章节里，失败块之后的译文落在正确绝对下标', async () => {
+    // 3 段各 ~2100 字 ⇒ chunkParagraphs 切成 3 块（每块 1 段），块内序号都从 0 起。
+    // 中间块失败（retryable=false ⇒ 不触发整批回退）⇒ 收敛 partial。
+    dispatchByShape({
+      'A#1': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译一' },
+          { type: 'done' },
+        ]),
+      'B#1': () =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }]),
+      'C#1': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译三' },
+          { type: 'done' },
+        ]),
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(200, 200, [longPara('A'), longPara('B'), longPara('C')], 0)
+
+    expect(store.status).toBe('partial')
+    // 缺陷态：第 3 块的 delta 落在绝对 0 ⇒ 实际是 ['译一译三', 占位, 占位]
+    expect(store.displayParagraphs[0]).toBe('译一')
+    expect(store.displayParagraphs[1]).toBe('〔未翻译〕')
+    expect(store.displayParagraphs[2]).toBe('译三')
+  })
+
+  it('重复段落文本的章节：偏移必须来自块区间，不得按块首段文本反查', async () => {
+    // 布局 ['甲', long('P'), '甲', '丙'] ⇒ 3 块：['甲'] / ['P…'] / ['甲','丙']。
+    // 第 3 块的首段文本与第 1 块**完全相同**（散文里重复短句是常见形态）。
+    // 任何「用块首段文本 indexOf 反查偏移」的修法都会把第 3 块的偏移算成 0 ⇒
+    // 本用例正是把那种「看起来已经修好」的最小改法挡在门外的防线。
+    dispatchByShape({
+      '甲#1': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译一' },
+          { type: 'done' },
+        ]),
+      'P#1': () =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }]),
+      '甲#2': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译三' },
+          { type: 'delta', paragraphIndex: 1, text: '译四' },
+          { type: 'done' },
+        ]),
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(201, 201, ['甲', longPara('P'), '甲', '丙'], 0)
+
+    expect(store.status).toBe('partial')
+    // 缺陷态（含「把 indexOf 读取端挪到 sub」那种最小改法）：
+    // 第 3 块的两条 delta 落到绝对 0/1 ⇒ 实际是 ['译一译三', '译四', 占位, 占位]
+    expect(store.displayParagraphs).toEqual(['译一', '〔未翻译〕', '译三', '译四'])
+  })
+
+  it('多段落块：偏移取 range.start 而非块序号', async () => {
+    // 前两条 fixture 的块区间恰好让 range.start 与块序号**巧合相等**（都是 0,1,2），
+    // 因此换成块序号也能全绿。真机章节的常见形态是**多段落块**（12 段 × 400 字 ⇒
+    // {0,4}{4,8}{8,12}，start = 0,4,8 ≠ 序号 0,1,2），那里两个值才分家。
+    //
+    // 布局 ['甲','乙',long('P'),'丙'] ⇒ 块 {0,2} ['甲','乙'] / {2,3} ['P…'] / {3,4} ['丙']
+    // ⇒ range.start = 0,2,3，而块序号是 0,1,2。
+    dispatchByShape({
+      '甲#2': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译一' },
+          { type: 'delta', paragraphIndex: 1, text: '译二' },
+          { type: 'done' },
+        ]),
+      'P#1': () =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }]),
+      '丙#1': () =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '译三' },
+          { type: 'done' },
+        ]),
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(202, 202, ['甲', '乙', longPara('P'), '丙'], 0)
+
+    expect(store.status).toBe('partial')
+    // 若偏移误用块序号：第 3 块会写到绝对 2 ⇒ 实际是 ['译一','译二','译三','〔未翻译〕']
+    expect(store.displayParagraphs).toEqual(['译一', '译二', '〔未翻译〕', '译三'])
+  })
+})

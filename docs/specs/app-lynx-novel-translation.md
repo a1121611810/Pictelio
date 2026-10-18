@@ -333,7 +333,7 @@ sequenceDiagram
     Native-->>Prov: 解析 → TranslationChunk
     Prov->>Store: for-await chunk
     alt delta chunk
-        Store->>Store: translatedParagraphs[i] += text
+        Store->>Store: translatedParagraphs[chunkStart + paragraphIndex] += text
         Store->>Store: status = 'translating'
         Store-->>ND: 段落增量渲染（响应式）
     else done chunk
@@ -522,12 +522,25 @@ sequenceDiagram
 | `pending` | provider `connect OK` | `translating` | — |
 | `pending` | provider `connect FAIL` | `failed` | emit `lastError` |
 | `pending` | user `abort()` | `aborted` | abortController.abort() |
-| `translating` | chunk `delta` | `translating` | translatedParagraphs[i] += text |
+| `translating` | chunk `delta` | `translating` | translatedParagraphs[i] += text，**i = 块 `range.start` + chunk 内 `paragraphIndex`**（见下方「delta 落库下标」） |
 | `translating` | chunk `done` 但 zero-delta（零译文段；content policy 拦截 / 模型拒答等） | `failed` | errorCode=content_filter; emit `lastError` |
 | `translating` | chunk `done` | `completed` | cache.write(); `isCached[chapterId]=true`（原 `fromCache=false` 已作废，见 §7.2 末「幽灵验收项作废」） |
 | `translating` | chunk `error (retryable)` | `translating`（整批回退中；UI 保持 `translating` + 微提示「重试中…」） | retried via `stream=false, max_output_tokens × 2`；**0ms 退避**（即时触发）；成功后 → `completed` |
 | `translating` | chunk `error (non-retryable)` | `failed` | emit `lastError` |
 
+> **delta 落库下标**（#1033）：chunked pipeline 每块从原段落数组切一片下发，**块的身份是
+> 区间而不是文本**。增量写入的下标为 `range.start + chunk.paragraphIndex`，偏移由 pipeline
+> 在 `onChunk(chunk, chunkStart)` 的第二入参给出。不得按块首段文本反查偏移 —— 章节里出现
+> 重复段落时（散文常见）即错位，表现为 `partial` 终态下失败块之后的译文整体前移。
+>
+> 两条限定，公式在这两条路径上不成立：
+> - **块内序号可信的前提是 provider 逐段编号**。native 桥按 `[N]` 锚定逐段下发，可信；
+>   web-core 预览的流式路径恒给占位 `paragraphIndex = 0`（见 `src/api/translate.ts`
+>   的 `mapEventToChunk`），此时多段落块的增量只对齐到块首段。该路径**真机不走**，
+>   且最终结果以 pipeline 的 `result.paragraphs` 为准，不影响 `completed` 终态。
+> - **整批回退路径根本不经过 `onChunk`**：它整章单请求直连 provider，`paragraphIndex`
+>   本身即绝对下标，**不得**再叠 `chunkStart`。
+>
 > **Retry 触发子集**（ADR-0178 D2）：仅 `retryable=true` 的错误码触发整批回退：
 > - `network` (TCP RST / 连接超时 / DNS) ✓
 > - `server` (HTTP 5xx) ✓
