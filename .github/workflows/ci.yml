@@ -112,3 +112,12 @@ jobs:
       - name: Gradle unit tests (testDebugUnitTest)
         working-directory: packages/android-host/android
         run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-daemon --no-build-cache
+
+      # #1034：断言 **release 变体生成产物** 的 BuildConfig.DEBUG 为 false。
+      # 既有单测只读 LynxActivity.java 源码（文本层），证不了变体取值——后者只存在于
+      # 编译期生成的 BuildConfig.java 里，源码树看不到。本任务不依赖签名凭据
+      # （实测 keystore 环境变量未设置时可跑），故能进 CI。
+      # 与 Robolectric 同 job 而非并入 test:all，同本仓既有实践：Android 侧门禁独立成步。
+      - name: Verify release BuildConfig.DEBUG is false (#1034)
+        working-directory: packages/android-host/android
+        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew verifyReleaseBuildConfig --no-daemon --no-build-cache

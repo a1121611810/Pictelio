@@ -13,7 +13,8 @@
     "sync:android-version": "node scripts/sync-android-version.mjs",
     "sync:credentials": "node scripts/sync-credentials.mjs",
     "test": "vitest run",
-    "test:android:unit": "npm run sync:credentials && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-build-cache"
+    "test:android:unit": "npm run sync:credentials && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testDebugUnitTest --no-build-cache",
+    "verify:release-buildconfig": "npm run sync:credentials && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew verifyReleaseBuildConfig --no-build-cache"
   },
   "dependencies": {
     "json5": "^2.2.3",

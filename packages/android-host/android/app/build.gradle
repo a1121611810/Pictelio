@@ -155,6 +155,74 @@ gradle.taskGraph.whenReady { graph ->
     }
 }
 
+// ── release BuildConfig.DEBUG 机器防线（#1034）──────────────────────
+//
+// 既有单测（settingsDevOverride.test.ts）只读 LynxActivity.java 的**源码**，
+// 断言 applyDevIntentHooks 首句含 `if (!BuildConfig.DEBUG) return;`。那是文本层契约，
+// 证不了 release 变体里 BuildConfig.DEBUG 真的为 false——而「release 的 DEBUG 为
+// false」这件事只存在于**变体编译时生成的源文件**里，源码树里看不到。两者是不同的
+// 断言对象，缺一不可。
+//
+// 本任务读生成产物并断言取值。不依赖 keystore（实测在 PICTELIO_KEYSTORE_PASSWORD /
+// PICTELIO_KEY_PASSWORD 均未设置时可跑），因此可以进 CI，不阻塞于签名凭据。
+//
+// ⚠️ **已知失效面（登记，非缺陷）**：本任务断言的是 release 变体的**生成源**。它证不到：
+// ① R8 优化后该分支在最终 dex 中是否仍按预期存在；
+// ② release 包的真实运行时行为（需签名包 + 真机，属人工步骤）；
+// ③ **守卫本身是否被绕过**。早退写在 applyDevIntentHooks 方法体内，若有人从第二个入口调用它、
+//    或另开一条不经该方法的写入路径，`BuildConfig.DEBUG` 仍是 false、本任务照样绿，
+//    而 release 已经开始接受 dev extra。故「DEBUG 取值正确」**不等于**「早退不会被绕开」。
+// 不得只记它抓到了什么。
+
+// 配置期捕获：Gradle 配置缓存不允许在执行期访问 Task.project
+def releaseBuildConfigDir = new File(project.layout.buildDirectory.get().asFile, 'generated/source/buildConfig/release')
+
+tasks.register('verifyReleaseBuildConfig') {
+    group = 'verification'
+    description = '断言 release 变体生成的 BuildConfig.DEBUG 为 false（#1034）'
+    dependsOn 'generateReleaseBuildConfig'
+    // 刻意不声明 outputs：本任务无产物可缓存，因此天然不 UP-TO-DATE。
+    // 保证「读到的是本次真实生成的产物」的是 dependsOn 的输入哈希 + CI 侧 --no-build-cache，
+    // **不是** outputs.upToDateWhen —— 那对本任务（无 outputs）恒为无操作，
+    // 加了只会给出「这里防住了缓存」的错觉。gradle.properties 里
+    // org.gradle.caching=true，若日后有人给本 job 加回 Gradle 缓存，这里挡不住。
+
+    doLast {
+        def genRoot = releaseBuildConfigDir
+        if (!genRoot.exists()) {
+            throw new GradleException(
+                "[#1034] 未找到 release 变体的生成目录: ${genRoot}。\n" +
+                "「搜到 0 条」不等于通过——必须确认 generateReleaseBuildConfig 真的产出了文件。")
+        }
+        def sources = []
+        genRoot.eachFileRecurse { f -> if (f.name == 'BuildConfig.java') sources << f }
+        if (sources.isEmpty()) {
+            throw new GradleException("[#1034] release 生成目录内没有任何 BuildConfig.java: ${genRoot}\n抽取器失效也算失败，不放行。")
+        }
+
+        def matcher = ~/(?m)^\s*public static final boolean DEBUG\s*=\s*(.+?);\s*$/
+        def checked = []
+        sources.each { f ->
+            def hit = (f.text =~ matcher)
+            if (!hit.find()) {
+                throw new GradleException("[#1034] 在 ${f} 中找不到 DEBUG 字段声明——抽取器可能已随 AGP 升级失效。")
+            }
+            def expr = hit.group(1).trim()
+            checked << "${f} => ${expr}"
+            if (expr != 'false') {
+                throw new GradleException(
+                    "[#1034] release 变体的 BuildConfig.DEBUG 不是 false！\n" +
+                    "  取值表达式: ${expr}\n" +
+                    "  后果: dev 播种键的写侧早退失效，release 包会接受 dev intent extra，\n" +
+                    "        受限正文可能被放行外发（ADR-0173 D4b）。\n" +
+                    "  已检查: ${checked.join('\n            ')}")
+            }
+        }
+        println "[#1034] release BuildConfig.DEBUG = false 校验通过（${sources.size()} 个生成源）"
+        checked.each { println "  ok: ${it}" }
+    }
+}
+
 repositories {
 }
 

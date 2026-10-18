@@ -111,6 +111,7 @@ ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/dom
 | `lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
 | `dev:android-host` / `build:android-host` / `build:android-host:release` | 宿主：装调试包 / 构建 APK（release 需密码环境变量） |
 | `test:android-host` / `test:android-host:unit` / `test:android-host:e2e` | 宿主单测 / JVM(Robolectric) / 模拟器 E2E（手动按需） |
+| `verify:android-host:release-buildconfig` | 门禁（#1034）：断言 release 变体生成的 BuildConfig.DEBUG 为 false。免签名凭据，已接入 CI 的 android-unit-test job。⚠️ 只证取值，证不到早退被绕开、也证不到 release 运行时行为 |
 | `release:android-host` / `deploy` / `deploy:dry` | 交互式发布 / 落地页预览 |
 | `check:all` / `lint:all` / `test:all` / `fmt:all` | 全部包（`:all` = **有界并发**，concurrency-limit 4） |
 

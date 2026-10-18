@@ -19,7 +19,11 @@
 // 数据 ⇒ 残留键会被 release 读到。故读点必须自判构建类型（原生 BuildConfig.DEBUG，fail closed）。
 //
 // ⚠️ **本文件剩余的已知失效面（登记，非缺陷）**：
-// 1. 写侧仍是**文本层契约**，证不了 release 变体里 `BuildConfig.DEBUG` 确为 false（挂账 #1034）。
+// 1. **本文件内的**写侧断言仍是文本层契约——它读 LynxActivity.java 源码，证不了变体取值。
+//    该缺口已由 #1034 的机器防线在**仓外**补上：`gradlew verifyReleaseBuildConfig` 断言
+//    release 变体生成的 BuildConfig.DEBUG 为 false，已接入 CI 的 android-unit-test job。
+//    ⚠️ 本行只说明「本文件的断言层级」，不代表 release 取值无人看守——换仓外那道防线时
+//    须同步改这里，否则登记会与实际状态不符（门禁冻结线 #5 的漂移形态）。
 // 2. 读侧闸门由**注入的 `isDebugBuild` 桩**驱动。它证的是「判定被 consulted 且生效」，
 //    证不了原生侧那座桥真的把 `BuildConfig.DEBUG` 送到了 JS——该缺口挂账 **#1038**
 //    （JVM/Robolectric 单测；本仓只存在 testDebugUnitTest，跑在 debug 变体，故它证的是

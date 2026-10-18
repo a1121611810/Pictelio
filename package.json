@@ -33,6 +33,7 @@
     "test:android-host": "vp run --filter @pictelio/android-host test",
     "test:android-host:unit": "vp run --filter @pictelio/android-host test:android:unit",
     "test:android-host:e2e": "pnpm --filter @pictelio/android-host exec vitest run -c tests/android-e2e/vitest.config.ts",
+    "verify:android-host:release-buildconfig": "vp run --filter @pictelio/android-host verify:release-buildconfig",
     "test:ugoira": "vp run --filter @pictelio/ugoira test",
     "test:update-check": "vp run --filter @pictelio/update-check test",
     "test:novel-export": "vp run --filter @pictelio/novel-export test",
