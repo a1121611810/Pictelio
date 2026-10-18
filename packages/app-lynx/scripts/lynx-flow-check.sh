@@ -23,8 +23,30 @@ shot() {
   return 0
 }
 classify() { $ANALYZE /tmp/flow_$1.png classify 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['page'])" 2>/dev/null || echo ""; }
+busy() { $ANALYZE /tmp/flow_$1.png classify 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['busy'])" 2>/dev/null || echo 0; }
 colored() { $ANALYZE /tmp/flow_$1.png classify 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['colored'])" 2>/dev/null || echo 0; }
 red() { $ANALYZE /tmp/flow_$1.png classify 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['red'])" 2>/dev/null || echo 0; }
+
+# ─── 页面断言（#1036：断言**具体**页面，不接受「不是 login 且不是 blank」） ───
+#
+# 旧写法 `[ "$ST" = "login" ] || [ "$ST" = "blank" ] || { echo " ✓ ..."; }`
+# 在分类器恒返回 detail 的前提下**全部通过** ⇒ 那些 ✓ 是不挣得的（issue #1036）。
+# 现在每步断言确切页名，并附可行动的诊断。
+expect_page() {          # expect_page <截图名> <期望页> <步骤描述> <允许的替代页,可选>
+  local shot_name="$1" want="$2" desc="$3" alt="${4:-}"
+  local got busy_v
+  got=$(classify "$shot_name"); busy_v=$(busy "$shot_name")
+  if [ "$got" = "$want" ]; then
+    echo "   ✓ $desc（${got}，busy=${busy_v}）"
+    return 0
+  fi
+  if [ -n "$alt" ] && [ "$got" = "$alt" ]; then
+    echo "   ✓ $desc（${got}，busy=${busy_v}；接受的替代形态）"
+    return 0
+  fi
+  echo "❌ $desc 失败：期望 ${want}${alt:+ 或 ${alt}}，实测 ${got:-<无返回>}（busy=${busy_v}）"
+  return 1
+}
 
 # ─── 分辨率自适应：全部坐标按 1080x2400 基准缩放 ───
 # AVD 实测：pictelio_ui=720x1280（旧脚本硬编码 1080x2400 坐标在低分屏上
@@ -39,12 +61,26 @@ sy() { echo $(( $1 * WM_W / 1080 )); }   # 纵向（lynx vw 布局 → 同样按
 echo "   屏幕: ${WM_W}x${WM_H}（坐标按基准 1080x2400 缩放）"
 
 echo "════ 0. 重置（client=lynx + 清 token） ════"
+# ⚠️ 必须**前置守卫**：第 0 步靠 `run-as` 改 SharedPreferences，而 run-as 只对
+# debuggable 包可用。装的是 release 包时它在 `set -e` 下**静默终止整条脚本**——
+# 屏幕上只多一行步骤标题，看起来像脚本本身坏了（2026-10-18 实测踩到）。
+if ! adb shell "run-as $PKG id" >/dev/null 2>&1; then
+  echo "❌ 当前安装的 $PKG 不是 debuggable 包，run-as 不可用 ⇒ 无法执行第 0 步重置。"
+  echo "   请先安装 debug 包：pnpm build:android-host && adb install -r <debug apk>"
+  exit 1
+fi
 adb shell "run-as $PKG sh -c '
   mkdir -p shared_prefs
   F=shared_prefs/CapacitorStorage.xml
   printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n    <string name=\\\"pictelio_client_kind\\\">lynx</string>\n</map>\n\" > \$F
   S=shared_prefs/WSSecureStorageSharedPreferences.xml
-  [ -f \$S ] && sed -i \"\|<string name=\\\"capacitor-storage_refresh_token\\\">|d\" \$S'" 2>/dev/null
+  # ⚠️ 必须写成显式 if + 末尾 exit 0：`[ -f ... ] && sed ...` 在文件不存在时整条
+  #   返回 1；新装包（尚无 secure storage 文件）会触发 `set -e` **静默终止整条脚本**。
+  #   注：本段在双引号内，注释里也不能出现裸的美元变量名（bash 会展开它并被 set -u 拦下），
+  #   也不能出现反引号（会被当命令替换）。两处都实测踩到过。
+  #   2026-10-18 实测。
+  if [ -f \$S ]; then sed -i \"\|<string name=\\\"capacitor-storage_refresh_token\\\">|d\" \$S; fi
+  exit 0'" 2>/dev/null
 adb logcat -c
 adb shell am force-stop $PKG; sleep 1
 # ⚠️ launcher activity **不可写死**：manifest 按 flavor 注入（#116/#117），本脚本写死的
@@ -89,8 +125,9 @@ elif [ "$STATE" = "login" ]; then
 else
   echo "❌ 页面异常: $STATE"; exit 1
 fi
-[ "$STATE" != "login" ] && [ "$STATE" != "blank" ] || { echo "❌ 登录未跳转推荐页（${STATE}）"; exit 1; }
-echo "   ✓ 登录成功，进入推荐页"
+# #1036：断言**具体**页面。旧写法只判「不是 login 且不是 blank」，在分类器恒返回
+# detail 的前提下恒真。现在登录后必须真的落在推荐瀑布流上。
+expect_page s recommended "登录后进入推荐页" || exit 1
 
 # ─── SETTINGS_ONLY=1：跳过中间回归步骤（收藏/详情/小说/R18），直接验证设置页滚动（issue #90 核心）。
 # 中间步骤依赖真实推荐内容 + BACK 导航，模拟器上偶发不稳定，
@@ -185,15 +222,15 @@ shot rec1; C1=$(colored rec1)
 adb shell input swipe $(sx 540) $(sy 1600) $(sx 540) $(sy 400) 300; sleep 3
 shot rec2; C2=$(colored rec2)
 echo "   滚动前彩色 $C1 → 滚动后 $C2"
-STATE2=$(classify rec2)
-[ "$STATE2" != "blank" ] && [ "$STATE2" != "login" ] || { echo "❌ 滚动后页面异常: $STATE2"; exit 1; }
+# #1036：滚动后必须仍在推荐页（具体页断言）
+expect_page rec2 recommended "推荐页滚动后仍在推荐页" "detail" || exit 1
 echo "   ✓ 推荐页滚动正常"
 
 echo "════ 4. 点卡片 → 插画详情 ════"
 # 先滚动回顶部（swipe 向上滑 = 内容回顶；注意方向：1600→400）
 adb shell input swipe $(sx 540) $(sy 1600) $(sx 540) $(sy 400) 300; sleep 3
 shot back_top
-[ "$(classify back_top)" = "login" ] && { echo "❌ 回顶后异常: login"; exit 1; }
+expect_page back_top recommended "回顶后仍在推荐页" "detail" || exit 1
 # 详情页判断：classify=detail（大图特征，lynx-service-http 不打 URL 日志，API grep 不可靠）
 DETAIL_OK=""
 for pos in "270 400" "270 500" "540 550"; do
@@ -208,35 +245,29 @@ for pos in "270 400" "270 500" "540 550"; do
   fi
 done
 [ -n "$DETAIL_OK" ] || { echo "❌ 未进入详情页（classify=${ST:-?}）"; exit 1; }
-# 大图渲染验证（中部非白密集；浅色大图可能彩色低）
+# 大图渲染验证（#1036：改为背景相对——旧判据 `not is_whiteish` 在暗色下恒真）
 shot det
 DET_NW=$(python3 - scripts/lynx-screen-analyze.py <<'PYEOF' || true
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location('a', sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 w, h, rows = m.load_png('/tmp/flow_det.png')
-nw = 0; total = 0
-for y in range(250, min(h, 1350), 8):
-    for x in range(0, w, 16):
-        r, g, b = m.pixel(rows, y, x)
-        total += 1
-        if not m.is_whiteish(r, g, b): nw += 1
-print(round(nw / total, 3))
+print(round(m.busy_ratio(w, h, rows, 0.20, 0.83), 3))
 PYEOF
 )
-echo "   详情页中部非白占比: ${DET_NW}（大图渲染）"
+echo "   详情页中部背景相对内容占比: ${DET_NW}（大图渲染）"
+# 阈值来源：真实详情帧实测 0.320（取反帧 0.331）；非作品页最高为我的页 0.033
 if python3 -c "exit(0 if float('${DET_NW:-0}') > 0.15 else 1)"; then
   echo "   ✓ 详情大图已渲染"
 else
-  echo "❌ 详情大图未渲染（非白 ${DET_NW}）"; exit 1
+  echo "❌ 详情大图未渲染（背景相对内容占比 ${DET_NW}，阈值 0.15）"; exit 1
 fi
 
 echo "════ 5. 详情返回 → 推荐 ════"
 adb shell input keyevent 4; sleep 4
 shot back1
-ST5=$(classify back1)
-[ "$ST5" = "login" ] || [ "$ST5" = "blank" ] || { echo "   ✓ 返回后内容页（${ST5}）"; }
-# 返回是否成功由步骤 6 兜底：只有推荐页的"小说"入口有效
+# #1036：从详情返回应回到推荐页（具体页断言）。旧写法「不是 login 且不是 blank」恒真。
+expect_page back1 recommended "详情返回后回到推荐页" "text" || exit 1
 
 echo "════ 6. 小说列表 → 正文 → 返回 ════"
 adb shell input tap $(sx 800) $(sy 145); sleep 4   # 顶部"小说"（仅推荐页有效）
@@ -248,9 +279,26 @@ if [ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ]; t
   adb shell input tap $(sx 800) $(sy 145); sleep 4
   shot nv1b; ST6=$(classify nv1b)
 fi
-# 小说列表 = 有顶部栏的文本页（text/me；推荐瀑布流 recommended 表示未切过去）
-[ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ] || echo "   ✓ 进入小说列表（${ST6}）"
-[ "$ST6" != "recommended" ] || { echo "❌ 未进入小说列表（仍在推荐页）"; exit 1; }
+# 小说列表 = 有顶部栏的文本页（text）。#1036：具体页断言 + 可行动诊断。
+# 允许 `me` 作为**空列表**的已知形态并给出明确原因（实测：本账号小说列表为空时
+# classify 判 me，busy≈0.019）——这是数据状态不是分类缺陷，措辞必须说准。
+NV_PAGE=$(classify nv1)
+if [ "$NV_PAGE" = "recommended" ] || [ "$NV_PAGE" = "login" ] || [ "$NV_PAGE" = "blank" ]; then
+  # 可能详情返回失败仍在详情页 → 返回后再点小说
+  adb shell input keyevent 4; sleep 3
+  adb shell input tap $(sx 800) $(sy 145); sleep 4
+  shot nv1b; NV_PAGE=$(classify nv1b)
+fi
+if [ "$NV_PAGE" = "recommended" ]; then
+  echo "❌ 未进入小说列表（仍在推荐页）"; exit 1
+fi
+if [ "$NV_PAGE" = "text" ]; then
+  echo "   ✓ 进入小说列表（text，busy=$(busy nv1)）"
+elif [ "$NV_PAGE" = "me" ] && [ "$(python3 -c "print(1 if float('$(busy nv1)') < 0.026 else 0)")" = "1" ]; then
+  echo "   ⚠️ 小说列表为空（本账号无小说，busy=$(busy nv1) 远低于文本页阈值）——非分类缺陷，继续"
+else
+  echo "❌ 小说列表判定异常：期望 text，实测 ${NV_PAGE:-<无返回>}（busy=$(busy nv1)）"; exit 1
+fi
 # [spec] 小说列表内容非空断言：item-key 传数字 → lynx 220201 illegal item-key → 列表条目不渲染
 # （骨架屏消失后纯空白）。内容区（顶部栏下方）暗色文本像素占比过低视为空白。
 shot nv_content
@@ -259,32 +307,26 @@ import importlib.util, sys
 spec = importlib.util.spec_from_file_location('a', sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 w, h, rows = m.load_png('/tmp/flow_nv_content.png')
-dark = 0; total = 0
-for y in range(int(h * 0.18), int(h * 0.8), 6):
-    for x in range(0, w, 12):
-        r, g, b = m.pixel(rows, y, x)
-        total += 1
-        if r < 200 and g < 200 and b < 200:
-            dark += 1
-print(round(dark / total, 4))
+print(round(m.busy_ratio(w, h, rows, 0.18, 0.80), 4))
 PYEOF
 )
-echo "   小说列表内容区暗色像素占比: ${NVC:-0}"
-python3 -c "exit(0 if float('${NVC:-0}') > 0.003 else 1)" || { echo "❌ 小说列表空白（疑似 220201 item-key 回归）"; exit 1; }
+echo "   小说列表内容区背景相对占比: ${NVC:-0}"
+# 阈值来源：实测空列表 0.019、我的页 0.033；非空小说列表应显著更高（文本条目密集）
+python3 -c "exit(0 if float('${NVC:-0}') > 0.05 else 1)" || { echo "❌ 小说列表无内容（busy=${NVC:-0}，阈值 0.05；疑似 220201 item-key 回归）"; exit 1; }
 adb shell input tap $(sx 270) $(sy 330); sleep 6   # 列表第一条 → 小说正文
 shot nv2
 echo "   小说正文: $(classify nv2)"
 adb shell input keyevent 4; sleep 3   # 正文返回 → 列表
 adb shell input keyevent 4; sleep 3   # 列表返回 → 推荐
 shot nv3
-ST6B=$(classify nv3)
-[ "$ST6B" = "login" ] || [ "$ST6B" = "blank" ] || echo "   ✓ 小说流程完成（${ST6B}）"
+# #1036：两级返回后应回到推荐页
+expect_page nv3 recommended "小说流程两级返回后回到推荐页" "text" || exit 1
 
 echo "════ 7. 我的 → R18 切换（坐标敏感，失败不阻断） ════"
 adb shell input tap $(sx 900) $(sy 145); sleep 4   # 顶部"我的"
 shot me1
-ST7=$(classify me1)
-[ "$ST7" = "login" ] || [ "$ST7" = "blank" ] || { echo "   ✓ 进入我的页（${ST7}）"; }
+# #1036：具体页断言。「我的」是列表型页面（实测 busy≈0.033），不是作品页也不是文本页。
+expect_page me1 me "进入我的页" "text" || exit 1
 # R18 开关切换（布局随分辨率变化，固定区域对比仅作参考）——png 空防护 + 不阻断
 adb exec-out screencap -p > /tmp/r18_before.png 2>/dev/null
 adb shell input tap $(sx 540) $(sy 740); sleep 2
@@ -313,39 +355,45 @@ echo "   R18 切换后全屏变化像素: $R18_DIFF"
 # 返回内容页（keyevent 比坐标 tap 可靠：详情/设置页返回按钮位置不定）
 adb shell input keyevent 4; sleep 3
 shot final
-STF=$(classify final)
-[ "$STF" = "login" ] || [ "$STF" = "blank" ] || echo "   ✓ 返回内容页（${STF}）"
+# #1036：具体页断言——从「我的」返回应回到推荐页
+expect_page final recommended "从我的返回推荐页" "text" || exit 1
 fi   # ← SETTINGS_ONLY：跳过中间回归步骤的 if 结束
 
 echo "════ 8. 设置页滚动（issue #90：scroll-view + 5 组） ════"
-# 复位到推荐页（顶栏 ≥3 个文字块 = 推荐插画 + 关注 + 小说/我的 合并块；实测 3 块）；
-# keyevent 4 逐级返回（仅在非推荐页时执行，避免根路由退桌面）
-# （SETTINGS_ONLY 模式登录后即在推荐页，首轮即命中；完整流程从步骤 7 返回后开始）
-NAV="{}"
+# 复位到推荐页。判据用 **classify**（#1036）而不是旧的「顶栏 blocks≥3」：
+# ① blocks≥3 此前在暗色主题下永远不满足（topbar_nav 只认 r<140 的深色文字，未选中
+#    tab 是暗灰检测不到）——2026-10-17 那次「无法回到推荐页顶栏（blocks=0）」退出 1
+#    即此因，已随 topbar_nav 的背景相对化修复；
+# ② 但 blocks 本身也区分不了「推荐页」与「任何同样有 3 个 tab 的页」，classify 更直接。
+# keyevent 4 逐级返回；**仅在已判定不在推荐页时**执行，避免根路由退桌面。
+# （SETTINGS_ONLY 模式登录后即在推荐页，首轮即命中）
+BACK_OK=""
 for i in 1 2 3 4 5; do
   sleep 2
   shot nav_i
-  NAV=$($ANALYZE /tmp/flow_nav_i.png topbar-nav 2>/dev/null) || NAV="{}"
-  NBLOCKS=$(echo "$NAV" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('blocks', [])))" 2>/dev/null || echo 0)
-  [ "${NBLOCKS:-0}" -ge 3 ] && break
-  if [ "${NBLOCKS:-0}" -ge 1 ] && [ "${NBLOCKS:-0}" -lt 3 ] && [ -s /tmp/flow_nav_i.png ]; then
-    # 截图有效且顶栏 1-2 块（详情/设置页等）→ keyevent 返回；
-    # blocks=0 可能是推荐页转场/截图异常 → 仅等待，禁止 keyevent（根路由会退桌面）
+  NAV_PAGE=$(classify nav_i)
+  # ⚠️ 必须写成显式 if：`A || B && C` 在 set -e 下，当 A、B 皆假时整条返回 1 会直接终止脚本。
+  if [ "$NAV_PAGE" = "recommended" ] || [ "$NAV_PAGE" = "detail" ]; then
+    BACK_OK="yes"; break
+  fi
+  if [ -s /tmp/flow_nav_i.png ]; then
     adb shell input keyevent 4; sleep 2
   else
-    sleep 2
+    sleep 2   # 截图失败：只等待，不发 keyevent（根路由会退桌面）
   fi
 done
-if [ "${NBLOCKS:-0}" -lt 3 ]; then
-  echo "❌ 无法回到推荐页顶栏（blocks=${NBLOCKS:-0}）"; exit 1
+if [ -z "$BACK_OK" ]; then
+  echo "❌ 无法回到推荐页（末次 classify=${NAV_PAGE:-<无返回>}）"; exit 1
 fi
-# "我的" = 最右侧 tab（右缘偏内 40px ≈ 两字中心；最右块常把 关注/小说/我的 合并成一块）
-ME_X=$(echo "$NAV" | python3 -c "import json,sys; b=json.load(sys.stdin)['blocks']; print(max(0, b[-1]['x1'] - 40))" 2>/dev/null || true)
-ME_Y=$(echo "$NAV" | python3 -c "import json,sys; print(json.load(sys.stdin)['y'])" 2>/dev/null || true)
-[ -n "$ME_X" ] && [ -n "$ME_Y" ] || { echo "❌ 顶栏定位失败（ME_X=$ME_X ME_Y=${ME_Y}）"; exit 1; }
-echo "   「我的」tab 定位: ($ME_X,$ME_Y)"
-adb shell input tap "$ME_X" "$ME_Y"; sleep 4
+echo "   ✓ 已回到推荐页（classify=${NAV_PAGE}）"
+# 进「我的」：当前顶栏是 全部/插画/小说（实测 3 块，cx≈119/360/600），**没有「我的」**。
+# 旧脚本取「最右块 -40」当「我的」tap —— 那会点在「小说」tab 上，进错页仍报成功。
+# 现走 FAB 菜单（设备实测：FAB $(sx 635) $(sy 1053) →「我的」$(sx 385) $(sy 1045)）。
+adb shell input tap $(sx 635) $(sy 1053); sleep 3
+shot fab_menu
+adb shell input tap $(sx 385) $(sy 1045); sleep 4
 shot me_top
+expect_page me_top me "经 FAB 菜单进入我的页" "text" || exit 1
 R_TOP=$(red me_top)
 # 内容上移 = 向下滚动；多次 swipe 滚到底（720x1280 视口，内容 ~2000px+）
 adb shell input swipe $(sx 540) $(sy 1600) $(sx 540) $(sy 400) 300; sleep 2

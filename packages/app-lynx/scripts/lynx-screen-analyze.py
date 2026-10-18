@@ -76,6 +76,76 @@ def is_whiteish(r, g, b):
     return r > 240 and g > 240 and b > 240
 
 
+def luminance(c):
+    """Rec.601 亮度（0..255）。主题归一的全部判据都建立在它之上（#1036）。"""
+    r, g, b = c
+    return int(0.299 * r + 0.587 * g + 0.114 * b)
+
+
+# ─── #1036 标定常量（每一项的实测依据见 docs/verification/CALIBRATION-flow-check.md） ───
+#
+# 旧判据（`is_whiteish` 定义「非白」+ 6 个魔数）的主题盲根因：暗色主题下几乎没有白像素，
+# 于是「非白占比」恒 ≈1、每个页面都走进 detail 分支。
+#
+# 新判据一律**背景相对**：每行取自己的亮度众数当该行背景，数偏离它的像素占比
+# （下称 busy）。行内局部背景对两件事同时免疫：① 亮/暗主题 ② 文字压在大图上还是表面上。
+# 主题锚点另取顶栏带中位亮度（顶栏是纯表面色，不会被作品图带偏）。
+CALIB_DELTA = 20  # 「偏离背景」判定亮度差。实测各帧在 δ=8..32 间排序稳定，取中间值
+CALIB_BUSY_ART = 0.20  # busy ≥ 此值 = 作品页（推荐 0.390 / 详情 0.296）
+CALIB_BUSY_TEXT = 0.06  # busy ≥ 此值 = 文本页（设置 0.124）；我的页 0.032 在其下
+CALIB_RUN_DETAIL = 13  # 连续彩色带 ≥ 此值 = 单大图详情（详情 16 / 推荐 10）
+CALIB_BUSY_LOGIN_MAX = 0.03  # 登录页头部无导航文字（实测登录页与空页均 <0.03）
+CALIB_BUSY_BLANK = 0.008
+CALIB_BTN_ROW_COVER = 0.45  # 登录按钮行的饱和像素覆盖率下限（实测按钮行 0.65-0.70，其余页 0）
+CALIB_BTN_ROWS = 8  # 连续实心饱和行数下限（实测登录页 19，其余页 0）  # busy < 此值 = 近乎空白（实测空小说列表 0.019、我的页 0.033）
+
+# 头部带 / 内容带的纵向范围（比例式，避免 1080 与 720 宽屏的硬编码越界问题）
+HEADER_Y0, HEADER_Y1 = 0.035, 0.20
+BODY_Y0, BODY_Y1 = 0.20, 0.85
+
+
+def _row_mode(values, bucket=8):
+    """一行的亮度众数。桶宽 8 是采样噪声的量级（相邻行同色像素亮度抖动 <8）。"""
+    hist = {}
+    for v in values:
+        k = (v // bucket) * bucket
+        hist[k] = hist.get(k, 0) + 1
+    return max(hist.items(), key=lambda kv: kv[1])[0]
+
+
+def busy_ratio(w, h, rows, y0_frac, y1_frac, y_step=6, x_step=12, delta=CALIB_DELTA):
+    """背景相对的内容占比：每行独立取背景，再统计偏离该背景的像素比例。
+
+    > 与旧 `mid_nonwhite / mid_total` 的区别（这是 #1036 的核心）：旧判据拿**整页**的
+    > 「白 vs 非白」比，暗色下分母里的「白」几乎为 0 ⇒ 比值恒 1。新判据的行局部背景
+    > 在纯背景行上给出 ≈0、在有内容的行上给出有意义的占比，于是暗色与亮色同构。
+    """
+    n = 0
+    total = 0
+    for y in range(int(h * y0_frac), min(h, int(h * y1_frac)), y_step):
+        vals = [luminance(pixel(rows, y, x)) for x in range(0, w, x_step)]
+        base = _row_mode(vals)
+        for x in range(0, w, x_step):
+            total += 1
+            if abs(luminance(pixel(rows, y, x)) - base) > delta:
+                n += 1
+    return n / total if total else 0.0
+
+
+def theme_background_lum(w, h, rows):
+    """主题锚点：顶栏带亮度中位数。顶栏是纯表面色 ⇒ 不会被作品图污染。
+
+    > 为什么不用整页中位数：实测推荐页整页中位亮度 69、详情页 226，而**两者同为暗色
+    > 主题**——大图（推荐页插画 / 详情页大图）会把整页统计带偏。顶栏带没有这个问题。
+    """
+    vals = sorted(
+        luminance(pixel(rows, y, x))
+        for y in range(int(h * HEADER_Y0), int(h * 0.12), 4)
+        for x in range(0, w, 4)
+    )
+    return vals[len(vals) // 2] if vals else 128
+
+
 def saturated(r, g, b):
     return max(r, g, b) - min(r, g, b) > 50 and max(r, g, b) > 100
 
@@ -84,23 +154,30 @@ def login_elements(w, h, rows):
     """定位登录页输入框与按钮。
 
     启发式（稳定性优先）：
-    1. 品牌蓝大块 = 登录按钮（最可靠特征）；
-    2. 输入框 = 按钮上方最近的灰细条（<150px 高）。
+    1. 主按钮 = 中下部**宽而实心的饱和色块**（判形态不判色相）；
+    2. 输入框 = 按钮上方最近的、与卡片底色不同的**矩形条带**（不按高度猜）。
+
+    ⚠️ #1036：此处原先用 `is_blue` 找按钮，而 `is_blue` 对真实登录帧**一个像素都命中
+    不了**（按钮实测色 `(155,203,250)`，卡在 `g<140` 上）⇒ 登录自动化一直报
+    「登录页定位失败」。补硬编码色值是 #709 已栽过的坑，故一律改判形态。
     """
-    # 逐行统计品牌蓝/中灰密度
-    blue_rows, gray_rows = {}, {}
-    for y in range(0, h, 4):
-        b_cnt = g_cnt = 0
-        for x in range(120, w - 120, 6):
-            r, g, b = pixel(rows, y, x)
-            if is_blue(r, g, b):
-                b_cnt += 1
-            if is_gray(r, g, b):
-                g_cnt += 1
-        if b_cnt > 6:
-            blue_rows[y] = b_cnt
-        if g_cnt > 8:
-            gray_rows[y] = g_cnt
+    y0, y1 = int(h * 0.35), int(h * 0.70)
+    # 逐行统计饱和色覆盖率（按钮）/ 与卡片底色的差异（输入框）
+    sat_rows, card_rows = {}, {}
+    for y in range(y0, y1, 4):
+        sat = 0
+        for x in range(0, w, 6):
+            if saturated(*pixel(rows, y, x)):
+                sat += 1
+        cover = sat * 100 // max(1, len(range(0, w, 6)))
+        if cover >= CALIB_BTN_ROW_COVER * 100:
+            sat_rows[y] = cover
+        # 输入框：整行众数亮度明显高于/低于卡片底色且该行较均匀 ⇒ 记一条带
+        vals = [luminance(pixel(rows, y, x)) for x in range(0, w, 8)]
+        mode_l = _row_mode(vals)
+        uniform = sum(1 for v in vals if abs(v - mode_l) <= CALIB_DELTA) / max(1, len(vals))
+        if uniform >= 0.45:
+            card_rows[y] = mode_l
 
     def segments(d):
         segs = []
@@ -116,31 +193,29 @@ def login_elements(w, h, rows):
             segs.append(cur)
         return segs
 
-    blue_segs = segments(blue_rows)
-    gray_segs = segments(gray_rows)
-
     result = {"input": None, "button": None}
 
-    # 按钮 = 品牌蓝最宽（密度最高）的段（标题也有蓝但字少、密度低）
-    button = None
-    for y0, y1 in blue_segs:
-        density = max(blue_rows.get(y, 0) for y in range(y0, y1 + 1, 4))
-        if density > (button[2] if button else 0):
-            button = (y0, y1, density)
-    if button and button[1] - button[0] > 30:  # 高度 >30px 才算按钮（排除细文字）
+    # 按钮 = 最长的实心饱和条带
+    btn_segs = segments(sat_rows)
+    button = max(btn_segs, key=lambda s: s[1] - s[0]) if btn_segs else None
+    if button and button[1] - button[0] >= 30:
         result["button"] = {"y": (button[0] + button[1]) // 2, "x": w // 2}
         btn_top = button[0]
     else:
-        btn_top = h  # 无按钮 → 不约束输入框位置
+        btn_top = h
 
-    # 输入框 = 按钮上方最近的灰细条（<150px 高）——取最靠近按钮的（按钮正上方是输入框）
+    # 输入框 = 按钮上方最近的「与卡片底色不同」的条带（输入框是浅色块、卡片更深）
+    dark = sorted(card_rows.items())
+    card_mode = None
+    if dark:
+        card_mode = max(set(v for _, v in dark), key=lambda v: sum(1 for _, x in dark if x == v))
     best = None
-    for y0, y1 in gray_segs:
-        if y1 - y0 < 150 and y1 < btn_top:
-            if best is None or y1 > best[1]:
-                best = (y0, y1)
-    if best:
-        result["input"] = {"y": (best[0] + best[1]) // 2, "x": w // 2}
+    for y, lv in dark:
+        if y < btn_top and card_mode is not None and abs(lv - card_mode) > CALIB_DELTA:
+            if best is None or y > best:
+                best = y
+    if best is not None:
+        result["input"] = {"y": best, "x": w // 2}
 
     return result
 
@@ -149,19 +224,35 @@ def topbar_nav(w, h, rows):
     """定位顶栏文字行：返回 {"y": 文字行中心, "blocks": [{x0,x1,cx}...]}。
 
     用途：带系统状态栏的屏幕上，顶栏（11.733vw 高）位于状态栏下方，
-    固定坐标缩放不可靠（曾误点入卡片/状态栏）。动态检测深色文字行最稳。
-    约定：最右侧文字块 = "我的"tab（推荐页），最左侧 = 返回按钮（详情/设置页）。
+    固定坐标缩放不可靠（曾误点入卡片/状态栏）。动态检测文字行最稳。
+
+    ⚠️ **主题归一（#1036）**：原实现把「深色」写死为 `r<140 and g<140 and b<140`。
+    暗色主题下**未选中**的 tab 是暗灰（实测亮度 ≥140）根本检测不到，只剩选中 tab
+    一个块 ⇒ flow-check 步骤 8 的「blocks≥3 才算推荐页」**永远不满足**，每次退出 1
+    （2026-10-17 实测「无法回到推荐页顶栏（blocks=0）」即此）。现改为「相对顶栏
+    背景高对比」，对明暗主题同构。
+
+    扫描带取 y[0.035h, 0.20h]：推荐页的三 tab 在 y≈95，设置页的「← 标题」在 y≈205
+    （两种布局的顶栏高度不同，取窄带会漏掉后者）。
     """
+    y0, y1 = int(h * HEADER_Y0), int(h * 0.20)
+    # 顶栏背景：扫描带内容区的亮度众数（顶栏是纯表面色）
+    vals = [luminance(pixel(rows, y, x)) for y in range(y0, y1, 4) for x in range(0, w, 4)]
+    if not vals:
+        return {}
+    base = _row_mode(vals)
+
     pts = []
-    # 顶栏区域：跳过状态栏（灰色条，r≈g≈b 且整行都是会被误判为文字块），
-    # 从 h*4.5% 开始（模拟器状态栏 ≈ 48px/1280）到 h*11%（顶栏 11.733vw 结束附近）
-    for y in range(int(h * 0.045), int(h * 0.11), 2):
+    for y in range(y0, y1, 2):
+        vals = [luminance(pixel(rows, y, x)) for x in range(0, w, 4)]
+        # 只认**顶栏行**：该行众数必须贴近顶栏背景。内容行（大图/卡片）众数是它自己的
+        # 颜色，不贴近 ⇒ 排除。否则扫描带下缘的内容会把 tab 连成一大块（实测推荐页
+        # 曾因此返回 x0..x1 贯穿全屏的单块）。
+        if abs(_row_mode(vals) - base) > CALIB_DELTA:
+            continue
         for x in range(0, w, 2):
-            r, g, b = pixel(rows, y, x)
-            # 顶栏 tab 文字是品牌蓝（b 高）或深色（foreground）；排除纯灰（状态栏 r≈g≈b）
-            is_dark = r < 140 and g < 140 and b < 140 and not (abs(r - g) < 20 and abs(g - b) < 20)
-            is_brand = b > 120 and b > r + 30 and b > g + 20
-            if is_dark or is_brand:
+            # 文字 = 相对顶栏背景的高对比像素（明暗主题同构：暗色下文字比背景亮）
+            if abs(luminance(pixel(rows, y, x)) - base) > CALIB_DELTA:
                 pts.append((x, y))
     if not pts:
         return {}
@@ -188,12 +279,16 @@ def classify(w, h, rows):
     """细粒度页面分类（完整流程自动化用）。
 
     返回 {"page": recommended|detail|text|me|login|blank, "colored": 彩色占比,
-          "red": 红色像素数, "topbar": 顶部导航栏是否有内容}
+          "red": 红色像素数, "busy": 背景相对内容占比, "theme_lum": 顶栏背景亮度}
+
+    ⚠️ **主题归一（#1036）**：本函数原先用 `is_whiteish` 定义「非白」，暗色主题下该比值
+    恒 ≈1 ⇒ **每个页面都返回 detail**（实测推荐页/详情页/我的页全部误判 detail）。
+    现全部改为背景相对判据，阈值依据见本文件 CALIB_* 常量与
+    docs/verification/CALIBRATION-flow-check.md 的真实帧实测表。
     """
     colored = 0
     total = 0
     red = 0
-    topbar = 0
     # 彩色行分布：判断"单大块"（详情图）vs"多块分散"（瀑布流）
     col_bands = {}
     for y in range(0, h, 6):
@@ -204,8 +299,6 @@ def classify(w, h, rows):
             if saturated(r, g, b):
                 colored += 1
                 col_bands[band] = col_bands.get(band, 0) + 1
-            if 60 <= y <= 220 and not is_whiteish(r, g, b):
-                topbar += 1
             if r > 170 and g < 110 and b < 110:
                 red += 1
     ratio = colored / total if total else 0
@@ -219,87 +312,51 @@ def classify(w, h, rows):
         max_run = max(max_run, run)
         prev = b
 
-    # 顶部导航栏：y 80-210 的深色文字（登录页 pt-32vw 顶部空白，无导航文字）
-    topbar_text = 0
-    for y in range(80, 210, 4):
-        for x in range(0, w, 8):
-            r, g, b = pixel(rows, y, x)
-            if r < 120 and g < 120 and b < 120:
-                topbar_text += 1
+    # 背景相对的两个占比（替代旧的 mid_nonwhite/total 与 dark_top/topbar_text）
+    busy_body = busy_ratio(w, h, rows, BODY_Y0, BODY_Y1)
+    busy_header = busy_ratio(w, h, rows, HEADER_Y0, HEADER_Y1, y_step=3, x_step=6)
+    theme_lum = theme_background_lum(w, h, rows)
+    out = {"colored": round(ratio, 3), "red": red, "busy": round(busy_body, 3), "theme_lum": theme_lum}
 
-    # 登录页：品牌蓝大按钮（屏幕中下部，随分辨率缩放——原硬编码 850-1150 是
-    # OPPO 2160p 真机区域，720p 模拟器下按钮位置不同导致误判 blank）+ 无顶部导航文字
-    blue_btn = 0
-    blue_total = 0
-    btn_y0, btn_y1 = int(h * 0.39), int(h * 0.53)
-    for y in range(btn_y0, btn_y1, 4):
-        for x in range(0, w, 8):
-            r, g, b = pixel(rows, y, x)
-            blue_total += 1
-            if is_blue(r, g, b):
-                blue_btn += 1
-    if blue_total > 0 and blue_btn * 100 // blue_total >= 2 and topbar_text < 30:
-        return {"page": "login", "colored": round(ratio, 3), "red": red}
+    # 登录页：屏幕中下部有一个**宽而实心的饱和色块**（主按钮）。
+    #
+    # ⚠️ 这里**不再用 is_blue**（#1036）。旧判据 `b>140 and b-r>80 and 60<g<150` 在真实
+    # 登录帧上一个像素都命中不了：登录按钮实测色 `(155,203,250)`，卡在 `g<150` 上 ⇒
+    # classify 把登录页判成 text（2026-10-18 实测）。补硬编码色值是 #709 已经栽过的坑
+    # （判据里钉死色板值 → 配色一改即失效），故改判**形态**不判**色相**：
+    # 「整行 ≥CALIB_BTN_ROW_COVER 比例的像素是饱和色，且这样的行连续出现 ≥CALIB_BTN_ROWS 行」。
+    # 真实帧实测（720×1280 暗色）：登录页 19 行，推荐/详情/设置/我的/空列表**全部 0 行**。
+    btn_rows = 0
+    for y in range(int(h * 0.35), int(h * 0.70), 4):
+        sat = tot = 0
+        for x in range(0, w, 6):
+            tot += 1
+            if saturated(*pixel(rows, y, x)):
+                sat += 1
+        if tot and sat / tot >= CALIB_BTN_ROW_COVER:
+            btn_rows += 1
+    if btn_rows >= CALIB_BTN_ROWS and busy_header < CALIB_BUSY_LOGIN_MAX:
+        return dict(out, page="login", btn_rows=btn_rows)
 
-    has_topbar = topbar_text > 30
+    # 作品页（推荐瀑布流 / 详情大图）：内容区背景相对占比高
+    if busy_body >= CALIB_BUSY_ART:
+        # 单大图详情 = saturated 像素集中在**连续**少数几个带；瀑布流分散在多带。
+        if max_run >= CALIB_RUN_DETAIL:
+            return dict(out, page="detail")
+        return dict(out, page="recommended")
 
-    # 详情页：单一大块（max_run 连续彩色带 ≥8 = 480px+，大图）+ 中部非白密集
-    if has_topbar and max_run >= 8:
-        mid_nonwhite = 0
-        mid_total = 0
-        for y in range(220, min(h, 1400), 8):
-            for x in range(0, w, 16):
-                r, g, b = pixel(rows, y, x)
-                mid_total += 1
-                if not is_whiteish(r, g, b):
-                    mid_nonwhite += 1
-        mid_ratio = mid_nonwhite / mid_total if mid_total else 0
-        if mid_ratio > 0.4:
-            return {"page": "detail", "colored": round(ratio, 3), "red": red}
+    # 列表型页面（我的）：文字稀疏、几乎无图
+    if busy_body >= CALIB_BUSY_TEXT:
+        return dict(out, page="text")
 
-    if has_topbar:
-        if ratio > 0.25 and max_run >= 8:
-            return {"page": "detail", "colored": round(ratio, 3), "red": red}
-        if ratio > 0.05:
-            return {"page": "recommended", "colored": round(ratio, 3), "red": red}
-        # 中部大块非白（浅色大图/文本页）→ 详情或文本：靠顶部栏+标题文字区分
-        mid_nonwhite = 0
-        mid_total = 0
-        for y in range(220, min(h, 1200), 8):
-            for x in range(0, w, 16):
-                r, g, b = pixel(rows, y, x)
-                mid_total += 1
-                if not is_whiteish(r, g, b):
-                    mid_nonwhite += 1
-        mid_ratio = mid_nonwhite / mid_total if mid_total else 0
-        if mid_ratio > 0.35 and ratio > 0.01:
-            # 顶部有标题文字（深色行）+ 中部大块 → 详情页（大图浅色时彩色低）
-            dark_top = 0
-            # ⚠️ 扫描区**必须按比例**给，不能写死像素：这里原来写的是 `range(60, 1020)`，
-            #   那是 1080 宽屏的边距。AVD `pictelio_ui` 实测 720×1280 ⇒ x 一旦到 1020
-            #   就越界，`pixel()` 直接 IndexError 崩掉整个分析器——于是 classify 从此
-            #   永远返回不了，flow-check 的每一步都判「页面异常」。
-            #   `flow-check.sh` 的 tap 坐标早就用 `sx/sy` 按屏宽缩放过（见该脚本注释
-            #   「旧脚本硬编码 1080x2400 坐标在低分屏上点击错位」），扫描区却漏了同一处。
-            #   比例式在 1080 宽上复现原意（≈60..1020），在 720 宽上自动收成 ≈40..680。
-            for y in range(220, 400, 4):
-                for x in range(int(w * 0.055), int(w * 0.945), 8):
-                    r, g, b = pixel(rows, y, x)
-                    if r < 120 and g < 120 and b < 120:
-                        dark_top += 1
-            if dark_top > 30:
-                return {"page": "detail", "colored": round(ratio, 3), "red": red}
-            return {"page": "text", "colored": round(ratio, 3), "red": red}
-        if ratio > 0.005:
-            return {"page": "text", "colored": round(ratio, 3), "red": red}
-        return {"page": "me", "colored": round(ratio, 3), "red": red}
-    # 无顶部栏：登录页（品牌蓝按钮）或空白
-    for y in range(850, 1150, 4):
-        for x in range(0, w, 8):
-            r, g, b = pixel(rows, y, x)
-            if is_blue(r, g, b):
-                return {"page": "login", "colored": round(ratio, 3), "red": red}
-    return {"page": "blank", "colored": round(ratio, 3), "red": red}
+    # 近乎空白（骨架屏空壳 / 加载中）：比空列表（实测 0.019）更低，比列表型页面（0.033）更低。
+    # ⚠️ 必须保留这一支：flow-check 多处以 `page != blank` 作为「页面已就绪」的判据，
+    # 若 classify 永不返回 blank，那些判断会静默退化成恒真（#1036 的第二类缺陷）。
+    if busy_body < CALIB_BUSY_BLANK:
+        return dict(out, page="blank")
+
+    # 列表型页面（我的）
+    return dict(out, page="me")
 
 
 def page_state(w, h, rows):
