@@ -1,10 +1,12 @@
 # ADR-0062：独立包引擎切换 UI 隐藏与 Native 能力暴露
 
-> **状态（2026-09-28 补）**：**目标已达成并被单引擎化内化，运行时判定部分已失效。**
-> 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）删除了 `full` / `webview` flavor，`BuildConfig.CLIENT_KINDS` 塌缩为 `{"lynx"}`。
-> - 仍在生效：JS 侧「仅当 `CLIENT_KINDS` 同时含 `webview` 与 `lynx` 才渲染切换 UI」这条**判定规则本身**仍作为代码形态存在，只是判定结果恒为「不渲染」。
+> **状态（2026-10-18 订正，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：**目标已达成并被单引擎化内化，本文的判定规则、JS 侧实现与原生暴露通道均已失效。**
+> 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）删除了 `full` / `webview` flavor，`BuildConfig.CLIENT_KINDS` 塌缩为 `{"lynx"}`；随后：
+> - 已失效：JS 侧「仅当 `CLIENT_KINDS` 同时含 `webview` 与 `lynx` 才渲染切换 UI」这条**判定规则本身**——其代码形态（`clientSwitch` 全链：`clientSwitchStore` / `clientSwitch` 模块 / UI 引用 / `clientSwitchJavaContract` 机器防线）已随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 决策 7（#845，commit `ca91f2b2`）删除，不再作为代码形态存在。
+> - 已失效：原生暴露通道——`ClientInfoPlugin.getClientKinds`（webview 侧，随 WebView 客户端删除）与 `PictelioAppModule.getClientKind(s)`（lynx 侧，随 #845 删除）均已不存在。
+> - 已失效：`BuildConfig.CLIENT_KINDS` 字段本身——最后一个 Java 读点（`LynxRuntimeInitializer.isAvailable()` / `clientKindsContainLynx()`）已随 #1043 死代码清理（commit `82cb05bd`）删除；`build.gradle` 的 `buildConfigField "String[]", "CLIENT_KINDS"` 于本次订正后删除（全仓零读点）。
 > - 已失效：本文「背景」所述的三分包（`full` / `webview` / `lynx`）与独立 APK 结构**已不存在**；`MainActivityWebview` / `MainActivity` / Capacitor 构建链随之删除。`#610` 修的正是这个门控的失效缺陷（单引擎包误显客户端卡）。
-> - 本文正文**按原样保留**作为决策史，不重写。
+> - 本文正文**按 ADR 惯例原样保留**作为决策史，不重写。
 
 ## 背景
 

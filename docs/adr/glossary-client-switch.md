@@ -6,6 +6,8 @@
 > **正文按原样保留，仅供决策史参考，不代表当前状态。**
 > 当前单引擎事实见 [`ADR-0201`](./ADR-0201-single-engine-facade-consolidation.md) 与
 > [`glossary-single-engine-facade`](./glossary-single-engine-facade.md)。
+>
+> **订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）**：下文「client 能力列表」词条所述 `BuildConfig.CLIENT_KINDS` 字段已随本次清理删除（全仓零读点；ADR-0062 / ADR-0164 状态已同步订正），正文按存档原样保留。
 
 > 范围：`pictelio-app`（webview 客户端）与 `app-lynx`（Lynx 客户端）双端共有的引擎切换机制、UI 入口与错误处理概念。配套 ADR：[ADR-0062-single-engine-client-switch-hiding.md](./ADR-0062-single-engine-client-switch-hiding.md)、[ADR-0064-engine-switch-experience-fix.md](./ADR-0064-engine-switch-experience-fix.md)、[ADR-0153-engine-availability-fallback.md](./ADR-0153-engine-availability-fallback.md)、[ADR-0159-bridge-thread-unblocking.md](./ADR-0159-bridge-thread-unblocking.md)、[ADR-0164-default-engine-lynx-bidirectional-fallback.md](./ADR-0164-default-engine-lynx-bidirectional-fallback.md)。
 

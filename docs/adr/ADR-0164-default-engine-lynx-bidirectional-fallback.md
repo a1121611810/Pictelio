@@ -1,8 +1,9 @@
 # ADR-0164: 默认引擎翻转为 Lynx 与双向引擎降级
 
-- 状态：accepted；**「缺省 Lynx」部分仍生效，「双向引擎降级」部分已失效**（2026-09-28 单引擎化，`c6ade216`）
-  - 仍生效：Lynx 是唯一渲染引擎；`CLIENT_KINDS[0]` 为缺省引擎的单一事实来源。
+- 状态：accepted；**「缺省 Lynx」部分仍生效，「双向引擎降级」与 `CLIENT_KINDS[0]` 事实源条款已失效**（2026-09-28 单引擎化 `c6ade216`；2026-10-18 订正，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）
+  - 仍生效：**Lynx 是唯一渲染引擎**——单引擎化后的结构性保证（「缺省 Lynx」语义已被内化，不再依赖运行时判定）。
   - 已失效：本文的双向降级机制（`EngineRoute` / `EnginePrefs` / 降级原因码 / 失败记忆 / 无引擎双失败页）**已随手术整体删除**——无第二个引擎可降级。`docs/adr/glossary-client-switch.md` 中的引擎决策相关词条与 `docs/specs/engine-default-lynx-bidirectional-fallback.md` §8 取证格表（`engine-fallback-matrix.spec.ts` M1–M3'）**一并失效，不可再作为发版 gate 执行**。
+  - 已失效：决策 1「Java 侧默认值单一事实来源 = full flavor `CLIENT_KINDS` 的首元素」与决策 2 的「`CLIENT_KINDS` 含 lynx」合取项——`buildConfigField "String[]", "CLIENT_KINDS"` 于本次订正（2026-10-18，[#1043](https://github.com/a1121611810/Pictelio/issues/1043)）后删除（全仓零读点；最后一个 Java 读点已随 `82cb05bd` 删除，`[0]` 下标读点为零）。
   - **本文不是被推翻，是被执行完毕后的收敛**：其决策目的是「让 Lynx 成为缺省且永不误降级」，单引擎化把该结论固化为结构性保证，代价是降级能力本身不再需要。
   - 后续如有 WebView 线重建，本 ADR 的双向降级章节**须重新评估**，不可直接复用。
 - 日期：2026-09-16
