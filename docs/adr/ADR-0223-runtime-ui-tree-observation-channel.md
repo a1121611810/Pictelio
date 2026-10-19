@@ -3,7 +3,7 @@
 - **状态**：已接受（Accepted，2026-10-20）｜**T0 最小验证已落地**（模拟器实跑，见 §4 证据）
 - **日期**：2026-10-20
 - **相关**：[ADR-0136（benchNav 深链验证通道，DEBUG 门禁范式）](./ADR-0136-bench-nav-deep-link-validation.md)、[ADR-0220（通知送达通道探测，跨端载荷约定）](./ADR-0220-notification-delivery-channel-probe.md)、[ADR-0163（QA 防线三网）](./ADR-0163-qa-defense-lines.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)
-- **术语文档**：`packages/android-host/CONTEXT.md`（宿主词汇层）
+- **术语文档**：`packages/android-host/CONTEXT.md`「运行时 UI 树观测通道（runtime UI tree dump）」
 - **证据**：spec [docs/specs/app-lynx-ui-tree-dump-t0.md](../specs/app-lynx-ui-tree-dump-t0.md)｜issue [#1045](https://github.com/a1121611810/Pictelio/issues/1045)｜T0 实测样本见 §3.2
 
 ---
@@ -43,7 +43,7 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | 触发通道 | intent extra `uiTreeDump=1`，沿用 benchNav / 通知落点同款通道 | 零新增组件、零 `app-lynx` 改动；热启动（`onNewIntent`）同样生效 ⇒ 人可自行掌握拍树时机 |
 | 采样点 | 冷启动 `onLoadSuccess` + 热启动 `onNewIntent` 两处 | 只接冷启动则「App 已在跑时补拍」不可用——那正是主要用法 |
 | 门禁 | `BuildConfig.DEBUG` 作为**判定函数的入参**（非埋在分支里） | release 变体该字段是字面量 `false`（常量表达式 → javac 内联）⇒ 整块成死代码被 R8 移除；入参化让「门禁」本身可被 JVM 单测证伪 |
-| 采样时机 | **连拍三份**（0 / 1.5 / 4s）；**落齐判据 = 按已知档位等齐** | `onLoadSuccess` 时 JS 未必渲染完，早拍拿到半棵树。实测体积 8.2KB → 9.0KB → 61.0KB，**4s 那份才是完整树**。判据必须按**档位**而不是「计数连续两次不变」——后者窗口约 1.2s < 档位间隔 2.5s，必然在空档里 break，**丢掉的正是 4s 那份**且静默 exit 0 |
+| 采样时机 | **连拍三份**（0 / 1.5 / 4s）；**落齐判据 = 按已知档位等齐** | `onLoadSuccess` 时 JS 未必渲染完，早拍拿到半棵树。实测体积 8.2KB → 9.0KB → 61.0KB，**4s 那份才是完整树**。判据必须按**档位**而不是「计数连续两次不变」——后者窗口约 1.2s < 档位间隔 2.5s，必然在空档里 break，**丢掉的正是 4s 那份**且静默 exit 0。落齐后另加 ≤2.5s **静默期**（冷启动命中 cold + hot 两轮，两轮 4s 档落盘时间可能差几百毫秒） |
 | 落盘 | 应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json` | `adb pull` 直拉（真机可用，不需 `run-as`）；随卸载清理；序号+时间戳 ⇒ 多次触发不覆盖；**带采样点与档位** ⇒ 冷启动同时命中 cold/hot 两轮时能分清哪份属哪轮、哪份才是完整树（否则只能靠体积猜） |
 | 写盘 | 临时文件 + rename 原子写；写盘 IO 移交后台线程 | 引擎两个回调都落 UI 线程，几 MB 写盘不能占 UI 线程；rename 前目标文件不完整 ⇒ `adb pull` 会拉到半截 JSON |
 | 产物形态 | **引擎原始 JSON 原样落盘**，摘要由本地脚本现算 | 诊断场景常是「不知道缺什么」——预先裁字段就丢答案；加工逻辑不进 APK |
@@ -80,6 +80,8 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 抓取往返耗时 4–10ms（140 节点 / 55,895 字节；实测最坏样本往返 83ms）⇒ **UI 线程开销可忽略**（大树另计）。日志字段名取「抓取往返耗时」而非「序列化耗时」——它覆盖的是「发起抓取 → 拿到 JSON」整段往返，序列化只是其中一段。
 
+宿主侧度量日志字段（logcat `UiTreeDump`）：`字节=` · `节点数=` · `抓取往返耗时=` · `采样点=` · `采样延迟=` · `路径=`。**节点数由宿主在落盘线程解析 JSON 得出**（不占 UI 线程；口径与脚本侧 `summarize` 一致 ⇒ 两边数字可互校）——现场只有 logcat 时也能判断树有多大。
+
 **真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,945 字节 / 140 节点 / 深度 10）。脱敏只改**内容值**（作品 id 数字 → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`），**结构统计量与原始抓取逐项一致**（节点数 / 深度 / class 覆盖 / id 数 / a11y 数 / 事件分布 / tag 分布）。
 
 ### 3.3 尚未覆盖
@@ -89,17 +91,31 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **「连拍三份」的调度时序**：由 Handler 驱动，单测只断言常量取值，不验证时序。
 - **dex 级「R8 确实移除了本类」**：无 dex 级断言。既有 `verify:android-host:release-buildconfig` 门禁**只证取值**（release 变体的 `BuildConfig.DEBUG` 为 `false`），证不到「早退分支被绕开」，也证不到 R8 移除。
 
-### 3.4 本通道的机器防线（第 1 轮 review 后补齐）
+### 3.4 本通道的机器防线（第 1 轮 review 后补齐，第 2 轮又补了两处判别力缺口）
 
-本通道横跨 **Java 宿主 / Node 脚本**两侧，两侧无共享代码；且「release 不导出」这条承诺原先只有约定、没有机器防线。第 1 轮 review 把这两处补成可执行门禁：
+本通道横跨 **Java 宿主 / Node 脚本**两侧，两侧无共享代码；且「release 不导出」这条承诺原先只有约定、没有机器防线。第 1 轮 review 把这两处补成可执行门禁；**第 2 轮 review 又用反事实实测出三处「门禁存在但没判别力」的缺口**（见下表末三行的说明）：
 
 | 防线 | 位置 | 守住什么 |
 |---|---|---|
 | 协议常量逐字比对（6 个要素）+ **行为面**比对 | `UiTreeDumpProtocolContractTest`（JVM） | extra 键 / 目录名 / 文件名前后缀 / 采样档位 / 采样点标识两侧一致；且**宿主真实产出的产物名必须能被脚本侧正则解析**（只比常量不够——产物名是宿主造、脚本解） |
 | 协议抽取器有效性 | 同上 | 抽取到**恰好 1 条**才算数（正则失配 ⇒ 抽取为空 ⇒「两侧相等」变恒真断言） |
-| DEBUG 门禁**调用点接线**源级守卫 | `tests/unit/uiTreeDumpReleaseGate.test.ts` | `UiTreeDump.scheduleIfRequested` 的**每个**调用点都必须传 `BuildConfig.DEBUG` 与采样点标识；含**阳性对照**（把 `DEBUG` 换成 `true` 的合成源码必须打红） |
+| DEBUG 门禁**调用点接线**源级守卫 | `tests/unit/uiTreeDumpReleaseGate.test.ts` | `UiTreeDump.scheduleIfRequested` 的**每个**调用点都必须传 `BuildConfig.DEBUG` 与采样点标识 |
 | 落齐判据回归 | `tests/unit/scripts/ui-tree-dump-core.test.ts` | 缺 4s 档时**不得**判落齐（守住「最完整那份被静默丢弃」这个已发生的缺陷） |
 | 真实样本回放 | 同上 | 摘要统计量对着**真实抓取样本**断言（节点数 / 深度 / 字段覆盖 / 事件分布 / tag 分布） |
+| **退出码门禁** | 同上（`exitCodeFor`） | 未落齐 / 超时 / 拉回失败 / 非法 JSON ⇒ **非零退出码**。第 1 轮只改了告警文案、退出码仍是 0 ⇒ 「静默 exit 0」缺陷**未闭环**；退出码是判据里唯一能被机器读到的那一半，故下沉成纯函数并单测 |
+| **DEBUG 守卫的判别力**（第 2 轮补） | `uiTreeDumpReleaseGate.test.ts` | ① 扫描根从「写死 `LynxActivity.java`」扩到**同包全部生产 Java 源集**——第 1 版把第三个调用点放进别的 `.java` 即**骗过守卫**（外部复核变异体实测 GREEN）；② 实参**先剥注释再判定**——第 1 版裸 `includes("BuildConfig.DEBUG")`，实参真值写成 `true`、同实参列表里留一句 `// TODO 改回 BuildConfig.DEBUG` 即**7/7 全绿骗过**（Spec 轴 F2 阻塞项） |
+| **fixture 脱敏门禁**（第 2 轮补） | `tests/unit/scripts/ui-tree-dump-core.test.ts` | 断言 fixture 不含明文作品 id。第 1 轮只脱敏了 `attributes.id`、**顶层 `node.id` 仍留 15 处明文**（而摘要取 `node.id \|\| attributes.id` ⇒ 明文从顶层漏出）——脱敏声明当时是**不实**的（Spec 轴 F1 阻塞项） |
+
+**门禁规模线基线**（第 2 轮 review 实测登记，供下轮加码前对照；`workflows/review-fix-loop.md`「门禁冻结线」第 1 条）：
+
+| 门禁 | 被测对象 | 比例 |
+|---|---|---|
+| `uiTreeDumpReleaseGate.test.ts` | `LynxActivity.java`（1242 行） | 0.12 |
+| `ui-tree-dump-core.test.ts` | `ui-tree-dump-core.mjs`（181 行） | 0.99 |
+| `UiTreeDumpTest.java` | `UiTreeDump.java`（291 行） | 1.08 |
+| `UiTreeDumpProtocolContractTest.java` | 协议两侧承载文件（291 + 181 = 472 行） | 0.56 |
+
+⚠️ **取法说明**（避免下轮误判）：前三行是「单测 ↔ 单文件镜像」的字面比例，看着过半；但这四个文件 60–70% 是中文理由注释（AGENTS.md「中文注释为主」），真实判据体量很小。**更能反映「给回归创造就业」风险的量是门禁机器总量 vs 生产代码量 = 903 / 741 = 1.22×**（健康）。跨端契约那行若改按「协议常量条数」算会得出 1250% 的误导性数字——该门禁还重放了「宿主产物名 ↔ 脚本正则」的**行为面**，其契约由 `fileName()` 格式函数 + `ARTIFACT_NAME_RE_SOURCE` 定义，不由常量条数定义。
 
 ## 4. 证据
 

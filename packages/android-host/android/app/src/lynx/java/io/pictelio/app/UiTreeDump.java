@@ -17,6 +17,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
 /**
  * 运行时 UI 树导出（T0 最小验证；spec {@code docs/specs/app-lynx-ui-tree-dump-t0.md}，
  * 决策与能力边界见 ADR-0223）。
@@ -35,8 +40,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * ⇒ 本通道只给「结构 + 几何 + 事件」，不给「这个节点来自哪个 .vue」。
  *
  * <p><b>门禁</b>：整段以 {@code BuildConfig.DEBUG} 包裹。release 变体里该字段是字面量
- * {@code false}（常量表达式 → javac 内联）⇒ 分支恒 false、整块成死代码、被 R8 移除，
- * 生产 APK 不含任何导出能力（与 ADR-0136 benchNav / {@code pictelio_dev_*} 通道同范式）。
+ * {@code false}（常量表达式 → javac 内联）⇒ 分支恒 false、整块成死代码，
+ * <b>预期</b>被 R8 移除、生产 APK 不含任何导出能力（与 ADR-0136 benchNav /
+ * {@code pictelio_dev_*} 通道同范式）。⚠️ <b>口径</b>：可执行门禁
+ * {@code verifyReleaseBuildConfig} <b>只证取值</b>（release 变体的
+ * {@code BuildConfig.DEBUG} 为 {@code false}），<b>证不到 R8 确实移除了本类</b>——
+ * 那需要 dex 级断言，本仓目前没有（ADR-0223 §3.3 已登记该缺口）。
  *
  * <p><b>时机</b>：<b>不做</b>「等 JS 侧首载落定」——落定是逐页面属性（各页面/组件各自持有
  * {@code settled}，仓库无全局汇聚点），做成中央层需逐页改动，超出本票边界。改为
@@ -205,14 +214,29 @@ final class UiTreeDump {
 
     /** 落盘（移交 I/O 线程：引擎回调在 UI 线程，几 MB 写盘不能占 UI 线程）。 */
     private static void persist(Context context, String json, long delayMs, long elapsedMs, String point) {
-        IO.execute(() -> {
-            File dir = resolveOutputDir(context);
-            if (dir == null) {
-                Log.w(TAG, "UI 树落盘失败：getExternalFilesDir 返回 null（无可用外部存储）");
-                return;
-            }
-            writeArtifact(dir, json, delayMs, elapsedMs, point);
-        });
+        IO.execute(() -> writeArtifactTo(context, json, delayMs, elapsedMs, point));
+    }
+
+    /**
+     * 落盘入口（<b>可测 seam</b>：把「取目录」与「写文件」接起来，让「目录拿不到」这条失败路径
+     * 也能被 JVM 单测钉住）。
+     *
+     * <p>为什么把「目录为 null」这条分支也做成可测：它是 IO 边界的**失败路径**之一
+     * （测试硬约束 #1 要求成功 + 失败双路径都有单测）。原先这条分支藏在
+     * {@code persist} 的后台任务里 ⇒ 测不到 ⇒ 「拿不到外部存储 ⇒ 什么都不发生」
+     * 这一形态是静默的。
+     *
+     * @return 成功返回 {@code null}；失败返回失败原因（同时已打 WARN 日志）
+     */
+    static String writeArtifactTo(
+            Context context, String json, long delayMs, long elapsedMs, String point) {
+        File dir = resolveOutputDir(context);
+        if (dir == null) {
+            String reason = "getExternalFilesDir 返回 null（无可用外部存储）";
+            Log.w(TAG, "UI 树落盘失败：" + reason);
+            return reason;
+        }
+        return writeArtifact(dir, json, delayMs, elapsedMs, point);
     }
 
     /**
@@ -234,8 +258,10 @@ final class UiTreeDump {
             File target = new File(dir, fileName(point, delayMs, SEQ.incrementAndGet(),
                     System.currentTimeMillis()));
             writeAtomically(target, json);
+            int nodes = countNodes(json);
             Log.i(TAG, "UI 树已落盘 " + target.getName()
                     + " 字节=" + target.length()
+                    + " 节点数=" + (nodes >= 0 ? String.valueOf(nodes) : "解析失败")
                     + " 抓取往返耗时=" + elapsedMs + "ms"
                     + " 采样点=" + point
                     + " 采样延迟=" + delayMs + "ms"
@@ -245,6 +271,45 @@ final class UiTreeDump {
             Log.w(TAG, "UI 树落盘异常（采样点=" + point + "，延迟 " + delayMs + "ms）", t);
             return "写盘异常：" + t.getClass().getSimpleName();
         }
+    }
+
+    /**
+     * 数一棵树的节点数。
+     *
+     * <p><b>为什么宿主侧也要数</b>：spec US4 与 issue #1045 的 T0-2 都承诺
+     * 「logcat 里留下体积 / 耗时 / **节点数**」——节点数是判断「这条通道在真机上是否可用」
+     * 的关键量（树越大 ⇒ 序列化越慢、文件越大）。而摘要脚本给的节点数要**拉回文件后**才看得到，
+     * 现场判断时手边只有 logcat。
+     *
+     * <p><b>为什么放在 I/O 线程</b>：解析一棵大树是毫秒级操作，而引擎回调落在 UI 线程
+     * ⇒ 计数一律在落盘线程做，绝不占 UI 线程。
+     *
+     * <p><b>口径与脚本侧一致</b>：根节点算 1 个；只沿 {@code children} 递归。
+     * （脚本侧 {@code summarize} 是同一口径 ⇒ 两边数字可互校。）
+     *
+     * @return 节点数；JSON 解析失败返回 {@code -1}（调用方据此打「解析失败」而非假数字）
+     */
+    static int countNodes(String json) {
+        try {
+            Object root = new JSONTokener(json).nextValue();
+            return countJsonNodes(root);
+        } catch (JSONException e) {
+            return -1;
+        }
+    }
+
+    /** 递归计数（口径：根算 1，只沿 children 下探）。 */
+    private static int countJsonNodes(Object value) {
+        if (!(value instanceof JSONObject)) return 0;
+        JSONObject node = (JSONObject) value;
+        int count = 1;
+        JSONArray children = node.optJSONArray("children");
+        if (children != null) {
+            for (int i = 0; i < children.length(); i++) {
+                count += countJsonNodes(children.opt(i));
+            }
+        }
+        return count;
     }
 
     /**

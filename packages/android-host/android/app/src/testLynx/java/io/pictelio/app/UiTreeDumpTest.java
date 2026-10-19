@@ -11,6 +11,7 @@ import static org.junit.Assert.fail;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.util.Log;
 
 import androidx.test.core.app.ApplicationProvider;
@@ -266,7 +267,7 @@ public class UiTreeDumpTest {
     /**
      * 写盘成功路径：产出文件 + 返回 {@code null}（无失败原因）+ 打出 INFO 度量日志。
      *
-     * <p>度量日志里的字段是 spec US4 的承诺（体积 / 耗时），少一个字段就等于
+     * <p>度量日志里的字段是 spec US4 的承诺（体积 / 耗时 / <b>节点数</b>），少一个字段就等于
      * 「真机上没法判断这条通道可不可用」。此处钉住<b>字段名</b>而非具体数值
      * （数值随页面而变，不是契约）。
      */
@@ -289,9 +290,75 @@ public class UiTreeDumpTest {
 
         String log = allUiTreeDumpLogs();
         assertTrue("日志应含体积：[" + log + "]", log.contains("字节="));
+        assertTrue("日志应含节点数：[" + log + "]", log.contains("节点数="));
         assertTrue("日志应含耗时：[" + log + "]", log.contains("抓取往返耗时="));
         assertTrue("日志应含采样点：[" + log + "]", log.contains("采样点="));
         assertTrue("日志应含采样延迟：[" + log + "]", log.contains("采样延迟="));
+    }
+
+    // ── 节点计数（spec US4 的「节点数」承诺） ────────────────────────────
+
+    /**
+     * 计数口径：根算 1，只沿 {@code children} 下探。
+     *
+     * <p>期望值来自**结构**而非实现：一棵 4 节点的小树，节点数就是 4。
+     * 这是性质/不变量型断言（口径），不是从实现输出抄回来的数字。
+     */
+    @Test
+    public void countNodes_countsRootAndDescendants() {
+        String tree = "{\"tag\":\"page\",\"children\":["
+                + "{\"tag\":\"view\",\"children\":[{\"tag\":\"text\",\"children\":[]}]},"
+                + "{\"tag\":\"image\",\"children\":[]}]}";
+        assertEquals("根 + view + text + image = 4", 4, UiTreeDump.countNodes(tree));
+    }
+
+    /** 单节点树（无 children 字段）也要计 1——引擎的根节点就是这种形态。 */
+    @Test
+    public void countNodes_singleNodeTree_returnsOne() {
+        assertEquals("单节点树 = 1", 1, UiTreeDump.countNodes("{\"tag\":\"view\"}"));
+    }
+
+    /** 失败路径：非法 JSON ⇒ 返回 -1（让调用方打「解析失败」而不是假数字）。 */
+    @Test
+    public void countNodes_invalidJson_returnsMinusOne() {
+        assertEquals("非法 JSON ⇒ -1", -1, UiTreeDump.countNodes("{not json"));
+    }
+
+    /** 失败路径：空串 ⇒ 同样 -1，不抛异常。 */
+    @Test
+    public void countNodes_emptyString_returnsMinusOne() {
+        assertEquals("空串 ⇒ -1", -1, UiTreeDump.countNodes(""));
+    }
+
+    // ── 落盘：取不到外部存储目录（IO 失败双路径的另一半） ──────────────────
+
+    /**
+     * 「拿不到外部存储目录」这条失败路径必须<b>既返回失败原因、又打出 WARN</b>。
+     *
+     * <p>为什么必须覆盖：它原先藏在后台任务里 ⇒ 测不到 ⇒ 「什么都没发生」是静默的
+     * （测试硬约束 #1：IO 边界必须有成功 + 失败双路径）。
+     *
+     * <p>怎么制造：把 Robolectric 的外部文件目录列表置空 ⇒
+     * {@code getExternalFilesDir(null)} 返回 null（Android 契约：空数组 ⇒ 取不到目录）。
+     */
+    @Test
+    public void writeArtifactTo_externalDirUnavailable_reportsReasonAndWarns() {
+        // 用一个「取不到外部存储目录」的 Context 制造失败（不依赖 Robolectric 影子 API：
+        // 4.14 的 ShadowContextImpl 只有 protected 的 getter，没有公开 setter）。
+        Context noExternalDir = new ContextWrapper(appContext()) {
+            @Override
+            public File getExternalFilesDir(String type) {
+                return null;
+            }
+        };
+        ShadowLog.clear();
+
+        String reason = UiTreeDump.writeArtifactTo(
+                noExternalDir, "{\"tag\":\"view\"}", 4000L, 7L, UiTreeDump.POINT_COLD);
+
+        assertNotNull("取不到外部存储目录必须返回失败原因（不得静默）", reason);
+        assertTrue("原因应指向外部存储：" + reason, reason.contains("getExternalFilesDir"));
+        assertTrue("必须打出 WARN（人也要看得见）", warnedOnUiTreeDumpTag());
     }
 
     /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */

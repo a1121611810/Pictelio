@@ -2,7 +2,7 @@
 
 > 状态：implemented（2026-10-20，T0 验证通过并落地；依据 [ADR-0223](../adr/ADR-0223-runtime-ui-tree-observation-channel.md)）
 > 前置决策：ADR-0223（上游 UI source map 的 React-only 边界 + 本仓选定形态）
-> 术语：见 `packages/app-lynx/CONTEXT.md`；引擎能力事实见本 spec「Solution」
+> 术语：见 `packages/android-host/CONTEXT.md`「运行时 UI 树观测通道」（本票是**宿主侧**改动，零 app-lynx 改动）；引擎能力事实见本 spec「Solution」
 
 ## Problem Statement
 
@@ -43,7 +43,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 |---|---|---|---|
 | `tag` | 140/140 | `page`/`view`/`image`/`text` | 元素类型 |
 | `attributes.class` | 138/140 | Tailwind 类名数组（如 `["w-full","h-full","flex","flex-col","relative","bg-surface"]`） | **直接看出是哪个组件** |
-| `attributes.id` | 16/140 | 语义 id，含作品 id（`pictelio-hero-root` / `pictelio-hero-source-150995806`） | **定位到具体作品** |
+| `attributes.id` | 16/140 | 语义 id，含作品 id（`pictelio-hero-root` / `pictelio-hero-source-<illustId>`） | **定位到具体作品** |
 | `attributes.accessibility-label` | 有 | 如 `打开菜单`、`『少女』`（作品标题） | a11y 标注**在树里**（a11y 树并不暴露给 uiautomator） |
 | `attributes.vue-ref-N` | 132/140 | Vue 实例标记 | 区分同构实例 |
 | `attributes.style` | 有 | 已解析的内联样式（如 `height: 53px`） | 布局实况 |
@@ -57,11 +57,12 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 **相对官方 UI source map 的差距**：只有「源码位置」这一层拿不到（Vue 侧无 producer，见上）。**组件级信息不依赖它**。
 
-**时机实测**：连拍三份的体积为 8,168 / 8,961 / 61,013 字节 ⇒ **0ms 那份几乎是空树、4s 那份才是完整树**。「早拍拿到半棵树」是实测量，不是假设。
+**时机实测**：同一次触发的三份连拍体积为 8,168 / 8,961 / 61,013 字节 ⇒ **0ms 那份几乎是空树、4s 那份才是完整树**。「早拍拿到半棵树」是实测量，不是假设。
+⚠️ **两个体积口径来自不同次抓取，别混用**：本 spec 表格里的 55,895 字节 / 140 节点是**热启动、页面已渲染完**那一次的产物（入库 fixture 即此份，脱敏后 55,945 字节）；而 8,168 / 8,961 / 61,013 是**冷启动**那一次的三档连拍。同一页面在不同启动时机下的树大小不同（冷启动首拍几乎是空树）。
 
 **落地时踩到的真实缺陷（已修）**：诊断脚本原先用「连续两次轮询计数不变」判断「文件已落齐」——轮询窗口约 1.2s，而第 2→3 份间隔 2.5s ⇒ **必然在空档里提前收工**，丢掉的正是 4s 那份（唯一完整树），且 **exit 0 静默**。现判据改为**按已知档位等齐**（出现的采样点里至少有一轮三档齐），收不齐时**显式告警**而不是当作成功。回归由 `tests/unit/scripts/ui-tree-dump-core.test.ts` 钉住。
 
-**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（脱敏：作品 id → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`；结构统计量与原始抓取逐项一致）。
+**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（脱敏：作品 id → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`；结构统计量与原始抓取逐项一致）。⚠️ **脱敏要盖两处**：`attributes.id` **和**顶层 `node.id`（摘要取 `node.id || attributes.id`，只脱敏前者会从顶层漏出明文——第 2 轮 review 实测抓到 15 处明文作品 id）。已补单测断言 fixture 不含明文作品 id。
 
 ## User Stories
 
@@ -82,7 +83,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **门禁**：整段以 `BuildConfig.DEBUG` 包裹（与既有 `pictelio_dev_*` / benchNav 通道同范式）⇒ release 编译下为恒 false 死代码、被 R8 移除。
 - **连拍**：一次触发在 0 / 1.5 / 4s 三个时刻各抓一份，每份独立文件。间隔取自仓库既有的「四次投递 1.5/3/4.5/6s」防挂载竞态思路（ADR-0136 / ADR-0220）。
 - **产物名带采样点与档位**：`ui-tree-<cold|hot>-<0|1500|4000>ms-<序号>-<时间戳>.json`。理由：冷启动会同时命中 cold 与 hot 两轮（各 3 份，共 6 份），没有标识就分不清哪份属哪轮；而「哪份才是完整树」实测只能靠体积猜 ⇒ 把档位写进文件名。
-- **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。收不齐 ⇒ 显式告警 + 非零退出提示。
+- **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。落齐后再等一段**静默期**（≤2.5s），把冷启动另一轮迟到的产物也捞回来。收不齐 ⇒ 显式告警 **+ 非零退出码**（退出码判据是纯函数 `exitCodeFor`，在 `scripts/lib/ui-tree-dump-core.mjs` 里，有单测）。
 - **落盘位置**：应用专属外部目录下的 `ui-tree/` 子目录。文件名带序号 + 时间戳 ⇒ 多次触发不覆盖。
 - **写盘时机**：引擎两个回调都落在 **UI 线程** ⇒ 落盘 I/O 移交后台线程，UI 线程只做「拿到字符串就转交」。
 - **写盘方式**：临时文件 + 原子 rename ⇒ `adb pull` 不会读到半截 JSON。

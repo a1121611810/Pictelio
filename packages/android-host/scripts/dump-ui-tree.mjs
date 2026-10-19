@@ -19,6 +19,22 @@
  *
  * 本文件只做**编排**（调 adb / 轮询 / 打印）；可测的纯逻辑都在 ./lib/ui-tree-dump-core.mjs，
  * 那里有对应的单测（tests/unit/scripts/ui-tree-dump-core.test.ts）。
+ *
+ * <p><b>已知失效面（显式登记，不是缺陷，是本层的边界）</b>：
+ * <ul>
+ *   <li><b>编排层本身没有单测</b>：真正跑 adb 的部分需要真设备，无法在 CI 里单测。
+ *       可测的判据（落齐判据、退出码、产物名解析、摘要统计）**全部下沉到
+ *       {@code lib/ui-tree-dump-core.mjs} 并在那里单测</b>——这是本层唯一有机器防线的部分。</li>
+ *   <li><b>「拉回来的是不是本次触发产生的」靠文件名时间戳 + 目录清空近似</b>：
+ *       脚本用「触发前的文件集合」做差集来认新文件；若设备上另一个进程并发抓树，
+ *       差集里会混入别人的产物（认不出 ⇒ 摘要会多列几棵树，但不会静默丢）。</li>
+ *   <li><b>不做「哪一份才是完整树」的自动判定</b>：判据是「三档齐」，
+ *       「哪一份最完整」由人看体积/节点数决定（本轮实测 4s 那份最完整，但那是当次页面的事实，
+ *       不是通用规律）。</li>
+ *   <li><b>远端目录路径是按平台约定拼的</b>（{@code /sdcard/Android/data/<pkg>/files/<dir>}），
+ *       而宿主侧用 {@code getExternalFilesDir(null)} 动态取——两者靠约定相等，不靠字面量相等
+ *       （宿主侧与脚本侧的<b>目录名</b>由跨端协议门禁逐字比对，见 ADR-0223 §3.4）。</li>
+ * </ul>
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
@@ -32,6 +48,7 @@ import {
   REMOTE_DIR,
   SAMPLE_DELAYS_CSV,
   SAMPLE_DELAYS_MS,
+  exitCodeFor,
   parseArtifactName,
   planWait,
   summarize,
@@ -49,12 +66,23 @@ function adbPath() {
   throw new Error("找不到 adb：请设 ANDROID_HOME 或 ANDROID_SDK_ROOT");
 }
 
-const adb = adbPath();
+/**
+ * adb 路径（惰性解析）。
+ *
+ * <p>为什么惰性：原先在模块顶层 `const adb = adbPath()`，**import 即产生副作用**——
+ * 没有 adb 的环境（CI、别的机器）只要 import 本文件就会抛错。惰性化后模块可被安全 import，
+ * 也让「本文件被引用」不再等于「本机必须装了 adb」。
+ */
+let adbCache = null;
+function adb() {
+  if (!adbCache) adbCache = adbPath();
+  return adbCache;
+}
 
 /** 跑一条 adb 命令。返回 {stdout, stderr, status}；失败不抛（调用点自己判 status）。 */
 function adbRun(serial, args) {
   try {
-    const stdout = execFileSync(adb, ["-s", serial, ...args], {
+    const stdout = execFileSync(adb(), ["-s", serial, ...args], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       maxBuffer: 64 * 1024 * 1024,
@@ -128,10 +156,15 @@ function trigger(serial) {
  *
  * <p>判据（见 lib/ui-tree-dump-core.mjs 的 planWait）：
  * **按已知采样档位等齐**——宿主侧每轮连拍 3 份（0 / 1.5 / 4s，档位见 spec），
- * 落齐 = 出现的采样点里至少有一轮三档齐；再等一段静默期兜住「另一轮迟到的文件」。
+ * 落齐 = 出现的采样点里至少有一轮三档齐；落齐后再等一段**静默期**，
+ * 把「另一轮迟到」的文件也一并捞回来。
  *
  * <p>⚠️ 旧实现用「连续两次轮询计数不变」判落齐（窗口约 1.2s），而第 2→3 份间隔 2.5s
  * ⇒ 必然在空档里 break，**丢掉的正是 4s 那份（唯一完整树）**且 exit 0 静默。
+ *
+ * <p>为什么需要静默期：冷启动会同时命中 cold 与 hot **两轮**（各 3 份，共 6 份），
+ * 两轮的 4s 档几乎同时落盘但可能差几百毫秒——「一轮齐」时另一轮可能还差最后一档。
+ * 静默期只多花 ≤2.5s，却能把那几份捞回来。
  */
 async function waitForNewFiles(serial, before, waitMs) {
   const deadline = Date.now() + waitMs;
@@ -139,10 +172,37 @@ async function waitForNewFiles(serial, before, waitMs) {
   while (Date.now() < deadline) {
     appeared = listRemoteFiles(serial).filter((f) => !before.has(f));
     const plan = planWait(appeared, SAMPLE_DELAYS_MS);
-    if (plan.settled) return { files: appeared, plan };
+    if (plan.settled) {
+      return await collectQuietPeriod(serial, before, appeared, deadline);
+    }
     await sleep(300);
   }
   return { files: appeared, plan: planWait(appeared, SAMPLE_DELAYS_MS), timedOut: true };
+}
+
+/** 落齐后的静默期：连续若干次轮询没有新增文件即认为静默，提前收工。 */
+const QUIET_PERIOD_MS = 2500;
+const QUIET_STREAK_POLLS = 3;
+
+async function collectQuietPeriod(serial, before, appeared, deadline) {
+  const quietDeadline = Math.min(Date.now() + QUIET_PERIOD_MS, deadline);
+  const known = new Set(appeared);
+  let quietStreak = 0;
+  let files = appeared;
+  while (Date.now() < quietDeadline) {
+    await sleep(300);
+    const all = listRemoteFiles(serial).filter((f) => !before.has(f));
+    const fresh = all.filter((f) => !known.has(f));
+    if (fresh.length > 0) {
+      for (const f of fresh) known.add(f);
+      files = all;
+      quietStreak = 0;
+    } else {
+      quietStreak += 1;
+      if (quietStreak >= QUIET_STREAK_POLLS) break;
+    }
+  }
+  return { files, plan: planWait(files, SAMPLE_DELAYS_MS) };
 }
 
 async function main() {
@@ -162,7 +222,7 @@ async function main() {
         "排查顺序：① App 是否已装（debug 包）② logcat 里是否有「UI 树抓取请求已受理」\n" +
         "③ 是否为 release 包（本能力仅 DEBUG 构建存在）",
     );
-    process.exit(1);
+    process.exit(exitCodeFor({ settled: plan.settled, timedOut }));
   }
   if (!plan.settled) {
     // 收不齐必须显式告警：不能静默丢档位（实测丢的正是 4s 那份完整树）。
@@ -180,6 +240,8 @@ async function main() {
   if (!opts.keep) rmSync(opts.out, { recursive: true, force: true });
   mkdirSync(opts.out, { recursive: true });
 
+  let pullFailures = 0;
+  let invalidJson = 0;
   for (const name of appeared) {
     const local = join(opts.out, name);
     const pulled = adbRun(serial, ["pull", `${REMOTE_DIR}/${name}`, local]);
@@ -188,6 +250,7 @@ async function main() {
     }
     if (!existsSync(local)) {
       console.error(`[ui-tree] 拉回失败: ${name}`);
+      pullFailures += 1;
       continue;
     }
     const bytes = statSync(local).size;
@@ -196,6 +259,7 @@ async function main() {
       tree = JSON.parse(readFileSync(local, "utf8"));
     } catch (e) {
       console.error(`[ui-tree] ${name} 不是合法 JSON（${e.message}），字节=${bytes}`);
+      invalidJson += 1;
       continue;
     }
     const s = summarize(tree);
@@ -225,6 +289,8 @@ async function main() {
   if (timedOut) {
     console.error("[ui-tree] ⚠️ 等待超时（采样未确认落齐），请核对上面的档位清单。");
   }
+  // 退出码 = 唯一能被机器读到的那一半失败信号（判据纯函数在 core 层，有单测）。
+  process.exit(exitCodeFor({ settled: plan.settled, timedOut, pullFailures, invalidJson }));
 }
 
 /** 解析命令行参数（缺值/未知参数 ⇒ exit 2，不静默忽略）。 */

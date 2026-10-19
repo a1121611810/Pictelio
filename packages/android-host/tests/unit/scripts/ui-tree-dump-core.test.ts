@@ -12,6 +12,7 @@ import {
   POINT_IDS_CSV,
   SAMPLE_DELAYS_CSV,
   SAMPLE_DELAYS_MS,
+  exitCodeFor,
   parseArtifactName,
   planWait,
   summarize,
@@ -29,6 +30,18 @@ import {
 // 3. 协议常量的期望值来自**宿主侧** io.pictelio.app.UiTreeDump —— 两侧逐字一致性由
 //    宿主侧 JVM 单测 UiTreeDumpProtocolContractTest 承担（Java/Node 无共享代码，
 //    只能各写各的字面量 + 逐字比对）。本文件断言的是「脚本侧常量自洽」。
+//
+// ── 已知失效面（显式登记，非缺陷）──
+//
+// - **样本是单页快照**：fixture 是 2026-10-20 在模拟器 `pictelio_ui` 上抓的**推荐页**
+//   脱敏样本，只覆盖这一个页面的结构；换页面 / 换引擎版本后字段分布会漂移
+//   ⇒ 本文件断言的是「摘要口径对这份样本成立」，不是「所有页面的字段分布」。
+// - **只认「至少一轮齐」**：`planWait` 的落齐判据是「出现的采样点里至少有一轮三档齐」，
+//   不是「所有轮都齐」——冷启动会命中 cold + hot 两轮，另一轮迟到不应误判超时。
+// - **「两侧 CSV 逐字相等」即认定同步**：本文件不解析协议的实际语义，只比对字符串；
+//   语义是否被真正消费由宿主侧 JVM 门禁与实机锚点承担。
+// - **协议方向不对称**：宿主侧的 `SAMPLE_DELAYS_CSV` 由数组**派生**（改档位只改一处），
+//   而脚本侧是**手写字面量** ⇒ 脚本侧改档位不会自动传播，必须靠跨端门禁比对出来。
 
 const FIXTURE = resolvePath(
   dirname(fileURLToPath(import.meta.url)),
@@ -122,6 +135,61 @@ describe("planWait（落齐判据）", () => {
     expect(plan.settled).toBe(false);
     expect(plan.seenDelays).toEqual([]);
     expect(plan.groups).toEqual([]);
+  });
+});
+
+describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
+  // 第 2 轮 review 实测抓到：只脱敏了 `attributes.id`，**顶层 `node.id` 仍是明文作品 id**
+  // （15 处）——而摘要取 `node.id || attributes.id` ⇒ 明文会从顶层漏出来。
+  // ⇒ 这条断言是「脱敏声明」的机器防线，不是走过场。
+  const raw = readFileSync(FIXTURE, "utf-8");
+
+  it("fixture 不含明文作品 id（pictelio-hero-source-<数字>）", () => {
+    const plaintext = raw.match(/pictelio-hero-source-\d{6,}/g) ?? [];
+    expect(
+      plaintext,
+      `fixture 残留 ${plaintext.length} 处明文作品 id —— 脱敏只改了 attributes.id、漏了顶层 node.id`,
+    ).toEqual([]);
+  });
+
+  it("脱敏占位符确实存在于两处（attributes.id 与顶层 node.id 都换掉了）", () => {
+    const topLevelIds: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== "object") return;
+      const n = node as Record<string, unknown>;
+      if (typeof n.id === "string") topLevelIds.push(n.id);
+      for (const child of (n.children ?? []) as unknown[]) walk(child);
+    };
+    walk(realTree);
+    expect(topLevelIds.filter((id) => id.includes("<illustId>")).length).toBe(15);
+  });
+});
+
+describe("exitCodeFor（退出码 = 机器读得到的那一半失败信号）", () => {
+  it("成功路径：落齐 + 未超时 + 无拉回失败 + JSON 合法 ⇒ 0", () => {
+    expect(exitCodeFor({ settled: true, timedOut: false, pullFailures: 0, invalidJson: 0 })).toBe(
+      0,
+    );
+  });
+
+  it("失败路径 · 采样未落齐 ⇒ 非零（丢 4s 那份最不能算成功）", () => {
+    expect(exitCodeFor({ settled: false, timedOut: false })).toBe(1);
+  });
+
+  it("失败路径 · 等待超时 ⇒ 非零", () => {
+    expect(exitCodeFor({ settled: true, timedOut: true })).toBe(1);
+  });
+
+  it("失败路径 · 拉回失败 ⇒ 非零（设备上有、本地没有 ⇒ 产物集不完整）", () => {
+    expect(exitCodeFor({ settled: true, timedOut: false, pullFailures: 1 })).toBe(1);
+  });
+
+  it("失败路径 · JSON 不合法 ⇒ 非零（不是引擎原始 JSON ⇒ 通道本身出问题）", () => {
+    expect(exitCodeFor({ settled: true, timedOut: false, invalidJson: 1 })).toBe(1);
+  });
+
+  it("缺省字段按 0 处理（拉回失败/非法 JSON 未发生时不得误判失败）", () => {
+    expect(exitCodeFor({ settled: true })).toBe(0);
   });
 });
 

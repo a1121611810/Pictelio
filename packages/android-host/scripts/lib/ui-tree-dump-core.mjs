@@ -116,6 +116,34 @@ export function planWait(names, expectedDelays = SAMPLE_DELAYS_MS) {
 }
 
 /**
+ * 运行结果的退出码（纯函数 ⇒ 可单测）。
+ *
+ * <p><b>为什么必须有</b>：CLI 编排层此前对「采样未落齐」只打 `console.error`、**退出码仍是 0**——
+ * 而「丢 4s 那份且静默 exit 0」正是本轮要修的缺陷。**只改文案不改退出码 = 缺陷未闭环**：
+ * 调用方按 `$?` 判定仍拿到「成功」。退出码是这套判据里**唯一能被机器读到**的那一半，
+ * 所以它必须落在一个可单测的纯函数里，而不是埋在 CLI 的分支中。
+ *
+ * <p>判定项与理由：
+ * <ul>
+ *   <li><b>未落齐</b> ⇒ 1：最完整的那份（4s 档）可能没到，产物集不完整；</li>
+ *   <li><b>等待超时</b> ⇒ 1：同上（超时即未能确认落齐）；</li>
+ *   <li><b>拉回失败</b> ⇒ 1：文件在设备上但没拿到，本地产物集不完整；</li>
+ *   <li><b>JSON 不合法</b> ⇒ 1：产物不是引擎原始 JSON ⇒ 通道本身出问题。</li>
+ * </ul>
+ * 全部满足才 0。
+ *
+ * @param {{settled: boolean, timedOut?: boolean, pullFailures?: number, invalidJson?: number}} result
+ * @returns {number} 进程退出码
+ */
+export function exitCodeFor(result) {
+  if (!result.settled) return 1;
+  if (result.timedOut) return 1;
+  if ((result.pullFailures ?? 0) > 0) return 1;
+  if ((result.invalidJson ?? 0) > 0) return 1;
+  return 0;
+}
+
+/**
  * 统计一棵树。
  *
  * <p>除了基础计数，另给四项「诊断价值最高」的派生量：
