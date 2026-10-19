@@ -15,11 +15,11 @@
  * 而 release 包会真的导出 UI 树 —— 门禁只由「约定」保证，没有机器防线。
  *
  * ## 扫描面（第 2 轮 review 修过两次）
- * ① 扫描根**不是**写死的 `LynxActivity.java`，而是**同包全部生产 Java 源文件**
- *    （`src/lynx/java/**` + `src/main/java/**` 递归）。第 1 版只扫单文件 ⇒
- *    「第三个调用点放进别的 .java 文件」实测**骗过守卫**（外部复核的变异体 M4 GREEN）。
- *    `UiTreeDump` 是 package-private，只有 `io.pictelio.app` 包内的类能合法调用它，
- *    所以「同包生产源集」就是**完备**的调用点全集。
+ * ① 扫描根**不是**写死的 `LynxActivity.java`，而是**两个生产源集的全部 Java 源文件**
+ *    （`src/lynx/java/**` + `src/main/java/**` 递归，实测 57 文件，其中 1 个在
+ *    `io.pictelio.app.config`）。第 1 版只扫单文件 ⇒「第三个调用点放进别的 .java 文件」
+ *    实测**骗过守卫**（外部复核的变异体 M4 GREEN）；`UiTreeDump` 是 package-private
+ *    ⇒ 跨包不可能有合法调用点，真正的边界是「**新增 source set / 新增模块**不在面内」。
  * ② 实参文本**先剥注释再判定**：第 1 版用裸 `args.includes("BuildConfig.DEBUG")`，
  *    实参真值写成 `true`、同一实参列表里留一句 `// TODO 改回 BuildConfig.DEBUG`
  *    ⇒ 实测守卫 7/7 全绿而 release 真的会导出（Spec 轴 F2 阻塞项）。

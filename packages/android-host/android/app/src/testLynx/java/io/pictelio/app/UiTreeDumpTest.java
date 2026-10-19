@@ -57,7 +57,7 @@ import java.nio.file.Files;
  *       本测试只断言该常量本身的取值，不验证调度时序。</li>
  *   <li><b>证不到产物名的跨端可解析性</b>：产物名要被 Node 侧诊断脚本反解（采样点 + 档位），
  *       那是<b>跨端接缝</b>，由 {@code UiTreeDumpProtocolContractTest} 的
- *       「Java 产出 ↔ Node 解析」共享 fixture 钉住，不在本测试范围。</li>
+ *       「两侧字面量逐字比对 + 行为面（宿主真实产物名撞脚本侧正则）」钉住，不在本测试范围。</li>
  * </ul>
  */
 @RunWith(RobolectricTestRunner.class)
