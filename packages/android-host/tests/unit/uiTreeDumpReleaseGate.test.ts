@@ -19,7 +19,7 @@
  *    （`src/lynx/java/**` + `src/main/java/**` 递归，实测 57 文件，其中 1 个在
  *    `io.pictelio.app.config`）。第 1 版只扫单文件 ⇒「第三个调用点放进别的 .java 文件」
  *    实测**骗过守卫**（外部复核的变异体 M4 GREEN）；`UiTreeDump` 是 package-private
- *    ⇒ 跨包不可能有合法调用点，真正的边界是「**新增 source set / 新增模块**不在面内」。
+ *    ⇒ 跨包不可能有合法调用点，真正的边界是「**已存在的 `src/debug` 变体源集**（见下方已知失效面）**与新增 source set / 新增模块**不在面内」。
  * ② 实参文本**先剥注释再判定**：第 1 版用裸 `args.includes("BuildConfig.DEBUG")`，
  *    实参真值写成 `true`、同一实参列表里留一句 `// TODO 改回 BuildConfig.DEBUG`
  *    ⇒ 实测守卫 7/7 全绿而 release 真的会导出（Spec 轴 F2 阻塞项）。
@@ -62,6 +62,11 @@
  *   但会让诊断者按 ADR 反复陈述的「三场景 → cold/hot 份数」读错归属，
  *   而本通道的产物正是给人读的。把判定收紧成「实参**恰好**等于 `POINT_COLD` / `POINT_HOT`」
  *   属**判据强度变更**，见 **#1049**（不在本票范围）。
+ * - **不扫描 `src/debug` 变体源集**：本能力**只存在于 debug 变体**（`BuildConfig.DEBUG` 闸门），
+ *   而 `src/debug/` 是 AGP 自动编译进 debug 变体的**活源集**（实测存在 `AndroidManifest.xml`、
+ *   当前 0 个 `.java`）⇒ 将来把调用点放进它是自然写法，却**不在扫描面内**（第 14 轮 Spec 轴实测抓出；
+ *   此前本文件头把它写成「新增 source set」的**未来假设**）。把 `src/debug/java` 加进扫描根属
+ *   **判据强度变更**，见 **#1049**（不在本票范围）。
  */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
