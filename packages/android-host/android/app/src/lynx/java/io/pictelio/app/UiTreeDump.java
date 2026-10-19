@@ -336,7 +336,7 @@ final class UiTreeDump {
      *
      * <p>形如 {@code ui-tree-cold-4000ms-3-1700000000000.json}：
      * 采样点让人分辨「冷启动那轮 / 热启动那轮」，档位让人分辨「早拍还是晚拍」——
-     * 实测 4s 那份才是完整树（8KB → 9KB → 61KB），没有档位就只能靠体积猜。
+     * 实测 4s 那份才是完整树（8KB → 9KB → 61KB；⚠️ 单次抓取口径，字节数随内容漂移，见 ADR-0223 §3.2），没有档位就只能靠体积猜。
      */
     static String fileName(String point, long delayMs, int seq, long timestampMillis) {
         return FILE_PREFIX + point + "-" + delayMs + "ms-" + seq + "-" + timestampMillis + FILE_SUFFIX;

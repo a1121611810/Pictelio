@@ -27,7 +27,7 @@ import {
 //    脱敏只改**内容值**（作品 id 数字、标题/作者名文本），不改结构
 //    （节点数 / 深度 / 字段覆盖 / 事件分布均与原始抓取逐项一致，见 spec「T0 实测结论」）。
 // 2. 落齐判据的期望值来自 spec「Implementation Decisions · 连拍」：0 / 1.5 / 4s 三档，
-//    且 spec 明写「4s 那份才是完整树」（实测 8KB → 9KB → 61KB）。
+//    且 spec 明写「4s 那份才是完整树」（实测 8KB → 9KB → 61KB；⚠️ 单次抓取口径，见 ADR-0223 §3.2）。
 // 3. 协议常量的期望值来自**宿主侧** io.pictelio.app.UiTreeDump —— 两侧逐字一致性由
 //    宿主侧 JVM 单测 UiTreeDumpProtocolContractTest 承担（Java/Node 无共享代码，
 //    只能各写各的字面量 + 逐字比对）。本文件断言的是「脚本侧常量自洽」。

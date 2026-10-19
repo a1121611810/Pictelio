@@ -4,7 +4,7 @@
 // import 即产生副作用，无法直接单测——先例：release-version-json.mjs（release.mjs 的
 // plan/execute 分离）。
 //
-// 本模块承载四件事：
+// 本模块承载五件事：
 // ① **跨端协议常量**（与宿主侧 io.pictelio.app.UiTreeDump 逐字对应，由宿主侧
 //    UiTreeDumpProtocolContractTest 做两侧比对——Java/Node 两套运行时无共享代码）；
 // ② **产物名解析**（从文件名反解采样点 + 采样档位）；
@@ -64,7 +64,7 @@ export const REMOTE_DIR = `/sdcard/Android/data/${APP_PACKAGE}/files/${OUT_DIR_N
  * <p>为什么产物名要带采样点与档位：① 命中几个采样点**取决于进程怎么死的**
  * （2026-10-20 模拟器三场景实测）：App 正在跑 ⇒ hot 3 份；进程死、任务记录还在
  * ⇒ cold + hot 共 6 份；`am force-stop` ⇒ cold 3 份——没有标识就分不清哪份属于哪一轮；
- * ② 实测 4s 那份才是完整树（8KB → 9KB → 61KB），没有档位就只能靠体积猜。
+ * ② 实测 4s 那份才是完整树（8KB → 9KB → 61KB；⚠️ 单次抓取口径，字节数随内容漂移，见 ADR-0223 §3.2），没有档位就只能靠体积猜。
  */
 export const ARTIFACT_NAME_RE_SOURCE =
   "^ui-tree-(?<point>[a-z]+)-(?<delay>\\d+)ms-(?<seq>\\d+)-(?<ts>\\d+)\\.json$";

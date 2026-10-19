@@ -177,7 +177,7 @@ public class UiTreeDumpProtocolContractTest {
      * 采样档位两侧一致：脚本据此判断「哪一份才是完整树」并等齐。
      *
      * <p>档位漂移 ⇒ 脚本的等齐判据失准 ⇒ 静默丢掉最完整的那一份（实测 4s 那份是唯一完整树，
-     * 8KB → 9KB → 61KB）。这是 **T0 实测**阶段抓到过的真实缺陷。
+     * 8KB → 9KB → 61KB；⚠️ 单次抓取口径，见 ADR-0223 §3.2）。这是 **T0 实测**阶段抓到过的真实缺陷。
      */
     @Test
     public void sampleDelayTiers_matchesBetweenHostAndScript() throws Exception {
