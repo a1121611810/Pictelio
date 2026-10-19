@@ -42,6 +42,14 @@
 // （注入的是真实 scripts 表的内存副本，不碰仓库文件、不落临时文件），所以它在任何环境下都跑得动。
 // 标记 `[root-gate-detector-start/end]` 之间是完整判据区间，可原样抽取给 /tmp 副本做人工反事实。
 //
+// ## 体量裁决（门禁冻结线，2026-10-19 round 5 review 记录）
+//
+// 本文件 523 行，被守对象（根 package.json 两脚本 + 3 份 workflow + 根 vite.config）按行数
+// 字面算超过「单个门禁文件 > 被测对象 30%」的冻结线；按契约门禁先例（agentsMd.contract
+// 305 行守 311 行 AGENTS.md，已被接受）判**不过度**：判据核心约 200 行（纯函数 + 反事实
+// 常驻 + 失效面登记），体量由门禁纪律要求的要素决定，不是加码刷门禁。**后续停止加码**；
+// 若要再大，先把判据/夹具拆成 helper 并重新论证分子口径。
+//
 // ## 已知失效面（抓不到什么）—— 显式登记，见 `workflows/review-fix-loop.md` §门禁纪律
 //
 // **已覆盖范围（2026-10-19；别读成「全管」）**：根 package.json 的 check:all / test:all 与
@@ -49,6 +57,9 @@
 // **残余盲区**：
 // 1. **CI 的非字面量路径**：.github/actions/** 的 composite action、`uses:` 远端/可复用 workflow、
 //    动态 shell（变量展开/命令替换/alias）、环境变量（`VP_CACHE=1`）、Gradle 缓存均不在扫描面。
+//    ①-a **workflow 扫描器本体**：按行去 `#` 注释时不区分引号 —— 同一行引号内先出现 `#` 时，
+//    后续 token 会被当注释跳过（可能漏报）；`echo --cache` 这类非 `vp run` 文本会 fail-closed
+//    误报。二者均为已知残余（误报方向安全），出现实例再按「显式登记 + 正反例」扩展。
 // 2. **run.cache 的其它注入形态**：函数/异步工厂配置、或 `run: { cache: 表达式 }` 时按 fail-closed
 //    判红（宁可误报）；`run.tasks` 的 task 缓存默认开启，但门禁脚本是 script 非 task，不属本防线。
 // 3. 其它 vp run 脚本（`build:all` / `dev:all` / 各包裸命令…）被加缓存开关抓不到 —— 只守
