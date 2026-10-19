@@ -1,14 +1,17 @@
 package io.pictelio.app;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.app.Application;
 import android.content.Context;
+import android.util.Log;
 
 import androidx.test.core.app.ApplicationProvider;
 
@@ -18,6 +21,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowLog;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,12 +47,16 @@ import java.nio.file.Files;
  * <ul>
  *   <li><b>证不到 release 变体的真实行为</b>：本测试跑在 debug 变体，
  *       {@code BuildConfig.DEBUG} 为 true。release 下「恒 false ⇒ 整块被 R8 移除」那一半
- *       由 release 变体的可执行门禁（{@code verifyReleaseBuildConfig} 一族）承担；
- *       本测试只证<b>判定函数</b>在 {@code debugBuild=false} 时返回 false。</li>
+ *       <b>只由取值门禁承担</b>（{@code verifyReleaseBuildConfig} 证「release 侧 DEBUG 是
+ *       字面量 false」）；<b>「R8 确实移除了本类」没有任何机器防线</b>（无 dex 级断言），
+ *       这一层是代码级推论：常量表达式内联 + {@code proguard-rules.pro} 无本类 keep 规则。</li>
  *   <li><b>证不到引擎真的回调</b>：{@code getLynxElementRoot} / {@code toJSONString}
  *       需要真实 LynxView 与引擎，本测试不覆盖——那正是 T0 的模拟器实测部分。</li>
  *   <li><b>证不到连拍调度</b>：{@code SAMPLE_DELAYS_MS} 的三份采样由 Handler 驱动，
  *       本测试只断言该常量本身的取值，不验证调度时序。</li>
+ *   <li><b>证不到产物名的跨端可解析性</b>：产物名要被 Node 侧诊断脚本反解（采样点 + 档位），
+ *       那是<b>跨端接缝</b>，由 {@code UiTreeDumpProtocolContractTest} 的
+ *       「Java 产出 ↔ Node 解析」共享 fixture 钉住，不在本测试范围。</li>
  * </ul>
  */
 @RunWith(RobolectricTestRunner.class)
@@ -82,6 +90,24 @@ public class UiTreeDumpTest {
         assertFalse("release 构建 + 缺失 extra ⇒ 不触发", UiTreeDump.shouldDump(false, null));
     }
 
+    // ── 连拍档位 ──────────────────────────────────────────────────────────
+
+    /**
+     * 连拍档位 = 0 / 1500 / 4000ms（spec「Implementation Decisions · 连拍」）。
+     *
+     * <p>为什么单独钉：这组档位同时是<b>跨端协议</b>——诊断脚本按它判断「哪一份才是完整树」
+     * （4000ms 那份，实测 8KB → 9KB → 61KB）。档位一改而脚本没跟上 ⇒ 脚本等齐判据失准，
+     * 又变成「静默丢掉最完整那份」。
+     */
+    @Test
+    public void sampleDelays_areTheThreeAgreedTiers() {
+        assertArrayEquals(
+                "连拍档位必须是 0 / 1500 / 4000ms（spec Implementation Decisions）",
+                new long[] {0L, 1500L, 4000L},
+                UiTreeDump.SAMPLE_DELAYS_MS);
+        assertEquals("CSV 形态（跨端协议比对面）", "0,1500,4000", UiTreeDump.SAMPLE_DELAYS_CSV);
+    }
+
     // ── 落盘位置与文件名 ────────────────────────────────────────────────
 
     /**
@@ -94,7 +120,8 @@ public class UiTreeDumpTest {
     public void resolveOutputDir_isUnderAppSpecificExternalDir() {
         File dir = UiTreeDump.resolveOutputDir(appContext());
         assertNotNull("专属外部目录在 Robolectric 下应可用", dir);
-        assertEquals("子目录名", UiTreeDump.DIR_NAME, dir.getName());
+        // 字面量而非实现常量：常量与由它构造出的名字互比只能证「还在用 DIR_NAME」（自证）
+        assertEquals("子目录名（spec「落盘位置」逐字）", "ui-tree", dir.getName());
         assertEquals(
                 "父目录必须是 app 专属外部目录本身（adb pull 直拉的前提）",
                 appContext().getExternalFilesDir(null),
@@ -102,20 +129,39 @@ public class UiTreeDumpTest {
     }
 
     /**
-     * 文件名互不覆盖：序号不同 ⇒ 名不同；序号相同但时间戳不同 ⇒ 名也不同。
+     * 文件名互不覆盖：采样点 / 档位 / 序号 / 时间戳任一不同 ⇒ 名不同。
      *
      * <p>为什么重要：一次触发会连拍多份（0/1.5/4s），多份必须各自独立成文件——
      * 覆盖会让「挑那份渲染完整的」这件事失效。
      */
     @Test
-    public void fileName_isUniqueAcrossSequenceAndTimestamp() {
-        String a = UiTreeDump.fileName(1, 1_700_000_000_000L);
-        String b = UiTreeDump.fileName(2, 1_700_000_000_000L);
-        String c = UiTreeDump.fileName(1, 1_700_000_000_001L);
+    public void fileName_isUniqueAcrossPointDelaySequenceAndTimestamp() {
+        String a = UiTreeDump.fileName(UiTreeDump.POINT_COLD, 0L, 1, 1_700_000_000_000L);
+        String b = UiTreeDump.fileName(UiTreeDump.POINT_COLD, 0L, 2, 1_700_000_000_000L);
+        String c = UiTreeDump.fileName(UiTreeDump.POINT_COLD, 0L, 1, 1_700_000_000_001L);
+        String d = UiTreeDump.fileName(UiTreeDump.POINT_COLD, 1500L, 1, 1_700_000_000_000L);
+        String e = UiTreeDump.fileName(UiTreeDump.POINT_HOT, 0L, 1, 1_700_000_000_000L);
 
         assertNotEquals("序号不同 ⇒ 文件名不同", a, b);
         assertNotEquals("时间戳不同 ⇒ 文件名不同", a, c);
+        assertNotEquals("档位不同 ⇒ 文件名不同", a, d);
+        assertNotEquals("采样点不同 ⇒ 文件名不同", a, e);
         assertTrue("以 .json 结尾（脚本按扩展名筛文件）", a.endsWith(".json"));
+        assertTrue("带 ui-tree- 前缀（脚本按前缀筛产物）", a.startsWith("ui-tree-"));
+    }
+
+    /**
+     * 产物名带采样点与采样档位（供 Node 侧诊断脚本反解）。
+     *
+     * <p>为什么：① 冷启动同时命中 cold 与 hot 两个采样点（各 3 份，共 6 份），
+     * 没有标识就分不清哪份属于哪一轮；② 实测 4s 那份才是完整树，没有档位就只能靠体积猜。
+     */
+    @Test
+    public void fileName_encodesSamplingPointAndDelay() {
+        String name = UiTreeDump.fileName(UiTreeDump.POINT_COLD, 4000L, 7, 1_700_000_000_000L);
+        assertTrue("含采样点：" + name, name.contains("cold"));
+        assertTrue("含档位（ms）：" + name, name.contains("4000ms"));
+        assertTrue("含序号：" + name, name.contains("-7-"));
     }
 
     // ── 写盘：成功路径 ──────────────────────────────────────────────────
@@ -129,7 +175,7 @@ public class UiTreeDumpTest {
     @Test
     public void writeAtomically_writesExactContentAndLeavesNoTempFile() throws Exception {
         File dir = tmp.newFolder("ui-tree");
-        File target = new File(dir, UiTreeDump.fileName(1, 1_700_000_000_000L));
+        File target = new File(dir, UiTreeDump.fileName(UiTreeDump.POINT_COLD, 0L, 1, 1_700_000_000_000L));
         String content = "{\"tag\":\"view\",\"children\":[{\"tag\":\"text\"}]}";
 
         UiTreeDump.writeAtomically(target, content);
@@ -191,5 +237,77 @@ public class UiTreeDumpTest {
         File[] leftovers = dir.listFiles((d, n) -> n.endsWith(".tmp"));
         assertNotNull("目录应可列举", leftovers);
         assertEquals("失败后不得残留临时文件", 0, leftovers.length);
+    }
+
+    /**
+     * 写盘失败必须<b>既返回失败原因、又打出 WARN</b>（禁静默降级的双重要求）。
+     *
+     * <p>怎么制造失败：让目标目录的<b>父路径是一个普通文件</b> ⇒ {@code mkdirs} 必然失败。
+     *
+     * <p>为什么两件事都要断言：返回原因让调用方能判；WARN 日志让<b>人</b>能看见。
+     * 只做前者 ⇒ 用户在 logcat 里看不到任何线索；只做后者 ⇒ 调用方以为成功了。
+     */
+    @Test
+    public void writeArtifact_directoryCreationFails_reportsReasonAndWarns() throws Exception {
+        File blocker = tmp.newFile("blocker-file");
+        File impossibleDir = new File(blocker, "ui-tree");
+        ShadowLog.clear();
+
+        String reason = UiTreeDump.writeArtifact(
+                impossibleDir, "{\"tag\":\"view\"}", 4000L, 7L, UiTreeDump.POINT_COLD);
+
+        assertNotNull("目录创建失败必须返回失败原因（不得静默）", reason);
+        assertTrue("原因应指向目录创建：" + reason, reason.contains("目录创建失败"));
+        assertTrue("必须打出 WARN（人也要看得见）", warnedOnUiTreeDumpTag());
+        String[] listed = impossibleDir.list();
+        assertEquals("失败时不应产出任何文件", 0, listed == null ? 0 : listed.length);
+    }
+
+    /**
+     * 写盘成功路径：产出文件 + 返回 {@code null}（无失败原因）+ 打出 INFO 度量日志。
+     *
+     * <p>度量日志里的字段是 spec US4 的承诺（体积 / 耗时），少一个字段就等于
+     * 「真机上没法判断这条通道可不可用」。此处钉住<b>字段名</b>而非具体数值
+     * （数值随页面而变，不是契约）。
+     */
+    @Test
+    public void writeArtifact_succeeds_returnsNullAndLogsMetrics() throws Exception {
+        File dir = new File(tmp.newFolder("ui-tree-ok"), "nested");
+        ShadowLog.clear();
+
+        String reason = UiTreeDump.writeArtifact(
+                dir, "{\"tag\":\"view\"}", 4000L, 7L, UiTreeDump.POINT_COLD);
+
+        assertNull("成功时不应返回失败原因", reason);
+        assertTrue("目录应被创建", dir.isDirectory());
+        File[] produced = dir.listFiles((d, n) -> n.endsWith(".json"));
+        assertNotNull("目录应可列举", produced);
+        assertEquals("应产出 1 份产物", 1, produced.length);
+        assertTrue(
+                "产物名应含采样点与档位：" + produced[0].getName(),
+                produced[0].getName().contains("cold") && produced[0].getName().contains("4000ms"));
+
+        String log = allUiTreeDumpLogs();
+        assertTrue("日志应含体积：[" + log + "]", log.contains("字节="));
+        assertTrue("日志应含耗时：[" + log + "]", log.contains("抓取往返耗时="));
+        assertTrue("日志应含采样点：[" + log + "]", log.contains("采样点="));
+        assertTrue("日志应含采样延迟：[" + log + "]", log.contains("采样延迟="));
+    }
+
+    /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */
+    private static boolean warnedOnUiTreeDumpTag() {
+        for (ShadowLog.LogItem item : ShadowLog.getLogsForTag(UiTreeDump.TAG)) {
+            if (item.type == Log.WARN) return true;
+        }
+        return false;
+    }
+
+    /** 本用例窗口内 UiTreeDump tag 的全部日志文本（拼成一行便于多子串断言）。 */
+    private static String allUiTreeDumpLogs() {
+        StringBuilder sb = new StringBuilder();
+        for (ShadowLog.LogItem item : ShadowLog.getLogsForTag(UiTreeDump.TAG)) {
+            sb.append(item.msg).append('\n');
+        }
+        return sb.toString();
     }
 }

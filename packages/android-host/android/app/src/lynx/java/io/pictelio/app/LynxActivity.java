@@ -660,7 +660,12 @@ public class LynxActivity extends AppCompatActivity {
                 // → javac 内联）⇒ shouldDump 恒 false、整块成死代码被 R8 移除，生产 APK 不含
                 // 导出能力（与 benchNav 同范式，但不在调用点写 if，是为了让「门禁值」成为
                 // 可单测的入参而不是埋在分支里）。
-                UiTreeDump.scheduleIfRequested(LynxActivity.this, lynxView, getIntent(), BuildConfig.DEBUG);
+                // ⚠️ 调用点的 BuildConfig.DEBUG 实参是 release 门禁的**接线点**：
+                //   改成 true 会让 release 包也导出 UI 树。该接线由
+                //   tests/unit/uiTreeDumpReleaseGate.test.ts 源级守卫钉住。
+                UiTreeDump.scheduleIfRequested(
+                        LynxActivity.this, lynxView, getIntent(), BuildConfig.DEBUG,
+                        UiTreeDump.POINT_COLD);
             }
 
             @Override
@@ -1132,9 +1137,12 @@ public class LynxActivity extends AppCompatActivity {
         dispatchNotificationTarget(intent);
         // UI 树导出（T0）：热启动采样点——「App 已在跑时再拍一张」是本通道的主要用法，
         // 也让人自己掌握拍树时机（自动等「首载落定」的替代品，见 spec Out of Scope）。
-        // ⚠️ 不判冷热：onNewIntent 在冷启动时也会于 bundle 加载之后送达（e940 实测），
-        // 判错会把「本次是否采样」判反。真正的门禁是 extra 是否存在 + DEBUG 闸门。
-        UiTreeDump.scheduleIfRequested(this, lynxView, intent, BuildConfig.DEBUG);
+        // ⚠️ 不判冷热：onNewIntent 在冷启动时也会于 bundle 加载之后送达
+        // （e2e #940 实测：通知冷启动链路），判错会把「本次是否采样」判反。
+        // 真正的门禁是 extra 是否存在 + DEBUG 闸门。
+        // ⇒ 冷启动会同时命中 cold 与 hot 两个采样点，各拍 3 份，共 6 份（ADR-0223）。
+        UiTreeDump.scheduleIfRequested(
+                this, lynxView, intent, BuildConfig.DEBUG, UiTreeDump.POINT_HOT);
     }
 
     @Override

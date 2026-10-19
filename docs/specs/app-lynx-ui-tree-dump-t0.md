@@ -1,7 +1,7 @@
 # app-lynx 运行时 UI 树导出 · T0 最小验证（能否落地）
 
-> 状态：ready-for-agent
-> 前置决策：无（ADR 待 T0 结论落地后补，见「Further Notes」）
+> 状态：implemented（2026-10-20，T0 验证通过并落地；依据 [ADR-0223](../adr/ADR-0223-runtime-ui-tree-observation-channel.md)）
+> 前置决策：ADR-0223（上游 UI source map 的 React-only 边界 + 本仓选定形态）
 > 术语：见 `packages/app-lynx/CONTEXT.md`；引擎能力事实见本 spec「Solution」
 
 ## Problem Statement
@@ -10,7 +10,7 @@
 
 已记录的既有限制（本仓此前实测，见 `docs/specs/qa-defense-lines.md` 与 `packages/app-lynx/CONTEXT.md`）：
 
-- Lynx 4.0.1 **不暴露无障碍树节点**：全仓 199 处 `accessibility-element` 标注也不出节点；
+- Lynx 4.0.1 **不暴露无障碍树节点**：全仓 `.vue` 源码 220 处 `accessibility-element` 标注也不出节点（口径：`grep -rn accessibility-element packages --include=*.vue | wc -l`）；
 - `uiautomator dump` 在 `pictelio_ui` 上必被 SIGKILL（exit 137），拿不到快照；
 - 三处 e2e spec（`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags`）当年的应对是**整体退到截图 + 像素分析**，从未先区分「拿不到观测」与「观测里没有节点」。
 
@@ -35,7 +35,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 ## T0 实测结论（模拟器 `pictelio_ui`，推荐页，2026-10-20）
 
-**结论：能落地。** 一条命令拿到完整 UI 树 JSON（55,895 字节 / 140 节点 / 最大深度 10 / 序列化耗时 4–10ms）。
+**结论：能落地。** 一条命令拿到完整 UI 树 JSON（55,895 字节 / 140 节点 / 最大深度 10 / 抓取往返耗时 4–10ms）。
 
 **引擎实际吐出的节点字段**（登录后推荐页，140 节点实测计数）：
 
@@ -59,6 +59,10 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 **时机实测**：连拍三份的体积为 8,168 / 8,961 / 61,013 字节 ⇒ **0ms 那份几乎是空树、4s 那份才是完整树**。「早拍拿到半棵树」是实测量，不是假设。
 
+**落地时踩到的真实缺陷（已修）**：诊断脚本原先用「连续两次轮询计数不变」判断「文件已落齐」——轮询窗口约 1.2s，而第 2→3 份间隔 2.5s ⇒ **必然在空档里提前收工**，丢掉的正是 4s 那份（唯一完整树），且 **exit 0 静默**。现判据改为**按已知档位等齐**（出现的采样点里至少有一轮三档齐），收不齐时**显式告警**而不是当作成功。回归由 `tests/unit/scripts/ui-tree-dump-core.test.ts` 钉住。
+
+**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（脱敏：作品 id → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`；结构统计量与原始抓取逐项一致）。
+
 ## User Stories
 
 1. 作为 app-lynx 维护者，我希望在模拟器上**一条命令**拿到当前页面的运行时 UI 树 JSON，以便回答「这个页面到底渲染了什么」。
@@ -76,7 +80,9 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **宿主侧新增一个独立类**承载抓取与落盘，不把逻辑塞进 `LynxActivity`（后者已 1200+ 行）。职责：判定是否该抓 → 调引擎 API → 落盘 → 告警与度量。
 - **触发协议**：intent extra 键 `uiTreeDump`，值为非空字符串即触发（与 benchNav 的 extra 风格一致）。冷启动在 `onLoadSuccess` 抓、热启动在 `onNewIntent` 抓——两处都要接，否则「App 已在跑时补拍」不可用（这正是 T0 要验证的主要用法）。
 - **门禁**：整段以 `BuildConfig.DEBUG` 包裹（与既有 `pictelio_dev_*` / benchNav 通道同范式）⇒ release 编译下为恒 false 死代码、被 R8 移除。
-- **连拍**：一次触发在 0 / 1.5 / 4s 三个时刻各抓一份，每份独立文件（文件名含序号与时间戳，不互相覆盖）。间隔取自仓库既有的「四次投递 1.5/3/4.5/6s」防挂载竞态思路（ADR-0136 / ADR-0220）。
+- **连拍**：一次触发在 0 / 1.5 / 4s 三个时刻各抓一份，每份独立文件。间隔取自仓库既有的「四次投递 1.5/3/4.5/6s」防挂载竞态思路（ADR-0136 / ADR-0220）。
+- **产物名带采样点与档位**：`ui-tree-<cold|hot>-<0|1500|4000>ms-<序号>-<时间戳>.json`。理由：冷启动会同时命中 cold 与 hot 两轮（各 3 份，共 6 份），没有标识就分不清哪份属哪轮；而「哪份才是完整树」实测只能靠体积猜 ⇒ 把档位写进文件名。
+- **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。收不齐 ⇒ 显式告警 + 非零退出提示。
 - **落盘位置**：应用专属外部目录下的 `ui-tree/` 子目录。文件名带序号 + 时间戳 ⇒ 多次触发不覆盖。
 - **写盘时机**：引擎两个回调都落在 **UI 线程** ⇒ 落盘 I/O 移交后台线程，UI 线程只做「拿到字符串就转交」。
 - **写盘方式**：临时文件 + 原子 rename ⇒ `adb pull` 不会读到半截 JSON。
@@ -93,14 +99,17 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
   - release 门禁：非 debug 构建下恒不触发；
   - 落盘：目录路径形态、文件名不互相覆盖、原子写（写临时 + rename）、写盘失败显式告警且不吞。
 - **不可单测部分**（只能真机/模拟器实测，正是 T0 的交付物）：引擎是否真的回调、根元素是否非空、JSON 的实际字段集、实际体积与耗时。
-- **先例**：`PictelioAppModuleDebugBuildTest`（BuildConfig.DEBUG 门禁的机器防线）、`ImageHostConfigTest`（「接口即测试面」）、`TranslateEventContractTest`（协议两侧逐字比对）、`firstLoadViewWireup.test.ts`（源级守卫）。
+- **跨端协议门禁**（第 1 轮 review 补齐）：触发协议的名字、目录名、产物名前后缀、采样档位、采样点标识**同时存在于 Java 宿主与 Node 脚本两侧**，而两侧是不同语言、不同运行时、无共享代码 ⇒ 只能各写各的字面量。故由 `UiTreeDumpProtocolContractTest` 做**逐字比对**，并额外比**行为面**（宿主真实产出的产物名必须能被脚本侧正则解析）。抽取器须断言**恰好 1 条**——正则失配导致抽取为空时，「两侧相等」会变成恒真断言。
+- **DEBUG 门禁接线门禁**（第 1 轮 review 补齐）：宿主单测只直接调判定函数、**不碰调用点** ⇒ 把 `LynxActivity` 两处的 `BuildConfig.DEBUG` 改成 `true`，单测仍全绿而 release 包会真的导出 UI 树。故补**源级守卫**（`tests/unit/uiTreeDumpReleaseGate.test.ts`）：逐个调用点检查传的是 `BuildConfig.DEBUG` 与采样点标识，并带**阳性对照**（反事实源码必须打红）。
+- **真实样本回放**（第 1 轮 review 补齐）：Node 侧单测用入库的真实脱敏样本断言摘要统计量（节点数 / 深度 / 字段覆盖 / 事件分布 / tag 分布），守住「摘要口径变了」这件事不被无声改掉。
+- **先例**：`PictelioAppModuleDebugBuildTest`（BuildConfig.DEBUG 门禁的机器防线）、`ImageHostConfigTest`（「接口即测试面」）、`TranslateEventContractTest`（协议两侧逐字比对）、`firstLoadViewWireup.test.ts`（源级守卫）、`webviewRemovalInvariants.test.ts`（源级守卫 + 阳性对照）。
 - **不做**：本票不新增 e2e spec；不把 UI 树接进任何既有门禁。
 
 ## Out of Scope
 
 - **UI source map / 源码反解**：`enableUiSourceMap` 是 React-only，vue-lynx 侧无 producer ⇒ 本仓拿不到源码位置。此路已由上游能力边界判死，不在本票尝试。
 - **e2e 断言接入**：`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags` 三处基于树的断言**另开票**（依赖本票产出的真实字段清单来定契约）。
-- **自动等「首载落定」**：「首载落定」是逐页面属性（12 个页面/组件各自持有 `settled`，共享的只有 `deriveFirstLoadView` 纯函数），仓库无全局落定概念 ⇒ 做成中央层需 12 处改动。T0 用「连拍 + 人工选样本」绕开。
+- **自动等「首载落定」**：「首载落定」是逐页面属性（各页面/组件各自持有 `settled`，共享的只有 `deriveFirstLoadView` 纯函数），仓库无全局落定概念 ⇒ 做成中央层需逐页改动。T0 用「连拍 + 人工选样本」绕开。
 - **子树 / 按 id 取元素**：`LynxElement` 在 SDK 4.0.1 里**只有一个公开方法** `toJSONString` ⇒ 只能整棵抓。
 - **release 构建可用**、**生产问题定位**、**导出到宿主可读路径之外**、**导出给非调试用户**。
 - **工具链升级**（rspeedy 0.13.6→0.18.2 等）：与本能力无关，不在本票。
@@ -108,5 +117,5 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 ## Further Notes
 
 - **为什么不做自动等落定**：原设想是「等 JS 侧首载落定后再 dump」。核查发现落定是逐页面属性、无全局汇聚点，「改一处」的前提不成立（详见 Out of Scope）。T0 改为「连拍多份 + 人工选样本」；若后续证明时机是核心问题，再单独立项做中央落定层。
-- **T0 结论落地后补 ADR-0223**：记录「UI source map 在 Vue 侧不可用」这一上游能力边界，以及本票最终选定的抓取协议、落点与门禁形态。当前编号水位 ADR-0222。
+- **ADR-0223 已落档**：[ADR-0223](../adr/ADR-0223-runtime-ui-tree-observation-channel.md) 记录「UI source map 在 Vue 侧不可用」这一上游能力边界、本票选定的抓取协议/落点/门禁形态，以及本通道的机器防线清单。
 - **若 T0 证伪**（引擎不回调 / 树为空 / 字段无诊断价值），本 spec 作废、ADR 记录证伪结论与后续方向，不留半成品能力。

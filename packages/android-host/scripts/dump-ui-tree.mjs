@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * 运行时 UI 树导出 · 诊断脚本（T0 最小验证）
- * spec: docs/specs/app-lynx-ui-tree-dump-t0.md · issue #1045
+ * spec: docs/specs/app-lynx-ui-tree-dump-t0.md · issue #1045 · ADR-0223
  *
  * 用法:
  *   node packages/android-host/scripts/dump-ui-tree.mjs [选项]
  *
  * 选项:
  *   --serial <s>   设备序列号（默认：ANDROID_E2E_SERIAL → 首个在线模拟器）
- *   --wait <ms>    等文件出现的最长时间（默认 20000）
+ *   --wait <ms>    等新文件出现的最长时间（默认 20000）
  *   --out <dir>    拉回本地目录（默认 <tmp>/pictelio-ui-tree）
  *   --keep         不清空本地目录里的旧文件
  *
@@ -16,37 +16,26 @@
  *
  * 摘要里最关键的一项是**节点字段清单**（每个字段在多少个节点上出现过）——
  * 它回答「引擎到底吐什么」，是 T0 的核心产出（反解源码位置不在能力范围内，见 spec）。
+ *
+ * 本文件只做**编排**（调 adb / 轮询 / 打印）；可测的纯逻辑都在 ./lib/ui-tree-dump-core.mjs，
+ * 那里有对应的单测（tests/unit/scripts/ui-tree-dump-core.test.ts）。
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const APP_PACKAGE = "io.pictelio.app";
-/**
- * 组件名必须写成 `pkg/.Class` 形态。
- * 写成 `pkg.Class`（少个斜杠）会被 ActivityManager 判为「Bad component name」——
- * `am start` 直接 exit 255，且**不启动任何东西**（静默失败，最容易误判成「能力没落地」）。
- */
-const LYNX_ACTIVITY = `${APP_PACKAGE}/.LynxActivity`;
-const EXTRA_TRIGGER = "uiTreeDump";
-const REMOTE_DIR = `/sdcard/Android/data/${APP_PACKAGE}/files/ui-tree`;
-
-function parseArgs(argv) {
-  const opts = { serial: null, wait: 20_000, out: join(tmpdir(), "pictelio-ui-tree"), keep: false };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--serial") opts.serial = argv[++i];
-    else if (a === "--wait") opts.wait = Number(argv[++i]);
-    else if (a === "--out") opts.out = resolve(argv[++i]);
-    else if (a === "--keep") opts.keep = true;
-    else {
-      console.error(`未知参数: ${a}`);
-      process.exit(2);
-    }
-  }
-  return opts;
-}
+import {
+  EXTRA_TRIGGER,
+  FILE_SUFFIX,
+  LYNX_ACTIVITY,
+  REMOTE_DIR,
+  SAMPLE_DELAYS_CSV,
+  SAMPLE_DELAYS_MS,
+  parseArtifactName,
+  planWait,
+  summarize,
+} from "./lib/ui-tree-dump-core.mjs";
 
 /** 定位 adb（与 e2e env.ts 同思路：ANDROID_HOME → ANDROID_SDK_ROOT → macOS 默认路径）。 */
 function adbPath() {
@@ -63,13 +52,12 @@ function adbPath() {
 const adb = adbPath();
 
 /** 跑一条 adb 命令。返回 {stdout, stderr, status}；失败不抛（调用点自己判 status）。 */
-function adbRun(serial, args, opts = {}) {
+function adbRun(serial, args) {
   try {
     const stdout = execFileSync(adb, ["-s", serial, ...args], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       maxBuffer: 64 * 1024 * 1024,
-      ...opts,
     });
     return { stdout, stderr: "", status: 0 };
   } catch (e) {
@@ -108,9 +96,8 @@ function listRemoteFiles(serial) {
   return out
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.endsWith(".json"));
+    .filter((l) => l.endsWith(FILE_SUFFIX));
 }
-
 /**
  * 触发抓取：向 LynxActivity 发一个 intent extra（冷启动走 onLoadSuccess，热启动走 onNewIntent）。
  *
@@ -137,66 +124,25 @@ function trigger(serial) {
 }
 
 /**
- * 统计一棵树。
+ * 等新文件落齐。
  *
- * <p>除了基础计数，另给四项「诊断价值最高」的派生量：
- * <ul>
- *   <li><b>class 覆盖率</b>：Tailwind 类名挂在多少节点上（≈「这棵树有多可读」）；</li>
- *   <li><b>语义 id 清单</b>：非空 id 的节点（仓库已在用 {@code id="pictelio-..."} 约定）；</li>
- *   <li><b>a11y 标签清单</b>：{@code accessibility-label}（a11y 树不暴露给 uiautomator，
- *       但它在 UI 树里——这是本通道相对既有手段的增量）；</li>
- *   <li><b>事件名分布</b>：哪些节点可交互、绑的是哪种事件。</li>
- * </ul>
+ * <p>判据（见 lib/ui-tree-dump-core.mjs 的 planWait）：
+ * **按已知采样档位等齐**——宿主侧每轮连拍 3 份（0 / 1.5 / 4s，档位见 spec），
+ * 落齐 = 出现的采样点里至少有一轮三档齐；再等一段静默期兜住「另一轮迟到的文件」。
+ *
+ * <p>⚠️ 旧实现用「连续两次轮询计数不变」判落齐（窗口约 1.2s），而第 2→3 份间隔 2.5s
+ * ⇒ 必然在空档里 break，**丢掉的正是 4s 那份（唯一完整树）**且 exit 0 静默。
  */
-export function summarize(tree) {
-  let nodeCount = 0;
-  let maxDepth = 0;
-  let withClass = 0;
-  const tagCounts = new Map();
-  const fieldCounts = new Map();
-  const topLevel = [];
-  const ids = [];
-  const a11yLabels = [];
-  const eventNames = new Map();
-
-  const walk = (node, depth) => {
-    if (!node || typeof node !== "object") return;
-    nodeCount += 1;
-    maxDepth = Math.max(maxDepth, depth);
-    for (const [k, v] of Object.entries(node)) {
-      if (k === "children") continue;
-      fieldCounts.set(k, (fieldCounts.get(k) ?? 0) + 1);
-    }
-    const tag = typeof node.tag === "string" ? node.tag : "(无 tag)";
-    tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-    if (depth === 0) topLevel.push(tag);
-
-    const attrs = node.attributes ?? {};
-    if (Array.isArray(attrs.class) && attrs.class.length > 0) withClass += 1;
-    const id = node.id || attrs.id;
-    if (id) ids.push(`${tag}#${id}`);
-    if (attrs["accessibility-label"]) a11yLabels.push(`${tag}:"${attrs["accessibility-label"]}"`);
-    if (Array.isArray(node.events)) {
-      for (const ev of node.events) {
-        const name = typeof ev === "object" ? ev.eventName : String(ev);
-        eventNames.set(name, (eventNames.get(name) ?? 0) + 1);
-      }
-    }
-    if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
-  };
-
-  walk(tree, 0);
-  return {
-    nodeCount,
-    maxDepth,
-    topLevel,
-    withClass,
-    ids,
-    a11yLabels,
-    tagCounts: [...tagCounts.entries()].sort((a, b) => b[1] - a[1]),
-    fieldCounts: [...fieldCounts.entries()].sort((a, b) => b[1] - a[1]),
-    eventNames: [...eventNames.entries()].sort((a, b) => b[1] - a[1]),
-  };
+async function waitForNewFiles(serial, before, waitMs) {
+  const deadline = Date.now() + waitMs;
+  let appeared = [];
+  while (Date.now() < deadline) {
+    appeared = listRemoteFiles(serial).filter((f) => !before.has(f));
+    const plan = planWait(appeared, SAMPLE_DELAYS_MS);
+    if (plan.settled) return { files: appeared, plan };
+    await sleep(300);
+  }
+  return { files: appeared, plan: planWait(appeared, SAMPLE_DELAYS_MS), timedOut: true };
 }
 
 async function main() {
@@ -205,17 +151,11 @@ async function main() {
   console.log(`[ui-tree] 设备: ${serial}`);
 
   const before = new Set(listRemoteFiles(serial));
+  console.log(`[ui-tree] 设备: ${serial}  远端落盘目录: ${REMOTE_DIR}`);
   console.log(`[ui-tree] 触发抓取（extra ${EXTRA_TRIGGER}=1）…`);
   trigger(serial);
 
-  // 等新文件出现（连拍会在数秒内陆续落盘）
-  const deadline = Date.now() + opts.wait;
-  let appeared = [];
-  while (Date.now() < deadline) {
-    appeared = listRemoteFiles(serial).filter((f) => !before.has(f));
-    if (appeared.length > 0) break;
-    await sleep(300);
-  }
+  const { files: appeared, plan, timedOut } = await waitForNewFiles(serial, before, opts.wait);
   if (appeared.length === 0) {
     console.error(
       `[ui-tree] ${opts.wait}ms 内没有新文件出现。\n` +
@@ -224,26 +164,18 @@ async function main() {
     );
     process.exit(1);
   }
-  // 等连拍落齐：文件数连续两次轮询不再增长即视为落齐。
-  // ⚠️ 不能只等固定时长——连拍间隔是 0/1.5/4s 三档，固定 sleep 会漏掉最后一份。
-  let lastCount = -1;
-  let stableRounds = 0;
-  const settleDeadline = Date.now() + 15_000;
-  while (Date.now() < settleDeadline) {
-    await sleep(600);
-    const current = listRemoteFiles(serial).filter((f) => !before.has(f));
-    if (current.length === lastCount) {
-      if (++stableRounds >= 2) {
-        appeared = current;
-        break;
-      }
-    } else {
-      stableRounds = 0;
-      lastCount = current.length;
-    }
+  if (!plan.settled) {
+    // 收不齐必须显式告警：不能静默丢档位（实测丢的正是 4s 那份完整树）。
+    console.error(
+      `[ui-tree] ⚠️ 采样未落齐：${opts.wait}ms 内只等到 ${appeared.length} 份。\n` +
+        `预期每轮 ${SAMPLE_DELAYS_CSV} ms 三档齐备；实际到档 ${plan.seenDelays.join(",") || "(无)"}。\n` +
+        "缺档位意味着「最完整的那一份」可能没到——请看 logcat 里 UiTreeDump 的告警。",
+    );
   }
-  appeared = listRemoteFiles(serial).filter((f) => !before.has(f));
   console.log(`[ui-tree] 设备上新增 ${appeared.length} 份：${appeared.join(", ")}`);
+  for (const group of plan.groups) {
+    console.log(`[ui-tree]   采样点 ${group.point}：到档 ${group.delays.join(",")} ms`);
+  }
 
   if (!opts.keep) rmSync(opts.out, { recursive: true, force: true });
   mkdirSync(opts.out, { recursive: true });
@@ -267,15 +199,19 @@ async function main() {
       continue;
     }
     const s = summarize(tree);
+    const parsed = parseArtifactName(name);
     console.log(`\n=== ${name} ===`);
-    console.log(`字节=${bytes}  节点数=${s.nodeCount}  最大深度=${s.maxDepth}  带class=${s.withClass}/${s.nodeCount}`);
+    console.log(
+      `字节=${bytes}  节点数=${s.nodeCount}  最大深度=${s.maxDepth}  带class=${s.withClass}/${s.nodeCount}`,
+    );
+    console.log(`采样点=${parsed?.point ?? "?"}  采样延迟=${parsed?.delayMs ?? "?"}ms`);
     console.log(`顶层: ${s.topLevel.join(", ")}`);
     console.log("tag 分布:");
     for (const [tag, n] of s.tagCounts) console.log(`  ${String(n).padStart(6)}  ${tag}`);
     console.log("节点字段清单（出现次数）:");
     for (const [field, n] of s.fieldCounts) console.log(`  ${String(n).padStart(6)}  ${field}`);
     console.log(`事件名分布（${s.eventNames.length} 种）:`);
-    for (const [name, n] of s.eventNames) console.log(`  ${String(n).padStart(6)}  ${name}`);
+    for (const [evName, n] of s.eventNames) console.log(`  ${String(n).padStart(6)}  ${evName}`);
     if (s.ids.length) {
       console.log(`语义 id（${s.ids.length}）:`);
       for (const id of s.ids) console.log(`  ${id}`);
@@ -286,6 +222,45 @@ async function main() {
     }
   }
   console.log(`\n[ui-tree] 产物已拉回: ${opts.out}`);
+  if (timedOut) {
+    console.error("[ui-tree] ⚠️ 等待超时（采样未确认落齐），请核对上面的档位清单。");
+  }
+}
+
+/** 解析命令行参数（缺值/未知参数 ⇒ exit 2，不静默忽略）。 */
+function parseArgs(argv) {
+  const opts = {
+    serial: null,
+    wait: 20_000,
+    out: join(tmpdir(), "pictelio-ui-tree"),
+    keep: false,
+  };
+  const needValue = (flag, value) => {
+    if (value === undefined || value.startsWith("--")) {
+      console.error(`参数 ${flag} 缺少取值`);
+      process.exit(2);
+    }
+    return value;
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--serial") opts.serial = needValue(a, argv[++i]);
+    else if (a === "--wait") {
+      const raw = needValue(a, argv[++i]);
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) {
+        console.error(`参数 --wait 需为正整数毫秒，收到: ${raw}`);
+        process.exit(2);
+      }
+      opts.wait = n;
+    } else if (a === "--out") opts.out = resolve(needValue(a, argv[++i]));
+    else if (a === "--keep") opts.keep = true;
+    else {
+      console.error(`未知参数: ${a}`);
+      process.exit(2);
+    }
+  }
+  return opts;
 }
 
 main().catch((e) => {
