@@ -37,9 +37,12 @@ import org.json.JSONTokener;
  * （{@code enableUiSourceMap}）是 <b>React-only</b>——该开关只存在于
  * {@code @lynx-js/react-rsbuild-plugin}，打标端是 {@code @lynx-js/react} 的 React-JSX 专用
  * SWC 插件；vue-lynx 无等价实现，其 main-thread 变换不保留任何位置信息。
- * ⇒ 本通道只给「结构 + 几何 + 事件」，不给「这个节点来自哪个 .vue」。
+ * ⇒ 本通道只给「<b>结构 + 语义 + 几何 + 事件</b>」，不给「这个节点来自哪个 .vue」。
+ *   （语义层 = 顶层 {@code id} / {@code attributes.id} / {@code class} /
+ *   {@code accessibility-label} / {@code vue-ref-N}；与 ADR-0223 §3.1 的三层表述一致。）
  *
- * <p><b>门禁</b>：整段以 {@code BuildConfig.DEBUG} 包裹。release 变体里该字段是字面量
+ * <p><b>门禁</b>：整段以 {@code BuildConfig.DEBUG} 作<b>判定函数的入参</b>（非埋在分支里）。
+ * release 变体里该字段是字面量
  * {@code false}（常量表达式 → javac 内联）⇒ 分支恒 false、整块成死代码，
  * <b>预期</b>被 R8 移除、生产 APK 不含任何导出能力（与 ADR-0136 benchNav /
  * {@code pictelio_dev_*} 通道同范式）。⚠️ <b>口径</b>：可执行门禁

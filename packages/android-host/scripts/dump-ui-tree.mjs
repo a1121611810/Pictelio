@@ -31,14 +31,16 @@
  *       脚本用「触发前的文件集合」做差集来认新文件；若设备上另一个进程并发抓树，
  *       差集里会混入别人的产物（认不出 ⇒ 摘要会多列几棵树，但不会静默丢）。</li>
  *   <li><b>不做「哪一份才是完整树」的自动判定</b>：判据是「三档齐」，
- *       「哪一份最完整」由人看体积/节点数决定（本轮实测 4s 那份最完整，但那是当次页面的事实，
+ *       「哪一份最完整」由人看体积/节点数决定（2026-10-20 实测 4s 那份最完整，但那是当次页面的事实，
  *       不是通用规律）。</li>
  *   <li><b>清理只删本通道产物</b>：输出目录里只删 `ui-tree-*.json`，<b>不删目录、不删其它
  *       文件</b>。旧实现是整目录递归删除（`--out ""` 会把当前工作目录删掉，第 4 轮 review
  *       实测复现过）⇒ 现已收紧，且 `--out` 拒绝空值 / 当前工作目录 / 其祖先。
  *       ⚠️ <b>本层的参数解析本身没有机器防线</b>（要真跑 adb 才能进到这里，无法在 CI 里
  *       单测）⇒ 第 4 轮那个阻塞缺陷就是从这里漏出去的。<b>目录安全校验已下沉到 lib 层</b>
- *       （{@code assertSafeOutDir}）并有门禁；但「参数解析」那一层仍只有人工复验兜着
+ *       （{@code assertSafeOutDir}）并有门禁；<b>取值与校验的单一出口也在 lib 层</b>
+ *       （{@code resolveOutDir}）⇒ 默认输出目录与显式 {@code --out} 走同一条防线，
+ *       不会分叉；但「参数解析」那一层仍只有人工复验兜着
  *       （见 ADR-0223 §3.3「尚未覆盖」）。</li>
  *   <li><b>远端目录路径是按平台约定拼的</b>（{@code /sdcard/Android/data/<pkg>/files/<dir>}），
  *       而宿主侧用 {@code getExternalFilesDir(null)} 动态取——两者靠约定相等，不靠字面量相等
@@ -58,10 +60,10 @@ import {
   SAMPLE_DELAYS_CSV,
   SAMPLE_DELAYS_MS,
   artifactsToRemove,
-  assertSafeOutDir,
   exitCodeFor,
   parseArtifactName,
   planWait,
+  resolveOutDir,
   summarize,
 } from "./lib/ui-tree-dump-core.mjs";
 
@@ -246,11 +248,15 @@ function cleanStaleArtifacts(dir) {
  *
  * <p>⚠️ 判据本体（含符号链接解析）在 {@code lib/ui-tree-dump-core.mjs} 的
  * {@code assertSafeOutDir} 里，配套单测在
- * {@code tests/unit/scripts/ui-tree-dump-outdir.test.ts}。
+ * {@code tests/unit/scripts/ui-tree-dump-outdir.test.ts}；<b>取值 + 校验的单一出口</b>
+ * 是同模块的 {@code resolveOutDir}（默认路径与显式 {@code --out} 都走它 ⇒ 不分叉）。
  */
-function checkOutDir(cwd, dir) {
+function checkOutDir(cwd, requested, tmpRoot) {
   try {
-    return assertSafeOutDir(cwd, dir);
+    // 取值 + 校验都在 lib 层的单一出口（resolveOutDir）：显式 `--out` 与**默认值**
+    // 走同一条防线 ⇒ 两条路径不可能分叉（第 6 轮 Standards 轴实测抓到：此前默认值
+    // 完全绕过校验，工作目录恰是默认输出目录时 CWD 里的通道产物会被删）。
+    return resolveOutDir(cwd, requested, tmpRoot);
   } catch (e) {
     console.error(e.message);
     process.exit(2);
@@ -294,7 +300,7 @@ async function main() {
 
   let pullFailures = 0;
   let invalidJson = 0;
-  /** 本轮最完整的一份（节点数多者胜，同数比字节）。收工时点名，避免读者被字典序里最空的那份误导。 */
+  /** 本次最完整的一份（节点数多者胜，同数比字节）。收工时点名，避免读者被字典序里最空的那份误导。 */
   let best = null;
   for (const name of appeared) {
     const local = join(opts.out, name);
@@ -302,7 +308,7 @@ async function main() {
     if (pulled.status !== 0) {
       // ⚠️ adb 报错 ⇒ 本地文件**不可信**（可能是上一轮的残留、也可能是半截）。
       //   必须计入失败**并且不拿它的内容当本次产物打印**——否则「拉回失败」只停在
-      //   一行告警上，退出码仍是 0（这正是本轮要堵的洞）。
+      //   一行告警上，退出码仍是 0（这正是第 1 轮 review 要堵的洞）。
       console.error(`[ui-tree] 拉回失败: ${name}（adb exit ${pulled.status}）${pulled.stderr}`);
       pullFailures += 1;
       continue;
@@ -368,7 +374,7 @@ function parseArgs(argv) {
   const opts = {
     serial: null,
     wait: 20_000,
-    out: join(tmpdir(), "pictelio-ui-tree"),
+    out: null, // 最终生效的输出目录在参数解析**末尾**统一解析并校验（含默认值）
     keep: false,
   };
   const needValue = (flag, value) => {
@@ -392,14 +398,17 @@ function parseArgs(argv) {
       }
       opts.wait = n;
     } else if (a === "--out") {
-      // 相对路径按 CWD 解析（判据在 lib 层：assertSafeOutDir 的 target 基准 = cwd）
-      opts.out = checkOutDir(process.cwd(), needValue(a, argv[++i]));
+      // 这里只**取值**；校验统一放在末尾（相对路径按 CWD 解析，判据在 lib 层：
+      // assertSafeOutDir 的 target 基准 = cwd）
+      opts.out = needValue(a, argv[++i]);
     } else if (a === "--keep") opts.keep = true;
     else {
       console.error(`未知参数: ${a}`);
       process.exit(2);
     }
   }
+  // 单一出口：显式 `--out` 与默认值都过同一条目录安全防线。
+  opts.out = checkOutDir(process.cwd(), opts.out, tmpdir());
   return opts;
 }
 

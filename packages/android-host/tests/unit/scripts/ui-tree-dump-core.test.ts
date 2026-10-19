@@ -55,8 +55,9 @@ describe("协议常量（脚本侧自洽）", () => {
   it("采样档位：CSV 形态与数值形态一致，且是 spec 约定的三档", () => {
     expect(SAMPLE_DELAYS_CSV).toBe("0,1500,4000");
     expect(SAMPLE_DELAYS_MS).toEqual([0, 1500, 4000]);
-    // CSV → 数值 的派生必须无损（否则跨端比对会因格式差异假红）
-    expect(SAMPLE_DELAYS_CSV.split(",").map(Number)).toEqual(SAMPLE_DELAYS_MS);
+    // ⚠️ 不再写 `expect(CSV.split(",").map(Number)).toEqual(MS)`：那只是把左值的定义式
+    // 抄一遍（右值就是左值的派生）⇒ 对当前实现**恒真**，属同义反复断言。
+    // 上面两条已把 spec 的档位值**逐字**钉住 ⇒ 「CSV 与数值同源」被蕴含，不需要再断言一次。
   });
 
   it("采样点：cold 与 hot 两个（命中几个取决于进程怎么死的：App 在跑 ⇒ hot；进程死、任务记录还在 ⇒ cold+hot；force-stop ⇒ cold）", () => {
@@ -294,6 +295,30 @@ describe("summarize（真实样本回放）", () => {
     expect(fields.id).toBe(140);
     expect(fields.debugInfo).toBe(140);
     expect(fields.events).toBe(50);
+  });
+
+  it("节点身份在 `nodeId`（140/140 唯一）——它才是节点级 diff 的键", () => {
+    // 第 6 轮 Spec 轴抓到：`debugInfo.nodeIndex` 140 个节点**取值全为 0**（真机原始树
+    // 实测，unique=1）⇒ 它**不能**当身份用（作 diff 键会恒真）。引擎真正保证唯一的是
+    // `nodeId`（140 个互不相同）⇒ 身份与 diff 能力归 `nodeId`。
+    const nodeIds: number[] = [];
+    const nodeIndexes: number[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== "object") return;
+      const n = node as Record<string, unknown>;
+      if (typeof n.nodeId === "number") nodeIds.push(n.nodeId);
+      const debugInfo = n.debugInfo as { nodeIndex?: number } | undefined;
+      if (debugInfo && typeof debugInfo.nodeIndex === "number")
+        nodeIndexes.push(debugInfo.nodeIndex);
+      for (const child of (n.children ?? []) as unknown[]) walk(child);
+    };
+    walk(realTree);
+    expect(nodeIds).toHaveLength(140);
+    expect(new Set(nodeIds).size, "nodeId 必须 140/140 互不相同（diff 的键）").toBe(140);
+    // nodeIndex 恒 0 = 构建期打标未生效（ADR-0223 §2.1 的运行时佐证）⇒ 这条断言
+    // 会在引擎**开始**打标时变红 —— 那正是需要重新核对字段清单的信号。
+    expect(nodeIndexes).toHaveLength(140);
+    expect(new Set(nodeIndexes).size, "nodeIndex 若不再是恒 0，说明引擎行为变了").toBe(1);
   });
 
   it("事件名分布：tap 29 / load 20 / error 20 / touchstart 5 / touchmove 5 / touchend 5", () => {

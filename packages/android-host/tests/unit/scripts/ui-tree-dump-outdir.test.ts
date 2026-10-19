@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve as resolvePath } from "node:path";
 
-import { assertSafeOutDir, sameDirectory } from "../../../scripts/lib/ui-tree-dump-core.mjs";
+import {
+  assertSafeOutDir,
+  resolveOutDir,
+  sameDirectory,
+} from "../../../scripts/lib/ui-tree-dump-core.mjs";
 
 // ── 这道门禁守什么 ──
 //
@@ -116,5 +120,46 @@ describe("assertSafeOutDir（--out 不得指向工作目录或其祖先）", () 
     const out = join(cwd, "尚未创建");
     const resolved = assertSafeOutDir(cwd, out);
     expect(resolved.endsWith("尚未创建")).toBe(true);
+  });
+});
+
+describe("resolveOutDir（默认输出目录与显式 --out 走同一条防线）", () => {
+  it("默认输出目录落在工作目录上 ⇒ 拒绝（第 6 轮 Standards 轴实测抓到的绕过）", () => {
+    // 失败形态（第 6 轮 Standards 轴在真实文件系统上复现过）：未传 `--out` 时，
+    // 默认输出目录 = <tmpRoot>/pictelio-ui-tree。此前**只有显式 --out 分支**调
+    // assertSafeOutDir ⇒ 默认值完全绕过判据；当工作目录恰是默认输出目录时，
+    // 清理动作落在 CWD 上（CWD 里的 ui-tree-*.json 被删），而同一时刻显式
+    // `--out <同一目录>` 会被正确拒绝 ⇒ 两条路径行为分叉。
+    const { root } = makeSandbox();
+    const fakeTmp = join(root, "tmp-root");
+    mkdirSync(fakeTmp);
+    const cwd = join(fakeTmp, "pictelio-ui-tree");
+    mkdirSync(cwd);
+    // 默认路径（未传 requested）⇒ 同样被拒
+    expect(() => resolveOutDir(cwd, undefined, fakeTmp)).toThrow(/不能是当前工作目录/);
+  });
+
+  it("默认路径与显式 --out 对同一目录的判定一致（不分叉）", () => {
+    const { root } = makeSandbox();
+    const fakeTmp = join(root, "tmp-root");
+    mkdirSync(fakeTmp);
+    const cwd = join(fakeTmp, "pictelio-ui-tree");
+    mkdirSync(cwd);
+    // 显式 --out 指向同一目录 ⇒ 拒
+    expect(() => resolveOutDir(cwd, cwd, fakeTmp)).toThrow(/不能是当前工作目录/);
+    // 默认路径指向同一目录 ⇒ 拒（**同一判据** ⇒ 两条路径不可能分叉）
+    expect(() => resolveOutDir(cwd, undefined, fakeTmp)).toThrow(/不能是当前工作目录/);
+  });
+
+  it("默认输出目录与工作目录无关 ⇒ 放行，且显式取值优先于默认值", () => {
+    const { root, cwd } = makeSandbox();
+    const fakeTmp = join(root, "tmp-root");
+    mkdirSync(fakeTmp);
+    // 默认值 = <tmpRoot>/pictelio-ui-tree，与 CWD 无关 ⇒ 放行
+    const def = resolveOutDir(cwd, undefined, fakeTmp);
+    expect(basename(def)).toBe("pictelio-ui-tree");
+    // 显式取值优先于默认值
+    const custom = join(root, "自定义输出");
+    expect(resolveOutDir(cwd, custom, fakeTmp).endsWith("自定义输出")).toBe(true);
   });
 });

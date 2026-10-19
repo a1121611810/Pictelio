@@ -33,9 +33,11 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 但这**不等于**「拿不到组件级信息」——见下节实测：引擎在 `attributes` 里保留了 Tailwind `class`、语义 `id`、`accessibility-label` 与 `vue-ref` 标记，**足以回答「这个节点是哪个组件/哪张作品卡」**（⚠️ 是**反推**出来的：靠 `class` / 语义 `id` 人工推断——**树里没有组件名 / 文件名 / owner 字段**，不是直接给出）。源码行号拿不到，组件身份**反推**得出来。
 
+> **轮次约定**（与 ADR-0223 §3.4 同文，消除「第 N 轮」的歧义）：「第 N 轮」= **第 N 次 review 及其修复**为一轮；本文一律用**明确轮次号**，不写「本轮」——spec 会活得比那一轮久，「本轮」对读者是歧义源。
+
 ## T0 实测结论（模拟器 `pictelio_ui`，推荐页，2026-10-20）
 
-**结论：能落地。** 一条命令拿到完整 UI 树 JSON（55,895 字节 / 140 节点 / 最大深度 10 / 抓取往返耗时 4–10ms）。
+**结论：能落地。** 一条命令拿到完整 UI 树 JSON（55,895 字节 / 140 节点 / 最大深度 10 / 抓取往返耗时 4–10ms）。⚠️ **耗时与字节数同属「单次抓取口径」**：2026-10-20 另一次真机复跑是 55,806 字节 / **9–14ms** ⇒ 区间会随内容与机器状态漂移，**稳定的是结构统计量**（140 节点 / 深度 10 / 各类覆盖数）。
 
 **引擎实际吐出的节点字段**（登录后推荐页，140 节点实测计数）：
 
@@ -53,7 +55,8 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | `attributes.src` / `lazy-load` / `mode` | 各 20/140 | 图片资源 URL / 懒加载标记 / 图片模式 | 图片链路实况 |
 | `position` | 140/140 | `frameInRoot` + `frameInScreen` **两套坐标系** | 命中测试几何 |
 | `events[]` | 50 节点 | `{eventName, function:"vue:1", runtime:"BTS", type:"bindEvent"}` | **哪个节点可交互、绑的哪个 handler** |
-| `nodeId` / `debugInfo.nodeIndex` | 140/140 | 节点身份（`debugInfo` **只有** `nodeIndex`，无源码位置） | **可做两棵树的节点级 diff** |
+| `nodeId` | 140/140（**140 个互不相同**） | 引擎分配的节点序号 | **节点级 diff 的键**（唯一性已实测） |
+| `debugInfo.nodeIndex` | 140/140（**取值恒为 0**） | 官方 UI source map 的构建期打标位；`debugInfo` **只有** `nodeIndex` 这一个键，无源码位置 | ⚠️ **不能当身份用**（140 个节点取值全同 ⇒ 作 diff 键恒真）⇒ 它是「构建期打标**没生效**」的运行时佐证（见 §2.1） |
 
 **事件名分布**（实测）：`tap` 29 / `load` 20 / `error` 20 / `touchstart` 5 / `touchmove` 5 / `touchend` 5。
 
@@ -68,7 +71,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 **落地时踩到的真实缺陷（已修）**：诊断脚本原先用「连续两次轮询计数不变」判断「文件已落齐」——轮询窗口约 1.2s，而第 2→3 份间隔 2.5s ⇒ **必然在空档里提前收工**，丢掉的正是 4s 那份（唯一完整树），且 **exit 0 静默**。现判据改为**按已知档位等齐**（出现的采样点里至少有一轮三档齐），收不齐时**显式告警**而不是当作成功。回归由 `tests/unit/scripts/ui-tree-dump-core.test.ts` 钉住。
 
 **另一处更严重的缺陷（第 4 轮 review 阻塞项，已修）**：诊断脚本原先用 `rmSync(out, {recursive:true, force:true})` **整目录递归删除**输出目录 ⇒ `--out ""`（`path.resolve("")` = 当前工作目录）**实测把用户的整个工作目录删掉**，`--out <任意已有目录>` 会清空该目录里用户的其它文件。修法两层：① 清理范围收紧到「只删本通道产物」（`ui-tree-*.json`），由 `artifactsToRemove` 单测钉住；② **输出目录不得是工作目录本身或其祖先**（`assertSafeOutDir`，判据在 `lib/ui-tree-dump-core.mjs`，门禁 `tests/unit/scripts/ui-tree-dump-outdir.test.ts`）。
-⚠️ **第 4 轮的第一版修复只比字面路径，被外部锚点实测抓出绕过**：macOS 上 `/tmp` → `/private/tmp` 是符号链接，而 `process.cwd()` 返回物理路径、`path.resolve()` 返回字面路径 ⇒ 同一个目录被看成两个，`--out /tmp/<cwd>` **没被拒**。现两侧都走 `realpath` 解析后再比。**这条是本轮唯一一处「改完仍被外部锚点打回」的缺陷**，说明这类判据不能靠读代码自证，必须在真实文件系统上跑。
+⚠️ **第 4 轮的第一版修复只比字面路径，被外部锚点实测抓出绕过**：macOS 上 `/tmp` → `/private/tmp` 是符号链接，而 `process.cwd()` 返回物理路径、`path.resolve()` 返回字面路径 ⇒ 同一个目录被看成两个，`--out /tmp/<cwd>` **没被拒**。现两侧都走 `realpath` 解析后再比。**这条是第 4 轮唯一一处「改完仍被外部锚点打回」的缺陷**，说明这类判据不能靠读代码自证，必须在真实文件系统上跑。
 
 **真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,724 字节 / 140 节点 / 深度 10；脱敏：作品 id → `<illustId>`、p0 哈希 → `<p0hash>`、上传时间路径 → `<uploadDate>`、标题/作者文本 → `文本#N` / `标签#N`；**结构统计量与原始抓取逐项一致**）。
 ⚠️ **两个 a11y 标签必须彼此可区分**（第 5 轮 Spec 轴 F6）：脱敏占位符最初把两个 `accessibility-label` 塌成同一个 `标签#4` ⇒ 样本里「2 个 a11y 标签」不可区分、也无法证明原始抓取里一个是 UI 字符串、一个是作品标题（原始取值是 `打开菜单` 与作品标题，第 5 轮真机复跑实证）。现分别占位为 `标签#4`（作品标题，与 `文本#4` 同一段原文）与 `标签#5`（`打开菜单` 类 UI 字符串）⇒ **节点数 / 深度 / 各类覆盖数不变，字节数不变（55,724）**。
@@ -90,14 +93,14 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 - **宿主侧新增一个独立类**承载抓取与落盘，不把逻辑塞进 `LynxActivity`（后者已 1200+ 行）。职责：判定是否该抓 → 调引擎 API → 落盘 → 告警与度量。
 - **触发协议**：intent extra 键 `uiTreeDump`，值为非空字符串即触发（与 benchNav 的 extra 风格一致）。冷启动在 `onLoadSuccess` 抓、热启动在 `onNewIntent` 抓——两处都要接，否则「App 已在跑时补拍」不可用（这正是 T0 要验证的主要用法）。
-- **门禁**：整段以 `BuildConfig.DEBUG` 包裹（与既有 `pictelio_dev_*` / benchNav 通道同范式）⇒ release 编译下为恒 false 死代码、被 R8 移除。
+- **门禁**：整段以 `BuildConfig.DEBUG` 作**判定函数的入参**（非埋在分支里；与既有 `pictelio_dev_*` / benchNav 通道同范式）⇒ release 编译下为恒 false 死代码、被 R8 移除。入参化让门禁本身可被 JVM 单测证伪。
 - **连拍**：一次触发在 0 / 1.5 / 4s 三个时刻各抓一份，每份独立文件。间隔取自仓库既有的「四次投递 1.5/3/4.5/6s」防挂载竞态思路（ADR-0136 / ADR-0220）。
 - **产物名带采样点与档位**：`ui-tree-<cold|hot>-<0|1500|4000>ms-<序号>-<时间戳>.json`。理由：命中几个采样点**取决于进程怎么死的**（2026-10-20 模拟器三场景实测）——App 正在跑 ⇒ 只走 `onNewIntent` ⇒ **hot 3 份**；进程死、**任务记录还在**（覆盖安装 / 进程被系统回收后重开）⇒ `onCreate` 与 `onNewIntent` 都走 ⇒ **cold + hot 共 6 份**；`am force-stop`（任务记录也清）⇒ 只走 `onCreate` ⇒ **cold 3 份**。没有标识就分不清哪份属哪轮；而「哪份才是完整树」实测只能靠体积猜 ⇒ 把档位写进文件名。
 - **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。落齐后再等一段**静默期**（≤2.5s），把另一采样点迟到的产物也捞回来。收不齐 ⇒ 显式告警 **+ 非零退出码**（退出码判据是纯函数 `exitCodeFor`，在 `scripts/lib/ui-tree-dump-core.mjs` 里，有单测）。
 - **落盘位置**：应用专属外部目录下的 `ui-tree/` 子目录。文件名带序号 + 时间戳 ⇒ 多次触发不覆盖。
 - **写盘时机**：引擎两个回调都落在 **UI 线程** ⇒ 落盘 I/O 移交后台线程，UI 线程只做「拿到字符串就转交」。
 - **写盘方式**：临时文件 + 原子 rename ⇒ `adb pull` 不会读到半截 JSON。
-- **失败路径一律显式告警**（logcat WARN）：根元素为 null / 序列化结果为 null / 写盘失败，三者分开报错，不合并成一句「失败」。
+- **失败路径一律显式告警**（logcat WARN），**五条分开报错**，不合并成一句「失败」：① LynxView 未就绪 / ② 根元素为 null / ③ 序列化结果为 null / ④ 抓取异常 / ⑤ 写盘失败（目录拿不到 / 目录创建失败 / 写盘异常）。⚠️ 机器防线只覆盖 ⑤ 的两个分支（目录创建失败、外部目录拿不到）；①②③④ 需真实引擎回调 ⇒ **无机器断言**（ADR-0223 §3.3 已登记）。
 - **产物不加工**：引擎原始 JSON 原样落盘。摘要由**本地诊断脚本**现算，加工逻辑不进 APK。
 - **摘要脚本**：宿主包开发脚本目录（`packages/android-host/scripts/`），职责 = 触发 → 轮询等文件出现 → `adb pull` → 打印摘要（节点数 / tag 分布 / 最大深度 / 体积 / 顶层结构）。**不写进 e2e 断言**（本票边界见 Out of Scope）。
 - **零 app-lynx 改动**：T0 不引入任何 JS↔宿主协议。

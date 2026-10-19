@@ -10,7 +10,9 @@
 // ② **产物名解析**（从文件名反解采样点 + 采样档位）；
 // ③ **落齐判据**（planWait：按已知档位等齐，而不是靠「计数不变」猜）；
 // ④ **树摘要**（summarize：节点数 / tag 分布 / 字段清单 / 事件名分布 / 语义 id / a11y 标签）；
-// ⑤ **输出目录安全校验**（assertSafeOutDir：拒绝把输出目录指到工作目录或其祖先）。
+// ⑤ **输出目录安全校验**（assertSafeOutDir：拒绝把输出目录指到工作目录或其祖先；
+//    resolveOutDir：默认路径与显式 `--out` 的**单一出口**——取值与校验收在一起，
+//    避免「只有显式路径有校验」的两条路径分叉）。
 //
 // ⑤ 为什么在这里：编排层（dump-ui-tree.mjs）要真跑 adb 才能进，**无法在 CI 里单测**
 // ——第 4 轮 review 的阻塞缺陷（`--out ""` 会删掉整个工作目录）正是这样漏出去的。
@@ -237,11 +239,39 @@ export function assertSafeOutDir(cwd, target) {
   return t;
 }
 
+/** 默认输出目录名（未传 `--out` 时落在 `<tmpRoot>/<该名>` 下）。 */
+export const DEFAULT_OUT_DIR_NAME = "pictelio-ui-tree";
+
+/**
+ * 解析**最终生效**的输出目录，并把安全校验收在这一个出口上。
+ *
+ * <p><b>为什么要有这个函数</b>（第 6 轮 Standards 轴实测抓到的产品面缺陷）：
+ * 此前编排层只在 `--out` 分支里调 {@link assertSafeOutDir}，**默认值**
+ * （`<tmpRoot>/pictelio-ui-tree`）**完全绕过判据** ⇒ 当工作目录恰好就是默认输出
+ * 目录时，清理动作会落在 CWD 上（实测：CWD 里的 `ui-tree-*.json` 被删），而同一
+ * 时刻显式 `--out <同一目录>` 会被正确拒绝 ⇒ **两条路径行为分叉**，ADR §3.4 登记表
+ * 声明的契约在默认路径上不成立。
+ *
+ * <p><b>修法不是「给默认值也补一次校验」</b>（那仍是两条路径，将来还会分叉），
+ * 而是把**取值与校验合成一个出口**：显式与默认都从这里出 ⇒ 行为不可能分叉；
+ * 且这个出口在 lib 层 ⇒ 有机器防线（`tests/unit/scripts/ui-tree-dump-outdir.test.ts`）。
+ *
+ * @param {string} cwd 当前工作目录（相对路径按它解析）
+ * @param {string|null|undefined} requested 显式 `--out` 的取值；`null`/`undefined` ⇒ 用默认值
+ * @param {string} tmpRoot 临时根目录（默认值的父目录）
+ * @returns {string} 校验通过后的物理路径（供调用方直接使用）
+ * @throws {Error} 输出目录是 cwd 本身、或 cwd 的祖先
+ */
+export function resolveOutDir(cwd, requested, tmpRoot) {
+  const out = requested ?? join(tmpRoot, DEFAULT_OUT_DIR_NAME);
+  return assertSafeOutDir(cwd, out);
+}
+
 /**
  * 运行结果的退出码（纯函数 ⇒ 可单测）。
  *
  * <p><b>为什么必须有</b>：CLI 编排层此前对「采样未落齐」只打 `console.error`、**退出码仍是 0**——
- * 而「丢 4s 那份且静默 exit 0」正是本轮要修的缺陷。**只改文案不改退出码 = 缺陷未闭环**：
+ * 而「丢 4s 那份且静默 exit 0」正是第 1 轮 review 要修的缺陷。**只改文案不改退出码 = 缺陷未闭环**：
  * 调用方按 `$?` 判定仍拿到「成功」。退出码是这套判据里**唯一能被机器读到**的那一半，
  * 所以它必须落在一个可单测的纯函数里，而不是埋在 CLI 的分支中。
  *
