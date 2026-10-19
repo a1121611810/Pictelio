@@ -54,6 +54,14 @@
  *   完整字面量才判定通过——Java 编译器要求编译期常量才能做条件编译，
  *   拼接出来的字符串**不可能**参与 `if (BuildConfig.DEBUG)` 这类常量折叠，
  *   故本守卫的窄化不会放过真实的 release 导出。
+ * - **不校验采样点标识的取值**：采样点这一关同样只做**子串**匹配
+ *   （`args.includes("UiTreeDump.POINT_")`）⇒ 只验「实参里出现了某个 `POINT_` 常量」，
+ *   **不验传的是 `POINT_COLD` 还是 `POINT_HOT`** ⇒ 冷启动调用点误传 `POINT_HOT`
+ *   同样判绿。影响面**低于**上一条：采样点标识只决定产物名里的冷/热标签，
+ *   **不影响 release 是否导出**，落齐判据（按档位分组）也不受影响；
+ *   但会让诊断者按 ADR 反复陈述的「三场景 → cold/hot 份数」读错归属，
+ *   而本通道的产物正是给人读的。把判定收紧成「实参**恰好**等于 `POINT_COLD` / `POINT_HOT`」
+ *   属**判据强度变更**，见 **#1049**（不在本票范围）。
  */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
