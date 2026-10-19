@@ -654,6 +654,13 @@ public class LynxActivity extends AppCompatActivity {
                 //   手法沿用 benchNav 深链（事件名编码路由 + 多窗重发对抗渲染竞态），
                 //   门禁与载荷约定另立，故不复用 benchNav 的 extra 名与 switch 表。
                 dispatchNotificationTarget(getIntent());
+
+                // UI 树导出（T0，spec docs/specs/app-lynx-ui-tree-dump-t0.md）：冷启动采样点。
+                // 门禁参数传 BuildConfig.DEBUG —— release 变体里它是字面量 false（常量表达式
+                // → javac 内联）⇒ shouldDump 恒 false、整块成死代码被 R8 移除，生产 APK 不含
+                // 导出能力（与 benchNav 同范式，但不在调用点写 if，是为了让「门禁值」成为
+                // 可单测的入参而不是埋在分支里）。
+                UiTreeDump.scheduleIfRequested(LynxActivity.this, lynxView, getIntent(), BuildConfig.DEBUG);
             }
 
             @Override
@@ -1123,6 +1130,11 @@ public class LynxActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         dispatchNotificationTarget(intent);
+        // UI 树导出（T0）：热启动采样点——「App 已在跑时再拍一张」是本通道的主要用法，
+        // 也让人自己掌握拍树时机（自动等「首载落定」的替代品，见 spec Out of Scope）。
+        // ⚠️ 不判冷热：onNewIntent 在冷启动时也会于 bundle 加载之后送达（e940 实测），
+        // 判错会把「本次是否采样」判反。真正的门禁是 extra 是否存在 + DEBUG 闸门。
+        UiTreeDump.scheduleIfRequested(this, lynxView, intent, BuildConfig.DEBUG);
     }
 
     @Override
