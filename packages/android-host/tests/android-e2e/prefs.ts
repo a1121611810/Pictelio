@@ -6,17 +6,11 @@
  * ——沿用「真实数据源比对」契约测试原则。写后即回读校验（write-then-verify），
  * 从而秒级区分「写入问题」与「读取/分发问题」。
  *
- * ⚠️ 单引擎化后（#610）：`pictelio_client_kind` **不再决定任何行为**——
- * `MainActivity` 分发器与引擎路由均已删除，唯一入口是 launcher `LynxActivity`，
- * 原 `PictelioAppModule.getClientKind` 归一逻辑已随 ADR-0203 决策 7 删除（该方法不再存在），
- * `pictelio_client_kind` 在生产代码中已无读方。
- * 因此播种该键的工具（`writeClientKind`）与相关引擎状态快照工具（`ENGINE_KEYS` /
- * `parseEngineState` / `readEngineState` / `pollEngineState`）**均已删除**——
- * 前者无被测行为（写入值被归一，断言恒真），后者的 spec
- * （`engine-fallback-matrix` 等）与 oracle（`EnginePrefs.java` /
- * `EngineRoute.snapshotLine()`）在源码树中已不存在。
- * 通用 pref 读写（`readPrefValue` / `writePrefKey` / `readClientPrefs` /
- * `pollPrefs`）不受影响，继续服务仍存活的键契约断言。
+ * 单引擎化后（#610 / ADR-0203）本工具只做**通用 CapacitorStorage 快照读取**：
+ * `readPrefs` 返回「文件是否存在 + 原始 XML」，任意键的取值一律走 `readPrefValue`，
+ * 不再为任何「引擎/客户端选择」类历史键提供专用字段——该类键在生产代码已无读方，
+ * 其播种工具与引擎状态快照工具亦已随之删除（无被测行为的断言恒真，已无保留价值）。
+ * 存量设备上可能仍留有这类历史键，需要取证时用 `readPrefValue` 按键读取即可。
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -25,26 +19,20 @@ import { adbPath, APP_PACKAGE, MAIN_ACTIVITY, runCapture, runOrThrow, TIMEOUTS }
 /** CapacitorStorage.xml 在 app 数据目录内的相对路径（run-as 需相对路径，绝对路径被 SELinux 拒） */
 const PREFS_REL = "shared_prefs/CapacitorStorage.xml";
 
-export interface ClientPrefs {
-  clientKind: "webview" | "lynx" | null;
-  /** 文件是否存在（null 时区分「未初始化」与「文件缺失」） */
+/** CapacitorStorage.xml 单次原始读取结果（文件存在性 + 原始 XML） */
+export interface PrefsSnapshot {
+  /** 文件是否存在（区分「未初始化」与「文件缺失」） */
   fileExists: boolean;
   /** 原始 XML（失败诊断用） */
   rawXml: string;
 }
 
-/** CapacitorStorage.xml 单次原始读取结果（文件存在性 + 原始 XML） */
-interface PrefsFile {
-  fileExists: boolean;
-  rawXml: string;
-}
-
 /**
- * 读取设备上 CapacitorStorage.xml 的原始内容（run-as cat，debug 包可读）。
+ * 读取设备上 CapacitorStorage.xml 的原始快照（run-as cat，debug 包可读）。
  * 文件不存在 / run-as 失败 → fileExists=false（rawXml 保留失败输出供诊断）。
- * readClientPrefs / readPrefValue 共用同一 adb 调用路径，不重复实现。
+ * readPrefValue / writePrefKey / dumpPrefsToFile 共用同一 adb 调用路径，不重复实现。
  */
-function readPrefsXml(serial: string): PrefsFile {
+export function readPrefs(serial: string): PrefsSnapshot {
   const r = runCapture(adbPath(), [
     "-s",
     serial,
@@ -73,23 +61,6 @@ function extractStringValue(xml: string, key: string): string | null {
 }
 
 /**
- * 读取设备上 CapacitorStorage.xml 的 pictelio_client_kind 值。
- * 用 run-as 访问 app 私有目录（debug 包可读）。文件不存在 → clientKind=null。
- */
-export function readClientPrefs(serial: string): ClientPrefs {
-  const { fileExists, rawXml } = readPrefsXml(serial);
-  if (!fileExists) {
-    return { clientKind: null, fileExists: false, rawXml };
-  }
-  return {
-    clientKind:
-      (extractStringValue(rawXml, "pictelio_client_kind") as ClientPrefs["clientKind"]) ?? null,
-    fileExists: true,
-    rawXml,
-  };
-}
-
-/**
  * 轮询读取 CapacitorStorage.xml 直到谓词满足（issue #523，T3 共享契约工具）。
  *
  * 为什么必须轮询：app 侧写 prefs 走「JS 桥排队 → Java 线程 → SharedPreferences
@@ -102,17 +73,17 @@ export function readClientPrefs(serial: string): ClientPrefs {
  * @param predicate 判定快照是否满足期望（满足即停，返回该次快照）
  * @param timeoutMs 总超时，默认 30s
  * @param intervalMs 轮询间隔，默认 1s
- * @param readFn 读取函数，默认 readClientPrefs；仅单测注入 fake 用，E2E 勿传
+ * @param readFn 读取函数，默认 readPrefs；仅单测注入 fake 用，E2E 勿传
  * @returns 满足谓词的那次快照
  * @throws Error 超时未满足：消息含「轮询超时」与最后一次 rawXml 快照（诊断用）
  */
 export async function pollPrefs(
   serial: string,
-  predicate: (prefs: ClientPrefs) => boolean,
+  predicate: (prefs: PrefsSnapshot) => boolean,
   timeoutMs = 30_000,
   intervalMs = 1_000,
-  readFn: (serial: string) => ClientPrefs = readClientPrefs,
-): Promise<ClientPrefs> {
+  readFn: (serial: string) => PrefsSnapshot = readPrefs,
+): Promise<PrefsSnapshot> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const prefs = readFn(serial);
@@ -132,7 +103,7 @@ export async function pollPrefs(
  * 文件不存在或键不存在 → null。用于取证键写入后的落盘校验。
  */
 export function readPrefValue(serial: string, key: string): string | null {
-  const { fileExists, rawXml } = readPrefsXml(serial);
+  const { fileExists, rawXml } = readPrefs(serial);
   if (!fileExists) return null;
   return extractStringValue(rawXml, key);
 }
@@ -144,7 +115,7 @@ export function readPrefValue(serial: string, key: string): string | null {
  * 键/值来自测试字面量（show_r18_42 / true），无正则特殊字符风险。
  */
 export function writePrefKey(serial: string, key: string, value: string): void {
-  const cur = readClientPrefs(serial);
+  const cur = readPrefs(serial);
   let xml: string;
   if (cur.fileExists) {
     const hasKey = cur.rawXml.includes(`name="${key}"`);
@@ -178,7 +149,7 @@ export function writePrefKey(serial: string, key: string, value: string): void {
         `stderr: ${r.stderr}`,
     );
   }
-  const written = readClientPrefs(serial);
+  const written = readPrefs(serial);
   if (!written.rawXml.includes(`name="${key}"`)) {
     throw new Error(`[android-e2e] 写入后校验失败：${key} 不在 ${written.rawXml}`);
   }
@@ -531,7 +502,7 @@ export function snapshotDir(): string {
 /** 失败时把当前 SharedPreferences 内容落盘（诊断证据） */
 export function dumpPrefsToFile(serial: string, tag: string): void {
   try {
-    const prefs = readClientPrefs(serial);
+    const prefs = readPrefs(serial);
     const dir = snapshotDir();
     mkdirSync(dir, { recursive: true });
     writeFileSync(resolve(dir, `${tag}-CapacitorStorage.xml`), prefs.rawXml || "(文件不存在)");

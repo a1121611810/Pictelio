@@ -25,7 +25,7 @@ import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import {
   currentTopActivity,
   forceStopApp,
-  readClientPrefs,
+  readPrefs,
   startMainActivity,
   writePrefKey,
 } from "../prefs";
@@ -80,9 +80,9 @@ describe.skipIf(!ENABLED)("WebDAV 备份 lynx 原生链路（模拟器）", () =
     const before = findBackupFiles();
 
     forceStopApp(ctx.serial);
-    // ⚠️ #819 删除了 writeClientKind(...,"lynx")：单引擎下入口恒为 LynxActivity，
-    // 原 PictelioAppModule.getClientKind 归一逻辑已随 ADR-0203 决策 7 删除（该方法不再存在）——
-    // 该写入无被测行为、断言恒真（与 lynx-network-check / fab / lynx-bookmark-tags 同批处置）。
+    // 单引擎下入口恒为 LynxActivity，无需播种任何引擎/客户端选择键：原归一逻辑已随
+    // ADR-0203 决策 7 删除，写入无被测行为、断言恒真（与 lynx-network-check / fab /
+    // lynx-bookmark-tags 同批处置）。
     writePrefKey(ctx.serial, "settings_webdav_enabled", "true");
     writePrefKey(ctx.serial, "settings_webdav_url", DAV_URL);
     writePrefKey(ctx.serial, "settings_webdav_username", "e2e");
@@ -120,7 +120,7 @@ describe.skipIf(!ENABLED)("WebDAV 备份 lynx 原生链路（模拟器）", () =
 
     // 3) lynx 模块把「上次备份时间」写回真实 SharedPreferences（完整回路）
     await waitUntil(
-      () => /name="settings_webdav_last_backup">[^<]+</u.test(readClientPrefs(ctx.serial).rawXml),
+      () => /name="settings_webdav_last_backup">[^<]+</u.test(readPrefs(ctx.serial).rawXml),
       30_000,
       "lynx 写回 settings_webdav_last_backup",
     );

@@ -68,7 +68,8 @@
  *   → `LynxActivity.applyDevIntentHooks()` 调 `autoLoginWithRefreshToken` 持久化并登录
  *   （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。单引擎化后 webview 登录页已不存在
  *   （APK 内无 WebView），跨引擎共享 WSSecureStorage 种子恢复那条路随之失效。
- *   `pictelio_client_kind` 无需播种：单引擎下入口恒为 LynxActivity，原 `getClientKind` 归一逻辑已随 ADR-0203 决策 7 删除（生产代码已无该键读方）。
+ *   引擎/客户端选择键无需播种：单引擎下入口恒为 LynxActivity，原归一逻辑已随
+ *   ADR-0203 决策 7 删除（生产代码已无该类键读方）。
  * - `PIXIV_REFRESH_TOKEN`（packages/app-lynx/.env）与 `credentials.json5`：host 侧
  *   独立 oracle 用（与 webview 验收同源）。
  *

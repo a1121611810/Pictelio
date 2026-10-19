@@ -66,7 +66,7 @@ import {
   forceStopApp,
   loginViaDevIntent,
   readAppLogcat,
-  readClientPrefs,
+  readPrefs,
   seedAppearance,
   startMainActivity,
 } from "../prefs";
@@ -428,7 +428,7 @@ describe.skipIf(SKIPPED)(
       //   ⇒ A1/A2 会**空洞地转绿**（实测：帧仅 32KB 纯色，却 4 条全过）。
       //   主动登录让本 spec 不再依赖同批 spec 的执行顺序与设备残留状态。
       await loginViaDevIntent(serial);
-      originalPrefsXml = readClientPrefs(serial).rawXml;
+      originalPrefsXml = readPrefs(serial).rawXml;
     }, 1_500_000);
 
     afterAll(() => {

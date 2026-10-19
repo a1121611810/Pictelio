@@ -32,7 +32,7 @@ import {
   currentTopActivity,
   forceStopApp,
   pollPrefs,
-  readClientPrefs,
+  readPrefs,
   startMainActivity,
   writePrefKey,
   dumpPrefsToFile,
@@ -90,7 +90,7 @@ describe("T5 设置迁移契约（ADR-0103）", () => {
     // 模拟升级前设备状态：设备级老键（lynx 侧 loadSettings 的迁移源）
     writePrefKey(serial, "show_r18", "true");
     writePrefKey(serial, "show_r18g", "true");
-    const seeded = readClientPrefs(serial);
+    const seeded = readPrefs(serial);
     expect(seeded.rawXml).toContain('name="show_r18"');
     // 重启 app（fresh SharedPreferences 实例读取种子文件）；单引擎布局入口恒为 LynxActivity
     startMainActivity(serial);
