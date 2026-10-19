@@ -22,7 +22,8 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 /**
- * 「宿主侧 ↔ 诊断脚本」协议契约门禁（spec {@code docs/specs/app-lynx-ui-tree-dump-t0.md} 接缝③）。
+ * 「宿主侧 ↔ 诊断脚本」协议契约门禁（spec {@code docs/specs/app-lynx-ui-tree-dump-t0.md}
+ * 的「Testing Decisions · 跨端协议门禁」一条）。
  *
  * <p><b>为什么这道门禁必须存在</b>：触发协议的名字（intent extra 键）、落盘目录名、
  * 产物名前缀与后缀、采样档位、采样点标识**同时存在于两侧**，而两侧是<b>不同语言、不同运行时</b>
@@ -176,7 +177,7 @@ public class UiTreeDumpProtocolContractTest {
      * 采样档位两侧一致：脚本据此判断「哪一份才是完整树」并等齐。
      *
      * <p>档位漂移 ⇒ 脚本的等齐判据失准 ⇒ 静默丢掉最完整的那一份（实测 4s 那份是唯一完整树，
-     * 8KB → 9KB → 61KB）。这是本轮实测抓到过的真实缺陷。
+     * 8KB → 9KB → 61KB）。这是 **T0 实测**阶段抓到过的真实缺陷。
      */
     @Test
     public void sampleDelayTiers_matchesBetweenHostAndScript() throws Exception {

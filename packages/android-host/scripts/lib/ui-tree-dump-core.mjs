@@ -100,7 +100,7 @@ export function parseArtifactName(name) {
  * 为什么「至少一轮」而不是「所有轮」：冷启动会命中 cold + hot 两轮，两轮的 4s 档几乎同时落盘，
  * 只看「一轮齐」就能确认最完整的那份已经拿到；要求「所有轮齐」会因另一轮迟到而误判超时。
  *
- * @param {string[]} names 本轮新出现的产物文件名
+ * @param {string[]} names 本次抓取中新出现的产物文件名
  * @param {number[]} expectedDelays 期望的采样档位（ms）
  * @returns {{settled: boolean, seenDelays: number[], groups: {point: string, delays: number[]}[]}}
  */

@@ -258,7 +258,7 @@ function checkOutDir(cwd, requested, tmpRoot) {
     // 完全绕过校验，工作目录恰是默认输出目录时 CWD 里的通道产物会被删）。
     return resolveOutDir(cwd, requested, tmpRoot);
   } catch (e) {
-    console.error(e.message);
+    console.error(`[ui-tree] ${e.message}`);
     process.exit(2);
   }
 }
@@ -381,7 +381,7 @@ function parseArgs(argv) {
     // 空串也必须拒：--out "" ⇒ path.resolve("") = 当前工作目录 ⇒ 旧实现会把用户的
     // 整个目录删掉（第 4 轮 review 实测复现过）。空值在任何参数上都没有意义。
     if (value === undefined || value.startsWith("--") || value.trim() === "") {
-      console.error(`参数 ${flag} 缺少有效取值`);
+      console.error(`[ui-tree] 参数 ${flag} 缺少有效取值`);
       process.exit(2);
     }
     return value;
@@ -392,8 +392,11 @@ function parseArgs(argv) {
     else if (a === "--wait") {
       const raw = needValue(a, argv[++i]);
       const n = Number(raw);
-      if (!Number.isFinite(n) || n <= 0) {
-        console.error(`参数 --wait 需为正整数毫秒，收到: ${raw}`);
+      // ⚠️ 判据必须是**整数**：文案承诺「正整数毫秒」，而 `Number.isFinite` 会放行
+      //   `1.5` 这类小数（第 7 轮 Standards 轴抓到文案与实现不一致）⇒ 这里用
+      //   `Number.isInteger`（它同时排除 NaN / Infinity）。
+      if (!Number.isInteger(n) || n <= 0) {
+        console.error(`[ui-tree] 参数 --wait 需为正整数毫秒，收到: ${raw}`);
         process.exit(2);
       }
       opts.wait = n;
@@ -403,7 +406,7 @@ function parseArgs(argv) {
       opts.out = needValue(a, argv[++i]);
     } else if (a === "--keep") opts.keep = true;
     else {
-      console.error(`未知参数: ${a}`);
+      console.error(`[ui-tree] 未知参数: ${a}`);
       process.exit(2);
     }
   }
