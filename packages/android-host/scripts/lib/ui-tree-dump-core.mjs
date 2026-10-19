@@ -168,7 +168,10 @@ export function summarize(tree) {
   const eventNames = new Map();
 
   const walk = (node, depth) => {
-    if (!node || typeof node !== "object") return;
+    // 只把**对象**算作节点：null 与数组都不计。
+    // ⚠️ 这条与宿主侧 `UiTreeDump.countNodes` 的口径逐项对齐（null 不计、数组不计）——
+    //   两侧对退化输入若分叉，「两边数字可互校」就只是断言（ADR-0223 §3.2）。
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
     nodeCount += 1;
     maxDepth = Math.max(maxDepth, depth);
     for (const key of Object.keys(node)) {

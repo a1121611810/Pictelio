@@ -264,4 +264,16 @@ describe("summarize（真实样本回放）", () => {
     expect(empty.maxDepth).toBe(0);
     expect(empty.tagCounts).toEqual([]);
   });
+
+  it("退化输入口径：null 与数组元素都**不计**（与宿主侧 countNodes 对齐）", () => {
+    // 两侧口径若分叉，「两边数字可互校」就只是断言（ADR-0223 §3.2）。
+    // 期望值来自「只把对象算作节点」这条规则本身，不是从实现输出抄的。
+    const tree = {
+      tag: "page",
+      children: [null, [], { tag: "view", children: [] }],
+    } as unknown as Record<string, unknown>;
+    const degenerate = summarize(tree);
+    expect(degenerate.nodeCount).toBe(2); // 根 + view
+    expect(degenerate.maxDepth).toBe(1);
+  });
 });

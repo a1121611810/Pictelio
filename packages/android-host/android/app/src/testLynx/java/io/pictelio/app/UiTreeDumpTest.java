@@ -332,6 +332,18 @@ public class UiTreeDumpTest {
     }
 
     /**
+     * 退化输入口径：<b>null 与数组元素都不计</b>（只把对象算作节点）。
+     *
+     * <p>与脚本侧 {@code summarize} 的口径逐项对齐——两侧若分叉，「两边数字可互校」就只是断言
+     * （ADR-0223 §3.2）。期望值来自「只把对象算作节点」这条规则本身。
+     */
+    @Test
+    public void countNodes_degenerateChildren_areNotCounted() {
+        String tree = "{\"tag\":\"page\",\"children\":[null,[],{\"tag\":\"view\",\"children\":[]}]}";
+        assertEquals("根 + view = 2（null 与数组都不计）", 2, UiTreeDump.countNodes(tree));
+    }
+
+    /**
      * <b>跨端互校</b>：宿主侧与 Node 侧对<b>同一份真实样本</b>必须数出同一个节点数。
      *
      * <p>为什么必须：ADR-0223 写「宿主日志的节点数与脚本摘要口径一致 ⇒ 两边数字可互校」——
