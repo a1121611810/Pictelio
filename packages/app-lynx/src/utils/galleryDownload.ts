@@ -134,7 +134,10 @@ function stripEmptySegmentPlaceholders(tpl: string, ctx: SaveNamingContext): str
  * 模板展开内核（不含扩展名拼装）：返回净化 trim 后的文件名基段。
  * - `{p}`：多页展开为 0-based 页号；单页展开为空串（spec D4）
  * - 单页含 `{p}` 的模板先在**模板层**剥离紧邻连接符残段（`_{p}` / `_p{p}` / `-{p}` 等
- *   → `{id}_{p}` 单页得 `<id>`、`{id}_p{p}` 单页得 `<id>`）；在模板层剥离避免误伤
+ *   → `{id}_{p}` 单页得 `<id>`、`{id}_p{p}` 单页得 `<id>`）；连接符两侧都要吃、**位置无关**：
+ *   段落在模板首部时（`{p}_{id}`）残段是其**后继**，在尾部时（`{id}_{p}`）是其**前驱**，
+ *   只吃一侧会在另一侧留下孤立连接符（`{p}_{id}` 单页得 `<id>`）；居中时（`{author}_{p}_{title}`）
+ *   两侧连接符一并剥除、两段直接相接——与 {title}/{author} 空段同口径。在模板层剥离避免误伤
  *   以 p 结尾的标题值
  * - 值为空的 {title}/{author} 段同样在**模板层**剥离紧邻连接符（见上），覆盖「段空整体非空」
  *   这一 {p} 之外的第三种残段形态
@@ -144,7 +147,7 @@ function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<s
   const multiPage = ctx.pageCount > 1
   let t = tpl
   if (!multiPage && t.includes("{p}")) {
-    t = t.replace(/[-_. ]?p?\{p\}/g, "")
+    t = t.replace(/[-_. ]?p?\{p\}[-_. ]?/g, "")
   }
   t = stripEmptySegmentPlaceholders(t, ctx)
   const expanded = t.replace(/\{(\w+)\}/g, (raw, name: string) => {

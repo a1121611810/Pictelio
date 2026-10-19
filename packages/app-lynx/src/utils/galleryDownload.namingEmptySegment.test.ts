@@ -9,6 +9,11 @@
 //
 // 核心风险（= 剥离必须在**模板层**）：值替换后清洗会把「真实标题自带的尾部下划线」
 // 当成残段吃掉。断言「suffix_」逐字保留即为该风险的门禁。
+//
+// #1032 追加：第三种空段触发路径 = 「**占位符解析结果为空**」——单页作品的 `{p}` 展开为空串。
+// 既有 `{p}` 剥离只吃占位符**前侧**连接符，模板首部的 `{p}` 因此留下孤立连接符
+// （`{p}_{id}` → `_123456.jpg`，与 #757 修复前的 `{title}_{id}` 同形）。本文件同族断言：
+// `{p}` 空段与 title/author 空段**同口径**（两侧连接符都吃、位置无关）。
 import { describe, expect, it, vi } from "vitest"
 import {
   buildSaveFileNameFromTemplate,
@@ -53,9 +58,14 @@ function noAuthorCtx(illust: PixivIllust): SaveNamingContext {
   return { ...singleCtx(illust), author: undefined }
 }
 
+/** 多页语境（#1032）：`{p}` 解析为 0-based 页号（**非空**）⇒ 不作空段处置 */
+function multiCtx(illust: PixivIllust, page: number): SaveNamingContext {
+  return { ...singleCtx(illust), page, pageCount: 2 }
+}
+
 const url = "https://i.pximg.net/img-original/single.jpg"
 
-describe("命名模板：空段残段在模板层剥离（#757）", () => {
+describe("命名模板：空段残段在模板层剥离（#757 / #1032）", () => {
   it("title 为空 → 连同紧邻连接符剥离，产出不以 _ 开头（等价于 {id} 单独展开）", () => {
     expect(buildSaveFileNameFromTemplate("{title}_{id}", singleCtx(makeSingleIllust("", "画师名")), url)).toBe(
       "123456.jpg",
@@ -113,5 +123,31 @@ describe("命名模板：空段残段在模板层剥离（#757）", () => {
     expect(
       buildSaveFileNameFromTemplate(DEFAULT_DOWNLOAD_TEMPLATE, noAuthorCtx(makeSingleIllust("", "画师名")), url),
     ).toBe("Pictelio_123456.jpg")
+  })
+
+  // ── #1032：{p} 解析为空 = 第三种空段触发路径（与 title/author 空段同口径）──
+  it("{p} 单页解析为空 → 连同紧邻两侧连接符剥离（首部形态不留孤立前导连接符）", () => {
+    const ctx = singleCtx(makeSingleIllust("夕暮れの庭", "画师名"))
+    expect(buildSaveFileNameFromTemplate("{p}_{id}", ctx, url)).toBe("123456.jpg")
+    expect(buildSaveFileNameFromTemplate("{p}-{id}", ctx, url)).toBe("123456.jpg")
+    expect(buildSaveFileNameFromTemplate("{p}_{title}", ctx, url)).toBe("夕暮れの庭.jpg")
+  })
+
+  it("两侧都吃、位置无关：{p} 居中时两侧连接符一并剥除、两段直接相接（同 title/author 空段口径）", () => {
+    const ctx = singleCtx(makeSingleIllust("夕暮れの庭", "画师名"))
+    expect(buildSaveFileNameFromTemplate("{author}_{p}_{title}", ctx, url)).toBe("画师名夕暮れの庭.jpg")
+  })
+
+  it("{p} 解析为非空（多页页号）→ 不作空段处置，连接符逐字保留", () => {
+    const illust = makeSingleIllust("夕暮れの庭", "画师名")
+    expect(buildSaveFileNameFromTemplate("{p}_{id}", multiCtx(illust, 0), url)).toBe("0_123456.jpg")
+    expect(buildSaveFileNameFromTemplate("{p}_{title}", multiCtx(illust, 1), url)).toBe("1_夕暮れの庭.jpg")
+  })
+
+  it("单页 {p} 与空标题段语义等价：路径形态模板产出逐字节相同", () => {
+    const ctx = singleCtx(makeSingleIllust("", "画师名"))
+    // 推导：模板字面量 `/` 净化为 `_` → `{p}_..` → 剥 `{p}` 及其紧邻 `_` → `..` → 拼 `.jpg`
+    expect(buildSaveFileNameFromTemplate("{p}/..", ctx, url)).toBe("...jpg")
+    expect(buildSaveFileNameFromTemplate("{title}/..", ctx, url)).toBe("...jpg")
   })
 })

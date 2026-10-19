@@ -138,7 +138,7 @@
 | `src/utils/downloadsViewModel.ts` | 1 | `src/utils/downloadsViewModel.test.ts`（A档·误红4） |
 | `src/utils/filesystemTranslationCache.ts` | 1 | `tests/unit/utils/filesystemTranslationCache.test.ts`（B档·误红3） |
 | `src/utils/firstLoadView.ts` | 1 | `src/utils/firstLoadView.test.ts`（A档） |
-| `src/utils/galleryDownload.ts` | 1 | `src/utils/galleryDownload.test.ts`（A档·误红1） |
+| `src/utils/galleryDownload.ts` | 2 | `src/utils/galleryDownload.test.ts`（A档·误红1） · `src/utils/galleryDownload.namingEmptySegment.test.ts`（档位未登记·#757 后新增） |
 | `src/utils/gallerySaver.ts` | 1 | `src/utils/gallerySaver.test.ts`（A档·误红1） |
 | `src/utils/lynxClipboard.ts` | 1 | `src/utils/lynxClipboard.test.ts`（A档·误红2） |
 | `src/utils/lynxDownloadExecutor.ts` | 1 | `src/utils/lynxDownloadExecutor.test.ts`（A档） |
