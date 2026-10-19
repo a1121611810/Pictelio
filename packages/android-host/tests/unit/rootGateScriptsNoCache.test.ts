@@ -12,7 +12,7 @@
 // AGENTS.md 写死「check:all / test:all 一律不带 --cache」，但那份约束**只在文档里**：
 // 没有机器防线时，任何人一次「顺手提速」就能把它加回来，加回后 CI 依旧常绿。
 //
-// ## 判据（只守根 `package.json` 的 `check:all` / `test:all` 两个字面量）
+// ## 判据（2026-10-19 扩展：命令行开关 + runner 配置 + vp 别名三类缓存使能形态）
 //
 // 1. 两脚本存在且非空（被删/改名即红——CI 的 check:all / test:all 步骤会 Missing script）；
 // 2. 经 `vp run` 执行（不是裸 tsc / 裸 vitest 绕过 runner；`pnpm vp` 解析后就是
@@ -27,7 +27,11 @@
 //    合法化。真正会静默假绿的是 `vp run --cache <task>` 与 `run.cache.scripts: true`（失效面 2）；
 // 4. 阳性锚点（防全称断言静默恒真）：两脚本各含 CI 覆盖承诺的 `--filter` 子集
 //    （`@pictelio/android-host` = bf2641b1 才补上的**最近一次漏包事故点**；
-//    `pictelio-app-lynx` = 唯一客户端），且 token 数 / filter 命中数达下界（扫描面非空）。
+//    `pictelio-app-lynx` = 唯一客户端），且 token 数 / filter 命中数达下界（扫描面非空）；
+// 5. `.github/workflows/*.yml` 的**字面量命令**不得出现 cache 使能 token（尤其 `vp run` 行）；
+// 6. 根 `vite.config.ts` 的 `run.cache` 不得对 script 开缓存（`cache: true` / `scripts: true` 等）；
+//    fail-closed：配置形态无法静态判定时判红，不放行（「没解析出来」≠「没开」）；
+// 7. 根 `package.json` 的 `scripts.vp` 别名（全部 `pnpm vp …` 的中转点）不得注入 cache token。
 //
 // ## 判据实现 = 纯函数 + 反事实常驻
 //
@@ -40,23 +44,17 @@
 //
 // ## 已知失效面（抓不到什么）—— 显式登记，见 `workflows/review-fix-loop.md` §门禁纪律
 //
-// 1. **只管根 package.json 这两个脚本的字面量**。CI workflow 的 run 步骤直接写
-//    `pnpm vp run --cache <task>`（或任何绕过根脚本的 vp run 调用）、composite action、
-//    Gradle 的 `org.gradle.caching` 等其它 runner 缓存开关，一律抓不到。
-// 2. **runner 配置 `run.cache` 变化抓不到（最硬的限制）**：根 `vite.config.ts` 若加
-//    `run: { cache: { scripts: true } }` 或 `run.cache: true`（run.md §`run.cache`），script 缓存
-//    被**配置**打开 —— 此时脚本里没有 `--cache` 也照样缓存，本门禁仍绿。它守的是
-//    「命令行没开缓存」，**不守**「缓存没被开」。
+// **已覆盖范围（2026-10-19；别读成「全管」）**：根 package.json 的 check:all / test:all 与
+// scripts.vp；.github/workflows/*.yml 的字面量 cache token；vite.config.ts 的 run.cache.scripts。
+// **残余盲区**：
+// 1. **CI 的非字面量路径**：.github/actions/** 的 composite action、`uses:` 远端/可复用 workflow、
+//    动态 shell（变量展开/命令替换/alias）、环境变量（`VP_CACHE=1`）、Gradle 缓存均不在扫描面。
+// 2. **run.cache 的其它注入形态**：函数/异步工厂配置、或 `run: { cache: 表达式 }` 时按 fail-closed
+//    判红（宁可误报）；`run.tasks` 的 task 缓存默认开启，但门禁脚本是 script 非 task，不属本防线。
 // 3. 其它 vp run 脚本（`build:all` / `dev:all` / 各包裸命令…）被加缓存开关抓不到 —— 只守
-//    AGENTS.md「门禁边界」点名、且 CI 直接执行的两个 vp run 脚本（ci.yml 的
-//    "Type check (all packages)" 与 "Run unit tests" 两步）。`lint:all` 不在判据面是因为
-//    `vp lint` 本身没有 `--cache` 开关（`--cache` 属 `vp run`，无同类缓存假绿面），
-//    不是因为「不守 lint 门禁」。
-// 4. **子脚本 / 包脚本级 cache 抓不到**：根 check:all 委派各包 `check`；若某包脚本内部再嵌套
-//    `vp run --cache`，或把 check 改成 `vite.config.ts` 的 task 并配 `cache: true`
-//    （task 默认就缓存，run.md §`cache`），本门禁看不见。**最贴近的同类盲区**是根 scripts 的
-//    `vp` 别名（`"vp": "node_modules/.bin/vp"`）：把它改成注入 `--cache` 会让全部 `pnpm vp …`
-//    调用带缓存，而本门禁只读 check:all/test:all 字面量、照样绿。
+//    「门禁边界」点名的两个 CI 脚本；`lint:all` 不在判据面是因为 `vp lint` 没有 `--cache` 开关。
+// 4. **子脚本 / 包脚本级 cache 抓不到**：包内脚本嵌套 `vp run --cache`、或 check 改成
+//    `vite.config.ts` 的 task 并配 `cache: true`；vp 别名只守**根** scripts.vp，包级同名不在面内。
 // 5. **不证明「本次真跑了」**：它不校验 CI 确实执行了这两个脚本，也不校验 runner 输出了
 //    `⊘ cache disabled` / `0/N cache hit (0%)`。绿灯结论仍要按 AGENTS.md 口径看日志。
 // 6. **等价写法盲区**：判据是「按空白切分 + 剥成对引号」后按 token 比对，抓不到 shell 变量展开
@@ -64,7 +62,7 @@
 // 7. **不证明 filter 列表完备**：只钉必含包 + 下界，不从 workspace 自动推导（`pictelio-website`
 //    刻意不在 CI 门禁面内，自动推导会把它误报成漏包）。新增包若忘进 check:all/test:all，本门禁不红。
 // 8. 退出码被吞（`… || true` / `… ; true`）抓不到 —— 那是另一种假绿，不属本判据。
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -233,7 +231,49 @@ function evaluateGateScripts(scripts: Record<string, string> | undefined): GateV
       }
     }
   }
+  // 残余 4 中唯一被收窄的别名盲区：根 scripts.vp 是全部 `pnpm vp …` 的中转点，禁止注入 token
+  const vpAlias = scripts?.vp;
+  const aliasTokens = typeof vpAlias === "string" ? findCacheEnablingTokens(vpAlias) : [];
+  if (typeof vpAlias !== "string" || vpAlias.trim() === "") {
+    problems.push("[别名缺失] 根 scripts.vp 不存在或为空 —— 根命令表的 `pnpm vp …` 会全线断掉");
+  } else if (aliasTokens.length > 0) {
+    const tokens = aliasTokens.map((t) => `\`${t}\``).join("、");
+    problems.push(`[别名注入] scripts.vp 含 ${tokens}：全部 \`pnpm vp …\` 调用都会带缓存，删掉它`);
+  }
   return { scripts: scans, problems };
+}
+/** 扫一份 CI workflow 源文本：只认命令上下文的**字面量** cache token（去行内/整行 `#` 注释；残余 1）。 */
+function scanWorkflowText(source: string): string[] {
+  const cacheHits: string[] = [];
+  source.split("\n").forEach((raw, i) => {
+    const line = raw.replace(/\s+#.*$/, "");
+    if (line.trimStart().startsWith("#")) return;
+    for (const token of findCacheEnablingTokens(line)) cacheHits.push(`:${i + 1} \`${token}\``);
+  });
+  return cacheHits;
+}
+
+/** fail-closed：根 vite.config.ts 默认导出是否把 package.json script 缓存打开（run.md §`run.cache`）。 */
+function detectRunCacheScriptCaching(config: unknown): string[] {
+  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+    return ["[检测式不可信] vite.config 默认导出不是普通对象——无法证明 script 缓存未开"];
+  }
+  const run = (config as Record<string, unknown>).run;
+  if (run === undefined) return [];
+  if (typeof run !== "object" || run === null || Array.isArray(run)) {
+    return ["[检测式不可信] vite.config 的 run 不是普通对象——无法证明 run.cache.scripts 未开"];
+  }
+  const cache = (run as Record<string, unknown>).cache;
+  if (cache === undefined || cache === false) return [];
+  if (cache === true) return ["[缓存配置] run.cache: true 同时打开 task/script 缓存 ⇒ 假绿"];
+  if (typeof cache !== "object" || cache === null || Array.isArray(cache)) {
+    return ["[检测式不可信] run.cache 既非 boolean 也非普通对象——fail-closed 判红"];
+  }
+  const scripts = (cache as Record<string, unknown>).scripts;
+  if (scripts === undefined || scripts === false) return [];
+  return [
+    `[缓存配置] run.cache.scripts = ${JSON.stringify(scripts)}：script 缓存被配置打开 ⇒ 假绿`,
+  ];
 }
 // ── [root-gate-detector-end]
 
@@ -269,6 +309,24 @@ function expectCacheHit(
   }
 }
 
+// ── 扩展求值（2026-10-19）：CI workflow / 根 vite.config.ts / scripts.vp 别名 ────────────
+const WORKFLOWS_DIR = join(REPO_ROOT, ".github/workflows");
+const WORKFLOW_ENTRIES = readdirSync(WORKFLOWS_DIR)
+  .filter((file) => /\.ya?ml$/.test(file))
+  .toSorted()
+  .map((file) => ({ file, source: readFileSync(join(WORKFLOWS_DIR, file), "utf8") }));
+const WORKFLOW_SCANS = WORKFLOW_ENTRIES.map(({ file, source }) => ({
+  file,
+  hits: scanWorkflowText(source),
+}));
+const WORKFLOW_RUN_LINES = WORKFLOW_ENTRIES.reduce(
+  (n, { source }) => n + (source.match(/^\s*(?:-\s*)?run:/gm) ?? []).length,
+  0,
+);
+/** 真实配置动态 import 求值（defineConfig 只回填入参）；字面量路径由 vitest 转译 TS，CI Node22 可移植。 */
+async function loadRootViteConfig(): Promise<unknown> {
+  return ((await import("../../../../vite.config.ts")) as { default?: unknown }).default;
+}
 describe("真实仓库：check:all / test:all 不得启用 vp run 缓存（AGENTS.md 门禁边界）", () => {
   it("核心判据：两脚本的缓存使能 token = 0", () => {
     for (const name of GATE_SCRIPT_NAMES) {
@@ -404,6 +462,62 @@ describe("反事实自检（常驻；门禁纪律「判别力三要件」之反�
     expect(
       verdict.problems.some((p) => p.startsWith("[检测式不可信]") && p.includes("--filter")),
       "filter 扫描面清空后必须报 [检测式不可信]",
+    ).toBe(true);
+  });
+});
+
+describe("扩展判据（2026-10-19）：CI workflow / vite run.cache / scripts.vp 别名", () => {
+  it("CI workflow：无字面量 cache token；扫描面非空（失效面 #1 覆盖 + 阳性锚）", () => {
+    const hits = WORKFLOW_SCANS.flatMap((s) => s.hits.map((hit) => `${s.file}${hit}`));
+    expect(hits, `CI workflow 出现 cache 使能 token：\n${hits.join("\n")}`).toEqual([]);
+    expect(WORKFLOW_ENTRIES.length, "至少 2 份 workflow（实测 3）").toBeGreaterThanOrEqual(2);
+    expect(WORKFLOW_RUN_LINES, "run 命令行数下界 10（实测 21）").toBeGreaterThanOrEqual(10);
+  });
+
+  it("CI workflow 反事实：坏样例命中 / 好样例不误报", () => {
+    expect(scanWorkflowText("- run: pnpm vp run --cache check:all"), "坏样例").toHaveLength(1);
+    expect(scanWorkflowText("- run: vp run --cache=true x")[0]).toContain("--cache=true");
+    for (const good of [
+      "- run: pnpm check:all",
+      "- run: pnpm vp run --no-cache check:all",
+      "with:\n  cache: pnpm",
+      "# 严禁 --cache（注释不执行）",
+    ]) {
+      expect(scanWorkflowText(good), `好样例不得误报：${good}`).toEqual([]);
+    }
+  });
+
+  it("根 vite.config.ts：真实配置动态 import + run.cache 坏配置反事实（fail-closed）", async () => {
+    const config = await loadRootViteConfig();
+    expect(config, "真实 vite.config 必须加载成功（失败即红，不 skip）").toHaveProperty("lint");
+    expect(detectRunCacheScriptCaching(config), "真实配置不得开 script 缓存").toEqual([]);
+    for (const [label, bad] of [
+      ["cache: true", { run: { cache: true } }],
+      ["scripts: true", { run: { cache: { scripts: true } } }],
+      ['scripts: "true"', { run: { cache: { scripts: "true" } } }],
+      ["scripts 表达式", { run: { cache: { scripts: () => true } } }],
+    ] as [string, unknown][]) {
+      expect(detectRunCacheScriptCaching(bad), `坏配置必须命中：${label}`).not.toEqual([]);
+    }
+    const goodCases: unknown[] = [
+      {},
+      { run: {} },
+      { run: { cache: false } },
+      { run: { cache: { scripts: false } } },
+      { run: { cache: { tasks: true } } },
+    ];
+    for (const good of goodCases) expect(detectRunCacheScriptCaching(good)).toEqual([]);
+    expect(detectRunCacheScriptCaching(undefined), "无法判定时 fail-closed").not.toEqual([]);
+    expect(detectRunCacheScriptCaching("not-a-config"), "无法判定时 fail-closed").not.toEqual([]);
+  });
+
+  it("scripts.vp 别名：无 cache token；注入 --cache 即红（失效面 #4 已覆盖）", () => {
+    expect(ROOT_SCRIPTS["vp"], "根 scripts.vp 必须存在").toBeTruthy();
+    expect(findCacheEnablingTokens(ROOT_SCRIPTS["vp"])).toEqual([]);
+    const injected = evaluateGateScripts(withScript("vp", `${ROOT_SCRIPTS["vp"]} --cache`));
+    expect(
+      injected.problems.some((p) => p.startsWith("[别名注入]")),
+      "别名注入必须判红",
     ).toBe(true);
   });
 });
