@@ -138,6 +138,18 @@ _Avoid_：拿底色块形状（`bg-inverse-surface` + `rounded-lg`）当**发现
 
 **有意窄覆盖**：一张压在作品图上、却**没有** scrim 渐变的卡不会被自动发现。按本门禁的既定定义，没有渐变就不算「与作品图融合」的沉浸卡，故**不补**兜底发现判据——「压在作品图上」是布局属性，类串层面表达不了，补了只会引入误抓。此项为已登记的决定，不是疏漏。
 
+### 沉浸看图与 chrome 抑制（Immersive media view & chrome suppression）【2026-10-19 新增，#895，ADR-0213】
+
+**沉浸看图（immersive media view）**：
+单击插画进入/退出沉浸的**应用内**形态——只做应用内 chrome 显隐，**不碰原生系统栏**（系统栏是另一语义，见「系统栏」词条；ADR-0213 决策 4/5/6 属后续票）。唯一状态持有者是深模块 `useImmersiveChrome`（`src/composables/useImmersiveChrome.ts`）：`chromeHidden` 是**页面本地 ref**（当前查看状态，非跨页共享数据 ⇒ 不进 Pinia），触发**仅手动单击**切换（**无自动隐藏超时** ⇒ 结构上不存在定时器泄漏）。
+**所有权 token**：模块级 `activeOwner` 存「当前 owner 的复位动作」（函数引用即身份，天然幂等），是全局抑制标志的唯一事实源；新 owner 申请时**先强制旧 owner 幂等复位再接管** ⇒ 根治「A 页进沉浸 → push B → pop 回 A 却仍隐藏 chrome」这类页间泄漏；宿主组件卸载即释放所有权（`onUnmounted` → `exit()`），不依赖调用方记得手动退出。
+_Avoid_: 在多处各写一份「是否沉浸」布尔量、给沉浸态加自动隐藏超时、让浮层组件反向感知沉浸、把「隐藏系统栏」与本条混为一谈
+
+**chrome 抑制（chrome suppression）**：
+全局 chrome 组件（`GlobalFab`）拿不到页面本地的 `chromeHidden`，只读模块级导出 `chromeSuppressed`——它**从所有权派生**（`computed(() => activeOwner !== null)`）而非另维护一份布尔量：另写一个 `isImmersive` 就多出第二个必须与所有权同步的状态，一次漏改即复现所有权机制要根治的那一类泄漏。浮层入口（评论/选页/收藏面板）统一走 `openOverlay`：**先退出沉浸再打开**，**不反向依赖**浮层组件（避免反向依赖）。
+无障碍：图片容器按 `chromeHidden` 挂**动态** `accessibility-label`（进入/退出沉浸，多图分支附「第 n / N 张」），否则屏幕阅读器用户进入沉浸后没有退出路径。⚠️ 动态插值在 Lynx 上是否生效**尚未真机取证**（ADR-0213 P5）；阴性时须走 ADR-0213 已指定的回退动作（常驻一个常量 label 的最小退出控件），不靠推测。
+_Avoid_: 让浮层组件各自判断沉浸态、用页面本地的 `chromeHidden` 去驱动全局 chrome、只存布尔量而不留所有权
+
 ### 追更（Series watchlist）
 
 **追更询问（watchlist prompt）**：
