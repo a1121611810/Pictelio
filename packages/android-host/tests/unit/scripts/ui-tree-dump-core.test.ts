@@ -318,7 +318,7 @@ describe("summarize（真实样本回放）", () => {
     // nodeIndex 恒 0 = 构建期打标未生效（ADR-0223 §2.1 的运行时佐证）⇒ 这条断言
     // 会在引擎**开始**打标时变红 —— 那正是需要重新核对字段清单的信号。
     expect(nodeIndexes).toHaveLength(140);
-    expect(new Set(nodeIndexes).size, "nodeIndex 若不再是恒 0，说明引擎行为变了").toBe(1);
+    expect([...new Set(nodeIndexes)], "nodeIndex 若不再是恒 0，说明引擎行为变了").toEqual([0]);
   });
 
   it("事件名分布：tap 29 / load 20 / error 20 / touchstart 5 / touchmove 5 / touchend 5", () => {
