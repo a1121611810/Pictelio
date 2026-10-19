@@ -9,7 +9,14 @@
 //    UiTreeDumpProtocolContractTest 做两侧比对——Java/Node 两套运行时无共享代码）；
 // ② **产物名解析**（从文件名反解采样点 + 采样档位）；
 // ③ **落齐判据**（planWait：按已知档位等齐，而不是靠「计数不变」猜）；
-// ④ **树摘要**（summarize：节点数 / tag 分布 / 字段清单 / 事件名分布 / 语义 id / a11y 标签）。
+// ④ **树摘要**（summarize：节点数 / tag 分布 / 字段清单 / 事件名分布 / 语义 id / a11y 标签）；
+// ⑤ **输出目录安全校验**（assertSafeOutDir：拒绝把输出目录指到工作目录或其祖先）。
+//
+// ⑤ 为什么在这里：编排层（dump-ui-tree.mjs）要真跑 adb 才能进，**无法在 CI 里单测**
+// ——第 4 轮 review 的阻塞缺陷（`--out ""` 会删掉整个工作目录）正是这样漏出去的。
+// 把判据下沉到本模块，它才有机器防线（见 tests/unit/scripts/ui-tree-dump-outdir.test.ts）。
+import { realpathSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 /** 应用包名（宿主侧 applicationId）。 */
 export const APP_PACKAGE = "io.pictelio.app";
@@ -114,6 +121,120 @@ export function planWait(names, expectedDelays = SAMPLE_DELAYS_MS) {
     if ([...expected].every((d) => unique.includes(d))) settled = true;
   }
   return { settled, seenDelays: [...new Set(seenDelays)].toSorted((a, b) => a - b), groups: out };
+}
+
+/**
+ * 这个名字是不是本通道的产物？（产物名前缀 + 后缀）
+ *
+ * <p>用途：清理输出目录时**只删本通道自己的产物**，绝不整目录递归删除。
+ */
+export function isArtifactName(name) {
+  return name.startsWith(FILE_PREFIX) && name.endsWith(FILE_SUFFIX);
+}
+
+/**
+ * 从一个目录的条目里挑出「本次该清理的旧产物」。
+ *
+ * <p><b>为什么不做整目录递归删除</b>：第 4 轮 review 实测发现，旧实现
+ * {@code rmSync(out, {recursive:true, force:true})} 在 {@code --out ""} 时
+ * （{@code path.resolve("")} = 当前工作目录）会**把用户的整个目录删掉**，
+ * {@code --out <任意已有目录>} 也会把该目录里用户的其它文件一并清空。
+ * ⇒ 清理范围收紧到「只删本通道产物名的文件」，其余一律不动。
+ *
+ * <p><b>为什么只删「普通文件」</b>：第 5 轮 Standards 轴实测抓到一个 EISDIR 崩口——
+ * 输出目录里若存在**名叫 {@code ui-tree-*.json} 的目录**，按名字过滤会把它挑出来，
+ * {@code rmSync} 抛 {@code EISDIR} ⇒ 整跑批中止（fail-closed、无数据丢失，但白跑）。
+ *
+ * @param {{name: string, isDir: boolean}[]} entries 目录条目（名字 + 是否为目录）
+ * @returns {string[]} 该删除的条目名（只含本通道产物的普通文件）
+ */
+export function artifactsToRemove(entries) {
+  return entries.filter((e) => isArtifactName(e.name) && !e.isDir).map((e) => e.name);
+}
+
+/**
+ * 把路径解析成「物理路径」（解析符号链接）；目标不存在时解析其最深的存在祖先再拼回末段。
+ *
+ * <p>为什么必须做：macOS 上 {@code /tmp} 是指向 {@code /private/tmp} 的符号链接，而
+ * {@code process.cwd()} 返回的是**物理路径**、{@code path.resolve()} 返回的是**字面路径**
+ * ⇒ 只比字面路径会把「同一个目录」判成两个（守卫被绕过）。
+ * 这是第 4 轮外部锚点复验时实测抓到的：{@code --out /tmp/uitree-cwd}（CWD 正是它）
+ * 因路径形态不同而**没被拒**。
+ *
+ * @param {string} p 路径
+ * @param {string} [base] 相对路径的基准（默认进程 CWD）
+ * @returns {string} 物理路径（解析不出来时退回字面绝对路径）
+ */
+export function realish(p, base = process.cwd()) {
+  const abs = resolve(base, p);
+  try {
+    return realpathSync(abs);
+  } catch {
+    const parent = dirname(abs);
+    try {
+      return join(realpathSync(parent), basename(abs));
+    } catch {
+      return abs;
+    }
+  }
+}
+
+/**
+ * 两个路径是不是**同一个目录**？**按 inode 判定**（dev + ino）。
+ *
+ * <p><b>为什么不能只比路径字符串</b>：macOS 默认 APFS **大小写不敏感** ⇒
+ * {@code /tmp/x/work} 与 {@code /tmp/x/WORK} 是**同一个目录**（同一 inode）但字符串不等；
+ * 而 {@code realpathSync} **不归一化大小写**（返回输入的大小写形态）⇒ 只比字符串会让
+ * 「CWD 的大小写变体」绕过输出目录守卫。
+ * ⚠️ 第 5 轮 Standards 轴实测抓到该绕过：{@code --out <cwd 的大小写变体>} **没被拒**，
+ * 清理动作落在 CWD 上（同目录的通道产物被删）。inode 判定与大小写、符号链接都无关。
+ *
+ * @param {string} a 路径
+ * @param {string} b 路径
+ * @returns {boolean} 同一目录则 true
+ */
+export function sameDirectory(a, b) {
+  try {
+    const sa = statSync(a);
+    const sb = statSync(b);
+    return sa.dev === sb.dev && sa.ino === sb.ino;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `--out` 目录的安全校验：拒绝会波及工作目录本身的路径。
+ *
+ * <p>为什么必须挡：输出目录若就是当前工作目录（或它的祖先），清理动作会落在用户的
+ * 工作目录上 ⇒ 目录直接消失。旧实现是整目录递归删除 ⇒ 第 4 轮 review 实测复现过
+ * （整个 CWD 消失）。现在清理范围已收紧到「只删本通道产物」，本函数是**第二道**防线：
+ * 即使清理逻辑再被改坏，也不让它落在工作目录上。
+ *
+ * <p>判定按 **inode**（{@link sameDirectory}）⇒ 大小写变体、符号链接别名都挡得住；
+ * 祖先判定把 CWD 的物理路径逐级上溯、逐级比 inode。
+ *
+ * @param {string} cwd 当前工作目录（相对路径按进程 CWD 解析）
+ * @param {string} target 待校验的输出目录（**相对路径按 cwd 解析**）
+ * @returns {string} 目标的物理路径（供调用方直接使用）
+ * @throws {Error} 目标是 CWD 本身、或 CWD 的祖先
+ */
+export function assertSafeOutDir(cwd, target) {
+  const c = realish(cwd);
+  const t = realish(target, c);
+  if (sameDirectory(c, t) || c === t) {
+    throw new Error(`--out 不能是当前工作目录（${c}）：那会清掉工作目录里的同名文件。`);
+  }
+  let dir = dirname(c);
+  for (;;) {
+    if (sameDirectory(dir, t) || dir === t) {
+      throw new Error(`--out 不能是当前工作目录的祖先（${t}）：那会连带影响工作目录本身。`);
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return t;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   POINT_IDS_CSV,
   SAMPLE_DELAYS_CSV,
   SAMPLE_DELAYS_MS,
+  artifactsToRemove,
   exitCodeFor,
   parseArtifactName,
   planWait,
@@ -156,6 +157,17 @@ describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
       name: "上传时间路径（/<年>/<月>/<日>/<时>/<分>/<秒>/）",
       re: /\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\//g,
     },
+    {
+      // 裸作品 id 形态：不带任何前缀的独立数字（`150995806` / `p0_150995806_…`）。
+      // 为什么必须单独挡：前面四种形态都**依赖上下文**（语义 id 前缀 / 斜杠 / `ci` 前缀 /
+      // 32 位十六进制 / 时间路径）——把同一个 id 单独放进某个字段（如 `attributes.src`
+      // 里的裸文件名）时，四种形态全部落空 ⇒ 门禁 0 命中静默放过。
+      // 长度取 8–10 位：Pixiv 作品 id 当前是 8–9 位（留一位给 10 位）。
+      // 用前后视断言排除「更长数字里的一段」与「小数里的数字段」——
+      // 实测 fixture 里独立数字最长 5 位（几何/样式值），本形态对它 0 误报。
+      name: "裸作品 id（独立 8–10 位数字）",
+      re: /(?<![.\d])\d{8,10}(?![.\d])/g,
+    },
   ];
 
   for (const { name, re } of FORBIDDEN) {
@@ -182,6 +194,52 @@ describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
     const leaked = raw.replaceAll("<illustId>", "150995806");
     const caught = FORBIDDEN.filter(({ re }) => (leaked.match(re) ?? []).length > 0);
     expect(caught.length, "还原明文后至少一种形态应被抓到").toBeGreaterThan(0);
+  });
+
+  it("反向对照：裸 id 形态必须能单独抓到（证明这一形态不是恒真断言）", () => {
+    // 前一条只断言「至少一种形态抓到」⇒ 裸 id 形态若写错（恒 0 命中）也不会被发现。
+    // 这里逐形态点名：把占位符换成裸 id 后，**裸 id 形态这一条自己**必须命中。
+    const bare = { name: "裸作品 id（独立 8–10 位数字）", re: /(?<![.\d])\d{8,10}(?![.\d])/g };
+    const leaked = raw.replaceAll("<illustId>", "150995806");
+    expect(leaked.match(bare.re) ?? [], "裸 id 形态必须命中").not.toEqual([]);
+    // 同时确认它对未还原的 fixture 不误报（否则这条断言是「恒红」而非「有效」）。
+    expect(raw.match(bare.re) ?? [], "对当前 fixture 不得误报").toEqual([]);
+  });
+});
+
+describe("artifactsToRemove（清理只删本通道产物，绝不整目录删除）", () => {
+  /** 目录条目 → { name, isDir }（与编排层 readdirSync(withFileTypes) 的形态一致）。 */
+  const entry = (name: string, isDir = false) => ({ name, isDir });
+
+  it("只挑出本通道产物名的文件", () => {
+    const entries = [
+      entry("ui-tree-cold-0ms-1-1700000000000.json"),
+      entry("ui-tree-hot-4000ms-3-1700000004000.json"),
+      entry("我的照片.txt"),
+      entry("子目录", true),
+      entry("notes.json"),
+      entry("ui-tree-notes.json.bak"),
+    ];
+    expect(artifactsToRemove(entries)).toEqual([
+      "ui-tree-cold-0ms-1-1700000000000.json",
+      "ui-tree-hot-4000ms-3-1700000004000.json",
+    ]);
+  });
+
+  it("空目录 ⇒ 无可删项", () => {
+    expect(artifactsToRemove([])).toEqual([]);
+  });
+
+  it("同名**目录**不是可删项（第 5 轮 Standards 轴实测的 EISDIR 崩口）", () => {
+    // 输出目录里存在一个**名叫 ui-tree-*.json 的目录**时，按名字删会抛 EISDIR
+    // ⇒ 整跑批中止。判据只认**普通文件**，目录一律跳过。
+    expect(artifactsToRemove([entry("ui-tree-目录.json", true)])).toEqual([]);
+  });
+
+  it("反向对照：把一个用户文件改成本通道产物名 ⇒ 它就变成可删项（说明过滤靠名字）", () => {
+    // 说明「只按名字过滤」这一口径的边界：同名即视为本通道产物。
+    // 这是刻意的保守取舍：宁可多删一个同名文件，也绝不做整目录递归删除。
+    expect(artifactsToRemove([entry("ui-tree-x.json")])).toEqual(["ui-tree-x.json"]);
   });
 });
 

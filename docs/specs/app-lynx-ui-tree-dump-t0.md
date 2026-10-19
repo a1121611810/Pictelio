@@ -31,7 +31,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 **不做源码反解**。官方 UI source map 的第 1 步（构建期给元素打 `nodeIndex`）是 **React-only**：`enableUiSourceMap` 只存在于 `@lynx-js/react-rsbuild-plugin`，打标端是 `@lynx-js/react` 的 React-JSX 专用 SWC 插件；vue-lynx 无等价实现，其 main-thread 变换不保留任何位置信息。⇒ 本仓拿到的树**没有源码位置**（`repo`/`source`/`line`/`column`）。
 
-但这**不等于**「拿不到组件级信息」——见下节实测：引擎在 `attributes` 里保留了 Tailwind `class`、语义 `id`、`accessibility-label` 与 `vue-ref` 标记，**足以回答「这个节点是哪个组件/哪张作品卡」**。源码行号拿不到，组件身份拿得到。
+但这**不等于**「拿不到组件级信息」——见下节实测：引擎在 `attributes` 里保留了 Tailwind `class`、语义 `id`、`accessibility-label` 与 `vue-ref` 标记，**足以回答「这个节点是哪个组件/哪张作品卡」**（⚠️ 是**反推**出来的：靠 `class` / 语义 `id` 人工推断——**树里没有组件名 / 文件名 / owner 字段**，不是直接给出）。源码行号拿不到，组件身份**反推**得出来。
 
 ## T0 实测结论（模拟器 `pictelio_ui`，推荐页，2026-10-20）
 
@@ -62,12 +62,17 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 **相对官方 UI source map 的差距**：只有「源码位置」这一层拿不到（Vue 侧无 producer，见上）。**组件级信息不依赖它**。
 
 **时机实测**：同一次触发的三份连拍体积为 8,168 / 8,961 / 61,013 字节 ⇒ **0ms 那份几乎是空树、4s 那份才是完整树**。「早拍拿到半棵树」是实测量，不是假设。
-⚠️ **两个体积口径来自不同次抓取，别混用**：本 spec 表格里的 55,895 字节 / 140 节点是**热启动、页面已渲染完**那一次的产物（入库 fixture 即此份，脱敏后 55,945 字节）；而 8,168 / 8,961 / 61,013 是**冷启动**那一次的三档连拍。同一页面在不同启动时机下的树大小不同（冷启动首拍几乎是空树）。
+⚠️ **两个体积口径来自不同次抓取，别混用**：本 spec 表格里的 55,895 字节 / 140 节点是**热启动、页面已渲染完**那一次的产物（入库 fixture 即此份，脱敏后 55,724 字节）；而 8,168 / 8,961 / 61,013 是**冷启动**那一次的三档连拍。同一页面在不同启动时机下的树大小不同（冷启动首拍几乎是空树）。
+⚠️ **字节数会随内容漂移，不是不变量**：55,895（原始抓取，原始文件未入库、事后不可复算）/ 55,724（入库 fixture，可复算）/ 55,806（2026-10-20 第 4 轮收敛时真机复跑「App 已在跑」⇒ hot 3 份，三档同为 55,806）——同一页面不同次抓取字节数就不同（作品 id / 标题 / 图片 URL 的内容与长度都变）。**稳定的断言是结构统计量**（140 节点 / 深度 10 / 字段覆盖 / id 数 / a11y 数 / 事件分布 / tag 分布），字节数只在同一次抓取内部比较才有意义。
 
 **落地时踩到的真实缺陷（已修）**：诊断脚本原先用「连续两次轮询计数不变」判断「文件已落齐」——轮询窗口约 1.2s，而第 2→3 份间隔 2.5s ⇒ **必然在空档里提前收工**，丢掉的正是 4s 那份（唯一完整树），且 **exit 0 静默**。现判据改为**按已知档位等齐**（出现的采样点里至少有一轮三档齐），收不齐时**显式告警**而不是当作成功。回归由 `tests/unit/scripts/ui-tree-dump-core.test.ts` 钉住。
 
+**另一处更严重的缺陷（第 4 轮 review 阻塞项，已修）**：诊断脚本原先用 `rmSync(out, {recursive:true, force:true})` **整目录递归删除**输出目录 ⇒ `--out ""`（`path.resolve("")` = 当前工作目录）**实测把用户的整个工作目录删掉**，`--out <任意已有目录>` 会清空该目录里用户的其它文件。修法两层：① 清理范围收紧到「只删本通道产物」（`ui-tree-*.json`），由 `artifactsToRemove` 单测钉住；② **输出目录不得是工作目录本身或其祖先**（`assertSafeOutDir`，判据在 `lib/ui-tree-dump-core.mjs`，门禁 `tests/unit/scripts/ui-tree-dump-outdir.test.ts`）。
+⚠️ **第 4 轮的第一版修复只比字面路径，被外部锚点实测抓出绕过**：macOS 上 `/tmp` → `/private/tmp` 是符号链接，而 `process.cwd()` 返回物理路径、`path.resolve()` 返回字面路径 ⇒ 同一个目录被看成两个，`--out /tmp/<cwd>` **没被拒**。现两侧都走 `realpath` 解析后再比。**这条是本轮唯一一处「改完仍被外部锚点打回」的缺陷**，说明这类判据不能靠读代码自证，必须在真实文件系统上跑。
+
 **真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,724 字节 / 140 节点 / 深度 10；脱敏：作品 id → `<illustId>`、p0 哈希 → `<p0hash>`、上传时间路径 → `<uploadDate>`、标题/作者文本 → `文本#N` / `标签#N`；**结构统计量与原始抓取逐项一致**）。
-⚠️ **脱敏要盖多种形态**（第 2、3 轮 review 两次抓到）：① 作品 id 有**两个落点**——顶层 `node.id`（140/140 都有该键，16 个非空）与 `attributes.id`（只在 16 个节点上）⇒ 只盖后者会从顶层漏出 15 处明文；② 作品 id 还会以**路径形态**出现在 `attributes.src`；③ src 里还有**稳定作品指纹**——p0 的 32 位十六进制哈希与上传时间路径，两者都能反查作品。已补**五种形态**的断言 + 「还原成明文必须被抓到」的反向对照。
+⚠️ **两个 a11y 标签必须彼此可区分**（第 5 轮 Spec 轴 F6）：脱敏占位符最初把两个 `accessibility-label` 塌成同一个 `标签#4` ⇒ 样本里「2 个 a11y 标签」不可区分、也无法证明原始抓取里一个是 UI 字符串、一个是作品标题（原始取值是 `打开菜单` 与作品标题，第 5 轮真机复跑实证）。现分别占位为 `标签#4`（作品标题，与 `文本#4` 同一段原文）与 `标签#5`（`打开菜单` 类 UI 字符串）⇒ **节点数 / 深度 / 各类覆盖数不变，字节数不变（55,724）**。
+⚠️ **脱敏要盖多种形态**（第 2、3 轮 review 两次抓到、第 4 轮补第三种落点）：① 作品 id 有**两个落点**——顶层 `node.id`（140/140 都有该键，16 个非空）与 `attributes.id`（只在 16 个节点上）⇒ 只盖后者会从顶层漏出 15 处明文；② 作品 id 还会以**路径形态**出现在 `attributes.src`；③ src 里还有**稳定作品指纹**——p0 的 32 位十六进制哈希与上传时间路径，两者都能反查作品；④ 第 4 轮 review 另指出**裸形态**（`150995806` / `p0_150995806_…`）——前三种形态全靠上下文（语义 id 前缀 / 斜杠 / `ci` 前缀 / 32 位十六进制 / 时间路径）识别，id 单独出现在某个字段里时全部落空 ⇒ 门禁 0 命中静默放过。已补**六种形态**的断言 + **两条**反向对照（一条「还原成明文必须被抓到」、一条点名「裸 id 形态这一条自己必须命中」）。
 
 ## User Stories
 
@@ -108,6 +113,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **跨端协议门禁**（第 1 轮 review 补齐）：触发协议的名字、目录名、产物名前后缀、采样档位、采样点标识**同时存在于 Java 宿主与 Node 脚本两侧**，而两侧是不同语言、不同运行时、无共享代码 ⇒ 只能各写各的字面量。故由 `UiTreeDumpProtocolContractTest` 做**逐字比对**，并额外比**行为面**（宿主真实产出的产物名必须能被脚本侧正则解析）。抽取器须断言**恰好 1 条**——正则失配导致抽取为空时，「两侧相等」会变成恒真断言。
 - **DEBUG 门禁接线门禁**（第 1 轮 review 补齐）：宿主单测只直接调判定函数、**不碰调用点** ⇒ 把 `LynxActivity` 两处的 `BuildConfig.DEBUG` 改成 `true`，单测仍全绿而 release 包会真的导出 UI 树。故补**源级守卫**（`tests/unit/uiTreeDumpReleaseGate.test.ts`）：逐个调用点检查传的是 `BuildConfig.DEBUG` 与采样点标识，并带**阳性对照**（反事实源码必须打红）。
 - **真实样本回放**（第 1 轮 review 补齐）：Node 侧单测用入库的真实脱敏样本断言摘要统计量（节点数 / 深度 / 字段覆盖 / 事件分布 / tag 分布），守住「摘要口径变了」这件事不被无声改掉。
+- **输出目录安全校验**（第 4 轮 review 补齐）：`--out` 的目录校验若留在编排层就等于**没防线**（编排层要真跑 adb 才能进，CI 里单测不到）⇒ 判据下沉到 `lib/ui-tree-dump-core.mjs` 的 `assertSafeOutDir`，门禁在 `tests/unit/scripts/ui-tree-dump-outdir.test.ts`（含**符号链接别名**这一条——第 4 轮的第一版修复就是在这条上被外部锚点打回的）。**外部锚点做法**：用假 adb 驱动脚本跑真实文件系统，覆盖「空值 / CWD / CWD 的符号链接别名 / 祖先 / 根目录 / 正常子目录」六种 `--out`，逐条断言退出码与「工作目录与哨兵文件仍在」。
 - **先例**：`PictelioAppModuleDebugBuildTest`（BuildConfig.DEBUG 门禁的机器防线）、`ImageHostConfigTest`（「接口即测试面」）、`TranslateEventContractTest`（协议两侧逐字比对）、`firstLoadViewWireup.test.ts`（源级守卫）、`webviewRemovalInvariants.test.ts`（源级守卫 + 阳性对照）。
 - **不做**：本票不新增 e2e spec；不把 UI 树接进任何既有门禁。
 
@@ -116,6 +122,7 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **UI source map / 源码反解**：`enableUiSourceMap` 是 React-only，vue-lynx 侧无 producer ⇒ 本仓拿不到源码位置。此路已由上游能力边界判死，不在本票尝试。
 - **e2e 断言接入**：`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags` 三处基于树的断言见 follow-up **#1047**（依赖本票产出的真实字段清单来定契约）。
 - **release 变体的 dex 级移除断言**：见 follow-up **#1048**（既有门禁只证 `BuildConfig.DEBUG` 取值为 false，证不到 R8 移除）。
+- **本通道剩余的两处盲区**：见 follow-up **#1049**——① 编排层 `dump-ui-tree.mjs` 的**参数解析**（未知参数 / 缺值 / `--wait` 非法值）无门禁（编排层要真跑 adb 才能进，CI 里单测不到）；② 源级守卫只守「`scheduleIfRequested` 的调用点都传了 DEBUG 闸门」，**不证「宿主侧没有第二个导出出口」**。
 - **自动等「首载落定」**：「首载落定」是逐页面属性（各页面/组件各自持有 `settled`，共享的只有 `deriveFirstLoadView` 纯函数），仓库无全局落定概念 ⇒ 做成中央层需逐页改动。T0 用「连拍 + 人工选样本」绕开。
 - **子树 / 按 id 取元素**：`LynxElement` 在 SDK 4.0.1 里**只有一个公开方法** `toJSONString` ⇒ 只能整棵抓。
 - **release 构建可用**、**生产问题定位**、**导出到宿主可读路径之外**、**导出给非调试用户**。

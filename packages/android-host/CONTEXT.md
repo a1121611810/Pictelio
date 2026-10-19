@@ -43,9 +43,9 @@ _Avoid_: 把 `LruCache`（容器）与 `ImageMemoryCache`（容器的使用者�
 - **触发**：intent extra `uiTreeDump=1`（非空串即触发）；两个采样点——冷启动 `onLoadSuccess`（`cold`）、热启动 `onNewIntent`（`hot`）；一次触发**连拍三档**（0 / 1500 / 4000ms）。
 - **产物**：应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json`，引擎原始 JSON **不加工**落盘（摘要由脚本现算）。
 - **门禁**：`BuildConfig.DEBUG` 作为**判定函数的入参**（非埋在分支里）⇒ release 变体下为恒 false 死代码、被 R8 移除。
-- **能力边界**：**拿不到源码位置**——官方 UI source map 的构建期打标（`enableUiSourceMap`）是 React-only，vue-lynx 侧无 producer（ADR-0223 §2.1）。**「拿不到源码位置」≠「拿不到组件身份」**：树里带 Tailwind `class` / 语义 `id` / `accessibility-label` / `vue-ref` / 事件 / 两套坐标系。
+- **能力边界**：**拿不到源码位置**——官方 UI source map 的构建期打标（`enableUiSourceMap`）是 React-only，vue-lynx 侧无 producer（ADR-0223 §2.1）。**「拿不到源码位置」≠「拿不到组件身份」**：树里带 Tailwind `class` / 语义 `id` / `accessibility-label` / `vue-ref` / 事件 / 两套坐标系。⚠️ 组件身份是**反推**出来的（靠 `class` / 语义 `id` 人工推断）——**树里没有组件名 / 文件名字段**，别写成「直接看出是哪个组件」。
 - **跨端协议**：触发键、目录名、产物名前后缀、采样档位、采样点标识**同时存在于 Java 与 Node 两侧且无共享代码** ⇒ 由 `UiTreeDumpProtocolContractTest` 做逐字比对（含行为面）。
-_Avoid_: 「UI source map / 源码反解」（Vue 侧无 producer，判死）·「e2e 断言接入」（另开票）· 把本通道说成「能定位到源码行」
+_Avoid_: 「UI source map / 源码反解」（Vue 侧无 producer，判死）·「e2e 断言接入」（另开票 #1047）· 把本通道说成「能定位到源码行」
 
 ### 测试分层
 - `tests/unit/`（vitest，随 CI `test:all`）：契约测试（`agentsMd.contract` / `webviewRemovalInvariants` / `e2eContractSuiteCollected`）+ `scripts/` 发布链与 git 校验测试。

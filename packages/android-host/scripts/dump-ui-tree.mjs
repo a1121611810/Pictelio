@@ -9,7 +9,9 @@
  * 选项:
  *   --serial <s>   设备序列号（默认：ANDROID_E2E_SERIAL → 首个在线模拟器）
  *   --wait <ms>    等新文件出现的最长时间（默认 20000）
- *   --out <dir>    拉回本地目录（默认 <tmp>/pictelio-ui-tree）
+ *   --out <dir>    拉回本地目录（默认 <tmp>/pictelio-ui-tree）。**只清本通道的旧产物**
+ *                  （`ui-tree-*.json`），目录里的其它文件一律不动；拒绝指向当前工作
+ *                  目录或它的祖先。
  *   --keep         不清空本地目录里的旧文件
  *
  * 流程: 触发（intent extra）→ 轮询等文件出现 → adb pull → 打印摘要。
@@ -31,15 +33,22 @@
  *   <li><b>不做「哪一份才是完整树」的自动判定</b>：判据是「三档齐」，
  *       「哪一份最完整」由人看体积/节点数决定（本轮实测 4s 那份最完整，但那是当次页面的事实，
  *       不是通用规律）。</li>
+ *   <li><b>清理只删本通道产物</b>：输出目录里只删 `ui-tree-*.json`，<b>不删目录、不删其它
+ *       文件</b>。旧实现是整目录递归删除（`--out ""` 会把当前工作目录删掉，第 4 轮 review
+ *       实测复现过）⇒ 现已收紧，且 `--out` 拒绝空值 / 当前工作目录 / 其祖先。
+ *       ⚠️ <b>本层的参数解析本身没有机器防线</b>（要真跑 adb 才能进到这里，无法在 CI 里
+ *       单测）⇒ 第 4 轮那个阻塞缺陷就是从这里漏出去的。<b>目录安全校验已下沉到 lib 层</b>
+ *       （{@code assertSafeOutDir}）并有门禁；但「参数解析」那一层仍只有人工复验兜着
+ *       （见 ADR-0223 §3.3「尚未覆盖」）。</li>
  *   <li><b>远端目录路径是按平台约定拼的</b>（{@code /sdcard/Android/data/<pkg>/files/<dir>}），
  *       而宿主侧用 {@code getExternalFilesDir(null)} 动态取——两者靠约定相等，不靠字面量相等
  *       （宿主侧与脚本侧的<b>目录名</b>由跨端协议门禁逐字比对，见 ADR-0223 §3.4）。</li>
  * </ul>
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import {
   EXTRA_TRIGGER,
@@ -48,6 +57,8 @@ import {
   REMOTE_DIR,
   SAMPLE_DELAYS_CSV,
   SAMPLE_DELAYS_MS,
+  artifactsToRemove,
+  assertSafeOutDir,
   exitCodeFor,
   parseArtifactName,
   planWait,
@@ -205,6 +216,47 @@ async function collectQuietPeriod(serial, before, appeared, deadline) {
   return { files, plan: planWait(files, SAMPLE_DELAYS_MS) };
 }
 
+/**
+ * 清理输出目录里的**旧产物**——只删本通道产物名的**普通文件**，**不删目录、不删其它文件**。
+ *
+ * <p>⚠️ 旧实现是整目录递归删除：{@code --out ""}（{@code path.resolve("")} = 当前工作目录）
+ * 会把用户的整个目录删掉，{@code --out <任意已有目录>} 会把该目录里用户的其它文件一并清空。
+ * 第 4 轮 review 实测复现过（整个 CWD 消失）。⇒ 清理范围收紧到「只删本通道产物」。
+ *
+ * <p>⚠️ 只删**普通文件**：输出目录里若存在**名叫 `ui-tree-*.json` 的目录**，按名字删会
+ * 抛 EISDIR 让整跑批中止（第 5 轮 Standards 轴实测）⇒ 目录一律跳过。
+ */
+function cleanStaleArtifacts(dir) {
+  if (!existsSync(dir)) return;
+  const entries = readdirSync(dir, { withFileTypes: true }).map((d) => ({
+    name: d.name,
+    isDir: d.isDirectory(),
+  }));
+  for (const name of artifactsToRemove(entries)) {
+    rmSync(join(dir, name), { force: true });
+  }
+}
+
+/**
+ * `--out` 的安全校验（判据在 lib 层，有机器防线）。
+ *
+ * <p>为什么必须挡：输出目录若就是当前工作目录（或它的祖先），清理动作会落在用户的
+ * 工作目录上 ⇒ 目录直接消失。旧实现是整目录递归删除 ⇒ 第 4 轮 review 实测复现过
+ * （整个 CWD 消失）。现在清理范围已收紧到「只删本通道产物」，本校验是**第二道**防线。
+ *
+ * <p>⚠️ 判据本体（含符号链接解析）在 {@code lib/ui-tree-dump-core.mjs} 的
+ * {@code assertSafeOutDir} 里，配套单测在
+ * {@code tests/unit/scripts/ui-tree-dump-outdir.test.ts}。
+ */
+function checkOutDir(cwd, dir) {
+  try {
+    return assertSafeOutDir(cwd, dir);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(2);
+  }
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const serial = resolveSerial(opts.serial);
@@ -237,7 +289,7 @@ async function main() {
     console.log(`[ui-tree]   采样点 ${group.point}：到档 ${group.delays.join(",")} ms`);
   }
 
-  if (!opts.keep) rmSync(opts.out, { recursive: true, force: true });
+  if (!opts.keep) cleanStaleArtifacts(opts.out);
   mkdirSync(opts.out, { recursive: true });
 
   let pullFailures = 0;
@@ -320,8 +372,10 @@ function parseArgs(argv) {
     keep: false,
   };
   const needValue = (flag, value) => {
-    if (value === undefined || value.startsWith("--")) {
-      console.error(`参数 ${flag} 缺少取值`);
+    // 空串也必须拒：--out "" ⇒ path.resolve("") = 当前工作目录 ⇒ 旧实现会把用户的
+    // 整个目录删掉（第 4 轮 review 实测复现过）。空值在任何参数上都没有意义。
+    if (value === undefined || value.startsWith("--") || value.trim() === "") {
+      console.error(`参数 ${flag} 缺少有效取值`);
       process.exit(2);
     }
     return value;
@@ -337,8 +391,10 @@ function parseArgs(argv) {
         process.exit(2);
       }
       opts.wait = n;
-    } else if (a === "--out") opts.out = resolve(needValue(a, argv[++i]));
-    else if (a === "--keep") opts.keep = true;
+    } else if (a === "--out") {
+      // 相对路径按 CWD 解析（判据在 lib 层：assertSafeOutDir 的 target 基准 = cwd）
+      opts.out = checkOutDir(process.cwd(), needValue(a, argv[++i]));
+    } else if (a === "--keep") opts.keep = true;
     else {
       console.error(`未知参数: ${a}`);
       process.exit(2);

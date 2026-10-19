@@ -412,7 +412,8 @@ public class UiTreeDumpTest {
                 "定位真实样本失败：自 " + System.getProperty("user.dir") + " 向上 8 层内未找到 " + rel);
     }
 
-    /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */    private static boolean warnedOnUiTreeDumpTag() {
+    /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */
+    private static boolean warnedOnUiTreeDumpTag() {
         for (ShadowLog.LogItem item : ShadowLog.getLogsForTag(UiTreeDump.TAG)) {
             if (item.type == Log.WARN) return true;
         }
