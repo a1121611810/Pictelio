@@ -154,7 +154,8 @@ public class UiTreeDumpTest {
     /**
      * 产物名带采样点与采样档位（供 Node 侧诊断脚本反解）。
      *
-     * <p>为什么：① 冷启动同时命中 cold 与 hot 两个采样点（各 3 份，共 6 份），
+     * <p>为什么：① 命中几个采样点**取决于进程怎么死的**（App 在跑 ⇒ hot 3 份；
+     * 进程死、任务记录还在 ⇒ cold + hot 共 6 份；force-stop ⇒ cold 3 份），
      * 没有标识就分不清哪份属于哪一轮；② 实测 4s 那份才是完整树，没有档位就只能靠体积猜。
      */
     @Test
@@ -330,6 +331,26 @@ public class UiTreeDumpTest {
         assertEquals("空串 ⇒ -1", -1, UiTreeDump.countNodes(""));
     }
 
+    /**
+     * <b>跨端互校</b>：宿主侧与 Node 侧对<b>同一份真实样本</b>必须数出同一个节点数。
+     *
+     * <p>为什么必须：ADR-0223 写「宿主日志的节点数与脚本摘要口径一致 ⇒ 两边数字可互校」——
+     * 而「可互校」若无机器防线就只是断言。两侧实现分属 Java / Node 两套运行时，
+     * 退化输入（null 元素、数组元素）下口径可能悄悄分叉。
+     *
+     * <p>期望值 140 来自<b>真实抓取</b>（spec / ADR 的实测字段清单），不是从任一实现反推。
+     * Node 侧对同一 fixture 也断言 140（{@code tests/unit/scripts/ui-tree-dump-core.test.ts}）
+     * ⇒ 任一侧口径分叉都会让这一条转红。
+     */
+    @Test
+    public void countNodes_realFixture_matchesNodeSideCount() throws Exception {
+        String json = new String(Files.readAllBytes(locateFixture()), StandardCharsets.UTF_8);
+        assertEquals(
+                "宿主侧节点数必须与 Node 侧对同一 fixture 的结果一致（真实抓取值 140）",
+                140,
+                UiTreeDump.countNodes(json));
+    }
+
     // ── 落盘：取不到外部存储目录（IO 失败双路径的另一半） ──────────────────
 
     /**
@@ -361,8 +382,25 @@ public class UiTreeDumpTest {
         assertTrue("必须打出 WARN（人也要看得见）", warnedOnUiTreeDumpTag());
     }
 
-    /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */
-    private static boolean warnedOnUiTreeDumpTag() {
+    /**
+     * 定位真实样本 fixture（相对宿主包根）。
+     *
+     * <p>为什么用「向上找」而不是写死相对路径：Gradle 单测的工作目录随运行方式变
+     * （与 {@code UiTreeDumpProtocolContractTest} 定位脚本同一做法）。
+     */
+    private static java.nio.file.Path locateFixture() {
+        String rel = "tests/fixtures/ui-tree/recommend-page.sample.json";
+        java.nio.file.Path dir = java.nio.file.Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        for (int i = 0; i < 8 && dir != null; i++) {
+            java.nio.file.Path candidate = dir.resolve(rel);
+            if (Files.isRegularFile(candidate)) return candidate;
+            dir = dir.getParent();
+        }
+        throw new IllegalStateException(
+                "定位真实样本失败：自 " + System.getProperty("user.dir") + " 向上 8 层内未找到 " + rel);
+    }
+
+    /** 本用例窗口内是否出现 UiTreeDump tag 的 WARN（禁静默降级的机器防线）。 */    private static boolean warnedOnUiTreeDumpTag() {
         for (ShadowLog.LogItem item : ShadowLog.getLogsForTag(UiTreeDump.TAG)) {
             if (item.type == Log.WARN) return true;
         }

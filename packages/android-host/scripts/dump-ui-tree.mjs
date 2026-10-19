@@ -162,7 +162,7 @@ function trigger(serial) {
  * <p>⚠️ 旧实现用「连续两次轮询计数不变」判落齐（窗口约 1.2s），而第 2→3 份间隔 2.5s
  * ⇒ 必然在空档里 break，**丢掉的正是 4s 那份（唯一完整树）**且 exit 0 静默。
  *
- * <p>为什么需要静默期：冷启动会同时命中 cold 与 hot **两轮**（各 3 份，共 6 份），
+ * <p>为什么需要静默期：命中两个采样点时（进程死、任务记录还在 ⇒ cold + hot 两轮，各 3 份），
  * 两轮的 4s 档几乎同时落盘但可能差几百毫秒——「一轮齐」时另一轮可能还差最后一档。
  * 静默期只多花 ≤2.5s，却能把那几份捞回来。
  */
@@ -242,11 +242,18 @@ async function main() {
 
   let pullFailures = 0;
   let invalidJson = 0;
+  /** 本轮最完整的一份（节点数多者胜，同数比字节）。收工时点名，避免读者被字典序里最空的那份误导。 */
+  let best = null;
   for (const name of appeared) {
     const local = join(opts.out, name);
     const pulled = adbRun(serial, ["pull", `${REMOTE_DIR}/${name}`, local]);
     if (pulled.status !== 0) {
+      // ⚠️ adb 报错 ⇒ 本地文件**不可信**（可能是上一轮的残留、也可能是半截）。
+      //   必须计入失败**并且不拿它的内容当本次产物打印**——否则「拉回失败」只停在
+      //   一行告警上，退出码仍是 0（这正是本轮要堵的洞）。
       console.error(`[ui-tree] 拉回失败: ${name}（adb exit ${pulled.status}）${pulled.stderr}`);
+      pullFailures += 1;
+      continue;
     }
     if (!existsSync(local)) {
       console.error(`[ui-tree] 拉回失败: ${name}`);
@@ -264,6 +271,9 @@ async function main() {
     }
     const s = summarize(tree);
     const parsed = parseArtifactName(name);
+    if (!best || s.nodeCount > best.nodes || (s.nodeCount === best.nodes && bytes > best.bytes)) {
+      best = { name, nodes: s.nodeCount, bytes };
+    }
     console.log(`\n=== ${name} ===`);
     console.log(
       `字节=${bytes}  节点数=${s.nodeCount}  最大深度=${s.maxDepth}  带class=${s.withClass}/${s.nodeCount}`,
@@ -286,6 +296,14 @@ async function main() {
     }
   }
   console.log(`\n[ui-tree] 产物已拉回: ${opts.out}`);
+  if (best) {
+    // ⚠️ 产物按文件名字典序打印 ⇒ **最空的那份排在最前**（0ms 档常只有几十个节点）。
+    //   读者若只看第一段字段清单，会把「半棵树」当成结论——故收工时点名最完整的那一份。
+    console.log(
+      `[ui-tree] 最完整的一份：${best.name}（节点数=${best.nodes} 字节=${best.bytes}）` +
+        "——「三档落齐」只说明产物齐，不说明每份都完整，以这一份为准。",
+    );
+  }
   if (timedOut) {
     console.error("[ui-tree] ⚠️ 等待超时（采样未确认落齐），请核对上面的档位清单。");
   }

@@ -2,7 +2,7 @@
 
 - **状态**：已接受（Accepted，2026-10-20）｜**T0 最小验证已落地**（模拟器实跑，见 §4 证据）
 - **日期**：2026-10-20
-- **相关**：[ADR-0136（benchNav 深链验证通道，DEBUG 门禁范式）](./ADR-0136-bench-nav-deep-link-validation.md)、[ADR-0220（通知送达通道探测，跨端载荷约定）](./ADR-0220-notification-delivery-channel-probe.md)、[ADR-0163（QA 防线三网）](./ADR-0163-qa-defense-lines.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)
+- **相关**：[ADR-0136（benchNav 深链验证通道，DEBUG 门禁范式）](./ADR-0136-app-lynx-bench-nav-hook.md)、[ADR-0220（通知送达通道探测，跨端载荷约定）](./ADR-0220-notification-delivery-channel-probe.md)、[ADR-0163（QA 防线三网）](./ADR-0163-qa-defense-lines.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)
 - **术语文档**：`packages/android-host/CONTEXT.md`「运行时 UI 树观测通道（runtime UI tree dump）」
 - **证据**：spec [docs/specs/app-lynx-ui-tree-dump-t0.md](../specs/app-lynx-ui-tree-dump-t0.md)｜issue [#1045](https://github.com/a1121611810/Pictelio/issues/1045)｜T0 实测样本见 §3.2
 
@@ -41,10 +41,10 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | 决策 | 内容 | 理由 |
 |---|---|---|
 | 触发通道 | intent extra `uiTreeDump=1`，沿用 benchNav / 通知落点同款通道 | 零新增组件、零 `app-lynx` 改动；热启动（`onNewIntent`）同样生效 ⇒ 人可自行掌握拍树时机 |
-| 采样点 | 冷启动 `onLoadSuccess` + 热启动 `onNewIntent` 两处 | 只接冷启动则「App 已在跑时补拍」不可用——那正是主要用法 |
+| 采样点 | 冷启动 `onLoadSuccess`（`cold`）+ 热启动 `onNewIntent`（`hot`）两处 | 只接冷启动则「App 已在跑时补拍」不可用——那正是主要用法。⚠️ **命中几个采样点取决于进程怎么死的**（2026-10-20 模拟器三场景实测）：App 正在跑 ⇒ hot 3 份；进程死、任务记录还在 ⇒ cold + hot 共 6 份；`am force-stop` ⇒ cold 3 份 |
 | 门禁 | `BuildConfig.DEBUG` 作为**判定函数的入参**（非埋在分支里） | release 变体该字段是字面量 `false`（常量表达式 → javac 内联）⇒ 整块成死代码被 R8 移除；入参化让「门禁」本身可被 JVM 单测证伪 |
-| 采样时机 | **连拍三份**（0 / 1.5 / 4s）；**落齐判据 = 按已知档位等齐** | `onLoadSuccess` 时 JS 未必渲染完，早拍拿到半棵树。实测体积 8.2KB → 9.0KB → 61.0KB，**4s 那份才是完整树**。判据必须按**档位**而不是「计数连续两次不变」——后者窗口约 1.2s < 档位间隔 2.5s，必然在空档里 break，**丢掉的正是 4s 那份**且静默 exit 0。落齐后另加 ≤2.5s **静默期**（冷启动命中 cold + hot 两轮，两轮 4s 档落盘时间可能差几百毫秒） |
-| 落盘 | 应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json` | `adb pull` 直拉（真机可用，不需 `run-as`）；随卸载清理；序号+时间戳 ⇒ 多次触发不覆盖；**带采样点与档位** ⇒ 冷启动同时命中 cold/hot 两轮时能分清哪份属哪轮、哪份才是完整树（否则只能靠体积猜） |
+| 采样时机 | **连拍三份**（0 / 1.5 / 4s）；**落齐判据 = 按已知档位等齐** | `onLoadSuccess` 时 JS 未必渲染完，早拍拿到半棵树。实测体积 8.2KB → 9.0KB → 61.0KB，**4s 那份才是完整树**。判据必须按**档位**而不是「计数连续两次不变」——后者窗口约 1.2s < 档位间隔 2.5s，必然在空档里 break，**丢掉的正是 4s 那份**且静默 exit 0。落齐后另加 ≤2.5s **静默期**（两个采样点都命中时，两轮 4s 档落盘时间可能差几百毫秒） |
+| 落盘 | 应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json` | `adb pull` 直拉（真机可用，不需 `run-as`）；随卸载清理；序号+时间戳 ⇒ 多次触发不覆盖；**带采样点与档位** ⇒ 两个采样点都命中时能分清哪份属哪轮、哪份才是完整树（否则只能靠体积猜） |
 | 写盘 | 临时文件 + rename 原子写；写盘 IO 移交后台线程 | 引擎两个回调都落 UI 线程，几 MB 写盘不能占 UI 线程；rename 前目标文件不完整 ⇒ `adb pull` 会拉到半截 JSON |
 | 产物形态 | **引擎原始 JSON 原样落盘**，摘要由本地脚本现算 | 诊断场景常是「不知道缺什么」——预先裁字段就丢答案；加工逻辑不进 APK |
 | 失败语义 | 根元素为 null / 序列化为 null / 写盘失败**三条分开告警** | 合并成一句「失败」会让人无法定位；禁静默降级 |
@@ -67,14 +67,18 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | 字段 | 覆盖 | 内容 | 诊断价值 |
 |---|---|---|---|
 | `tag` | 140/140 | `page` / `view` / `image` / `text` | 元素类型 |
-| `attributes.class` | 138/140 | Tailwind 类名数组 | **直接看出是哪个组件** |
-| `attributes.id` | 16/140 | 语义 id，含作品 id（`pictelio-hero-source-<illustId>`） | **定位到具体作品** |
-| `attributes.accessibility-label` | 有 | 如 `打开菜单`、`『少女』`（作品标题） | a11y 标注在树里 |
-| `attributes.vue-ref-N` | 132/140 | Vue 实例标记 | 区分同构实例 |
-| `attributes.style` | 有 | 已解析的内联样式 | 布局实况 |
+| `attributes.class` | 138/140 | Tailwind 类名数组 | **可反推是哪个组件**（⚠️ 树里**没有**组件名 / 文件名 / owner 字段 ⇒ 组件身份是**反推**出来的） |
+| **顶层 `id`** | **140/140**（16 个非空） | 语义 id，含作品 id（`pictelio-hero-root` / `pictelio-hero-source-<illustId>`） | **定位到具体作品**。⚠️ 与 `attributes.id` 是**两个不同字段**（后者只在 16 个节点上）⇒ **脱敏必须盖两处** |
+| `attributes.id` | 16/140 | 同一语义 id 的另一处落点 | 同上 |
+| `attributes.accessibility-label` | 2 | 如 `打开菜单`、作品标题 | a11y 标注在树里 |
+| `attributes.accessibility-element` | 4（2 个为 true） | 树内 a11y 标记 | 哪些节点被标为 a11y 元素 |
+| `attributes.vue-ref-N` | 132/140 | Vue 实例序号（⚠️ 只是序号，不含组件名） | 区分同构实例 |
+| `attributes.style` | 51/140 | 已解析的内联样式 | 布局实况 |
+| `attributes.text` | 12/140 | 文本节点内容 | 节点里写了什么 |
+| `attributes.src` / `lazy-load` / `mode` | 各 20/140 | 图片资源 URL / 懒加载标记 / 图片模式 | 图片链路实况 |
 | `position` | 140/140 | `frameInRoot` + `frameInScreen` **两套坐标系** | 命中测试几何 |
 | `events[]` | 50 节点 | `{eventName, function, runtime, type}` | 哪个节点可交互、绑的哪个 handler |
-| `nodeId` / `debugInfo.nodeIndex` | 140/140 | 节点身份 | **可做两棵树的节点级 diff** |
+| `nodeId` / `debugInfo.nodeIndex` | 140/140 | 节点身份（`debugInfo` **只有** `nodeIndex`，无源码位置） | **可做两棵树的节点级 diff** |
 
 事件名分布（实测）：`tap` 29 / `load` 20 / `error` 20 / `touchstart` 5 / `touchmove` 5 / `touchend` 5。
 
@@ -82,14 +86,15 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 宿主侧度量日志字段（logcat `UiTreeDump`）：`字节=` · `节点数=` · `抓取往返耗时=` · `采样点=` · `采样延迟=` · `路径=`。**节点数由宿主在落盘线程解析 JSON 得出**（不占 UI 线程；口径与脚本侧 `summarize` 一致 ⇒ 两边数字可互校）——现场只有 logcat 时也能判断树有多大。
 
-**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,945 字节 / 140 节点 / 深度 10）。脱敏只改**内容值**（作品 id 数字 → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`），**结构统计量与原始抓取逐项一致**（节点数 / 深度 / class 覆盖 / id 数 / a11y 数 / 事件分布 / tag 分布）。
+**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,724 字节 / 140 节点 / 深度 10）。脱敏只改**内容值**、不改结构（节点数 / 深度 / class 覆盖 / id 数 / a11y 数 / 事件分布 / tag 分布均与原始抓取逐项一致）。
+⚠️ **脱敏要盖多种形态**（第 2、3 轮 review 两次抓到）：① 作品 id 有**两个落点**——顶层 `node.id`（140/140 都有该键，16 个非空）与 `attributes.id`（只在 16 个节点上）⇒ 只盖后者会从顶层漏出 15 处明文；② 作品 id 还会以**路径形态**出现在 `attributes.src`（`/<数字>/`、`ci<数字>_`）⇒ 只认「语义 id 形态」的门禁会 0 命中静默放过；③ src 里还有**稳定作品指纹**——p0 的 32 位十六进制哈希与上传时间路径（`/<年>/<月>/<日>/<时>/<分>/<秒>/`），两者都能反查作品。⇒ 门禁改为**五种形态**断言 + 一条「还原成明文必须被抓到」的反向对照。
 
 ### 3.3 尚未覆盖
 
-- **e2e 断言**：本票未做。三处基于树的断言另开票，契约以 §3.2 字段清单为准。
-- **release 变体的实际行为**：JVM 单测只跑 debug 变体（`BuildConfig.DEBUG` 在 debug 侧是 `Boolean.parseBoolean("true")` 方法调用、**不是**常量表达式、javac 不内联），「release 下整块被 R8 移除」那一半由 release 变体的可执行门禁承担。
+- **e2e 断言**：本票未做。三处基于树的断言见 follow-up **#1047**（`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags`），契约以 §3.2 字段清单为准。
+- **release 变体的实际行为**：JVM 单测只跑 debug 变体（`BuildConfig.DEBUG` 在 debug 侧是 `Boolean.parseBoolean("true")` 方法调用、**不是**常量表达式、javac 不内联），「release 下整块被 R8 移除」那一半由 release 变体的可执行门禁承担。⚠️ 该门禁**只证取值**、证不到 R8 移除 ⇒ dex 级断言见 follow-up **#1048**。
 - **「连拍三份」的调度时序**：由 Handler 驱动，单测只断言常量取值，不验证时序。
-- **dex 级「R8 确实移除了本类」**：无 dex 级断言。既有 `verify:android-host:release-buildconfig` 门禁**只证取值**（release 变体的 `BuildConfig.DEBUG` 为 `false`），证不到「早退分支被绕开」，也证不到 R8 移除。
+- **dex 级「R8 确实移除了本类」**：无 dex 级断言。既有 `verify:android-host:release-buildconfig` 门禁**只证取值**（release 变体的 `BuildConfig.DEBUG` 为 `false`），证不到「早退分支被绕开」（那一层由源级守卫覆盖），也证不到 R8 移除 ⇒ follow-up **#1048**。
 
 ### 3.4 本通道的机器防线（第 1 轮 review 后补齐，第 2 轮又补了两处判别力缺口）
 
@@ -102,20 +107,26 @@ Lynx 4.0 官方新增了 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | DEBUG 门禁**调用点接线**源级守卫 | `tests/unit/uiTreeDumpReleaseGate.test.ts` | `UiTreeDump.scheduleIfRequested` 的**每个**调用点都必须传 `BuildConfig.DEBUG` 与采样点标识 |
 | 落齐判据回归 | `tests/unit/scripts/ui-tree-dump-core.test.ts` | 缺 4s 档时**不得**判落齐（守住「最完整那份被静默丢弃」这个已发生的缺陷） |
 | 真实样本回放 | 同上 | 摘要统计量对着**真实抓取样本**断言（节点数 / 深度 / 字段覆盖 / 事件分布 / tag 分布） |
-| **退出码门禁** | 同上（`exitCodeFor`） | 未落齐 / 超时 / 拉回失败 / 非法 JSON ⇒ **非零退出码**。第 1 轮只改了告警文案、退出码仍是 0 ⇒ 「静默 exit 0」缺陷**未闭环**；退出码是判据里唯一能被机器读到的那一半，故下沉成纯函数并单测 |
+| **退出码门禁** | 同上（`exitCodeFor`） | 未落齐 / 超时 / 拉回失败 / 非法 JSON ⇒ **非零退出码**。第 1 轮只改了告警文案、退出码仍是 0 ⇒ 「静默 exit 0」缺陷**未闭环**；退出码是判据里唯一能被机器读到的那一半，故下沉成纯函数并单测。⚠️ 第 3 轮 review 又抓到**拉回失败的洞**：`adb pull` 报错但本地已有同名文件时只打了一行告警、退出码仍是 0 ⇒ 「拉回失败」必须**无条件计入失败且不拿它的内容当本次产物打印**（本地文件可能是上一轮残留或半截） |
 | **DEBUG 守卫的判别力**（第 2 轮补） | `uiTreeDumpReleaseGate.test.ts` | ① 扫描根从「写死 `LynxActivity.java`」扩到**同包全部生产 Java 源集**——第 1 版把第三个调用点放进别的 `.java` 即**骗过守卫**（外部复核变异体实测 GREEN）；② 实参**先剥注释再判定**——第 1 版裸 `includes("BuildConfig.DEBUG")`，实参真值写成 `true`、同实参列表里留一句 `// TODO 改回 BuildConfig.DEBUG` 即**7/7 全绿骗过**（Spec 轴 F2 阻塞项） |
-| **fixture 脱敏门禁**（第 2 轮补） | `tests/unit/scripts/ui-tree-dump-core.test.ts` | 断言 fixture 不含明文作品 id。第 1 轮只脱敏了 `attributes.id`、**顶层 `node.id` 仍留 15 处明文**（而摘要取 `node.id \|\| attributes.id` ⇒ 明文从顶层漏出）——脱敏声明当时是**不实**的（Spec 轴 F1 阻塞项） |
+| **fixture 脱敏门禁**（第 2、3 轮补） | `tests/unit/scripts/ui-tree-dump-core.test.ts` | 断言 fixture 不含**五种形态**的明文：语义 id 形态 / 路径里的裸 id 段 / novel 封面 id 形态 / p0 的 32 位十六进制哈希 / 上传时间路径。第 1 轮只脱敏了 `attributes.id`、**顶层 `node.id` 仍留 15 处明文**（摘要取 `node.id \|\| attributes.id` ⇒ 明文从顶层漏出）——脱敏声明当时是**不实**的（Spec 轴 F1 阻塞项）；第 2 轮门禁**只认一种形态** ⇒ 把 id 写回 `attributes.src` 即可 0 命中静默放过（Spec 轴 F4） |
+| **跨端节点数互校**（第 3 轮补） | `UiTreeDumpTest.java` | 宿主侧 `countNodes` 与 Node 侧 `summarize` 对**同一份真实 fixture** 必须数出同一个值（140）——「两边口径一致 ⇒ 可互校」若无机器防线就只是断言 |
 
-**门禁规模线基线**（第 2 轮 review 实测登记，供下轮加码前对照；`workflows/review-fix-loop.md`「门禁冻结线」第 1 条）：
+**门禁规模线基线**（`workflows/review-fix-loop.md`「门禁冻结线」第 1 条；2026-10-20 第 3 轮 review 后按 HEAD 重测，**供下轮加码前对照**）：
 
-| 门禁 | 被测对象 | 比例 |
+| 门禁 | 被测对象（分母与**扫描面**一致） | 比例 |
 |---|---|---|
-| `uiTreeDumpReleaseGate.test.ts` | `LynxActivity.java`（1242 行） | 0.12 |
-| `ui-tree-dump-core.test.ts` | `ui-tree-dump-core.mjs`（181 行） | 0.99 |
-| `UiTreeDumpTest.java` | `UiTreeDump.java`（291 行） | 1.08 |
-| `UiTreeDumpProtocolContractTest.java` | 协议两侧承载文件（291 + 181 = 472 行） | 0.56 |
+| `uiTreeDumpReleaseGate.test.ts`（376 行） | 扫描面 = **同包全部生产 Java 源集**（57 文件 / 15,918 行） | **0.024** |
+| `ui-tree-dump-core.test.ts`（267 行） | `ui-tree-dump-core.mjs`（210 行） | 1.27 |
+| `UiTreeDumpTest.java`（418 行） | `UiTreeDump.java`（361 行） | 1.16 |
+| `UiTreeDumpProtocolContractTest.java`（265 行） | 协议两侧承载文件（361 + 210 = 571 行） | 0.46 |
+| **门禁机器总量 vs 本票新增生产代码量** | 1,326 / 594 | **2.23×** |
 
-⚠️ **取法说明**（避免下轮误判）：前三行是「单测 ↔ 单文件镜像」的字面比例，看着过半；但这四个文件 60–70% 是中文理由注释（AGENTS.md「中文注释为主」），真实判据体量很小。**更能反映「给回归创造就业」风险的量是门禁机器总量 vs 生产代码量 = 903 / 741 = 1.22×**（健康）。跨端契约那行若改按「协议常量条数」算会得出 1250% 的误导性数字——该门禁还重放了「宿主产物名 ↔ 脚本正则」的**行为面**，其契约由 `fileName()` 格式函数 + `ARTIFACT_NAME_RE_SOURCE` 定义，不由常量条数定义。
+⚠️ **取法说明**（避免下轮误判）：
+- **分母必须与扫描面一致**。release 守卫第 2 轮登记时用 `LynxActivity.java`（1242 行）作分母得 0.12；第 3 轮把扫描面扩到**同包全部生产 Java**（因为 `UiTreeDump` 是 package-private，只有 `io.pictelio.app` 包内的类能合法调用它 ⇒ 那批文件就是调用点全集），分母随之变成 15,918 行 ⇒ 比例 0.024。**分母不跟扫描面走，登记值就是错的**（第 3 轮 review 实测抓到登记值停在第 2 轮快照）。
+- **单测 ↔ 单文件镜像的字面比例看着过半**（1.27 / 1.16），但这四个文件 60–70% 是中文理由注释（AGENTS.md「中文注释为主」），真实判据体量很小。
+- **跨端契约那行**若改按「协议常量条数」算会得出 1250% 的误导性数字——该门禁还重放了「宿主产物名 ↔ 脚本正则」的**行为面**，其契约由 `fileName()` 格式函数 + `ARTIFACT_NAME_RE_SOURCE` 定义，不由常量条数定义。
+- **总量比 2.23×** 看着高，但分母只算**本票新增**的生产代码（594 行），而门禁里有一大块是「跨端协议 + 跨端节点数互校」——那类门禁天生需要**两侧各一份**断言，天然高于 1×。**这条比值不是「给回归创造就业」的指标**（那是「单条门禁 vs 它的被测对象」那一列的用途）。
 
 ## 4. 证据
 

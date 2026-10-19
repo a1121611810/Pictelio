@@ -1140,7 +1140,10 @@ public class LynxActivity extends AppCompatActivity {
         // ⚠️ 不判冷热：onNewIntent 在冷启动时也会于 bundle 加载之后送达
         // （e2e #940 实测：通知冷启动链路），判错会把「本次是否采样」判反。
         // 真正的门禁是 extra 是否存在 + DEBUG 闸门。
-        // ⇒ 冷启动会同时命中 cold 与 hot 两个采样点，各拍 3 份，共 6 份（ADR-0223）。
+        // ⇒ 命中几个采样点**取决于进程怎么死的**（2026-10-20 模拟器三场景实测）：
+        //   App 正在跑 ⇒ 只走 onNewIntent ⇒ hot 3 份；
+        //   进程死、任务记录还在（覆盖安装 / 进程被回收后重开）⇒ cold + hot 共 6 份；
+        //   am force-stop（任务记录也清）⇒ 只走 onCreate ⇒ cold 3 份（ADR-0223）。
         UiTreeDump.scheduleIfRequested(
                 this, lynxView, intent, BuildConfig.DEBUG, UiTreeDump.POINT_HOT);
     }

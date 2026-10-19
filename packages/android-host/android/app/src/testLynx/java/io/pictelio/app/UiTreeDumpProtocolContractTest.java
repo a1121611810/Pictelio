@@ -189,9 +189,10 @@ public class UiTreeDumpProtocolContractTest {
     }
 
     /**
-     * 采样点标识两侧一致：冷启动会同时命中 cold 与 hot 两轮，脚本据此分组。
+     * 采样点标识两侧一致：脚本据此分组（命中几个采样点取决于进程怎么死的：App 在跑 ⇒ hot；
+     * 进程死、任务记录还在 ⇒ cold + hot；force-stop ⇒ cold）。
      *
-     * <p>标识漂移 ⇒ 脚本认不出采样点 ⇒ 「6 份产物分不清哪份属于哪一轮」。
+     * <p>标识漂移 ⇒ 脚本认不出采样点 ⇒ 「多份产物分不清哪份属于哪一轮」。
      */
     @Test
     public void samplingPointIds_matchesBetweenHostAndScript() throws Exception {

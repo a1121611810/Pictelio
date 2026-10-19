@@ -42,14 +42,18 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 | 字段 | 覆盖 | 内容 | 诊断价值 |
 |---|---|---|---|
 | `tag` | 140/140 | `page`/`view`/`image`/`text` | 元素类型 |
-| `attributes.class` | 138/140 | Tailwind 类名数组（如 `["w-full","h-full","flex","flex-col","relative","bg-surface"]`） | **直接看出是哪个组件** |
-| `attributes.id` | 16/140 | 语义 id，含作品 id（`pictelio-hero-root` / `pictelio-hero-source-<illustId>`） | **定位到具体作品** |
-| `attributes.accessibility-label` | 有 | 如 `打开菜单`、`『少女』`（作品标题） | a11y 标注**在树里**（a11y 树并不暴露给 uiautomator） |
-| `attributes.vue-ref-N` | 132/140 | Vue 实例标记 | 区分同构实例 |
-| `attributes.style` | 有 | 已解析的内联样式（如 `height: 53px`） | 布局实况 |
+| `attributes.class` | 138/140 | Tailwind 类名数组（如 `["w-full","h-full","flex","flex-col","relative","bg-surface"]`） | **可反推是哪个组件**（⚠️ 树里**没有**组件名 / 文件名 / owner 字段 ⇒ 组件身份是**反推**出来的，不是直接给出的） |
+| **顶层 `id`** | **140/140**（16 个非空） | 语义 id，含作品 id（`pictelio-hero-root` / `pictelio-hero-source-<illustId>`） | **定位到具体作品**。⚠️ 与 `attributes.id` 是**两个不同字段**：顶层 `id` 140/140 都有该键（16 个非空），`attributes.id` 只在 16 个节点上——**脱敏必须盖两处**（第 2 轮 review 实测：只盖 `attributes.id` 时顶层仍漏 15 处明文） |
+| `attributes.id` | 16/140 | 同上语义 id 的另一处落点 | 同上 |
+| `attributes.accessibility-label` | 2 | 如 `打开菜单`、作品标题 | a11y 标注**在树里**（a11y 树并不暴露给 uiautomator） |
+| `attributes.accessibility-element` | 4（2 个为 true） | 树内 a11y 标记 | 哪些节点被标为 a11y 元素 |
+| `attributes.vue-ref-N` | 132/140 | Vue 实例序号 | 区分同构实例（⚠️ 只是序号，**不含组件名**） |
+| `attributes.style` | 51/140 | 已解析的内联样式（如 `height: 53px`） | 布局实况 |
+| `attributes.text` | 12/140 | 文本节点内容 | 节点里写了什么 |
+| `attributes.src` / `lazy-load` / `mode` | 各 20/140 | 图片资源 URL / 懒加载标记 / 图片模式 | 图片链路实况 |
 | `position` | 140/140 | `frameInRoot` + `frameInScreen` **两套坐标系** | 命中测试几何 |
 | `events[]` | 50 节点 | `{eventName, function:"vue:1", runtime:"BTS", type:"bindEvent"}` | **哪个节点可交互、绑的哪个 handler** |
-| `nodeId` / `debugInfo.nodeIndex` | 140/140 | 节点身份 | **可做两棵树的节点级 diff** |
+| `nodeId` / `debugInfo.nodeIndex` | 140/140 | 节点身份（`debugInfo` **只有** `nodeIndex`，无源码位置） | **可做两棵树的节点级 diff** |
 
 **事件名分布**（实测）：`tap` 29 / `load` 20 / `error` 20 / `touchstart` 5 / `touchmove` 5 / `touchend` 5。
 
@@ -62,7 +66,8 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 
 **落地时踩到的真实缺陷（已修）**：诊断脚本原先用「连续两次轮询计数不变」判断「文件已落齐」——轮询窗口约 1.2s，而第 2→3 份间隔 2.5s ⇒ **必然在空档里提前收工**，丢掉的正是 4s 那份（唯一完整树），且 **exit 0 静默**。现判据改为**按已知档位等齐**（出现的采样点里至少有一轮三档齐），收不齐时**显式告警**而不是当作成功。回归由 `tests/unit/scripts/ui-tree-dump-core.test.ts` 钉住。
 
-**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（脱敏：作品 id → `<illustId>`、标题/作者文本 → `文本#N` / `标签#N`；结构统计量与原始抓取逐项一致）。⚠️ **脱敏要盖两处**：`attributes.id` **和**顶层 `node.id`（摘要取 `node.id || attributes.id`，只脱敏前者会从顶层漏出明文——第 2 轮 review 实测抓到 15 处明文作品 id）。已补单测断言 fixture 不含明文作品 id。
+**真实样本已入库**：`packages/android-host/tests/fixtures/ui-tree/recommend-page.sample.json`（55,724 字节 / 140 节点 / 深度 10；脱敏：作品 id → `<illustId>`、p0 哈希 → `<p0hash>`、上传时间路径 → `<uploadDate>`、标题/作者文本 → `文本#N` / `标签#N`；**结构统计量与原始抓取逐项一致**）。
+⚠️ **脱敏要盖多种形态**（第 2、3 轮 review 两次抓到）：① 作品 id 有**两个落点**——顶层 `node.id`（140/140 都有该键，16 个非空）与 `attributes.id`（只在 16 个节点上）⇒ 只盖后者会从顶层漏出 15 处明文；② 作品 id 还会以**路径形态**出现在 `attributes.src`；③ src 里还有**稳定作品指纹**——p0 的 32 位十六进制哈希与上传时间路径，两者都能反查作品。已补**五种形态**的断言 + 「还原成明文必须被抓到」的反向对照。
 
 ## User Stories
 
@@ -82,8 +87,8 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 - **触发协议**：intent extra 键 `uiTreeDump`，值为非空字符串即触发（与 benchNav 的 extra 风格一致）。冷启动在 `onLoadSuccess` 抓、热启动在 `onNewIntent` 抓——两处都要接，否则「App 已在跑时补拍」不可用（这正是 T0 要验证的主要用法）。
 - **门禁**：整段以 `BuildConfig.DEBUG` 包裹（与既有 `pictelio_dev_*` / benchNav 通道同范式）⇒ release 编译下为恒 false 死代码、被 R8 移除。
 - **连拍**：一次触发在 0 / 1.5 / 4s 三个时刻各抓一份，每份独立文件。间隔取自仓库既有的「四次投递 1.5/3/4.5/6s」防挂载竞态思路（ADR-0136 / ADR-0220）。
-- **产物名带采样点与档位**：`ui-tree-<cold|hot>-<0|1500|4000>ms-<序号>-<时间戳>.json`。理由：冷启动会同时命中 cold 与 hot 两轮（各 3 份，共 6 份），没有标识就分不清哪份属哪轮；而「哪份才是完整树」实测只能靠体积猜 ⇒ 把档位写进文件名。
-- **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。落齐后再等一段**静默期**（≤2.5s），把冷启动另一轮迟到的产物也捞回来。收不齐 ⇒ 显式告警 **+ 非零退出码**（退出码判据是纯函数 `exitCodeFor`，在 `scripts/lib/ui-tree-dump-core.mjs` 里，有单测）。
+- **产物名带采样点与档位**：`ui-tree-<cold|hot>-<0|1500|4000>ms-<序号>-<时间戳>.json`。理由：命中几个采样点**取决于进程怎么死的**（2026-10-20 模拟器三场景实测）——App 正在跑 ⇒ 只走 `onNewIntent` ⇒ **hot 3 份**；进程死、**任务记录还在**（覆盖安装 / 进程被系统回收后重开）⇒ `onCreate` 与 `onNewIntent` 都走 ⇒ **cold + hot 共 6 份**；`am force-stop`（任务记录也清）⇒ 只走 `onCreate` ⇒ **cold 3 份**。没有标识就分不清哪份属哪轮；而「哪份才是完整树」实测只能靠体积猜 ⇒ 把档位写进文件名。
+- **落齐判据按已知档位**：判据 =「出现的采样点里至少有一轮三档齐」，**不是**「计数连续两次不变」（见「T0 实测结论」里的缺陷复盘）。落齐后再等一段**静默期**（≤2.5s），把另一采样点迟到的产物也捞回来。收不齐 ⇒ 显式告警 **+ 非零退出码**（退出码判据是纯函数 `exitCodeFor`，在 `scripts/lib/ui-tree-dump-core.mjs` 里，有单测）。
 - **落盘位置**：应用专属外部目录下的 `ui-tree/` 子目录。文件名带序号 + 时间戳 ⇒ 多次触发不覆盖。
 - **写盘时机**：引擎两个回调都落在 **UI 线程** ⇒ 落盘 I/O 移交后台线程，UI 线程只做「拿到字符串就转交」。
 - **写盘方式**：临时文件 + 原子 rename ⇒ `adb pull` 不会读到半截 JSON。
@@ -109,7 +114,8 @@ Lynx 4.0 官方提供的 `LynxView.getLynxElementRoot` + `LynxElement.toJSONStri
 ## Out of Scope
 
 - **UI source map / 源码反解**：`enableUiSourceMap` 是 React-only，vue-lynx 侧无 producer ⇒ 本仓拿不到源码位置。此路已由上游能力边界判死，不在本票尝试。
-- **e2e 断言接入**：`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags` 三处基于树的断言**另开票**（依赖本票产出的真实字段清单来定契约）。
+- **e2e 断言接入**：`transition-matrix` / `fab-hit-testing-regression` / `lynx-bookmark-tags` 三处基于树的断言见 follow-up **#1047**（依赖本票产出的真实字段清单来定契约）。
+- **release 变体的 dex 级移除断言**：见 follow-up **#1048**（既有门禁只证 `BuildConfig.DEBUG` 取值为 false，证不到 R8 移除）。
 - **自动等「首载落定」**：「首载落定」是逐页面属性（各页面/组件各自持有 `settled`，共享的只有 `deriveFirstLoadView` 纯函数），仓库无全局落定概念 ⇒ 做成中央层需逐页改动。T0 用「连拍 + 人工选样本」绕开。
 - **子树 / 按 id 取元素**：`LynxElement` 在 SDK 4.0.1 里**只有一个公开方法** `toJSONString` ⇒ 只能整棵抓。
 - **release 构建可用**、**生产问题定位**、**导出到宿主可读路径之外**、**导出给非调试用户**。

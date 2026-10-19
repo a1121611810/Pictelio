@@ -58,7 +58,7 @@ describe("协议常量（脚本侧自洽）", () => {
     expect(SAMPLE_DELAYS_CSV.split(",").map(Number)).toEqual(SAMPLE_DELAYS_MS);
   });
 
-  it("采样点：cold 与 hot 两个（冷启动会同时命中两轮，各 3 份）", () => {
+  it("采样点：cold 与 hot 两个（命中几个取决于进程怎么死的：App 在跑 ⇒ hot；进程死、任务记录还在 ⇒ cold+hot；force-stop ⇒ cold）", () => {
     expect(POINT_IDS_CSV).toBe("cold,hot");
   });
 
@@ -141,16 +141,29 @@ describe("planWait（落齐判据）", () => {
 describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
   // 第 2 轮 review 实测抓到：只脱敏了 `attributes.id`，**顶层 `node.id` 仍是明文作品 id**
   // （15 处）——而摘要取 `node.id || attributes.id` ⇒ 明文会从顶层漏出来。
-  // ⇒ 这条断言是「脱敏声明」的机器防线，不是走过场。
+  // 第 3 轮 review 又抓到：门禁**只认一种形态** ⇒ 把 id 写回 `attributes.src` 形态即可
+  // 0 命中静默放过；且 src 里原本还留着 p0 哈希与上传时间路径（作品指纹）。
+  // ⇒ 这条断言组是「脱敏声明」的机器防线，必须**多形态**覆盖。
   const raw = readFileSync(FIXTURE, "utf-8");
 
-  it("fixture 不含明文作品 id（pictelio-hero-source-<数字>）", () => {
-    const plaintext = raw.match(/pictelio-hero-source-\d{6,}/g) ?? [];
-    expect(
-      plaintext,
-      `fixture 残留 ${plaintext.length} 处明文作品 id —— 脱敏只改了 attributes.id、漏了顶层 node.id`,
-    ).toEqual([]);
-  });
+  /** 作品 id / 指纹在树里可能出现的几种形态——每种都要挡住。 */
+  const FORBIDDEN: { name: string; re: RegExp }[] = [
+    { name: "语义 id 形态（pictelio-hero-source-<数字>）", re: /pictelio-hero-source-\d{6,}/g },
+    { name: "路径里的裸作品 id 段（/<数字>）", re: /\/\d{6,}(?:\/|_)/g },
+    { name: "novel 封面 id 形态（ci<数字>_）", re: /ci\d{6,}_/g },
+    { name: "p0 图片哈希（32 位十六进制）", re: /[0-9a-f]{32}/g },
+    {
+      name: "上传时间路径（/<年>/<月>/<日>/<时>/<分>/<秒>/）",
+      re: /\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\//g,
+    },
+  ];
+
+  for (const { name, re } of FORBIDDEN) {
+    it(`fixture 不含明文形态：${name}`, () => {
+      const hits = raw.match(re) ?? [];
+      expect(hits.slice(0, 5), `命中 ${hits.length} 处`).toEqual([]);
+    });
+  }
 
   it("脱敏占位符确实存在于两处（attributes.id 与顶层 node.id 都换掉了）", () => {
     const topLevelIds: string[] = [];
@@ -162,6 +175,13 @@ describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
     };
     walk(realTree);
     expect(topLevelIds.filter((id) => id.includes("<illustId>")).length).toBe(15);
+  });
+
+  it("反向对照：把占位符还原成明文，门禁必须能抓到（证明这些形态断言不是恒真）", () => {
+    // 防「正则写错了 ⇒ 0 命中 ⇒ 看起来很安全」的假防线。
+    const leaked = raw.replaceAll("<illustId>", "150995806");
+    const caught = FORBIDDEN.filter(({ re }) => (leaked.match(re) ?? []).length > 0);
+    expect(caught.length, "还原明文后至少一种形态应被抓到").toBeGreaterThan(0);
   });
 });
 

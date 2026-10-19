@@ -52,9 +52,10 @@ export const REMOTE_DIR = `/sdcard/Android/data/${APP_PACKAGE}/files/${OUT_DIR_N
 /**
  * 产物名正则：从 `ui-tree-<point>-<delayMs>ms-<seq>-<ts>.json` 反解采样点与档位。
  *
- * <p>为什么产物名要带采样点与档位：① 冷启动会同时命中 cold 与 hot 两个采样点（各 3 份），
- * 没有标识就分不清哪份属于哪一轮；② 实测 4s 那份才是完整树（8KB → 9KB → 61KB），
- * 没有档位就只能靠体积猜。
+ * <p>为什么产物名要带采样点与档位：① 命中几个采样点**取决于进程怎么死的**
+ * （2026-10-20 模拟器三场景实测）：App 正在跑 ⇒ hot 3 份；进程死、任务记录还在
+ * ⇒ cold + hot 共 6 份；`am force-stop` ⇒ cold 3 份——没有标识就分不清哪份属于哪一轮；
+ * ② 实测 4s 那份才是完整树（8KB → 9KB → 61KB），没有档位就只能靠体积猜。
  */
 export const ARTIFACT_NAME_RE_SOURCE =
   "^ui-tree-(?<point>[a-z]+)-(?<delay>\\d+)ms-(?<seq>\\d+)-(?<ts>\\d+)\\.json$";

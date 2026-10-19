@@ -158,9 +158,14 @@ final class UiTreeDump {
      * 热启动的 {@code onNewIntent}。后者是本通道的主要用法——「App 已在跑时再拍一张」，
      * 也让人自己掌握拍树时机（自动等落定的替代品）。
      *
-     * <p><b>冷启动会命中两个采样点</b>：{@code onNewIntent} 在冷启动时也会送达
-     * （见 {@code LynxActivity} 同处注释），故一次冷启动可能拍出 6 份（cold 3 份 + hot 3 份）。
-     * 这不是 bug 而是把「两个采样点都命中」显式化——产物名带采样点，人一眼能分。
+     * <p><b>命中几个采样点取决于进程怎么死的</b>（2026-10-20 模拟器三场景实测，不是推演）：
+     * <ul>
+     *   <li>App <b>正在跑</b>（intent 投给已运行实例）⇒ 只走 {@code onNewIntent} ⇒ <b>hot 3 份</b>；</li>
+     *   <li>进程已死、<b>任务记录还在</b>（覆盖安装、进程被系统回收后重开）⇒ {@code onCreate}
+     *       与 {@code onNewIntent} 都走 ⇒ <b>cold + hot 共 6 份</b>；</li>
+     *   <li>{@code am force-stop}（任务记录也清）⇒ 只走 {@code onCreate} ⇒ <b>cold 3 份</b>。</li>
+     * </ul>
+     * 这不是 bug 而是把「命中哪些采样点」显式化——产物名带采样点，人一眼能分。
      *
      * @param debugBuild 构建类型闸门（调用方传 {@code BuildConfig.DEBUG}）
      * @param point 采样点标识（{@link #POINT_COLD} / {@link #POINT_HOT}），进产物名与日志
