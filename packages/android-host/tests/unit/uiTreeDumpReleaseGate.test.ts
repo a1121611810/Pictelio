@@ -33,8 +33,17 @@
  * ⑤ **对真实源码**做同样的反事实替换（内存中替换，不落盘）必须打红。
  *
  * ## 已知失效面（显式登记，非缺陷）
- * - **只认 `BuildConfig.DEBUG` 字面量**：若将来改成 `BuildConfig.DEBUG && someFlag`，
- *   本守卫会判红（这是刻意保守：宁可多问一次，也不要放过 release 导出能力）。
+ * - **只认 `BuildConfig.DEBUG` 字面量**：实参里必须出现这个**完整字面量**才判定通过——
+ *   但判定是**子串**匹配（`args.includes("BuildConfig.DEBUG")`）⇒ 下列形态**同样判绿**
+ *   （第 8 轮 Standards 轴实测抓出：本文件头原先写「`BuildConfig.DEBUG && someFlag` 会判红」
+ *   是**失实**的，已订正）：
+ *   - `BuildConfig.DEBUG && someFlag` ⇒ 判绿。release 下 `false && x` 可被 javac 常量折叠
+ *     ⇒ 分支恒 false ⇒ **这个方向是安全的**。
+ *   - `BuildConfig.DEBUG || someFlag` ⇒ 判绿，且**不安全**：release 下 `false || x`
+ *     **不可**常量折叠 ⇒ 该调用点在 release 包里会**真的导出** UI 树，而守卫放行。
+ *   - `MyBuildConfig.DEBUG` 这类**含该字面量的其它标识符** ⇒ 判绿（子串同名）。
+ *   ⇒ 守卫**不拦**上述形态，需人工复核；把判定收紧成「实参**恰好**等于 `BuildConfig.DEBUG`」
+ *   属**判据强度变更**，见 **#1049**（不在本票范围）。
  * - **不覆盖 R8 移除**：本守卫只证「调用点传的是 DEBUG 闸门」，不证「R8 确实移除了本类」
  *   （无 dex 级断言，见 ADR-0223 §3.3）。
  * - **不扫描测试源集**（`src/test/`、`src/testLynx/`）：测试代码不进生产 APK，

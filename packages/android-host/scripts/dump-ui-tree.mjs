@@ -303,54 +303,15 @@ async function main() {
   /** 本次最完整的一份（节点数多者胜，同数比字节）。收工时点名，避免读者被字典序里最空的那份误导。 */
   let best = null;
   for (const name of appeared) {
-    const local = join(opts.out, name);
-    const pulled = adbRun(serial, ["pull", `${REMOTE_DIR}/${name}`, local]);
-    if (pulled.status !== 0) {
-      // ⚠️ adb 报错 ⇒ 本地文件**不可信**（可能是上一轮的残留、也可能是半截）。
-      //   必须计入失败**并且不拿它的内容当本次产物打印**——否则「拉回失败」只停在
-      //   一行告警上，退出码仍是 0（这正是第 1 轮 review 要堵的洞）。
-      console.error(`[ui-tree] 拉回失败: ${name}（adb exit ${pulled.status}）${pulled.stderr}`);
-      pullFailures += 1;
-      continue;
-    }
-    if (!existsSync(local)) {
-      console.error(`[ui-tree] 拉回失败: ${name}`);
-      pullFailures += 1;
-      continue;
-    }
-    const bytes = statSync(local).size;
-    let tree;
-    try {
-      tree = JSON.parse(readFileSync(local, "utf8"));
-    } catch (e) {
-      console.error(`[ui-tree] ${name} 不是合法 JSON（${e.message}），字节=${bytes}`);
-      invalidJson += 1;
-      continue;
-    }
-    const s = summarize(tree);
-    const parsed = parseArtifactName(name);
-    if (!best || s.nodeCount > best.nodes || (s.nodeCount === best.nodes && bytes > best.bytes)) {
-      best = { name, nodes: s.nodeCount, bytes };
-    }
-    console.log(`\n=== ${name} ===`);
-    console.log(
-      `字节=${bytes}  节点数=${s.nodeCount}  最大深度=${s.maxDepth}  带class=${s.withClass}/${s.nodeCount}`,
-    );
-    console.log(`采样点=${parsed?.point ?? "?"}  采样延迟=${parsed?.delayMs ?? "?"}ms`);
-    console.log(`顶层: ${s.topLevel.join(", ")}`);
-    console.log("tag 分布:");
-    for (const [tag, n] of s.tagCounts) console.log(`  ${String(n).padStart(6)}  ${tag}`);
-    console.log("节点字段清单（出现次数）:");
-    for (const [field, n] of s.fieldCounts) console.log(`  ${String(n).padStart(6)}  ${field}`);
-    console.log(`事件名分布（${s.eventNames.length} 种）:`);
-    for (const [evName, n] of s.eventNames) console.log(`  ${String(n).padStart(6)}  ${evName}`);
-    if (s.ids.length) {
-      console.log(`语义 id（${s.ids.length}）:`);
-      for (const id of s.ids) console.log(`  ${id}`);
-    }
-    if (s.a11yLabels.length) {
-      console.log(`a11y 标签（${s.a11yLabels.length}）:`);
-      for (const label of s.a11yLabels) console.log(`  ${label}`);
+    const r = pullAndReportArtifact(serial, name, opts.out);
+    if (r.failure === "pull") pullFailures += 1;
+    else if (r.failure === "json") invalidJson += 1;
+    else if (
+      !best ||
+      r.nodeCount > best.nodes ||
+      (r.nodeCount === best.nodes && r.bytes > best.bytes)
+    ) {
+      best = { name, nodes: r.nodeCount, bytes: r.bytes };
     }
   }
   console.log(`\n[ui-tree] 产物已拉回: ${opts.out}`);
@@ -367,6 +328,68 @@ async function main() {
   }
   // 退出码 = 唯一能被机器读到的那一半失败信号（判据纯函数在 core 层，有单测）。
   process.exit(exitCodeFor({ settled: plan.settled, timedOut, pullFailures, invalidJson }));
+}
+
+/**
+ * 拉回一份产物，并打印它的摘要。
+ *
+ * <p>失败分两类计数，都**不静默**：
+ * ① <b>拉回失败</b>（adb 报错 / 拉回后文件不在）——此时本地文件**不可信**（可能是上一轮的
+ *    残留、也可能是半截）⇒ 既计入失败、**也不拿它的内容当本次产物打印**；否则
+ *    「拉回失败」只停在一行告警上，退出码仍是 0（这正是第 1 轮 review 要堵的洞）。
+ * ② <b>JSON 非法</b>——同样计入失败并跳过摘要。
+ *
+ * @param {string} serial 设备序列号
+ * @param {string} name 产物文件名
+ * @param {string} outDir 本地输出目录
+ * @returns {{failure: "pull"|"json"|null, nodeCount: number, bytes: number}} 失败类别与规模统计
+ */
+function pullAndReportArtifact(serial, name, outDir) {
+  const local = join(outDir, name);
+  const pulled = adbRun(serial, ["pull", `${REMOTE_DIR}/${name}`, local]);
+  if (pulled.status !== 0) {
+    console.error(`[ui-tree] 拉回失败: ${name}（adb exit ${pulled.status}）${pulled.stderr}`);
+    return { failure: "pull", nodeCount: 0, bytes: 0 };
+  }
+  if (!existsSync(local)) {
+    console.error(`[ui-tree] 拉回失败: ${name}`);
+    return { failure: "pull", nodeCount: 0, bytes: 0 };
+  }
+  const bytes = statSync(local).size;
+  let tree;
+  try {
+    tree = JSON.parse(readFileSync(local, "utf8"));
+  } catch (e) {
+    console.error(`[ui-tree] ${name} 不是合法 JSON（${e.message}），字节=${bytes}`);
+    return { failure: "json", nodeCount: 0, bytes };
+  }
+  const s = summarize(tree);
+  printArtifactDetail(name, s, parseArtifactName(name), bytes);
+  return { failure: null, nodeCount: s.nodeCount, bytes };
+}
+
+/** 打印一份产物的字段清单（摘要正文）。 */
+function printArtifactDetail(name, s, parsed, bytes) {
+  console.log(`\n=== ${name} ===`);
+  console.log(
+    `字节=${bytes}  节点数=${s.nodeCount}  最大深度=${s.maxDepth}  带class=${s.withClass}/${s.nodeCount}`,
+  );
+  console.log(`采样点=${parsed?.point ?? "?"}  采样延迟=${parsed?.delayMs ?? "?"}ms`);
+  console.log(`顶层: ${s.topLevel.join(", ")}`);
+  console.log("tag 分布:");
+  for (const [tag, n] of s.tagCounts) console.log(`  ${String(n).padStart(6)}  ${tag}`);
+  console.log("节点字段清单（出现次数）:");
+  for (const [field, n] of s.fieldCounts) console.log(`  ${String(n).padStart(6)}  ${field}`);
+  console.log(`事件名分布（${s.eventNames.length} 种）:`);
+  for (const [evName, n] of s.eventNames) console.log(`  ${String(n).padStart(6)}  ${evName}`);
+  if (s.ids.length) {
+    console.log(`语义 id（${s.ids.length}）:`);
+    for (const id of s.ids) console.log(`  ${id}`);
+  }
+  if (s.a11yLabels.length) {
+    console.log(`a11y 标签（${s.a11yLabels.length}）:`);
+    for (const label of s.a11yLabels) console.log(`  ${label}`);
+  }
 }
 
 /** 解析命令行参数（缺值/未知参数 ⇒ exit 2，不静默忽略）。 */
