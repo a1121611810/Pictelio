@@ -161,14 +161,15 @@ final class UiTreeDump {
      * 热启动的 {@code onNewIntent}。后者是本通道的主要用法——「App 已在跑时再拍一张」，
      * 也让人自己掌握拍树时机（自动等落定的替代品）。
      *
-     * <p><b>命中几个采样点取决于进程怎么死的</b>（2026-10-20 模拟器三场景实测，不是推演）：
+     * <p><b>每次触发</b>命中几个采样点<b>取决于进程怎么死的</b>（2026-10-20 模拟器三场景实测，不是推演）：
      * <ul>
      *   <li>App <b>正在跑</b>（intent 投给已运行实例）⇒ 只走 {@code onNewIntent} ⇒ <b>hot 3 份</b>；</li>
      *   <li>进程已死、<b>任务记录还在</b>（覆盖安装、进程被系统回收后重开）⇒ {@code onCreate}
      *       与 {@code onNewIntent} 都走 ⇒ <b>cold + hot 共 6 份</b>；</li>
      *   <li>{@code am force-stop}（任务记录也清）⇒ 只走 {@code onCreate} ⇒ <b>cold 3 份</b>。</li>
      * </ul>
-     * 这不是 bug 而是把「命中哪些采样点」显式化——产物名带采样点，人一眼能分。
+     * 这不是 bug 而是把「命中哪些采样点」显式化——产物名带采样点，人一眼能分。⚠️ 份数按<b>每次
+     * 触发</b>计；<b>会话</b>（一次进程存活）可含多次触发 ⇒ 会话总份数不可按本段推算。
      *
      * @param debugBuild 构建类型闸门（调用方传 {@code BuildConfig.DEBUG}）
      * @param point 采样点标识（{@link #POINT_COLD} / {@link #POINT_HOT}），进产物名与日志

@@ -61,9 +61,9 @@ export const REMOTE_DIR = `/sdcard/Android/data/${APP_PACKAGE}/files/${OUT_DIR_N
 /**
  * 产物名正则：从 `ui-tree-<point>-<delayMs>ms-<seq>-<ts>.json` 反解采样点与档位。
  *
- * <p>为什么产物名要带采样点与档位：① 命中几个采样点**取决于进程怎么死的**
- * （2026-10-20 模拟器三场景实测）：App 正在跑 ⇒ hot 3 份；进程死、任务记录还在
- * ⇒ cold + hot 共 6 份；`am force-stop` ⇒ cold 3 份——没有标识就分不清哪份属于哪一轮；
+ * <p>为什么产物名要带采样点与档位：① **每次触发**命中几个采样点**取决于进程怎么死的**（2026-10-20
+ * 模拟器三场景实测；份数按**每次触发**计，同一会话可含多次触发）：App 在跑 ⇒ hot 3 份；进程死、
+ * 任务记录还在 ⇒ cold + hot 共 6 份；`am force-stop` ⇒ cold 3 份——没有标识就分不清哪份属于哪一轮；
  * ② 实测 4s 那份才是完整树（8KB → 9KB → 61KB；⚠️ 单次抓取口径，字节数随内容漂移，见 ADR-0223 §3.2），没有档位就只能靠体积猜。
  */
 export const ARTIFACT_NAME_RE_SOURCE =

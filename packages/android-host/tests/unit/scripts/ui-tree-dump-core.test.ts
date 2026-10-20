@@ -179,15 +179,22 @@ describe("fixture 脱敏（防复发：脱敏声明必须是真的）", () => {
   }
 
   it("脱敏占位符确实存在于两处（attributes.id 与顶层 node.id 都换掉了）", () => {
+    // 第 17 轮 Spec 轴实测：合并计数 `node.id || attrs.id` **看不见** `attributes.id`（16 个
+    // 带它的节点**全部**同时带非空顶层 `node.id`）⇒ 此前本用例只统计顶层、而用例名声称
+    // 「两处」⇒ 脱敏「盖两处」**无机器防线**；现在两处**分别**统计 ⇒ 删任一处即转红。
     const topLevelIds: string[] = [];
+    const attrIds: string[] = [];
     const walk = (node: unknown): void => {
       if (!node || typeof node !== "object") return;
       const n = node as Record<string, unknown>;
-      if (typeof n.id === "string") topLevelIds.push(n.id);
+      if (typeof n.id === "string" && n.id.includes("<illustId>")) topLevelIds.push(n.id);
+      const attrs = n.attributes as { id?: string } | undefined;
+      if (typeof attrs?.id === "string" && attrs.id.includes("<illustId>")) attrIds.push(attrs.id);
       for (const child of (n.children ?? []) as unknown[]) walk(child);
     };
     walk(realTree);
-    expect(topLevelIds.filter((id) => id.includes("<illustId>")).length).toBe(15);
+    expect(topLevelIds, "顶层 node.id 上的占位符数").toHaveLength(15);
+    expect(attrIds, "attributes.id 上的占位符数（合并计数看不见的那一处）").toHaveLength(15);
   });
 
   it("反向对照：把占位符还原成明文，门禁必须能抓到（证明这些形态断言不是恒真）", () => {
@@ -302,23 +309,23 @@ describe("summarize（真实样本回放）", () => {
     // 实测，unique=1）⇒ 它**不能**当身份用（作 diff 键会恒真）。引擎真正保证唯一的是
     // `nodeId`（140 个互不相同）⇒ 身份与 diff 能力归 `nodeId`。
     const nodeIds: number[] = [];
-    const nodeIndexes: number[] = [];
+    const debugInfoSigs: string[] = [];
     const walk = (node: unknown): void => {
       if (!node || typeof node !== "object") return;
       const n = node as Record<string, unknown>;
       if (typeof n.nodeId === "number") nodeIds.push(n.nodeId);
       const debugInfo = n.debugInfo as { nodeIndex?: number } | undefined;
       if (debugInfo && typeof debugInfo.nodeIndex === "number")
-        nodeIndexes.push(debugInfo.nodeIndex);
+        debugInfoSigs.push(`${Object.keys(debugInfo).join("+")}=${debugInfo.nodeIndex}`);
       for (const child of (n.children ?? []) as unknown[]) walk(child);
     };
     walk(realTree);
     expect(nodeIds).toHaveLength(140);
     expect(new Set(nodeIds).size, "nodeId 必须 140/140 互不相同（diff 的键）").toBe(140);
-    // nodeIndex 恒 0 = 构建期打标未生效（ADR-0223 §2.1 的运行时佐证）⇒ 这条断言
-    // 会在引擎**开始**打标时变红 —— 那正是需要重新核对字段清单的信号。
-    expect(nodeIndexes).toHaveLength(140);
-    expect([...new Set(nodeIndexes)], "nodeIndex 若不再是恒 0，说明引擎行为变了").toEqual([0]);
+    // 签名 =「键集=取值」⇒ 一条断言同时钉住两件事：`debugInfo` **只有** `nodeIndex` 这一个键
+    // （字段表）、取值**恒为 0**；第 17 轮实测：此前只验「取值恒同」，加两键仍全绿 ⇒ 已闭合。
+    expect(debugInfoSigs).toHaveLength(140);
+    expect([...new Set(debugInfoSigs)], "debugInfo 键集/取值变了").toEqual(["nodeIndex=0"]);
   });
 
   it("事件名分布：tap 29 / load 20 / error 20 / touchstart 5 / touchmove 5 / touchend 5", () => {

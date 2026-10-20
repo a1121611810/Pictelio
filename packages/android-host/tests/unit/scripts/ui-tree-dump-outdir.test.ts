@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve as resolvePath } from "node:path";
 
@@ -117,10 +117,12 @@ describe("assertSafeOutDir（--out 不得指向工作目录或其祖先）", () 
   });
 
   it("目标尚不存在（稍后由 mkdir 创建）⇒ 放行且返回物理路径", () => {
+    // 第 17 轮 Spec 轴实测：此前只断言「后缀是 尚未创建」⇒ 变异 `realish()` 的「目标不存在」
+    // 兜底分支后 12/12 仍全绿 ⇒ 现断言**等于物理路径**（父目录 realpath + 末段）。
     const { cwd } = makeSandbox();
     const out = join(cwd, "尚未创建");
     const resolved = assertSafeOutDir(cwd, out);
-    expect(resolved.endsWith("尚未创建")).toBe(true);
+    expect(resolved).toBe(join(realpathSync(cwd), "尚未创建"));
   });
 });
 
