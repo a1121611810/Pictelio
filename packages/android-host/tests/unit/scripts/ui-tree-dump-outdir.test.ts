@@ -117,9 +117,14 @@ describe("assertSafeOutDir（--out 不得指向工作目录或其祖先）", () 
   });
 
   it("目标尚不存在（稍后由 mkdir 创建）⇒ 放行且返回物理路径", () => {
-    // 第 17 轮 Spec 轴实测：此前只断言「后缀是 尚未创建」⇒ 变异 `realish()` 的「目标不存在」
-    // 兜底分支后 12/12 仍全绿 ⇒ 现断言**等于物理路径**（父目录 realpath + 末段）。
-    const { cwd } = makeSandbox();
+    // 第 17 轮 Spec 轴实测：此前只断言「后缀是 尚未创建」⇒ 变异 `realish()` 的「目标不存在」兜底分支后 12/12 仍全绿
+    // ⇒ 现断言**等于物理路径**（父目录 realpath + 末段）；⚠️ **第 18 轮 Spec 轴实测：该闭合原本是「平台条件性」的**——只有被测路径**含符号链接祖先**时「字面路径」才 ≠「物理路径」⇒ 变异在 macOS 默认 TMPDIR 下转红、**在无符号链接祖先的路径下仍全绿** ⇒ **CI（ubuntu-latest，`/tmp` 非符号链接）上该变异不可见** ⇒ 现**自建含符号链接祖先的输入**：工作目录建在软链 `别名 → 真实目录` 之下 ⇒ **两平台都有可分辨的输入**（变异在 Linux 样 TMPDIR 下亦转红）。
+    const { root } = makeSandbox();
+    const real = join(root, "真实目录");
+    mkdirSync(real);
+    symlinkSync(real, join(root, "别名"));
+    const cwd = join(root, "别名", "work");
+    mkdirSync(cwd);
     const out = join(cwd, "尚未创建");
     const resolved = assertSafeOutDir(cwd, out);
     expect(resolved).toBe(join(realpathSync(cwd), "尚未创建"));

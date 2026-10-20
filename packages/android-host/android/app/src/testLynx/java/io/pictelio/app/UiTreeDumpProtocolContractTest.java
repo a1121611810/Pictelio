@@ -190,8 +190,8 @@ public class UiTreeDumpProtocolContractTest {
     }
 
     /**
-     * 采样点标识两侧一致：脚本据此分组（命中几个采样点取决于进程怎么死的：App 在跑 ⇒ hot；
-     * 进程死、任务记录还在 ⇒ cold + hot；force-stop ⇒ cold）。
+     * 采样点标识两侧一致：脚本据此分组（**每次触发**命中几个采样点取决于进程怎么死的：App 在跑 ⇒ hot；
+     * 进程死、任务记录还在 ⇒ cold + hot；force-stop ⇒ cold——**份数是「每次触发」口径**）。
      *
      * <p>标识漂移 ⇒ 脚本认不出采样点 ⇒ 「多份产物分不清哪份属于哪一轮」。
      */
