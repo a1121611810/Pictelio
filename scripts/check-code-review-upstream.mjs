@@ -226,7 +226,10 @@ function listUpstreamCommits(path) {
         "api",
         `repos/${UPSTREAM_REPO}/commits?path=${path}&per_page=100`,
         "--jq",
-        '.[] | "\\(.sha) \\(.commit.author.date) \\(.commit.message | split("\\n")[0])"',
+        // 用 **committer** 日期而非 author 日期：GitHub 的提交列表按 commit date 排序，
+        // 而 author date 可能早很多（上游 d80fa0f4 作者日期 08-15、实际提交 09-17）。
+        // 显示 author 日期会让列表看起来「乱序」，而基线判定是按列表位置来的。
+        '.[] | "\\(.sha) \\(.commit.committer.date) \\(.commit.message | split("\\n")[0])"',
       ],
       { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
     );

@@ -30,10 +30,17 @@
 | ID | 上游路径 | 本仓路径 | 形态 | 基线 commit |
 | --- | --- | --- | --- | --- |
 | F1 | `skills/engineering/code-review/SKILL.md` | `.agents/skills/code-review/SKILL.md` | `structured`（上游骨架 + 本仓 override） | `3da8c011`（2026-10-07, #1208） |
+| F2 | `skills/engineering/setup-matt-pocock-skills/triage-labels.md` | `docs/agents/triage-labels.md` | `adapted`（本地化改编，只查漂移） | `5b7cade4`（2026-10-07, #1197） |
+| F3 | `skills/engineering/setup-matt-pocock-skills/issue-tracker-github.md` | `docs/agents/issue-tracker.md` | `adapted`（裁剪 + 改编，只查漂移） | `5b7cade4`（2026-10-07, #1197） |
+| F4 | `skills/engineering/setup-matt-pocock-skills/domain.md` | `docs/agents/domain.md` | `adapted`（本地化改编，只查漂移） | `d80fa0f4`（**提交** 2026-09-17，作者日期 08-15） |
 
-> **本仓还有三个上游派生的文件尚未纳入本表**：`docs/agents/triage-labels.md`、
-> `docs/agents/issue-tracker.md`、`docs/agents/domain.md`——它们是 setup skill 的**种子模板**经本仓
-> 本地化改编后的产物（不是逐字 fork）。三者的上游祖先与实测漂移见「遗留与后续」一节。
+**形态的两种含义**：`structured` 走**三方一致性**全文比对（上游正文 ↔ 本仓文件 ↔ 裁决表）；
+`adapted` 只做**漂移检测**（上游自基线起又动过没有）——因为本仓这三个文件是**本地化改编**，
+逐字比对既不成立也无意义（上游是英文模板，本仓是中文操作手册）。漂移时由人按下面的
+「文件级裁决」表裁定要跟什么。
+
+> ⚠️ F2/F3/F4 的上游祖先是 setup skill 的**种子模板**，**不是**上游仓自己的 `docs/agents/`
+> （后者是 setup 在上游自己仓里跑出来的产物，路径相同但来源不同）——核上游漂移要核对种子模板那条路径。
 
 ## 结构约定：上游骨架 + 本仓 overlay
 
@@ -97,6 +104,26 @@
 > 里 `### 1. Pin the fixed point` **没有任何 hunk** ⇒ 该条记在 OV-2，处置写作「adopt（上游 `5c89081d`）」。
 > 上游文档记录但**未进 SKILL.md** 的已知 bug（sub-agent 会重新调用本 skill 再派代理）由 OV-7 覆盖。
 
+### 文件级裁决（F2 / F3 / F4：三个 setup 种子模板）
+
+这三个文件是**本地化改编**（上游英文模板 → 本仓中文操作手册），所以裁定单位是**文件**，
+不是上游的段落。逐条裁定如下（上游自各自基线起动过的提交已逐个复核）：
+
+| 文件 | 上游改动 | 处置 | 理由 | 本仓落点 |
+| --- | --- | --- | --- | --- |
+| F2 `triage-labels.md` | `5b7cade4`：末行由「编辑右列」改为「编辑 **"Label in our tracker"** 列」 | **adopt** | 上游只是把「改哪一列」说得更明确；本仓的「右列」指向同一列但不如列名清楚 ⇒ 跟上游改成指名列名 | `docs/agents/triage-labels.md` 末行 |
+| F3 `issue-tracker.md` | `a2f93336` + `5b7cade4`：「Issues and PRDs」→「Issues and **specs**」 | **adopt** | 本仓没有 PRD 流程（只有 `docs/specs/`），沿用旧词会指向本仓不存在的概念 | 首段 |
+| F3 | `5b7cade4`：「读 issue」由 `--comments` + 手工 jq 过滤改为 `gh issue view <n> --json number,title,body,labels,comments` | **adopt** | 一次拿全 labels 与 comments，不再依赖手工过滤（与本仓「读点证据要未截断」的纪律同向） | Conventions「Read an issue」 |
+| F3 | `32165827`：去 em-dash（`—` → `;`） | **adopt** | 本仓该文件是英文逐字 fork，含 em-dash ⇒ 跟上游清掉 | 第 14 行 |
+| F3 | `5b7cade4`：新增「把 issue 挂成父 issue 的 sub-issue」小节 | **not-ported** | 本仓**没有** wayfinder，也没有父子 issue 流程 ⇒ 写进去是本仓用不上的噪声 | — |
+| F3 | `e0efb6e7`：external PRs 列表改用 `gh api` REST 端点 | **not-ported** | 本仓明确「PRs as a request surface: no」，PR 不进同一套 triage 流程 ⇒ 该改法无适用场景 | — |
+| F3 | `8e67db21` / `9e2abf86` / `c07714b5`：wayfinder 措辞收紧、Blocking 段重写 | **not-ported** | 同上：本仓无 wayfinder 节 | — |
+| F4 `domain.md` | `d80fa0f4`（作者日期 2026-08-15、**提交日期 09-17**）：领域文档约定改名 `CONTEXT.md`→`GLOSSARY.md`、`CONTEXT-MAP.md`→`GLOSSARY-MAP.md` | **adopt（已落地）** | 本仓已在 ADR-0224 那轮跟上：`docs/agents/domain.md` 与根 `GLOSSARY-MAP.md` 都已是新名口径 | `docs/agents/domain.md` 首段 |
+| F4 | `32165827`：去 em-dash | **not-ported（不适用）** | 本仓该文件是**中文本地化版**，不含 em-dash（中文的「——」是全角破折号，不在该清理范围） | — |
+
+> **裁决口径与 F1 的一致**：判据只有一个——**本仓有没有对应物 / 这条在本仓成不成立**。
+> F2/F3/F4 的基线已上移到上游各自路径的**最新**提交，闸对它们只做漂移检测（`adapted` 形态）。
+
 ## 机检的边界（哪些保证得住，哪些保证不住）
 
 这套机制保证得住的：
@@ -140,7 +167,7 @@ pnpm run check:code-review-upstream
 
 它做两件事，任一不通过即非零退出：
 
-1. **上游漂移**：读本文件的 `base-commit`，查上游自该 commit 起是否还有动过 `SKILL.md` 的 commit；
+1. **上游漂移**：对清单里每一个文件，查上游自该文件记录的基线 commit 起是否还有动过它的 commit；
    有则列出未裁决项并以退出码 1 结束。
 2. **三方一致性**：拉上游 `base-commit` 的正文，与本仓 `SKILL.md` 按锚点做块级比对 ——
 
@@ -163,12 +190,12 @@ pnpm run check:code-review-upstream
 
 ## 遗留与后续
 
-- **另三个上游派生文件尚未纳入机械闸**（本表只有 F1）。实测漂移：上游 `setup-matt-pocock-skills`
-  的种子模板在本仓引入之后都动过——`triage-labels.md`（本仓 2026-08-06 引入，上游 2026-10-07 改过
-  一行措辞）、`issue-tracker.md`（本仓 2026-07-26 引入，上游动了 **8 次**，口径与机械闸一致：含 merge
-  commit）、`domain.md`（本仓 2026-07-26
-  引入，上游 2026-08-15 做过 CONTEXT→GLOSSARY 改名、2026-08-19 去 em-dash）。三者本仓都已本地化
-  改编，需各自裁决「跟到什么程度」才能进表——**未裁决前不纳入闸，避免用「基线一填就绿」掩盖真实漂移**。
+- ~~**另三个上游派生文件尚未纳入机械闸**~~ → **2026-10-20 已处理**：F2 / F3 / F4 三条已逐个复核上游
+  改动、逐条裁定（见上「文件级裁决」表），本仓内容已跟上，基线已上移到上游各自路径的最新提交，
+  三行已纳入本表（`adapted` 形态 ⇒ 只做漂移检测）。**闸对它们不再零信号。**
 - **上游 `docs/agents/triage-labels.md` 不是本仓文件的祖先**：本仓 `docs/agents/*.md` 来自 setup skill
   的**种子模板**（`skills/engineering/setup-matt-pocock-skills/`），不是上游仓自己的 `docs/agents/`
-  产物（后者是 setup 在上游自己仓里跑出来的）。核上游漂移时要核对**种子模板**那条路径。
+  产物（后者是 setup 在上游自己仓里跑出来的）。核上游漂移时要核对**种子模板**那条路径——本表 F2/F3/F4
+  的「上游路径」列写的正是种子模板路径。
+- **联网闸仍无自动触发点**：它要联网，PR 门禁必须离线 ⇒ 只挂在发版清单第 7 条（人工跑）。
+  **没人记得手跑 = 上游漂移零信号**（这是本机制当前最大的已知缺口）。

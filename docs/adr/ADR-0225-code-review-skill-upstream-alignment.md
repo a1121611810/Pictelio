@@ -135,12 +135,17 @@
 
 **遗留（明确记录，不假装清零）**：
 
-- **另三个上游派生文件尚未纳入闸**：`docs/agents/triage-labels.md`、`docs/agents/issue-tracker.md`、
-  `docs/agents/domain.md`。它们是 setup skill 的**种子模板**经本仓本地化改编后的产物（不是逐字
-  fork），上游在各自引入之后都动过（实测 **1 次 / 8 次 / 2 次**提交，按种子模板路径
+- ✅ **另三个上游派生文件已于 2026-10-20 处理完毕并纳入闸**：`docs/agents/triage-labels.md`、
+  `docs/agents/issue-tracker.md`、`docs/agents/domain.md`。它们是 setup skill 的**种子模板**经本仓
+  本地化改编后的产物（不是逐字 fork），上游在各自引入之后都动过（实测 **1 次 / 8 次 / 2 次**提交，
+  按种子模板路径
   `skills/engineering/setup-matt-pocock-skills/{triage-labels,issue-tracker-github,domain}.md` 计，
-  口径与机械闸一致：含 merge commit）。
-  三者需各自裁决「跟到什么程度」才能进表——**未裁决前不纳入闸，避免用「基线一填就绿」掩盖真实漂移**。
+  口径与机械闸一致：含 merge commit）。**逐条复核 + 逐条裁定**见
+  `docs/agents/code-review-upstream.md`「文件级裁决」表：F2 采纳 1 处（指明改哪一列）、F3 采纳 3 处
+  （specs 措辞、`--json` 读 issue、去 em-dash）且不采纳 3 处（sub-issue 小节、external PR 改法、
+  wayfinder 节——本仓无 wayfinder、PR 不进同一套 triage）、F4 改名已跟上而 em-dash 清理不适用
+  （中文本地化版不含 em-dash）。三行已进「上游派生文件清单」（`adapted` 形态 ⇒ 只做漂移检测），
+  **闸对它们不再零信号**。
 - ⚠️ **上游 `docs/agents/triage-labels.md` 不是本仓文件的祖先**：本仓这三个文件来自种子模板
   `skills/engineering/setup-matt-pocock-skills/`，不是上游仓自己的 `docs/agents/`（后者是 setup 在
   上游自己仓里跑出来的产物）。核上游漂移要核对**种子模板**那条路径——这是本轮实测踩到的坑。
@@ -202,6 +207,7 @@ check:code-review-upstream: 1 upstream-derived file(s) checked; upstream has not
 | M7 | 删掉本仓专属的 overlay 块 | **红**（OV-11 无标记） | **红** |
 | CF-F | 预登记一条 `not-ported` 行，指名**仍在本地**的上游块 | **红**（规则 6：白名单不能给删掉的上游块洗白） | **红** |
 | CF-E | 整段清空 overlay 正文 152 行（留锚点 + 标记） | **红**（规则 7：空壳） | **红** |
+| CF-F2 | 把 F2（`triage-labels`）的基线回退到更早的上游 commit | **红**（点名上游那一次提交） | 不适用（联网侧） |
 | CF-T | 把裁决表**整段删空** | 不适用（表没了，闸读到 0 行即报解析失败） | **红**（判据 4 改成断言解析出的行 ⇒ 恒真断言已消除） |
 | **CF-B** | **静默改写一个已带标记的块的正文** | ⚠️ **绿（已知盲区）** | ⚠️ **绿（已知盲区）** |
 
