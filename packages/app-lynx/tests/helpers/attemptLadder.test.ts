@@ -28,7 +28,18 @@ function runChild(source: string, ladderPath: string = LADDER): { status: number
   try {
     const r = spawnSync(
       "npx",
-      ["vitest", "run", "--config", resolve(PKG_ROOT, "vitest.config.ts"), file],
+      // ⚠️ `--reporter=verbose` 不是装饰：默认 reporter **不把「通过用例的控制台输出」落进
+      // 子进程的标准流** ⇒ 父进程拿到的 output 是空串，下面「守卫把文案打印出来」那条断言
+      // 必然落空（本机必红、CI 恒绿的环境差异，issue #1046）。verbose 口径下子进程会把它
+      // 写到 stdout，实测命中数 0 → 1。改口径前先量一遍，别凭直觉调。
+      [
+        "vitest",
+        "run",
+        "--reporter=verbose",
+        "--config",
+        resolve(PKG_ROOT, "vitest.config.ts"),
+        file,
+      ],
       // ⚠️ spawnSync 阻塞事件循环，vitest 无法提前抢占，真正的预算是
       // vitest.config.ts 的 `testTimeout: 15000`。这里给的值是 spawnSync 自己的
       // 看门狗，不是用例超时——写成 180s 只会让人以为预算很宽裕。实测两个子 vitest
