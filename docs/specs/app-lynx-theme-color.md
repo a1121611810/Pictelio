@@ -2,7 +2,7 @@
 
 - 状态：implemented
 - 日期：2026-09-11
-- 关联：ADR-0152（决策记录）、`docs/research/pictelio-feature-gap-vs-third-party.md`（「亮暗主题/自定义主色」差距行）、`packages/app-lynx/CONTEXT.md`（新增词条：主题色）、`src/styles/tokens.css`（色板值）、`src/utils/themeColor.ts`（单一事实源）
+- 关联：ADR-0152（决策记录）、`docs/research/pictelio-feature-gap-vs-third-party.md`（「亮暗主题/自定义主色」差距行）、`packages/app-lynx/GLOSSARY.md`（新增词条：主题色）、`src/styles/tokens.css`（色板值）、`src/utils/themeColor.ts`（单一事实源）
 - 来源：目标「app-lynx，增加一个选择主题色的功能」
 - 范围：仅 `packages/app-lynx`；不改 webview（`packages/app`）、不改共享包、不改原生 Java。
 

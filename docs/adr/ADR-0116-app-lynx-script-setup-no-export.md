@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0115（推荐轮播）、`packages/app-lynx/CONTEXT.md`（「自研轮播」词条）、`packages/app-lynx/src/components/CarouselSwiper.vue`
+- 关联：ADR-0115（推荐轮播）、`packages/app-lynx/GLOSSARY.md`（「自研轮播」词条）、`packages/app-lynx/src/components/CarouselSwiper.vue`
 - 来源：T5 真机验证会话——`pnpm build`（rspeedy）在 `CarouselSwiper.vue` 上失败，定位为 `<script setup>` 内的 `export { ... }`。
 
 ## 背景

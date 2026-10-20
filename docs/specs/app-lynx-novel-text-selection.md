@@ -2,7 +2,7 @@
 
 > 父决策：wayfinder 地图 [#558](https://github.com/a1121611810/Pictelio/issues/558)（决策全清）｜设备实证 [#559](https://github.com/a1121611810/Pictelio/issues/559)｜复制通道 [#560](https://github.com/a1121611810/Pictelio/issues/560)｜路线定案 [#565](https://github.com/a1121611810/Pictelio/issues/565)
 > 取证：设备实证结论已逐条收进本 spec「不变式 1-4」与 `ADR-0165`「背景」节第 1-5 条（订正 2026-10-18：原文引用的 `docs/research/lynx-text-selection-device-probe.md` 在仓内不存在——这是**唯一**的悬空引用；6 处代码溯源文件均存在且有效，见 ADR-0165 同批订正）
-> 术语：`packages/app-lynx/CONTEXT.md`「正文选中」「操作菜单」「选中文本通道」
+> 术语：`packages/app-lynx/GLOSSARY.md`「正文选中」「操作菜单」「选中文本通道」
 
 ## Problem Statement
 

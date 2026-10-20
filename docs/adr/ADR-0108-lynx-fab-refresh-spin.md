@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-24
-- 关联：ADR-0107（刷新 FAB 入口，本 ADR 闭环其「原生 CSS keyframes 旋转动画」待验证项）、ADR-0076（语义 A：可见刷新过程）、`packages/app-lynx/CONTEXT.md`（刷新旋转 / refresh spin）
+- 关联：ADR-0107（刷新 FAB 入口，本 ADR 闭环其「原生 CSS keyframes 旋转动画」待验证项）、ADR-0076（语义 A：可见刷新过程）、`packages/app-lynx/GLOSSARY.md`（刷新旋转 / refresh spin）
 - 来源：grill-with-docs 会话，用户确认刷新按钮需动画（先方案后拍板）
 
 ## 背景

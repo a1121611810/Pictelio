@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0114（被替换的按钮分页/翻书分页）、ADR-0104（分页收敛 / createMixFeed）、ADR-0107（epoch 重建 workaround）、ADR-0108（FAB 旋转）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画）、`packages/app-lynx/CONTEXT.md`（分页：按钮分页 / button pagination；新增「推荐轮播」词条）
+- 关联：ADR-0114（被替换的按钮分页/翻书分页）、ADR-0104（分页收敛 / createMixFeed）、ADR-0107（epoch 重建 workaround）、ADR-0108（FAB 旋转）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画）、`packages/app-lynx/GLOSSARY.md`（分页：按钮分页 / button pagination；新增「推荐轮播」词条）
 - 来源：grill-with-docs 会话——用户拍板去掉推荐页列表，改单卡轮播；逐项确认（单卡/混合/无限/沉浸/跳过受限/不自动播/单刷新 FAB/图标 `⟳`）；图标字形曾验证原生 icon font 需赌多个未验证平台面，回退 unicode。
 
 ## 背景

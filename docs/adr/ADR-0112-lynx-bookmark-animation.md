@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-25
-- 关联：ADR-0108（Lynx 原生 keyframes/transform 引擎平台事实，本 ADR 直接复用）、ADR-0111（无 animationend/transitionend）、ADR-0107（决策 4：同 tick epoch 重建 workaround）、ADR-0110（重建 = 回顶）、`packages/app-lynx/CONTEXT.md`（收藏动效 / bookmark animation）、`docs/specs/app-lynx-bookmark-animation.md`
+- 关联：ADR-0108（Lynx 原生 keyframes/transform 引擎平台事实，本 ADR 直接复用）、ADR-0111（无 animationend/transitionend）、ADR-0107（决策 4：同 tick epoch 重建 workaround）、ADR-0110（重建 = 回顶）、`packages/app-lynx/GLOSSARY.md`（收藏动效 / bookmark animation）、`docs/specs/app-lynx-bookmark-animation.md`
 - 来源：grill-with-docs 会话 + UI 原型实拍选型（5 变体，`prototype/bookmark-anim` 分支留证，用户选定变体 E）
 
 ## 背景

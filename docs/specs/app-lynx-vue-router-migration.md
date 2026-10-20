@@ -1,6 +1,6 @@
 # Spec: app-lynx 路由迁移到官方 vue-router（createMemoryHistory）
 
-> 术语：见 `docs/glossary-vue-router-migration.md` 与 `packages/app-lynx/CONTEXT.md`「路由层（vue-router 迁移）」
+> 术语：见 `docs/glossary-vue-router-migration.md` 与 `packages/app-lynx/GLOSSARY.md`「路由层（vue-router 迁移）」
 > 决策：见 `docs/adr/ADR-0138-app-lynx-vue-router.md`
 > 实证：`prototype/lynx-vue-router` 分支（五轮探针，双端全绿）
 

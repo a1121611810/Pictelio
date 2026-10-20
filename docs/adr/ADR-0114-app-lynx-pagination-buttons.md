@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-29
-- 关联：ADR-0107（epoch 重建 workaround）、ADR-0110（`<list>` 无 JS 滚动接口，事实③）、ADR-0104（分页收敛 / createMixFeed）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画，同轮真机闭环方法）、`packages/app-lynx/CONTEXT.md`（分页：按钮分页 / button pagination）
+- 关联：ADR-0107（epoch 重建 workaround）、ADR-0110（`<list>` 无 JS 滚动接口，事实③）、ADR-0104（分页收敛 / createMixFeed）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画，同轮真机闭环方法）、`packages/app-lynx/GLOSSARY.md`（分页：按钮分页 / button pagination）
 - 来源：grill-with-docs 会话——web-core DOM 实证 + 真机确认钉死框架级增量渲染 bug，用户拍板放弃「滚动到底自动翻页」，改 FAB 按钮分页（替换式翻书）
 
 ## 背景

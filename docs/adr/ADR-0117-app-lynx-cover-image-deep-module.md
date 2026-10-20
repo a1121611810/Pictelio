@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0115（推荐轮播；RecommendedCover 是其「图片三态」产物，本轮收敛其实现）、`packages/app-lynx/CONTEXT.md`（新增「图片三态」词条）、`packages/app-lynx/src/components/RecommendedCover.vue`、`packages/app-lynx/src/components/SkeletonImage.vue`、`packages/app-lynx/src/utils/coverImage.ts`、`packages/app-lynx/src/components/skeletonStyle.ts`
+- 关联：ADR-0115（推荐轮播；RecommendedCover 是其「图片三态」产物，本轮收敛其实现）、`packages/app-lynx/GLOSSARY.md`（新增「图片三态」词条）、`packages/app-lynx/src/components/RecommendedCover.vue`、`packages/app-lynx/src/components/SkeletonImage.vue`、`packages/app-lynx/src/utils/coverImage.ts`、`packages/app-lynx/src/components/skeletonStyle.ts`
 - 来源：S2 code-smell 清理——`RecommendedCover.vue` 与 `SkeletonImage.vue` **重复实现「图片三态」**（骨架 / 图片 / 失败+重试）状态机 + 渲染模板。深模块方案经确认后采用（本文档只记录决策与术语，不写代码）。
 
 ## 背景

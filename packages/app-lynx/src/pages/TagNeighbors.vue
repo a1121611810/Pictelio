@@ -13,7 +13,7 @@
 //      与 gatedCount 的门控丢弃说明（D16：过滤必须可见）。
 // 行模型：buildTagNeighborRows（store 纯函数）——store 只存纯数据载荷，文案一律本页 t() 渲染。
 // [lynx:fix] 零 absolute 定位：list-item 内 absolute 子元素会被真机高度测量算进内容高度
-//      （CONTEXT.md「遮罩」词条）；徽标/来源/双值/标签全部走文档流。
+//      （GLOSSARY.md「遮罩」词条）；徽标/来源/双值/标签全部走文档流。
 defineOptions({ name: 'tag-neighbors' })
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { currentParams, navigate, goBack } from '../router'

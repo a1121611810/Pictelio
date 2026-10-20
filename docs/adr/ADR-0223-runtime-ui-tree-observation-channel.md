@@ -3,7 +3,7 @@
 - **状态**：已接受（Accepted，2026-10-20）｜**T0 最小验证已落地**（模拟器实跑，见 §4 证据）
 - **日期**：2026-10-20
 - **相关**：[ADR-0136（benchNav 深链验证通道，DEBUG 门禁范式）](./ADR-0136-app-lynx-bench-nav-hook.md)、[ADR-0220（通知送达通道探测，跨端载荷约定）](./ADR-0220-notification-delivery-channel-probe.md)、[ADR-0163（QA 防线三网）](./ADR-0163-qa-defense-lines.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)
-- **术语文档**：`packages/android-host/CONTEXT.md`「运行时 UI 树观测通道（runtime UI tree dump）」
+- **术语文档**：`packages/android-host/GLOSSARY.md`「运行时 UI 树观测通道（runtime UI tree dump）」
 - **证据**：spec [docs/specs/app-lynx-ui-tree-dump-t0.md](../specs/app-lynx-ui-tree-dump-t0.md)｜issue [#1045](https://github.com/a1121611810/Pictelio/issues/1045)｜T0 实测样本见 §3.2
 
 ---

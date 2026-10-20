@@ -5,7 +5,7 @@
 // md-shape-small 圆角，全 Tailwind utility 无 scoped CSS。
 // 判定收敛在 ./illustTypeBadges 纯函数，本组件只做渲染。
 // [lynx:fix] 严禁 absolute 定位——list-item 内 absolute 子元素会被真机高度测量
-// 算进内容高度（CONTEXT.md「遮罩」词条，2026-08-11 实测）。
+// 算进内容高度（GLOSSARY.md「遮罩」词条，2026-08-11 实测）。
 import { computed } from 'vue'
 import { t } from '../i18n'
 import AppIcon from './AppIcon.vue'

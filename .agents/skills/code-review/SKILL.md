@@ -21,7 +21,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 
 1. **Pin fixed point**：用户给定 commit/branch/tag/`main`/`HEAD~N`；确认 `git rev-parse` 可解析、diff 非空。记录 diff 命令与 commit 列表。bad ref 或空 diff 在此失败，不进入 sub-agent。
 2. **Identify spec source**：按序——commit message 的 issue 引用（`#123` 等，经 `docs/agents/issue-tracker.md` 流程获取）→ 用户传入路径 → `docs/`、`specs/`、`.scratch/` 下与分支/功能匹配的 spec 文件 → 询问用户。无 spec 则 Spec 轴跳过并注明 "no spec available"。
-3. **Identify standards sources**：发现式——`AGENTS.md`（含测试硬约束 #1-6、Fluent 设计规范、即时导航硬约束）、`packages/app/tests/TESTING.md`、`CONTEXT.md`、`CONTRIBUTING.md`、`docs/adr/`、`docs/development/`、README，存在即用。之上始终叠加下方 Fowler smell baseline。
+3. **Identify standards sources**：发现式——`AGENTS.md`（含测试硬约束 #1-6、Fluent 设计规范、即时导航硬约束）、`packages/app/tests/TESTING.md`、`GLOSSARY-MAP.md` + `packages/*/GLOSSARY.md`、`CONTRIBUTING.md`、`docs/adr/`、`docs/development/`、README，存在即用。之上始终叠加下方 Fowler smell baseline。
 4. **并行 spawn 两个 sub-agent**（general-purpose）：Standards 轴与 Spec 轴，上下文互不污染。Spec sub-agent 的 brief **必须**逐字包含下方「Spec 轴强制增量」全部指令原文（brief 注入），不得改写、缩写或"酌情执行"。
 5. **汇总**：两轴报告分列 `## Standards` / `## Spec`，不合并不重排。结尾一行总结每轴 finding 数与最严重项；不跨轴选 winner。
 

@@ -113,4 +113,4 @@ FAB_MENU_A11Y_LABELS = {
 ## 相关文档
 
 - docs/specs/app-lynx-fab-menu.md
-- packages/app-lynx/CONTEXT.md（列表刷新术语更新）
+- packages/app-lynx/GLOSSARY.md（列表刷新术语更新）

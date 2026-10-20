@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-02
-- 关联：ADR-0135（滚动指示条——本方法的首个应用）、ADR-0136（benchNav 钩子）、`packages/app-lynx/CONTEXT.md`（「滚动中采样」词条）
+- 关联：ADR-0135（滚动指示条——本方法的首个应用）、ADR-0136（benchNav 钩子）、`packages/app-lynx/GLOSSARY.md`（「滚动中采样」词条）
 - 来源：用户反馈（「滚动指示条实际滚动时能看见，agent 为什么总说看不见」）→ 测试方法复盘
 
 ## 背景

@@ -2,7 +2,7 @@
 
 - 状态：draft（Grill 已收敛并确认，2026-08-28；待 to-tickets 确认后进实现）
 - 日期：2026-08-28
-- 关联：`docs/adr/ADR-0118-app-lynx-recommended-carousel-polish-r2.md`、ADR-0115（推荐轮播）、ADR-0117（CoverImage 深模块）、`packages/app-lynx/CONTEXT.md`（新增 4 词条）、`docs/specs/app-lynx-recommended-carousel.md`（轮播原始 spec）、`docs/specs/app-lynx-recommended-carousel-image-fab-polish.md`（图片三态）
+- 关联：`docs/adr/ADR-0118-app-lynx-recommended-carousel-polish-r2.md`、ADR-0115（推荐轮播）、ADR-0117（CoverImage 深模块）、`packages/app-lynx/GLOSSARY.md`（新增 4 词条）、`docs/specs/app-lynx-recommended-carousel.md`（轮播原始 spec）、`docs/specs/app-lynx-recommended-carousel-image-fab-polish.md`（图片三态）
 - 前置：已有推荐轮播的**细化打磨**（4 点），不改数据层（createMixFeed / time-merge 语义不变）、不动其它页面。
 
 ## 1. 背景与根因

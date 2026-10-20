@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-10
-- 关联：ADR-0118（推荐轮播沉浸骨架——本决策把它推广为通例）、ADR-0104（feed 分页收敛 / 错误槽分流）、ADR-0082（首屏失败必须渲染错误而非空态）、ADR-0038（先渲染后加载）、`packages/app-lynx/CONTEXT.md`（新增词条：页级首载骨架 / 首载落定）、vue-lynx IFR 文档（https://vue.lynxjs.org/zh/guide/ifr）
+- 关联：ADR-0118（推荐轮播沉浸骨架——本决策把它推广为通例）、ADR-0104（feed 分页收敛 / 错误槽分流）、ADR-0082（首屏失败必须渲染错误而非空态）、ADR-0038（先渲染后加载）、`packages/app-lynx/GLOSSARY.md`（新增词条：页级首载骨架 / 首载落定）、vue-lynx IFR 文档（https://vue.lynxjs.org/zh/guide/ifr）
 - 来源：`/grill-with-docs` 收敛的需求（用户确认，Q1–Q18 全部确认）
 
 ## 背景

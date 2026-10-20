@@ -45,7 +45,7 @@ const zhPages = {
 
   // ─── 标签近邻（Tag neighbors，ADR-0197 / spec docs/specs/tag-neighbors.md）───
   // 术语红线：规范名「标签近邻」；禁用「溯源/以图搜图」（站外溯源，另一能力）
-  // 与「相关作品」（官方 /v2/illust/related 黑盒关联）。见 CONTEXT.md 词条。
+  // 与「相关作品」（官方 /v2/illust/related 黑盒关联）。见 GLOSSARY.md 词条。
   "tagNeighbors.entry": "标签近邻",
   "tagNeighbors.title": "标签近邻",
   "tagNeighbors.similarity": "{{score}} 相似",

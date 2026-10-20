@@ -1,6 +1,6 @@
 # app-lynx 收藏/取消收藏动效 —— 功能规格
 
-> 来源：grill-with-docs 会话 + UI 原型实拍选型（5 变体，`prototype/bookmark-anim` 分支留证）；决策记录：ADR-0112；术语：`packages/app-lynx/CONTEXT.md`
+> 来源：grill-with-docs 会话 + UI 原型实拍选型（5 变体，`prototype/bookmark-anim` 分支留证）；决策记录：ADR-0112；术语：`packages/app-lynx/GLOSSARY.md`
 > 状态：ready-for-agent
 
 ## Problem Statement

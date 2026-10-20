@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-02
-- 关联：ADR-0110（平台事实勘误来源）、ADR-0134（novel-detail 虚拟化，signal 面首次在工程使用）、`packages/app-lynx/CONTEXT.md`（滚动信号面 / 滚动指示条词条）
+- 关联：ADR-0110（平台事实勘误来源）、ADR-0134（novel-detail 虚拟化，signal 面首次在工程使用）、`packages/app-lynx/GLOSSARY.md`（滚动信号面 / 滚动指示条词条）
 - 来源：wayfinder #304 「Lynx 滚动跟手性追平 webview」→ #310 列表方案选型（B1/B2/H6 全部止损）→ #318 信号面复用；官方 tutorial-gallery 参照 + 真机 ABBA 实测
 
 ## 背景

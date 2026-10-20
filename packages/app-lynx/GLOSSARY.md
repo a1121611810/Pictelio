@@ -1,6 +1,6 @@
-# Pictelio app-lynx 上下文
+# Pictelio app-lynx 术语表
 
-app-lynx 是 vue-lynx 客户端（Pictelio 的**唯一运行时客户端**；双引擎期的 webview 侧已随 #610 整体下线，见 `docs/adr/glossary-single-engine-facade.md`；已过 MVP 阶段，功能差距清单见 issue #60 已关闭，剩余项按用户拍板搁置）。当前涵盖：登录 / 推荐 / 插画 / 小说 / 收藏 / 关注·粉丝列表 / 追更 / 评论 / 全局搜索（底部弹层 + FAB 双形态）/ 多图详情 / 用户主页 / 更新 / 错误页，放射导航 FAB 为导航中枢。渲染目标是 LynxView 真机与 web-core 预览。本上下文记录列表浏览、受限内容、分页与视口几何等领域语言。
+app-lynx 是 vue-lynx 客户端（Pictelio 的**唯一运行时客户端**；双引擎期的 webview 侧已随 #610 整体下线，见 `docs/adr/glossary-single-engine-facade.md`；已过 MVP 阶段，功能差距清单见 issue #60 已关闭，剩余项按用户拍板搁置）。当前涵盖：登录 / 推荐 / 插画 / 小说 / 收藏 / 关注·粉丝列表 / 追更 / 评论 / 全局搜索（底部弹层 + FAB 双形态）/ 多图详情 / 用户主页 / 更新 / 错误页，放射导航 FAB 为导航中枢。渲染目标是 LynxView 真机与 web-core 预览。本上下文记录列表浏览、受限内容、分页与视口几何等领域语言。（本文件原名 `CONTEXT.md`，**2026-10-20** 改名以对齐上游 `mattpocock/skills` 的领域文档约定，见 ADR-0224；词汇内容未改，文中 `packages/app/CONTEXT.md` 属已随 ADR-0203 删除的历史引用，保留原名。）
 
 ## 术语
 
@@ -770,7 +770,7 @@ _Avoid_: 客户端拼装/解析查询串（与服务端语义重复且易漂移�
 图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip、保存、下载五条链路共用同一键空间。
 
 > **覆盖范围与现状（2026-10-11 登记，ADR-0222 §2.5；#980 + #987 已交付）**：这两条不变量**覆盖内存层与磁盘层两层**。
-> 层数与层名以 `packages/android-host/CONTEXT.md`「图片代理」节为准（**两层缓存**，现行编号见 ADR-0222）。
+> 层数与层名以 `packages/android-host/GLOSSARY.md`「图片代理」节为准（**两层缓存**，现行编号见 ADR-0222）。
 >
 > ✅ **「唯一产出」已覆盖全部五条链路**（#987 交付）。`PixivImageLoader.cacheKey(url)` 是
 > **预取 / 显示 / zip 导出 / 保存到相册 / 下载器**五条链路的键的唯一产出点——同一张图以代理路径与

@@ -9,7 +9,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 - **入口**: `packages/app-lynx/src/index.ts` → `App.vue` → `src/router.ts`（vue-router）
 - **设计系统**: `pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）。**Fluent Design 2 章节为历史存档**：它服务的是已删除的 WebView 客户端
 - **Pixiv API**: `packages/app-lynx/src/api/` 经原生模块 `PictelioApiModule` 走 `PixivApiCore`，401 自动刷新 + 防死循环
-- **Monorepo 结构**: 包清单与各领域入口见 `CONTEXT-MAP.md`；代码事实走 CodeGraph。本文档不维护目录树（目录枚举必然陈腐）
+- **Monorepo 结构**: 包清单与各领域入口见 `GLOSSARY-MAP.md`；代码事实走 CodeGraph。本文档不维护目录树（目录枚举必然陈腐）
 
 ## 工具触发协议（任务开始第一步，违反视为架构违规）
 
@@ -17,7 +17,7 @@ Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），�
 
 | 任务涉及 | 第一步必须 | 依据 |
 |----------|-----------|------|
-| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 先认层：理由 → `docs/adr/` 对号入座的 ADR；路线 → `CONTEXT-MAP.md` | 「四层词」 |
+| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 先认层：理由 → `docs/adr/` 对号入座的 ADR；路线 → `GLOSSARY-MAP.md` | 「四层词」 |
 | 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（接入形态见「代码智能规范」，按本会话实际可用的那一种） | 「代码智能规范」速查表 |
 | 第三方库/框架文档 | Context7（工具清单里 `context7` 开头的那个） | 「文档查询规范」决策链 |
 | 浏览器标准 API | MDN（工具清单里 `mdn` 开头的那个） | 「文档查询规范」决策链 |
@@ -96,7 +96,7 @@ CodeGraph 有两种等价接入，能力相同、只有调用开销不同。开�
 |---|---------|--------|------|
 | **事实** | 代码在哪、怎么调用、改了炸多大 | 源码 | 索引随代码走 |
 | **理由** | 为什么这样设计、这条约束哪来的 | `docs/adr/` 对号入座的 ADR | ADR 评审流程 |
-| **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `CONTEXT-MAP.md` → 各包领域文档（`CONTEXT.md` / spec / ADR） | 缺口如实标注（无入口即标「未创建」） |
+| **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `GLOSSARY-MAP.md` → 各包领域文档（`GLOSSARY.md` / spec / ADR） | 缺口如实标注（无入口即标「未创建」） |
 | **保鲜** | 上面三层是否仍为真 | 确定性检查（脚本 / 人工复核），不走模型重写 | —— |
 
 ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/domain.md)「标记 ADR 冲突」。
@@ -119,15 +119,15 @@ ADR 与源码冲突时的浮出句式见 [docs/agents/domain.md](docs/agents/dom
 
 ## 架构
 
-`packages/app-lynx/src/` 分层与各目录职责见 `packages/app-lynx/CONTEXT.md`（领域词汇层）。**「宿主包」不是客户端**——`android-host` 只负责把客户端产物装进 APK 发出去；Lynx 原生模块在 `app/src/lynx/java/`，跨端共享核心在 `app/src/main/java/`。
+`packages/app-lynx/src/` 分层与各目录职责见 `packages/app-lynx/GLOSSARY.md`（领域词汇层）。**「宿主包」不是客户端**——`android-host` 只负责把客户端产物装进 APK 发出去；Lynx 原生模块在 `app/src/lynx/java/`，跨端共享核心在 `app/src/main/java/`。
 
 ## 关键设计决策
 
 细节一律**锚到 ADR 与源码**（精确语义以 ADR/源码为准绳）：
 
 - **PixivApiPlugin 网关** → ADR-0037 + `packages/app-lynx/src/api/`
-- **图片流水线两层缓存**（内存层 / 磁盘层）→ ADR-0222（现行编号）+ ADR-0143（缓存键恒官方 URL）；演进史见 ADR-0090（**历史编号**，其「三层」层 B 已随 ADR-0203 删除）。词汇层见 `packages/android-host/CONTEXT.md`「图片代理」节
-- **Android 原生集成**（返回键、`/pixiv-img/` 图片代理（`PictelioImageService`）、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`（词汇层见 `packages/android-host/CONTEXT.md`）
+- **图片流水线两层缓存**（内存层 / 磁盘层）→ ADR-0222（现行编号）+ ADR-0143（缓存键恒官方 URL）；演进史见 ADR-0090（**历史编号**，其「三层」层 B 已随 ADR-0203 删除）。词汇层见 `packages/android-host/GLOSSARY.md`「图片代理」节
+- **Android 原生集成**（返回键、`/pixiv-img/` 图片代理（`PictelioImageService`）、Java 原生模块）→ `packages/android-host/android/app/src/lynx/java/`（词汇层见 `packages/android-host/GLOSSARY.md`）
 - **单引擎路由（ADR-0164 状态行 / ADR-0201）**：Lynx 是唯一渲染引擎，入口 `LynxActivity.java`；原预热/路由共用与双向降级机制已随 #610 删除；10s 加载超时只落错误页、永不自动跳（`LynxActivity.LOAD_TIMEOUT_MS`）
 - **安全存储**（refresh_token 走 Keystore，首启迁移）→ `SecureStorageCompat`（android-host main/java）
 - **虚拟滚动与布局**（主 Feed 固定单列 ADR-0075）**/** **年龄限制与内容过滤** → `packages/app-lynx/src/primitives/` + 对应 ADR
@@ -263,13 +263,13 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## 任务完成前自检
 
-- **工具路由**：本次工具选择是否按「工具触发协议」执行？（事实 → CodeGraph；理由 → ADR；路线 → CONTEXT-MAP；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
+- **工具路由**：本次工具选择是否按「工具触发协议」执行？（事实 → CodeGraph；理由 → ADR；路线 → GLOSSARY-MAP；库/框架/API → Context7/MDN）偏离时当场沉淀 feedback memory
 - **CodeGraph 异常**：返回空结果先 `codegraph status` 看节点/边计数（边数归零 = 索引腐化，提示用户重建）。**计数正常也可能覆盖不到新代码**——`lastIndexed` 早于本分支时，用本分支新符号 `codegraph query <名>` 验活，返回空即按陈旧处理并降级 grep/read（实证：2026-10-11 图片缓存分支，12909 节点 / 41016 边看着健康，但 `CACHE_DIR_MUTATION_LOCK` 等新符号全部返回空，两轴 review 都因此降级）
 - **测试纪律**：逐条核对「测试硬约束」1/2/3（IO 双路径、契约用真实样例、兜底路径显式告警）
 - **闭环规格**：凡产生了代码改动，强制闭环一律以
   [`workflows/review-fix-loop.md`](workflows/review-fix-loop.md) 为准 —— **含**「工作流强制规范」的
   三条例外路径（纯 Bug 修复 / 纯重构 / ≤20 行局部改动）；`/review-fix-loop` 可显式调用
-- **地图保鲜**：改动 `packages/*` 结构或 `docs/adr/` 后，检查 `CONTEXT-MAP.md` 与 `docs/adr/README.md` 是否仍为真（缺口如实标注，不静默跳过）
+- **地图保鲜**：改动 `packages/*` 结构或 `docs/adr/` 后，检查 `GLOSSARY-MAP.md` 与 `docs/adr/README.md` 是否仍为真（缺口如实标注，不静默跳过）
 - **提交信息**：`type(scope): description`，type 取值见「Notes」
 
 ## Notes
@@ -302,7 +302,7 @@ Issues 托管在 GitHub（`a1121611810/Pictelio`），通过 `gh` CLI 操作。�
 
 ### Domain docs
 
-多上下文布局 —— 根目录 `CONTEXT-MAP.md` 指向各上下文的 `CONTEXT.md`。详见 `docs/agents/domain.md`。
+多上下文布局 —— 根目录 `GLOSSARY-MAP.md` 指向各上下文的 `GLOSSARY.md`。详见 `docs/agents/domain.md`。
 
 <!-- ai-memory:start -->
 **ai-memory（跨会话记忆）**：本仓跨会话记忆的权威说明在

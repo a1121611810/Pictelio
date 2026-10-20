@@ -4,7 +4,7 @@
 // 遮罩/防穿透、modalStack、i18n 接线、保存通道），行为语义由 useBookmarkPanel.test.ts 覆盖。
 //
 // 期望值出处（Oracle 溯源）：
-// - 全屏层规则 / 定位锚点 / modalStack = CONTEXT.md「覆盖层与命中测试」+ ADR-0123（真机实证，
+// - 全屏层规则 / 定位锚点 / modalStack = GLOSSARY.md「覆盖层与命中测试」+ ADR-0123（真机实证，
 //   独立于本实现）+ spec D8；挂载契约 = CommentOverlay.vue / PagePickerSheet.vue（既有弹层同款）；
 // - i18n 键面与 zh 值取 zh-CN locale 的当前值（spec D10「同键名同语义」），
 //   下方 PREFILL_ZH 是落盘快照，不从被测模板反推；

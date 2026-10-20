@@ -100,7 +100,7 @@ range 真流式在 Android 被 `shouldInterceptRequest` 拦截层破坏（ADR-01
 
 - `downloadAndExtractUgoira` 签名与行为（非流式）保留：range 模式、preloadedFrames 兼容调用不受影响。
 - `UgoiraViewer` 的 `preloadedFrames` 静态路径保留；渐进路径为新增入口（spec 定义组件契约）。
-- 双端术语：见 `packages/app/CONTEXT.md` / `packages/app-lynx/CONTEXT.md`「流式取帧/渐进播放/帧就绪」。
+- 双端术语：见 `packages/app/CONTEXT.md` / `packages/app-lynx/GLOSSARY.md`「流式取帧/渐进播放/帧就绪」。
 
 ## 待办（实现规范引用）
 

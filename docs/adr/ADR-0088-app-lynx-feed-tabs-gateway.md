@@ -70,4 +70,4 @@
 ## 关联
 
 - 术语：`docs/adr/glossary-app-lynx-feed-tabs-gateway.md`
-- 上下文：`packages/app-lynx/CONTEXT.md`
+- 上下文：`packages/app-lynx/GLOSSARY.md`

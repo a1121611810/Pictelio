@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-11
-- 关联：ADR-0138（vue-router 迁移 / 全局守卫鉴权 bootstrap 放行）、ADR-0050（refresh_token 持久化与启动恢复）、ADR-0150（页级首载骨架——本决策防其被误判为错误）、`packages/app-lynx/CONTEXT.md`（新增词条：认证就绪门）
+- 关联：ADR-0138（vue-router 迁移 / 全局守卫鉴权 bootstrap 放行）、ADR-0050（refresh_token 持久化与启动恢复）、ADR-0150（页级首载骨架——本决策防其被误判为错误）、`packages/app-lynx/GLOSSARY.md`（新增词条：认证就绪门）
 - 来源：用户报告「刷新页面先闪『未登录，请先登录』红字，应先显示骨架」+ `/diagnosing-bugs` 诊断
 
 ## 背景

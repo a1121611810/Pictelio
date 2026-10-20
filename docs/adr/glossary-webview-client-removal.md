@@ -138,7 +138,7 @@ _Avoid_: 直接删除历史文档 —— 会丢失 ADR 之外的实现记录与�
 
 ## 措辞锚点（可逐字复制）
 
-供 `README.md` / `AGENTS.md` / `packages/website/` / `CONTEXT-MAP.md` 复用：
+供 `README.md` / `AGENTS.md` / `packages/website/` / `GLOSSARY-MAP.md` 复用：
 
 > **单引擎**：Pictelio 是 Lynx 单引擎客户端。WebView 客户端的运行时随 #610 下线，
 > 其源码与依赖随 ADR-0203 删除，仓库中不再保留。

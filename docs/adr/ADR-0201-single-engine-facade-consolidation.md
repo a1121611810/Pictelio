@@ -59,7 +59,7 @@ accepted（2026-09-29）
   该教训已写回术语文档的使用约束节。
 - **删除 `05_client_switch.png` 必须 T1/T2 联动**：落地页与 README 截图表同时引用它，
   两侧引用都摘掉才能删文件。
-- `packages/app-lynx/CONTEXT.md` 首句原写「与 webview 客户端构成双引擎形态」，**已按本 ADR 订正**。
+- `packages/app-lynx/GLOSSARY.md` 首句原写「与 webview 客户端构成双引擎形态」，**已按本 ADR 订正**。
 - `openwiki/` 的过期内容（仍描述三 flavor 与 `src/webview/` 插件）**不处理**——生成物，
   CI 定时任务会重生成；禁止手改、禁止本地 `pnpm openwiki:update`。
 - 依赖留存期间，`AGENTS.md` 的 Capacitor 表述会长期「明知过时仍保留」，这是契约测试锚点的代价，

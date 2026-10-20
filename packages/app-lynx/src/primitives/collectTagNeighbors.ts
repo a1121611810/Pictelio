@@ -122,7 +122,7 @@ export interface CollectTagNeighborsResult<T> {
    * 内核保持纯逻辑，故只**计数**不自行呈现；由宿主渲染成可见说明。
    * 之所以必须有这个数：`isRestricted` 是注入的门控谓词（R18/R18G + AI 三态 + 静音标签
    * 三条在 store 侧链式合成），条目被它拦下时内核此前是静默 `continue` —— 用户看不到
-   * 「结果里少了东西」，违反 D16「不做静默过滤」与 CONTEXT.md 的取值纪律。
+   * 「结果里少了东西」，违反 D16「不做静默过滤」与 GLOSSARY.md 的取值纪律。
    * 计数让过滤**可见**，而「可见成什么样」由 UI 决定。
    */
   gatedCount: number

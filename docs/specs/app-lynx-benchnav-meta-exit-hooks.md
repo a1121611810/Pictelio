@@ -1,6 +1,6 @@
 # Spec: benchNav 测试钩子扩展（/update、/error 直达）—— 启用系统返回回归 S6
 
-> 背景：ADR-0138 迁移遗留项（ticket #334 关闭评论）——回归脚本 S6（`/update`、`/error` meta-exit 场景）需产品补 benchNav 测试钩子后启用。术语：`docs/adr/glossary-vue-router-migration.md`「benchNav / 真机导航钩子（ADR-0136）」与 `packages/app-lynx/CONTEXT.md`「真机导航钩子」词条。
+> 背景：ADR-0138 迁移遗留项（ticket #334 关闭评论）——回归脚本 S6（`/update`、`/error` meta-exit 场景）需产品补 benchNav 测试钩子后启用。术语：`docs/adr/glossary-vue-router-migration.md`「benchNav / 真机导航钩子（ADR-0136）」与 `packages/app-lynx/GLOSSARY.md`「真机导航钩子」词条。
 
 ## Problem Statement
 

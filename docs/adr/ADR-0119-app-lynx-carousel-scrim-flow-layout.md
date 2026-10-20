@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-28
-- 关联：ADR-0115（推荐轮播）、ADR-0118（打磨 R2）、`packages/app-lynx/CONTEXT.md`（「轮播 scrim 页面级遮罩」「遮罩」词条）、`packages/app-lynx/src/pages/Recommended.vue`（scrim）
+- 关联：ADR-0115（推荐轮播）、ADR-0118（打磨 R2）、`packages/app-lynx/GLOSSARY.md`（「轮播 scrim 页面级遮罩」「遮罩」词条）、`packages/app-lynx/src/pages/Recommended.vue`（scrim）
 - 来源：真机 bug——推荐轮播滑到**非首页**时，底部 scrim（标题/标签/作者/收藏）在**真机原生 LynxView** 上**不渲染**（web-core 正常）。
 
 ## 背景

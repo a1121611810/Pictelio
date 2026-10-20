@@ -18,7 +18,7 @@ evidence: ../research/openwiki-alternatives-2026-10.md
 |---|---|---|---|
 | **事实** | 代码在哪、怎么调用、改了炸多大 | 源码 + `codegraph`（12,909 节点 / 41,016 边） | 索引自维护 |
 | **理由** | 为什么这样设计、这条约束哪来的 | `docs/adr/`（271 篇，79.6% 互引） | 人工写，ADR 流程 |
-| **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `CONTEXT-MAP.md` + 各包 `CONTEXT.md` | **人写一次**；缺口如实标注 |
+| **地图** | 从哪看起、这块归谁、领域词汇怎么说 | `GLOSSARY-MAP.md` + 各包 `GLOSSARY.md` | **人写一次**；缺口如实标注 |
 | **保鲜** | 上面三层是否仍为真 | 确定性检查（无模型） | —— |
 
 openwiki 的错位：它把「保鲜」做成了「重写地图」，而**地图里真正会烂的那三样（包清单 / ADR 索引 / `CONTEXT.md` 存在性）它一个都没碰**。
@@ -28,7 +28,7 @@ openwiki 的错位：它把「保鲜」做成了「重写地图」，而**地图
 1. **删除** openwiki 生成链路（workflow + 死锁测试 + npm 脚本 + 文档引用）。
 2. **AGENTS.md 的工具触发协议改写为四层词**，删除 `## OpenWiki` / `## OpenWiki 查询规范` / `## OpenWiki 维护规则` 三节与 `<!-- OPENWIKI:START/END -->` 标记块。
 3. **不新增** openwiki 替代生成器。地图的「建」已由上游 skill 完成（产物在 `docs/agents/domain.md`），本方案只补「保鲜」。
-4. **保留** `docs/adr/` 现状、`packages/app-lynx/CONTEXT.md`（737 行 / 73 次 commit，活得最好的地图资产）与 CodeGraph。
+4. **保留** `docs/adr/` 现状、`packages/app-lynx/GLOSSARY.md`（737 行 / 73 次 commit，活得最好的地图资产）与 CodeGraph。
 
 > **不在本方案范围**：写新的 map 生成器、补 8 个包的 `CONTEXT.md`、ADR 模板与索引脚本。它们是独立决策（见 §后续）。
 
@@ -40,7 +40,7 @@ openwiki 的错位：它把「保鲜」做成了「重写地图」，而**地图
 |---|---|
 | 独有内容仅剩约 1 段，且已在仓库别处 | 「纯推模式首帧必丢」逐字在 `packages/app-lynx/src/utils/safeArea.ts:63-65`；`'root'` 模式是「静默破版脚枪」逐字在 commit `d52223bf` 的 message；样本天花板 ≈14/周 逐字在 `docs/specs/notification-delivery-probe.md:136-137` |
 | 事实上层更不准 | openwiki 写「28 of the 29 route entries」，`packages/app-lynx/src/router.ts` 实为 **27/28**；两处 `openwiki: broken internal link` 施工注释留在发布页正文 |
-| 保鲜的是错误的对象 | 每日全量重写让「地图」烂掉，却让 `CONTEXT-MAP.md`（3/10 包）、`docs/adr/`（0 行索引）、`NOTES.md`（cron/timeout 抄错 2 个月）无人问津 |
+| 保鲜的是错误的对象 | 每日全量重写让「地图」烂掉，却让 `GLOSSARY-MAP.md`（3/10 包）、`docs/adr/`（0 行索引）、`NOTES.md`（cron/timeout 抄错 2 个月）无人问津 |
 
 商业/托管替代方案已穷尽并否决：唯一产出意图叙事的 DeepWiki 产物锁在 SaaS、默认用你的数据训练、无导出与定时重生成路径——与本仓「地图住在仓库里」的制度不兼容。详见调研笔记第五节。
 
@@ -73,7 +73,7 @@ openwiki 的错位：它把「保鲜」做成了「重写地图」，而**地图
 |---|---|
 | 代码在哪 / 怎么调用 / 改了炸多大 | `codegraph explore`（默认路径，无需先问） |
 | 为什么这样设计 / 这条约束哪来的 | `docs/adr/` 里对号入座的 ADR |
-| 从哪看起 / 这块归谁 / 领域词汇怎么说 | `CONTEXT-MAP.md` |
+| 从哪看起 / 这块归谁 / 领域词汇怎么说 | `GLOSSARY-MAP.md` |
 | 第三方库与框架文档 | Context7 → MDN → web_fetch |
 | 浏览器标准 API | MDN → web_fetch |
 ```
@@ -156,7 +156,7 @@ grep -n 'uiautomator' docs/testing/conventions.md   # 期望命中 ≥1
 **动作**
 
 1. **保留** `docs/agents/domain.md` 的「静默继续」条款原文不动——那是上游 skill 的设计，目的是让 agent 别制造噪声。
-2. **改的是 artifact，不是 agent 行为**：`CONTEXT-MAP.md` 的表格补齐 `packages/*` 实际存在的全部包，未创建 `CONTEXT.md` 的显式标注 `未创建`。
+2. **改的是 artifact，不是 agent 行为**：`GLOSSARY-MAP.md` 的表格补齐 `packages/*` 实际存在的全部包，未创建 `GLOSSARY.md` 的显式标注 `未创建`。
    > 「agent 不抱怨缺失」与「地图假装完整」可以并存：前者是行为，后者是事实。
 3. 在 `docs/adr/` 新增一份索引（按主题/状态分组 + 交叉引用图；160/201 篇已互引，只是没人渲染）。
 
@@ -164,10 +164,10 @@ grep -n 'uiautomator' docs/testing/conventions.md   # 期望命中 ≥1
 
 ```bash
 # CONTEXT-MAP 覆盖全部实际包
-comm -13 <(grep -o 'packages/[a-z-]*' CONTEXT-MAP.md | sort -u) \
+comm -13 <(grep -o 'packages/[a-z-]*' GLOSSARY-MAP.md | sort -u) \
          <(ls -d packages/*/ | sed 's:/$::' | sort -u)   # 期望 0 行
 test -f docs/adr/README.md || test -f docs/adr/INDEX.md   # 期望存在
-grep -c '未创建' CONTEXT-MAP.md                            # 期望 ≥1（缺口可见）
+grep -c '未创建' GLOSSARY-MAP.md                            # 期望 ≥1（缺口可见）
 ```
 
 ---

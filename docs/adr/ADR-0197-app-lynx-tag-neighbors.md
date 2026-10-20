@@ -3,7 +3,7 @@
 - 状态：Accepted（已采纳）
 - 日期：2026-09-27
 - 取代：ADR-0196（站外溯源）—— 该方向的**技术调研结论仍然有效**（Pixiv 图床防盗链的一手事实、竞品实现机制），但产品决策已改为「标签近邻」，故 0196 标记 Superseded
-- 关联：issue #606（Lynx 单引擎化地图）、`packages/app-lynx/CONTEXT.md`「标签近邻」「站外溯源」词条、`packages/app/CONTEXT.md`「搜索关键词」词条（含本次实测的两个硬约束）、`@pictelio/search-core`（共享搜索核心，`search_target` 参数真值 oracle）、`relatedInjectionStore`（官方 related 注入，本功能的分工对象）、ADR-0086/0189 无关
+- 关联：issue #606（Lynx 单引擎化地图）、`packages/app-lynx/GLOSSARY.md`「标签近邻」「站外溯源」词条、`packages/app/CONTEXT.md`「搜索关键词」词条（含本次实测的两个硬约束）、`@pictelio/search-core`（共享搜索核心，`search_target` 参数真值 oracle）、`relatedInjectionStore`（官方 related 注入，本功能的分工对象）、ADR-0086/0189 无关
 
 ## 背景
 
@@ -32,7 +32,7 @@
 ## 决策
 
 **D1 功能命名与边界——叫「标签近邻」，不叫「溯源」。**
-用该作品的标签组合逐级放宽地搜 Pixiv 站内**其它作品**。排除：站外溯源（能力不同，见调研结论 4）、「相册选图搜」（输入源不同）、「角色识别 / 图生 tags」（本质是图像识别）。写入 `packages/app-lynx/CONTEXT.md` 词条（含 `_Avoid_` 排除项）。
+用该作品的标签组合逐级放宽地搜 Pixiv 站内**其它作品**。排除：站外溯源（能力不同，见调研结论 4）、「相册选图搜」（输入源不同）、「角色识别 / 图生 tags」（本质是图像识别）。写入 `packages/app-lynx/GLOSSARY.md` 词条（含 `_Avoid_` 排除项）。
 
 **D2 候选池优先级——两阶段：作者作品集优先，全站标签检索兜底。**
 

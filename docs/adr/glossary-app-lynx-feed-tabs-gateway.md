@@ -33,6 +33,6 @@ apiClient.requestRaw（原始响应接缝）
 
 ## 相关既有术语
 
-- **受限条目（Restricted item）**：因 R18/R18G 开关处于隐藏态的条目（见 `packages/app-lynx/CONTEXT.md`）
+- **受限条目（Restricted item）**：因 R18/R18G 开关处于隐藏态的条目（见 `packages/app-lynx/GLOSSARY.md`）
 - **web-core**：Lynx 的 Web 模拟渲染层（见 [glossary-lynx-units.md](./glossary-lynx-units.md)）
 - **双防抖**：loadMore 的 800ms 节流 + 3s 加载完成冷却（[lynx:fix] 防 web-core list 高频 scrolltolower）

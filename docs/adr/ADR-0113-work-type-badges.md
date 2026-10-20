@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-25
-- 关联：`packages/app/CONTEXT.md`（作品标识：动图/多图/类型角标）、`packages/app-lynx/CONTEXT.md`（作品标识：类型徽章行；受限内容：遮罩词条的 list-item absolute 平台事实）、`docs/specs/work-type-badges.md`
+- 关联：`packages/app/CONTEXT.md`（作品标识：动图/多图/类型角标）、`packages/app-lynx/GLOSSARY.md`（作品标识：类型徽章行；受限内容：遮罩词条的 list-item absolute 平台事实）、`docs/specs/work-type-badges.md`
 - 来源：grill-with-docs 会话（Q1 范围 / Q2 App 形态 / Q3 Lynx 位置 / Q4 M3 形态调研 / Q5 判定语义 / Q6 抽象与测试，全部由用户拍板）
 
 ## 背景

@@ -1,8 +1,8 @@
-# CONTEXT Map
+# GLOSSARY Map
 
-Pictelio 是多包 monorepo，各包的领域上下文相互分离。本文件将每个上下文映射到各自的 `CONTEXT.md`。
+Pictelio 是多包 monorepo，各包的领域上下文相互分离。本文件将每个上下文映射到各自的 `GLOSSARY.md`。（本文件原名 `CONTEXT-MAP.md`，各包词汇文档原名 `CONTEXT.md`，**2026-10-20** 统一改名以对齐上游 `mattpocock/skills` 的领域文档约定，见 ADR-0224。）
 
-| Context | 包 | CONTEXT.md | 领域 |
+| Context | 包 | GLOSSARY.md | 领域 |
 | -------- | ------------------- | --------------------------------- | ---------------------------------------- |
 | `app-lynx` | `packages/app-lynx` | **已创建**（活跃维护） | Lynx 客户端 —— 唯一运行时形态（列表浏览、受限内容、分页、小说导航、领域词汇） |
 | `android-host` | `packages/android-host` | **已创建**（活跃维护） | 构建宿主：Gradle 链、Lynx 原生模块、发布脚本、E2E 与 JVM 单测（不是客户端） |
@@ -15,12 +15,17 @@ Pictelio 是多包 monorepo，各包的领域上下文相互分离。本文件�
 | `website` | `packages/website` | **未创建** | Astro 落地页（GitHub Pages 部署） |
 
 > `packages/app-nuxt` 为未跟踪的空壳目录（仅 node_modules 残留），不是 workspace 包，不计入。
-> 第三列指向该包**词汇层入口**（CONTEXT.md / spec / ADR），单一事实源——不为一包维护两份词汇文档。
+> 第三列指向该包**词汇层入口**（GLOSSARY.md / spec / ADR），单一事实源——不为一包维护两份词汇文档。
 > 「未创建」= 词汇即代码本身、无独立文档（ugoira / website），是如实标注的真实缺口，由实际工作触发 `/domain-modeling` 按需补齐。
 
 ## 使用规则
 
-- 进入某个包的代码前，先读该包的 `CONTEXT.md` 获取术语与领域理解。
-- `CONTEXT.md` 不存在时**静默继续**，不要为缺失标记，也不要立即创建 —— `/domain-modeling` 会在术语或决策真正确定时按需创建。
+- 进入某个包的代码前，先读该包的 `GLOSSARY.md` 获取术语与领域理解。
+- `GLOSSARY.md` 不存在时**静默继续**，不要为缺失标记，也不要立即创建 —— `/domain-modeling` 会在术语或决策真正确定时按需创建。
 - 系统级决策统一在根目录 `docs/adr/`；上下文级决策放在 `packages/<context>/docs/adr/`。
 - ADR 总索引（按编号分组 + 被引统计）见 [docs/adr/README.md](docs/adr/README.md)，由 `scripts/generate-adr-index.mjs` 生成，勿手改。
+
+## 改名留痕
+
+- **历史文档**（`docs/specs/**`、`docs/adr/**`、`docs/research/**`、`research/**`）中出现的 `CONTEXT.md` / `CONTEXT-MAP.md`，指的就是这同一批文件——那些文档是当时的事实记录，内容未随本次改名变动。
+- 词汇文档正文中对**已随 ADR-0203 删除**的 `packages/app/CONTEXT.md` 的引用属历史事实，保留原名不改。

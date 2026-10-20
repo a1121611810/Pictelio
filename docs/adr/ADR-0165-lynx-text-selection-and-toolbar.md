@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-17
-- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、`packages/app-lynx/CONTEXT.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
+- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、`packages/app-lynx/GLOSSARY.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
 
 > **订正（2026-10-18）**：本行原引用取证报告
 > `docs/research/lynx-text-selection-device-probe.md`（分支 `probe/text-selection-559`），

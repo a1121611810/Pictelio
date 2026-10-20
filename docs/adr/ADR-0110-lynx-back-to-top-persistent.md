@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-24
-- 关联：ADR-0109（superseded——阈值感知设计被平台事实否决）、ADR-0107（RefreshableList 深模块）、ADR-0108（原生 keyframes 动画实证）、`packages/app-lynx/CONTEXT.md`（回顶按钮 / back-to-top button）
+- 关联：ADR-0109（superseded——阈值感知设计被平台事实否决）、ADR-0107（RefreshableList 深模块）、ADR-0108（原生 keyframes 动画实证）、`packages/app-lynx/GLOSSARY.md`（回顶按钮 / back-to-top button）
 - 来源：grill-with-docs 会话——T1 T-spike 实证原设计（滚动阈值感知）不可行，用户拍板改常驻按钮
 
 ## 背景

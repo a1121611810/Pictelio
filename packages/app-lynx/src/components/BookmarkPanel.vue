@@ -3,7 +3,7 @@
 // 形态蓝本 = CommentOverlay / PagePickerSheet / SearchSheet：遮罩 @tap 关闭、面板 @tap.stop
 // 防穿透、DOM 顺序靠后覆盖（不依赖 z-index）、modalStack 注册（系统返回先关面板）。
 //
-// 平台约束（违反即真机故障，见 CONTEXT.md「覆盖层与命中测试」，ADR-0123）：
+// 平台约束（违反即真机故障，见 GLOSSARY.md「覆盖层与命中测试」，ADR-0123）：
 //  - 全屏层必须 v-if 条件渲染：宿主 IllustDetail 以 v-if 挂载本组件，关闭即卸载
 //    （渲染树无全屏幽灵层，不用 pointer-events 指望穿透——原生 LynxView 不识别）；
 //  - 绝对定位只用 left/top 正向锚点：面板 = top-[20vh] + h-[80vh]（与 bottom-0 贴底等价

@@ -26,19 +26,19 @@
 
 | 内容类型 | 落点 | 理由 |
 | --- | --- | --- |
-| app-lynx **正在执行**的跨端契约 | `packages/app-lynx/CONTEXT.md` | 词条属 Lynx 上下文的领域语言，且原指针会在删除后悬空 |
+| app-lynx **正在执行**的跨端契约 | `packages/app-lynx/GLOSSARY.md` | 词条属 Lynx 上下文的领域语言，且原指针会在删除后悬空 |
 | **接受的缺口**的设计（无 Lynx 实现） | 本文档 §4 | 放 Lynx 上下文会暗示「Lynx 有此能力」，是失真 |
 | 被删侧的**工程约定**（模式级，非领域语言） | 本文档 §4 | 同上；且原引用点全在被删源码内 |
 | 测试约定 | `docs/testing/conventions.md` | 仓库级文档，不属任何单一客户端 |
 
-## 已直接搬入 `packages/app-lynx/CONTEXT.md` 的两条
+## 已直接搬入 `packages/app-lynx/GLOSSARY.md` 的两条
 
 以下两条**不在本文档重复正文**，正文已在 Lynx 侧落地，此处只记来源与判定理由：
 
 | 词条 | 搬运理由 | 落点 |
 | --- | --- | --- |
-| 搜索关键词的两个硬约束 | 不可再生的实测结论；ADR-0197 D11/D12 虽记录了同一结论，但那是**「标签近邻」功能的局部决策**，不是搜索领域的通用词条——Lynx 侧做搜索时不会去读 ADR-0197 | `packages/app-lynx/CONTEXT.md` §搜索 |
-| 图床缓存键 / 源无关命中 / 下载源 | app-lynx 原生读端**正在执行**该契约（`PictelioImageService` + Java 下载层），文档却在被删目录；且原 `CONTEXT.md:266` 的指针会在删除后悬空 | `packages/app-lynx/CONTEXT.md` §图床缓存契约 |
+| 搜索关键词的两个硬约束 | 不可再生的实测结论；ADR-0197 D11/D12 虽记录了同一结论，但那是**「标签近邻」功能的局部决策**，不是搜索领域的通用词条——Lynx 侧做搜索时不会去读 ADR-0197 | `packages/app-lynx/GLOSSARY.md` §搜索 |
+| 图床缓存键 / 源无关命中 / 下载源 | app-lynx 原生读端**正在执行**该契约（`PictelioImageService` + Java 下载层），文档却在被删目录；且原 `packages/app/CONTEXT.md:266` 的指针会在删除后悬空 | `packages/app-lynx/GLOSSARY.md` §图床缓存契约 |
 
 ## 搬运正文
 
@@ -162,16 +162,16 @@ _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 
 ## 风险登记：删除后会悬空的指针
 
-搬运完成后，以下**指向被删文件**的引用仍然存在于**不会删除**的文档中。它们不在本轮文件所有权范围内（分属 `docs/adr/**`、`docs/specs/**` 他文与 `CONTEXT-MAP.md`），仅登记：
+搬运完成后，以下**指向被删文件**的引用仍然存在于**不会删除**的文档中。它们不在本轮文件所有权范围内（分属 `docs/adr/**`、`docs/specs/**` 他文与 `GLOSSARY-MAP.md`），仅登记：
 
 | 位置 | 指向 | 影响 |
 | --- | --- | --- |
-| `packages/app-lynx/CONTEXT.md:28` | `packages/app/CONTEXT.md` | AI 模式词条互镜像引用 |
-| `packages/app-lynx/CONTEXT.md:47` | `packages/app/CONTEXT.md` | 动图/多图判定条件引用 |
-| `packages/app-lynx/CONTEXT.md:260` | `packages/app/CONTEXT.md` | 流式取帧 vs Range 流式取帧语义引用 |
-| `packages/app-lynx/CONTEXT.md:263` | `packages/app/CONTEXT.md`「网络直连」 | 直连模式术语引用 |
+| `packages/app-lynx/GLOSSARY.md:28` | `packages/app/CONTEXT.md` | AI 模式词条互镜像引用 |
+| `packages/app-lynx/GLOSSARY.md:47` | `packages/app/CONTEXT.md` | 动图/多图判定条件引用 |
+| `packages/app-lynx/GLOSSARY.md:260` | `packages/app/CONTEXT.md` | 流式取帧 vs Range 流式取帧语义引用 |
+| `packages/app-lynx/GLOSSARY.md:263` | `packages/app/CONTEXT.md`「网络直连」 | 直连模式术语引用 |
 | `packages/app-lynx/docs/specs/tag-neighbors.md:6` | `packages/app/CONTEXT.md`「搜索关键词」 | 该引用所指的**两个硬约束已由本轮搬入 app-lynx §搜索**，可改指 |
-| `CONTEXT-MAP.md:7` | `packages/app/CONTEXT.md` | 上下文地图的 `app` 行 |
+| `GLOSSARY-MAP.md:7` | `packages/app/CONTEXT.md` | 上下文地图的 `app` 行 |
 | `docs/adr/ADR-0127-ugoira-streaming-playback.md:97` | `packages/app/CONTEXT.md` | 「流式取帧/渐进播放/帧就绪」双端术语 |
 | `docs/adr/glossary-single-engine-facade.md:7,149` | `packages/app/CONTEXT.md` | 已阅读基线 / 保持不动表 |
 | `docs/adr/glossary-android-lifecycle-restore.md:13` | `packages/app/CONTEXT.md` | 已阅读基线 |
@@ -188,8 +188,8 @@ _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 ```bash
 cd /path/to/Pictelio
 # 两条高优先词条已落 Lynx 侧
-grep -c "关键词的两个硬约束" packages/app-lynx/CONTEXT.md   # 应 ≥1
-grep -c "源无关命中" packages/app-lynx/CONTEXT.md            # 应 ≥1
+grep -c "关键词的两个硬约束" packages/app-lynx/GLOSSARY.md   # 应 ≥1
+grep -c "源无关命中" packages/app-lynx/GLOSSARY.md            # 应 ≥1
 # 承接文档存在
 test -f docs/specs/webview-client-knowledge-migration.md && echo "OK"
 test -f docs/testing/conventions.md && echo "OK"

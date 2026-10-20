@@ -48,6 +48,6 @@ R18 在两端的既有实现并不相同：app 在 store 层（`r18Filter.ts` �
 
 ## 关联
 
-- 术语：`packages/app/CONTEXT.md`「内容过滤」、`packages/app-lynx/CONTEXT.md`「受限内容」
+- 术语：`packages/app/CONTEXT.md`「内容过滤」、`packages/app-lynx/GLOSSARY.md`「受限内容」
 - 规格：`docs/specs/ai-artwork-three-state-filter.md`
 - 工单：`docs/specs/ai-artwork-three-state-filter-tickets.md`

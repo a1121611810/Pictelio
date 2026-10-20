@@ -38,7 +38,7 @@ export interface WatchlistFeed {
   loading: () => boolean
   loadingMore: () => boolean
   /** 首载是否已成功落定（成功含 0 条；失败不算；refresh 期间回到未落定）。
-   * 页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+   * 页面三态判定的输入（ADR-0150 / GLOSSARY「首载落定」） */
   settled: () => boolean
   /** 首屏/刷新失败错误文案；无错误 null */
   error: () => string | null

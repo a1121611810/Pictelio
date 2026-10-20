@@ -3,7 +3,7 @@
 - **状态**：已接受（Accepted，2026-10-11）｜**词汇层已实施**（本 ADR 自身）｜**实现分片全部交付**：#977–#986 均已合入集成分支（逐项见 §4）
 - **日期**：2026-10-11
 - **相关**：[ADR-0090（图片缓存三层分离架构，本 ADR 取代其编号体系）](./ADR-0090-image-cache-three-layer.md)、[ADR-0143（图床下载源与「缓存键恒官方 URL」契约）](./ADR-0143-imagehost-download-source-java-sink.md)、[ADR-0203（WebView 客户端源码删除）](./ADR-0203-webview-client-source-removal.md)、[ADR-0054（图片流水线统一核心）](./ADR-0054-image-pipeline-unified-core.md)
-- **术语文档**：[packages/android-host/CONTEXT.md](../../packages/android-host/CONTEXT.md)（图片代理节，**权威**：两层缓存 / 内存层 / 磁盘层）、[packages/app-lynx/CONTEXT.md](../../packages/app-lynx/CONTEXT.md)（图床缓存契约节，**权威**：缓存键 / 源无关命中）
+- **术语文档**：[packages/android-host/GLOSSARY.md](../../packages/android-host/GLOSSARY.md)（图片代理节，**权威**：两层缓存 / 内存层 / 磁盘层）、[packages/app-lynx/GLOSSARY.md](../../packages/app-lynx/GLOSSARY.md)（图床缓存契约节，**权威**：缓存键 / 源无关命中）
 - **证据**：spec [#975](https://github.com/a1121611810/Pictelio/issues/975)；实现分片 #977（测试缝）、#978（磁盘真 LRU）、#979（内存预算）、#980（键空间统一）、#981（内存压力）、#982（预取补齐）、#983（可观测统计）
 
 ---
@@ -24,7 +24,7 @@
 
 | 来源 | 编号方式 | 现状 |
 |---|---|---|
-| `packages/android-host/CONTEXT.md`「缓存三层」 | 内存 `LruCache` / 内存盘 `ImageMemoryCache` / Java 磁盘 | ❌ **把容器与其使用者各算作一层**——`LruCache` 是 `ImageMemoryCache` 的内部实现，两者是同一层 |
+| `packages/android-host/GLOSSARY.md`「缓存三层」 | 内存 `LruCache` / 内存盘 `ImageMemoryCache` / Java 磁盘 | ❌ **把容器与其使用者各算作一层**——`LruCache` 是 `ImageMemoryCache` 的内部实现，两者是同一层 |
 | ADR-0090 标题的「三层」 | A 磁盘 / B 浏览器缓存头 / C JS 预取 | ❌ **层 B 在 Lynx 下已无载体**，随 WebView 客户端整体删除（ADR-0203） |
 
 两套编号指向**不同的层集合**，并存会持续误导后续改动。⇒ 统一为一套。

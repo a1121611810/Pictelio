@@ -58,7 +58,7 @@ The root `package.json` is the full command list. Bare `dev`, `build`, `check`, 
 
 - [AGENTS.md](AGENTS.md) — the rules that govern changes here. Read this first.
 - [docs/adr](docs/adr/) — decision records. Look for one before you change behavior.
-- [CONTEXT-MAP.md](CONTEXT-MAP.md) — the map from package to domain doc.
+- [GLOSSARY-MAP.md](GLOSSARY-MAP.md) — the map from package to domain doc.
 - [docs/privacy-policy.md](docs/privacy-policy.md) — what the app stores and what it sends.
 
 ---

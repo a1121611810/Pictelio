@@ -4,7 +4,7 @@
 # WARNING 本文件的注释是「反例载体」：下文多处故意在注释里写下错误写法（当反例）。
 #    因此对本文件做源级守卫时不能整体剥注释（会连反例一起剥掉、判不出残留缺陷），
 #    必须逐行排除行首 # 与 //。此例外的规范出处：
-#    packages/app-lynx/CONTEXT.md「源级守卫（source-level guard）」条目。
+#    packages/app-lynx/GLOSSARY.md「源级守卫（source-level guard）」条目。
 #    由 tests/captureScriptInvariants.test.ts 强制（删掉本段该守卫会转红）。
 #
 # 矩阵三轴：**屏宽** × **明暗** × **色板**，外加**页面**扫描。

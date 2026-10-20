@@ -236,5 +236,5 @@ return hash.toString(16).padStart(8, '0')
 - **`packages/app/src/translationCache.ts`**（webview 端参考；**不复用**，仅参考抽象边界；map #617 Q3 已收敛）
 - **`packages/app/src/openwiki/domain/novel-reader.md` §AI Translation**（webview 端翻译栈描述；参考非复用）
 - **`docs/specs/novel-ai-translation.md`**（webview 端 spec；参考非复用）
-- **`packages/app-lynx/CONTEXT.md`**（词条：翻译缓存 / LRU 淘汰 / sourceHash 失效——implement 阶段补）
+- **`packages/app-lynx/GLOSSARY.md`**（词条：翻译缓存 / LRU 淘汰 / sourceHash 失效——implement 阶段补）
 - **`docs/agents/triage-labels.md`** / **`docs/agents/issue-tracker.md`**（map #617 ticket #621 = ADR-0171）

@@ -1,4 +1,4 @@
-// oracle：ADR-0150 决策 1（三态优先级）+ packages/app-lynx/CONTEXT.md「页级首载骨架 / 首载落定」。
+// oracle：ADR-0150 决策 1（三态优先级）+ packages/app-lynx/GLOSSARY.md「页级首载骨架 / 首载落定」。
 // 期望值来自决策规则本身（独立来源），不由实现反推。
 import { describe, expect, it } from 'vitest'
 import { deriveFirstLoadView, type FirstLoadViewInput } from './firstLoadView'

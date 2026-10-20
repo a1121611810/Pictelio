@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-17
-- 关联：wayfinder 地图 #575（决策票 #576-#584 全关）、spec #585、票 #586-#590、commits `21ed312e` / `bfd694c2` / `d9a3a317` / `ab3724e2`（feat/novel-intro-575）、`packages/app-lynx/CONTEXT.md`（词条：小说介绍页 / 三段式导航 / 开始阅读 / 小说导航）、ADR-0118（轮播 scrim 视觉先例）、ADR-0131（内容区尺寸契约——CTA 贴底几何）、ADR-0133（全局搜索弹层——标签点击接线）、ADR-0155（AI 过滤语义）、ADR-0163（init-only props 宿主矩阵——BookmarkButton :key 契约）、throwaway 分支 `prototype/novel-intro-575`（落选视觉案 A/B/C 留存）
+- 关联：wayfinder 地图 #575（决策票 #576-#584 全关）、spec #585、票 #586-#590、commits `21ed312e` / `bfd694c2` / `d9a3a317` / `ab3724e2`（feat/novel-intro-575）、`packages/app-lynx/GLOSSARY.md`（词条：小说介绍页 / 三段式导航 / 开始阅读 / 小说导航）、ADR-0118（轮播 scrim 视觉先例）、ADR-0131（内容区尺寸契约——CTA 贴底几何）、ADR-0133（全局搜索弹层——标签点击接线）、ADR-0155（AI 过滤语义）、ADR-0163（init-only props 宿主矩阵——BookmarkButton :key 契约）、throwaway 分支 `prototype/novel-intro-575`（落选视觉案 A/B/C 留存）
 
 ## 背景
 

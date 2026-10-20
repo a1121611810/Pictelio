@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-24
-- 关联：ADR-0106（superseded，本 ADR 取代其决策 1/2/3/4/6；范围决策 D5 沿用）、ADR-0104（分页收敛 / createMixFeed）、ADR-0076（webview 下拉刷新）、`packages/app-lynx/CONTEXT.md`（术语）
+- 关联：ADR-0106（superseded，本 ADR 取代其决策 1/2/3/4/6；范围决策 D5 沿用）、ADR-0104（分页收敛 / createMixFeed）、ADR-0076（webview 下拉刷新）、`packages/app-lynx/GLOSSARY.md`（术语）
 - 来源：grill-with-docs 会话——ADR-0106 T4 模拟器验收发现原生 `<refresh>` 路线不可行，用户拍板改需求为右下角刷新按钮
 
 ## 背景

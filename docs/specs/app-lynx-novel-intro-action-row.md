@@ -349,7 +349,7 @@ const downloaded = computed(() =>
 - 屏蔽态置灰（沿用 #580，无新决策）
 - 复用 NovelExportSheet（沿用既有组件，无新决策）
 
-## 9. Glossary 增项（`packages/app-lynx/CONTEXT.md`）
+## 9. Glossary 增项（`packages/app-lynx/GLOSSARY.md`）
 
 新增 3 个词条到「小说导航」章节：
 
@@ -383,7 +383,7 @@ const downloaded = computed(() =>
 - `packages/app-lynx/src/pages/NovelIntro.vue` — 模板重组 + 脚本新增（§4 US5）
 - `packages/app-lynx/src/i18n/locales/zh-CN/misc.ts` — 新增 3-4 个 key
 - `packages/app-lynx/src/i18n/locales/en/misc.ts` — 同步英文
-- `packages/app-lynx/CONTEXT.md` — 新增 3 个 glossary 词条
+- `packages/app-lynx/GLOSSARY.md` — 新增 3 个 glossary 词条
 - `tests/novelIntroEntryGuards.test.ts` — 现有守卫加新 case（介绍页含 4 个动作按钮时仍守「不路由级重定向」）
 
 ## 11. 不做 / 留给未来

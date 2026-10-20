@@ -4,7 +4,7 @@
 > 背景：[#610](https://github.com/a1121611810/Pictelio/issues/610) 单引擎化已合入 main，v6.3.0 为首个单引擎发布版；
 > 但三处门面仍叙述双引擎形态，措辞互不一致。本文档是它们**唯一的措辞来源**。
 > 决策：[ADR-0201-single-engine-facade-consolidation.md](./ADR-0201-single-engine-facade-consolidation.md)。
-> 已阅读基线：`CONTEXT-MAP.md`、`packages/app/CONTEXT.md`、`packages/app-lynx/CONTEXT.md`、
+> 已阅读基线：`GLOSSARY-MAP.md`、`packages/app/CONTEXT.md`、`packages/app-lynx/GLOSSARY.md`、
 > `glossary-cross-engine.md`、`glossary-client-switch.md`、ADR-0062/0164/0177/0180、#805 / #819。
 > 术语惯例沿用 `CONTEXT.md`：中文定义 + 英文标识符；`_Avoid_` 标注禁用词。
 
@@ -147,7 +147,7 @@ _Avoid_: 按当前事实改写历史文档（抹掉决策史）、直接删除�
 | `glossary-cross-engine.md` | 存档横幅——记录双实现差分测试词汇，当前仅 lynx 一个消费方 |
 | `glossary-client-switch.md` | 存档横幅——引擎切换机制整体下线 |
 | `packages/app/CONTEXT.md` 引擎路由两节 | 已有 #610 订正横幅，**保持不动** |
-| `packages/app-lynx/CONTEXT.md` 首句「与 webview 客户端构成双引擎形态」 | **已订正**（本次改动） |
+| `packages/app-lynx/GLOSSARY.md` 首句「与 webview 客户端构成双引擎形态」 | **已订正**（本次改动） |
 
 ## ⚠️ 本文档的使用约束（读之前先看）
 

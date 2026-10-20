@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0120（放射双层环悬浮 FAB，`GlobalFab.vue`）、ADR-0111（M3 FAB menu，`RefreshableList` 分页/回顶 FAB）、`packages/app-lynx/CONTEXT.md`（「放射导航」「环项尺寸基准」「放射菜单项 56dp 圆」「展开层叠序」「外环扫角约束」词条）、`docs/adr/glossary-app-lynx-radial-nav-fab.md`（更新术语表）
+- 关联：ADR-0120（放射双层环悬浮 FAB，`GlobalFab.vue`）、ADR-0111（M3 FAB menu，`RefreshableList` 分页/回顶 FAB）、`packages/app-lynx/GLOSSARY.md`（「放射导航」「环项尺寸基准」「放射菜单项 56dp 圆」「展开层叠序」「外环扫角约束」词条）、`docs/adr/glossary-app-lynx-radial-nav-fab.md`（更新术语表）
 - 来源：需求「放射导航 FAB 展开项太小、且被遮罩盖住」。经原型（`packages/app-lynx/prototype/prototype-radial-menu-sizes.html`）三变体（A 去文字 / B 大圆 / C 紧凑）比选，与用户确认定稿 **B 方案（56dp 大圆，圆内 24dp 图标 + 12sp 文字）**。
 - 术语：见 `docs/adr/glossary-app-lynx-radial-nav-fab.md`（本文档只记录决策，不写代码）。
 
@@ -67,4 +67,4 @@ ADR-0120 把全局导航（4 tab 底部栏）+ 各页刷新 FAB 合并为「右�
 
 - docs/specs/app-lynx-radial-fab-m3-size.md
 - docs/adr/glossary-app-lynx-radial-nav-fab.md（术语更新）
-- packages/app-lynx/CONTEXT.md（术语更新）
+- packages/app-lynx/GLOSSARY.md（术语更新）

@@ -1,7 +1,7 @@
 # Spec：小说正文列表虚拟化与主线程滚动信号（app-lynx）
 
 > 父决策：ADR-0134（2026-09-02）；选型 #311；spike #313（原型分支 prototype/vapor-eval 7e92665a 已验证）
-> 术语：packages/app-lynx/CONTEXT.md「正文段落虚拟化」「主线程滚动信号」「输入派发地板」「主线程脚本（MTS）」
+> 术语：packages/app-lynx/GLOSSARY.md「正文段落虚拟化」「主线程滚动信号」「输入派发地板」「主线程脚本（MTS）」
 
 ## Problem Statement
 

@@ -1,6 +1,6 @@
-# Pictelio android-host 上下文
+# Pictelio android-host 术语表
 
-android-host 是 Android **构建宿主**——Gradle 工程、发布脚本、Lynx 原生模块与测试/E2E 编排都在此包。**它不是客户端**：唯一客户端是 `packages/app-lynx`（自 ADR-0203 起；webview 侧源码已删除，机制判定见 `docs/adr/glossary-webview-client-removal.md`）。本上下文记录宿主边界、目录契约、测试分层、发布链与 JS↔原生桥接面的领域语言；精确语义以 ADR 与源码为准。
+android-host 是 Android **构建宿主**——Gradle 工程、发布脚本、Lynx 原生模块与测试/E2E 编排都在此包。**它不是客户端**：唯一客户端是 `packages/app-lynx`（自 ADR-0203 起；webview 侧源码已删除，机制判定见 `docs/adr/glossary-webview-client-removal.md`）。本上下文记录宿主边界、目录契约、测试分层、发布链与 JS↔原生桥接面的领域语言；精确语义以 ADR 与源码为准。（本文件原名 `CONTEXT.md`，**2026-10-20** 改名以对齐上游 `mattpocock/skills` 的领域文档约定，见 ADR-0224；词汇内容未改。）
 
 ## 术语
 

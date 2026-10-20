@@ -58,7 +58,7 @@ export interface MixFeed {
   loading: () => boolean
   loadingMore: () => boolean
   /** 首载是否已成功落定（成功含 0 条；失败不算；刷新 / 重试期间回到未落定）。
-   * 页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+   * 页面三态判定的输入（ADR-0150 / GLOSSARY「首载落定」） */
   settled: () => boolean
   /** 首屏/刷新失败错误文案（presentError('加载失败') 产出）；无错误 null。
    * 与 pageError() 槽位分离（ADR-0104）：首屏失败 → 顶部整页提示 */
@@ -114,7 +114,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   let currentAc: AbortController | null = null
   /** 首载（含 refresh）网络阶段标志 */
   let firstLoadInFlight = false
-  /** 首载是否已成功落定（成功含 0 条；失败不算）——页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+  /** 首载是否已成功落定（成功含 0 条；失败不算）——页面三态判定的输入（ADR-0150 / GLOSSARY「首载落定」） */
   let firstLoadSettled = false
   /** fetchMore 进行中标志 */
   let loadMoreInFlight = false

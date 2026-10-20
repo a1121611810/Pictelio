@@ -61,7 +61,7 @@
 | TranslateModeSwitch.vue | `packages/app-lynx/src/components/TranslateModeSwitch.vue` | 修改：壳内 inline markup → 组件调用（disabled 语义由组件接管） |
 | 机器门禁（新） | `packages/app-lynx/tests/m3-segmented-button-migration-gate.test.ts` | 新增：inline 容器特征串全仓清零 + 组件调用数 ≥ 5 + 组件存在性 |
 | ADR-0190 | `docs/adr/ADR-0190-app-lynx-m3-segmented-button-component.md` | 新增：三段式（Context / Decision / Consequences） |
-| 术语登记 | `packages/app-lynx/CONTEXT.md` 外观/主题色节 | 修改：新增「分段控件（segmented button）」词条 |
+| 术语登记 | `packages/app-lynx/GLOSSARY.md` 外观/主题色节 | 修改：新增「分段控件（segmented button）」词条 |
 
 ### 4.2 公开接口
 

@@ -118,7 +118,7 @@ export const FAB_MENU_A11Y_LABELS = {
 | `packages/app-lynx/src/utils/accessibility.ts` | 移除 `REFRESH_A11Y_LABELS`、`BACK_TO_TOP_A11Y_LABELS`；新增 `FAB_MENU_A11Y_LABELS`。 |
 | `packages/app-lynx/src/components/RefreshableList.vue` | 重写为 FAB menu：模板结构、状态机绑定、动画类。 |
 | `packages/app-lynx/tests/unit.test.ts` | 新增 RefreshableList 结构断言 + a11y 完整性断言。 |
-| `packages/app-lynx/CONTEXT.md` | 更新「列表刷新」术语（刷新 FAB / 回顶按钮 → 列表操作 FAB menu）。 |
+| `packages/app-lynx/GLOSSARY.md` | 更新「列表刷新」术语（刷新 FAB / 回顶按钮 → 列表操作 FAB menu）。 |
 | `docs/adr/ADR-0111-lynx-fab-menu.md` | 新增决策记录。 |
 | 9 个页面（Recommended/IllustList/NovelList/Following/Bookmarks/UserHome/FollowList） | **零改动**（接口不变）。 |
 

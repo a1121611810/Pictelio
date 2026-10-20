@@ -10,7 +10,7 @@
 > 状态：已定稿（供差分测试 / 属性测试 / 测试加固 initiative 作为共享词汇基准）。
 > 本文档**不改变任何代码**，只统一说话方式；涉及的行为分歧仅作记录与建议，是否修改由对应 ADR 拍板。
 > 覆盖范围：`packages/app`（webview 客户端，SolidJS）与 `packages/app-lynx`（lynx 客户端，vue-lynx）之间的同语义双实现。
-> 已阅读基线：`CONTEXT-MAP.md`、`packages/app/CONTEXT.md`、`packages/app-lynx/CONTEXT.md`、`docs/adr/glossary-auth-retry.md`、`docs/adr/glossary-update-check.md`、ADR-0051/0089/0037/0084/0085/0097。
+> 已阅读基线：`GLOSSARY-MAP.md`、`packages/app/CONTEXT.md`、`packages/app-lynx/GLOSSARY.md`、`docs/adr/glossary-auth-retry.md`、`docs/adr/glossary-update-check.md`、ADR-0051/0089/0037/0084/0085/0097。
 > 相关一手来源：Pixiv OAuth 400 真实响应体（pixivpy#374、gallery-dl#9331，见证据节）。
 
 ## 范围与目的

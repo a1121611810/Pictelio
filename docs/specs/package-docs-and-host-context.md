@@ -14,8 +14,8 @@ openwiki 退役任务（#966）登记了两项后续漂移：5 个共享包 desc
 ## 决策
 
 1. 5 个 description：消费者改为 app-lynx；保留仍有效的 spec 链接（ranking.md / search-advanced-filters.md 已验证存在）。
-2. 新增 `packages/android-host/CONTEXT.md`（~120 行，app-lynx 的 1/5 体量），词汇全部从 ADR + 代码事实抽取，每条带锚点，不发明。
-3. CONTEXT-MAP.md 的 android-host 行「未创建」→「已创建」。
+2. 新增 `packages/android-host/GLOSSARY.md`（~120 行，app-lynx 的 1/5 体量），词汇全部从 ADR + 代码事实抽取，每条带锚点，不发明。
+3. GLOSSARY-MAP.md 的 android-host 行「未创建」→「已创建」。
 4. 顺带修正 AGENTS.md「关键设计决策」行的一处陈旧机制引用：`shouldInterceptRequest` 是 WebView 时代机制（ADR-0090 描述已删客户端），现行机制为 lynx/java 的 PictelioImageService + main/java 的 PixivImageLoader（`/pixiv-img/` 代理）。
 
 ## 票

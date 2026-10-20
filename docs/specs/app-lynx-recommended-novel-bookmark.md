@@ -3,7 +3,7 @@
 > 来源：Grill（`grill-with-docs`）第 1/2 轮 + 补问轮（2026-09-21）；问题现场 = 用户截图「推荐 = 小说时看不见收藏按钮」
 > 状态：ready-for-agent
 > 相关决策：ADR-0115（推荐页 = 单卡轮播）、ADR-0118（封面比例/标签行）、ADR-0112（收藏动效）、ADR-0163（init-only props remount 契约）、ADR-0160（收藏面板范围裁剪：**仅插画**）
-> 术语遵循 `packages/app-lynx/CONTEXT.md`（推荐轮播 / 滑页 / 小说介绍页 / 三段式导航）
+> 术语遵循 `packages/app-lynx/GLOSSARY.md`（推荐轮播 / 滑页 / 小说介绍页 / 三段式导航）
 
 ## Problem Statement
 

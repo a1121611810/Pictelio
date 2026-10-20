@@ -3,7 +3,7 @@
 > 范围：`packages/app-lynx` 的**继续读**领域语言。决策见 [ADR-0219](./ADR-0219-lynx-continue-reading.md)。
 > 本表只定义领域语言与术语红线，不写实现细节。
 > 与既有术语表的关系：**稍后看 / 追更 / 收藏 / 快照条目** 见 [glossary-lynx-four-features.md](./glossary-lynx-four-features.md)（下称「四功能表」，其易混辨析 #1 是本表的**上位红线**）；
-> 三段式导航与「开始阅读」见 [glossary-lynx-novel-intro-toggle.md](./glossary-lynx-novel-intro-toggle.md) 与 `packages/app-lynx/CONTEXT.md`。
+> 三段式导航与「开始阅读」见 [glossary-lynx-novel-intro-toggle.md](./glossary-lynx-novel-intro-toggle.md) 与 `packages/app-lynx/GLOSSARY.md`。
 >
 > **状态**：ADR-0219 已接受。**小说侧（阅读位置）票 #926、插画侧（浏览历史）票 #927
 > 均已落地**——书架段 3 与 `/continue` 列表两轴混排可用：小说行显示「上次读到 第N话」，
@@ -74,7 +74,7 @@
    - _Avoid_: 「向 Kindle 看齐」「最远进度」「未读就跳下一话」。
 
 4. **继续读 ≠ 「开始阅读」按钮**（前者是功能位，后者是介绍页的 CTA）：
-   `packages/app-lynx/CONTEXT.md` 的「开始阅读」词条当前写着「进入正文页**固定从头开始**。
+   `packages/app-lynx/GLOSSARY.md` 的「开始阅读」词条当前写着「进入正文页**固定从头开始**。
    无续读——阅读进度持久化未立项」。该描述**对现状为真**。ADR-0219 落地后它会被改写为
    「未读过则「开始阅读」从头；已有位置则「**继续阅读**」并从该话开始」。
    ⇒ **改写必须与实现同轮提交**，否则该词条会变成一句谎话（它描述的是**当前状态**，

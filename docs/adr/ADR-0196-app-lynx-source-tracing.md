@@ -5,7 +5,7 @@
   - **本文档的调研结论仍然有效**，且已被 ADR-0197 的「调研结论 1–4」部分复用（tags 关联度降序、`translated_name` 为 `None`、官方 related 的分工关系、站外溯源的能力边界）。**若将来重启站外溯源，直接复用本文的防盗链 / 竞品 / 中转服务取证，无需重做调研。**
   - 保留全文不删：它是「做了→验证→因架构与风险放弃」这一决策过程的完整记录。
 - 日期：2026-09-27（转 Superseded 同日）
-- 关联：issue #606（Lynx 单引擎化地图，本 ADR 挂其下）、#607（终态 = WebView 线下线）、`packages/app-lynx/CONTEXT.md`「溯源（Source tracing）」词条、webview 端图床设置范式（`SettingsImage.tsx` / `ImageHostSettings.tsx` / `imageHostStore.ts`）、`NetDiagProbe.java`（网络探测基座）、`PictelioAppModule.openUrl`（外链打开）、`composables/useLongPress.ts`（长按范式）、ADR-0129（通栏连续多图列表）、ADR-0103（账号级键契约与 PrefsStorage seam）、ADR-0187（标签静音，`relatedInjection` 过滤链）、ADR-0189（NovelIntro 动作行）、竞品调研 `docs/research/competitor-comparison-2026-09.md`
+- 关联：issue #606（Lynx 单引擎化地图，本 ADR 挂其下）、#607（终态 = WebView 线下线）、`packages/app-lynx/GLOSSARY.md`「溯源（Source tracing）」词条、webview 端图床设置范式（`SettingsImage.tsx` / `ImageHostSettings.tsx` / `imageHostStore.ts`）、`NetDiagProbe.java`（网络探测基座）、`PictelioAppModule.openUrl`（外链打开）、`composables/useLongPress.ts`（长按范式）、ADR-0129（通栏连续多图列表）、ADR-0103（账号级键契约与 PrefsStorage seam）、ADR-0187（标签静音，`relatedInjection` 过滤链）、ADR-0189（NovelIntro 动作行）、竞品调研 `docs/research/competitor-comparison-2026-09.md`
 
 ## 背景
 
@@ -97,7 +97,7 @@ webview 图床支持多 host 同时启用（`fluent-checkbox` 多选），但那
 ## 决策
 
 **D1 功能边界——只做「溯源」，入口为作品详情页。**
-术语定为「溯源」（Source tracing），语义 = 把当前作品的原图交给外部反向搜图服务，跳转其结果页，用于查证该图更早的发布出处。排除「相册反查外部图」与「角色识别」。写入 `packages/app-lynx/CONTEXT.md` 词条（含 `_Avoid_` 排除项）。作用对象为**作品级**（单图作品 = 该图；多图作品 = 首页图）。
+术语定为「溯源」（Source tracing），语义 = 把当前作品的原图交给外部反向搜图服务，跳转其结果页，用于查证该图更早的发布出处。排除「相册反查外部图」与「角色识别」。写入 `packages/app-lynx/GLOSSARY.md` 词条（含 `_Avoid_` 排除项）。作用对象为**作品级**（单图作品 = 该图；多图作品 = 首页图）。
 
 **D2 引擎集——四个全列、默认全关；排除 Google Lens。**
 引擎清单：Ascii2D / SauceNAO / IQDB / TinEye。**全部默认关闭**，由用户按自身网络环境自行勾选——这正是问题一的直接解法：可达性判断从开发者转移到用户，我们既不替用户猜、也不因为"某引擎国内不可达"就不做它。

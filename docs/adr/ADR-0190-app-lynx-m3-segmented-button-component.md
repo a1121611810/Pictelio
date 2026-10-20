@@ -2,7 +2,7 @@
 
 - 状态: Accepted（2026-09-26）
 - 日期: 2026-09-26
-- 关联: spec [docs/specs/app-lynx-m3-segmented-button.md](../specs/app-lynx-m3-segmented-button.md)；术语 [packages/app-lynx/CONTEXT.md](../../packages/app-lynx/CONTEXT.md)「分段控件」；原型 `packages/app-lynx/prototype/prototype-m3-segmented-button.html`（B 案定稿）；关联 ADR-0179（`<M3Switch>` 同范式先驱）/ ADR-0155（AI 作品三态业务）/ ADR-0180（外观模式业务）/ ADR-0097（机器防线）
+- 关联: spec [docs/specs/app-lynx-m3-segmented-button.md](../specs/app-lynx-m3-segmented-button.md)；术语 [packages/app-lynx/GLOSSARY.md](../../packages/app-lynx/GLOSSARY.md)「分段控件」；原型 `packages/app-lynx/prototype/prototype-m3-segmented-button.html`（B 案定稿）；关联 ADR-0179（`<M3Switch>` 同范式先驱）/ ADR-0155（AI 作品三态业务）/ ADR-0180（外观模式业务）/ ADR-0097（机器防线）
 
 ## 背景
 

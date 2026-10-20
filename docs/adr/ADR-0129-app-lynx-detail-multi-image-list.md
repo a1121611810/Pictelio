@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-31
-- 关联：ADR-0115（推荐轮播，**未复用**其轮播形态）、ADR-0117（CoverImage 深模块）、ADR-0118（封面比例显示）、`packages/app-lynx/CONTEXT.md`（新增「多图详情」3 词条）、`docs/specs/app-lynx-detail-multi-image-list.md`
+- 关联：ADR-0115（推荐轮播，**未复用**其轮播形态）、ADR-0117（CoverImage 深模块）、ADR-0118（封面比例显示）、`packages/app-lynx/GLOSSARY.md`（新增「多图详情」3 词条）、`docs/specs/app-lynx-detail-multi-image-list.md`
 - 来源：grill-with-docs 会话——用户先提「改轮播（参考推荐页）」，Grill 收敛轮播方案后**用户推翻，改拍板列表形式**（「不要用轮播，改为列表形式显示比较好」）；随后逐项确认（通栏连续/角标/全量渲染/逐页比例/首图占位/点图无动作），并确认「load 后按比例修正」能力必须落地。
 
 ## 背景

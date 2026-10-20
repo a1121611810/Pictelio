@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0120（放射双层环悬浮 FAB，`GlobalFab.vue`）、ADR-0121（FAB 尺寸/层叠，容器内 `scrim z-10 < 菜单 z-20 < FAB z-30`）、ADR-0111（M3 FAB menu，`RefreshableList`——本问题的**正确对照实现**）、`packages/app-lynx/CONTEXT.md`（「推荐轮播 scrim」词条含 pointer-events 真机失效记录；「展开层叠序」词条需同步）、`docs/adr/glossary-app-lynx-hit-testing.md`（新建统一术语表）、`docs/adr/glossary-app-lynx-radial-nav-fab.md`（「展开层叠序」词条更新）
+- 关联：ADR-0120（放射双层环悬浮 FAB，`GlobalFab.vue`）、ADR-0121（FAB 尺寸/层叠，容器内 `scrim z-10 < 菜单 z-20 < FAB z-30`）、ADR-0111（M3 FAB menu，`RefreshableList`——本问题的**正确对照实现**）、`packages/app-lynx/GLOSSARY.md`（「推荐轮播 scrim」词条含 pointer-events 真机失效记录；「展开层叠序」词条需同步）、`docs/adr/glossary-app-lynx-hit-testing.md`（新建统一术语表）、`docs/adr/glossary-app-lynx-radial-nav-fab.md`（「展开层叠序」词条更新）
 - 来源：用户报告「lynx 客户端进入后，除右下角全局导航外其他点击都没反应」。经 diagnosing-bugs 流程（模拟器原生复现 + logcat + 代码取证）确认根因；经 codebase-design 视角（与 `RefreshableList`/各 overlay 的正确模式对照）定稿修复方案。
 - 术语：见 `docs/adr/glossary-app-lynx-hit-testing.md`（本文档只记录决策，不写代码）。
 
@@ -40,7 +40,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 4. **回归接缝**：
    - 单测（既有模板结构断言模式，`tests/unit.test.ts`）：更新 GlobalFab 结构断言到新结构，并新增**负向断言**——模板不得再含全屏 `pointer-events-none` 元素、展开层必须 `v-if="view.isOpen"` 条件渲染。
    - E2E（android-e2e，adb 驱动仿 `lynx-boot-renders.spec.ts`）：登录后经 FAB 进「我的」页，点账户卡「我的收藏」行，断言导航到 /bookmarks（全屏像素 diff；离线可点、确定性）。修复前该点击被全屏容器吞掉 0 变化（红）、修复后导航（绿）。
-5. **文档同步**：新建 `glossary-app-lynx-hit-testing.md`；更新 `glossary-app-lynx-radial-nav-fab.md`「展开层叠序」、`packages/app-lynx/CONTEXT.md`（平台约束固化 + 展开层叠序措辞）。
+5. **文档同步**：新建 `glossary-app-lynx-hit-testing.md`；更新 `glossary-app-lynx-radial-nav-fab.md`「展开层叠序」、`packages/app-lynx/GLOSSARY.md`（平台约束固化 + 展开层叠序措辞）。
 
 ## 被考虑的方案
 
@@ -78,4 +78,4 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 - docs/adr/glossary-app-lynx-hit-testing.md（新建）
 - docs/adr/glossary-app-lynx-radial-nav-fab.md（「展开层叠序」更新）
 - docs/specs/app-lynx-fab-hit-testing-fix.md
-- packages/app-lynx/CONTEXT.md（平台约束固化）
+- packages/app-lynx/GLOSSARY.md（平台约束固化）

@@ -28,7 +28,7 @@ let cached: boolean | undefined
  * ⚠️ **已知失效面（登记，非缺陷）**：本方法返回的 Promise 只由原生回调或同步抛错沉降。
  * 原生侧实现是同步 `invoke`，但若桥中断 / 模块未注册 / `Callback` 被吞，回调永不落 ⇒
  * Promise 永不着陆。**本方法不设超时兜底**——「探测超时 + 兜底」在本仓是登记在案的
- * 反模式（见 `packages/app-lynx/CONTEXT.md`「三态 cache adapter」词条的 _Avoid_：
+ * 反模式（见 `packages/app-lynx/GLOSSARY.md`「三态 cache adapter」词条的 _Avoid_：
  * 真机上 setTimeout 不可靠，会造出「看起来在工作」的假象）。
  *
  * 该挂起面**不是本改动引入的新风险类**：同一条 `loadSettings` 上每个 `prefs().get()`

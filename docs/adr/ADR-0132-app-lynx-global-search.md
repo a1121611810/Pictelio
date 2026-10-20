@@ -76,7 +76,7 @@ app-lynx 与 webview client 的功能差距中，**搜索**是剩余最大缺口
 - **第三方共识**：spec `docs/specs/search-user-scope.md` §1 记录的六个第三方客户端（Pixiv-Shaft / Mako / PixivBiu / pixez / Pixiv-SwiftUI / pixivpy）全部实现用户搜索；其中 pixez `getSearchUser` 与 Mako `UserSearchEngine` **只发 `filter` + `word`**，与本仓 `buildUserSearchRequest` 的参数口径同款。
 - **端点响应面已一手实测**（2026-10-16，脚本 `docs/research/verify-search-user-api.sh` + fixture `packages/app-lynx/src/api/__fixtures__/search-users.json`）：顶层键只有 `user_previews` / `next_url`；`PixivUser`（4 必填）/ `PixivIllust`（15）/ `PixivNovel`（11）在实测样例中**零必填字段缺失**，故不新造这三种类型。`user` 是**轻量对象无 `profile`**，术语与坑见 `docs/adr/glossary-search-pagination.md`「用户搜索范围」。
 - **第 4 条其余部分不变**：三档排序、三个既有端点、`mergeSearchResults` 混排；**用户端点必须不发 `search_target`**——2026-10-17 一手反向实测订正：该端点对它做**枚举校验**，传任何值一律 **HTTP 400**，而不相关的未知参数名（`foo=bar`）**200 且结果不变** ⇒ 它是校验已识别参数、忽略未识别参数，**不是「不消费」**（本轮原文写「不消费 `search_target` 与任何筛选参数」，其中 `search_target` 一半方向危险，已订正）；**其余筛选参数不发**的依据是实测未发 + 第三方实现同款，**尚未做反向实验**（见 `docs/specs/search-advanced-filters.md` §3.2 / `docs/specs/search-user-scope.md` §5.1）。~~`search_target` 派生规则原样保留~~ —— 该分句 2026-10-17 作废，见文末「修订（2026-10-17）」。
-- 配套：术语 `docs/adr/glossary-search-pagination.md` / `packages/app-lynx/CONTEXT.md` §搜索「用户搜索范围」。
+- 配套：术语 `docs/adr/glossary-search-pagination.md` / `packages/app-lynx/GLOSSARY.md` §搜索「用户搜索范围」。
 
 ## 修订（2026-10-17，issue #1025~#1028 → spec `docs/specs/search-target-mode.md`）
 

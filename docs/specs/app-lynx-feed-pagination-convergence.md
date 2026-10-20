@@ -1,6 +1,6 @@
 # app-lynx 分页收敛 + 受限卡等高 —— 功能规格
 
-> 来源：grill-with-docs 会话（用户逐项拍板）；决策记录：ADR-0104（分页收敛）/ ADR-0105（受限卡等高）；术语：`packages/app-lynx/CONTEXT.md`
+> 来源：grill-with-docs 会话（用户逐项拍板）；决策记录：ADR-0104（分页收敛）/ ADR-0105（受限卡等高）；术语：`packages/app-lynx/GLOSSARY.md`
 > 状态：ready-for-agent
 
 ## Problem Statement

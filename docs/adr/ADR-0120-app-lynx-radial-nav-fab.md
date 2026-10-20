@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-30
-- 关联：ADR-0111（M3 FAB menu，`RefreshableList` 分页/回顶 FAB + `createFabMenuState`）、ADR-0115（推荐轮播，Recommended 自带内联刷新 FAB）、`packages/app-lynx/CONTEXT.md`（「放射导航」「双层环」词条）、`packages/app-lynx/src/components/navTabs.ts`（`NAV_TABS` 唯一事实源）、`packages/app-lynx/src/primitives/createGlobalFab.ts`（深模块接口）、`packages/app-lynx/src/components/GlobalFab.vue`（薄渲染适配器）、`packages/app-lynx/src/components/NavigationBar.vue`（被替换）、`packages/app-lynx/src/components/RefreshableList.vue`（加 `:fab="false"`）
+- 关联：ADR-0111（M3 FAB menu，`RefreshableList` 分页/回顶 FAB + `createFabMenuState`）、ADR-0115（推荐轮播，Recommended 自带内联刷新 FAB）、`packages/app-lynx/GLOSSARY.md`（「放射导航」「双层环」词条）、`packages/app-lynx/src/components/navTabs.ts`（`NAV_TABS` 唯一事实源）、`packages/app-lynx/src/primitives/createGlobalFab.ts`（深模块接口）、`packages/app-lynx/src/components/GlobalFab.vue`（薄渲染适配器）、`packages/app-lynx/src/components/NavigationBar.vue`（被替换）、`packages/app-lynx/src/components/RefreshableList.vue`（加 `:fab="false"`）
 - 来源：需求「把全局导航(tabs)改为环形放射悬浮菜单」，原型（`packages/app-lynx/prototype/prototype-radial-nav.html`）三变体比选后定稿 **B 方案（双层环）**；经 `/codebase-design` 深模块接口多方案对比后定稿。
 - 术语：见 `docs/adr/glossary-app-lynx-radial-nav-fab.md`（本文档只记录决策与术语，不写代码）。深模块接口经原型/设计确认，签名在 `createGlobalFab.ts`（严格属实现，见配套实现）。
 

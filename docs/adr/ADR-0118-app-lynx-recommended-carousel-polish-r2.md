@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-08-28
-- 关联：ADR-0115（推荐轮播）、ADR-0117（CoverImage 深模块）、`packages/app-lynx/CONTEXT.md`（新增 4 词条：封面比例显示 / 轮播吸附阈值 / 沉浸骨架 / 标签胶囊行）、`docs/specs/app-lynx-recommended-carousel-polish-r2.md`
+- 关联：ADR-0115（推荐轮播）、ADR-0117（CoverImage 深模块）、`packages/app-lynx/GLOSSARY.md`（新增 4 词条：封面比例显示 / 轮播吸附阈值 / 沉浸骨架 / 标签胶囊行）、`docs/specs/app-lynx-recommended-carousel-polish-r2.md`
 - 来源：`/grill-with-docs` 收敛的四点打磨需求（用户确认），全部落在推荐轮播页，不改数据层（createMixFeed 语义不变）。
 
 ## 背景

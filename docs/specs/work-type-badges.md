@@ -4,7 +4,7 @@
 > App 侧（Fluent 2）实现为历史记录，现行契约只覆盖 app-lynx。
 
 - 关联 ADR：ADR-0113
-- 术语：`packages/app/CONTEXT.md`（已随 ADR-0203 删除）与 `packages/app-lynx/CONTEXT.md` 的「作品标识」节（动图 / 多图 / 类型角标 / 类型徽章行）
+- 术语：`packages/app/CONTEXT.md`（已随 ADR-0203 删除）与 `packages/app-lynx/GLOSSARY.md` 的「作品标识」节（动图 / 多图 / 类型角标 / 类型徽章行）
 - 来源：grill-with-docs 会话（2026-08-25，Q1–Q6 用户拍板）
 
 ## Problem Statement

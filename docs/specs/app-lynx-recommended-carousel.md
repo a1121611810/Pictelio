@@ -2,7 +2,7 @@
 
 - 状态：draft（Grill 已收敛，待用户确认后进实现）
 - 日期：2026-08-30
-- 关联：`docs/adr/ADR-0115-app-lynx-recommended-carousel.md`、`docs/specs/app-lynx-feed-pagination-buttons.md`（被取代的按钮分页）、ADR-0104（createMixFeed 收敛）、ADR-0108（FAB 旋转）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画）、`packages/app-lynx/CONTEXT.md`
+- 关联：`docs/adr/ADR-0115-app-lynx-recommended-carousel.md`、`docs/specs/app-lynx-feed-pagination-buttons.md`（被取代的按钮分页）、ADR-0104（createMixFeed 收敛）、ADR-0108（FAB 旋转）、ADR-0111（FAB menu）、ADR-0112（bookmark 动画）、`packages/app-lynx/GLOSSARY.md`
 
 ## 1. 背景与根因
 

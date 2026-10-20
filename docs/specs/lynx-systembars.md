@@ -123,7 +123,7 @@ flowchart LR
 
 ## 8. Glossary 同步
 
-`packages/app-lynx/CONTEXT.md` 增补：**基底边到边（edge-to-edge base）**= 窗口内容延伸至系统栏下的固定布局基底，Android 15+ 由系统强制；**全屏模式（fullscreen mode）**= 设置开关控制的隐藏系统栏沉浸态，运行时可逆；**可视内容区（visible content area）**= 窗口减当前可见系统栏 insets 的区域，`getViewportSize` 的返回语义（ADR-0131，本 spec D3 保持）。
+`packages/app-lynx/GLOSSARY.md` 增补：**基底边到边（edge-to-edge base）**= 窗口内容延伸至系统栏下的固定布局基底，Android 15+ 由系统强制；**全屏模式（fullscreen mode）**= 设置开关控制的隐藏系统栏沉浸态，运行时可逆；**可视内容区（visible content area）**= 窗口减当前可见系统栏 insets 的区域，`getViewportSize` 的返回语义（ADR-0131，本 spec D3 保持）。
 
 ## 9. ADR-0168 草案要点
 

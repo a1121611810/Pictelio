@@ -2,13 +2,13 @@
 
 > 状态：implemented（2026-10-20，T0 验证通过并落地；依据 [ADR-0223](../adr/ADR-0223-runtime-ui-tree-observation-channel.md)）
 > 前置决策：ADR-0223（上游 UI source map 的 React-only 边界 + 本仓选定形态）
-> 术语：见 `packages/android-host/CONTEXT.md`「运行时 UI 树观测通道」（本票是**宿主侧**改动，零 app-lynx 改动）；引擎能力事实见本 spec「Solution」
+> 术语：见 `packages/android-host/GLOSSARY.md`「运行时 UI 树观测通道」（本票是**宿主侧**改动，零 app-lynx 改动）；引擎能力事实见本 spec「Solution」
 
 ## Problem Statement
 
 本仓在模拟器/真机上**拿不到运行时 UI 节点树**，因此对「渲染出来到底是什么」这类问题只能做像素 diff。
 
-已记录的既有限制（本仓此前实测，见 `docs/specs/qa-defense-lines.md` 与 `packages/app-lynx/CONTEXT.md`）：
+已记录的既有限制（本仓此前实测，见 `docs/specs/qa-defense-lines.md` 与 `packages/app-lynx/GLOSSARY.md`）：
 
 - Lynx 4.0.1 **不暴露无障碍树节点**：全仓 `.vue` 源码 220 处 `accessibility-element` 标注也不出节点（口径：`grep -rn accessibility-element packages --include=*.vue | wc -l`）；
 - `uiautomator dump` 在 `pictelio_ui` 上必被 SIGKILL（exit 137），拿不到快照；

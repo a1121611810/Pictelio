@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-11
-- 关联：ADR-0139（Pinia setup store——本决策沿用 settingsStore 模式）、ADR-0103（`PrefsStorage` seam）、`docs/specs/app-lynx-theme-color.md`、`packages/app-lynx/CONTEXT.md`（新增词条：主题色）、`docs/research/pictelio-feature-gap-vs-third-party.md`
+- 关联：ADR-0139（Pinia setup store——本决策沿用 settingsStore 模式）、ADR-0103（`PrefsStorage` seam）、`docs/specs/app-lynx-theme-color.md`、`packages/app-lynx/GLOSSARY.md`（新增词条：主题色）、`docs/research/pictelio-feature-gap-vs-third-party.md`
 - 来源：目标「app-lynx，增加一个选择主题色的功能」
 
 ## 背景

@@ -2,7 +2,7 @@
 
 - 状态：ready-for-agent
 - 日期：2026-09-10
-- 关联：ADR-0150（本 spec 的决策记录）、ADR-0118（推荐轮播沉浸骨架——本 spec 把它推广为通例）、ADR-0104（feed 分页收敛 / 错误槽分流）、ADR-0082（首屏失败必须渲染错误而非空态）、`packages/app-lynx/CONTEXT.md`（新增词条：页级首载骨架 / 首载落定）
+- 关联：ADR-0150（本 spec 的决策记录）、ADR-0118（推荐轮播沉浸骨架——本 spec 把它推广为通例）、ADR-0104（feed 分页收敛 / 错误槽分流）、ADR-0082（首屏失败必须渲染错误而非空态）、`packages/app-lynx/GLOSSARY.md`（新增词条：页级首载骨架 / 首载落定）
 - 来源：`/grill-with-docs`（Q1–Q18 全部确认）
 - 发布：https://github.com/a1121611810/Pictelio/issues/431（`ready-for-agent`）
 - 前置：本轮只改 `packages/app-lynx`；不改数据层分页语义（`createMixFeed` 的分页/合并/防抖/错误槽不变），不改 webview（`packages/app`）。

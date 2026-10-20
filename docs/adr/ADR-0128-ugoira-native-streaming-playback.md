@@ -89,7 +89,7 @@ lynx 原生模式 ugoira 首次播放 = `ugoiraExtract` 全量路径：`download
 - 现有 `ugoiraExtract` 全量路径与缓存命中不动（其他调用方/兜底）。
 - 流式中途失败：error 可读（HTTP 码/zip 损坏/IO）；已写盘帧保留 → 下次缓存命中。
 - 播放器尾部等待逻辑与 ADR-0127 统一（app 侧 streaming prop 语义的 lynx 版）。
-- 术语：见 `packages/app-lynx/CONTEXT.md`「原生流式渐进」。
+- 术语：见 `packages/app-lynx/GLOSSARY.md`「原生流式渐进」。
 
 ## 待办（实现规范引用）
 

@@ -1,7 +1,7 @@
 // 类型徽章判定纯函数（ADR-0113 / spec: docs/specs/work-type-badges.md）。
 // 判定语义：
 // 独立判定、允许并存、动图在前。
-// 术语见 CONTEXT.md「作品标识」节。
+// 术语见 GLOSSARY.md「作品标识」节。
 
 /** 类型徽章项：ugoira = 动图；multi = 多图（携带页数） */
 export type IllustTypeBadgeItem = { kind: 'ugoira' } | { kind: 'multi'; pageCount: number }

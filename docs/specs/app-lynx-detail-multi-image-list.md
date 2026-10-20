@@ -2,7 +2,7 @@
 
 - 状态：implemented（Grill 收敛 → ADR-0129 → spec → tickets #287/#288/#289 → T1+T2 实现完成，2026-08-31；T3 回归建单跟进）
 - 日期：2026-08-31
-- 关联：`docs/adr/ADR-0129-app-lynx-detail-multi-image-list.md`、ADR-0117（CoverImage 深模块）、`packages/app-lynx/CONTEXT.md`（新增「多图详情」3 词条）
+- 关联：`docs/adr/ADR-0129-app-lynx-detail-multi-image-list.md`、ADR-0117（CoverImage 深模块）、`packages/app-lynx/GLOSSARY.md`（新增「多图详情」3 词条）
 - 前置：已有详情页（`pages/IllustDetail.vue`）多图按钮翻页现状（`currentPage`/`nextPage`/`prevPage`/`‹ 1/N ›` 行、`pages`/`currentImage` computed、`SkeletonImage` 单图渲染）；**不改数据层**（loadDetail / meta_pages 结构不变）、不动其它页面、不动轮播相关（`swiperMath.ts` / `CarouselSwiper` / `Recommended`）。
 
 ## 1. 背景与根因
@@ -120,6 +120,6 @@ loadDetail(id) → illust (PixivIllust)
 
 ## 8. Further Notes
 
-- 术语已在 `packages/app-lynx/CONTEXT.md` 落库：「多图详情列表」「详情翻页（废弃）」「逐页比例修正」；
+- 术语已在 `packages/app-lynx/GLOSSARY.md` 落库：「多图详情列表」「详情翻页（废弃）」「逐页比例修正」；
 - 决策记录见 ADR-0129（含被否决方案的否决理由）；
 - 实现顺序建议（tickets）：T1 CoverImage 深模块扩展（默认行为不变）→ T2 IllustDetail 列表化接线 → T3 全量回归 + 验证清单。

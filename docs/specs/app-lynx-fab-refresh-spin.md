@@ -1,6 +1,6 @@
 # app-lynx 刷新 FAB 旋转动画 —— 功能规格
 
-> 来源：grill-with-docs 会话（用户确认刷新按钮需动画）；决策记录：ADR-0108；术语：`packages/app-lynx/CONTEXT.md`（刷新旋转 / refresh spin）
+> 来源：grill-with-docs 会话（用户确认刷新按钮需动画）；决策记录：ADR-0108；术语：`packages/app-lynx/GLOSSARY.md`（刷新旋转 / refresh spin）
 > 状态：ready-for-agent
 
 ## Problem Statement

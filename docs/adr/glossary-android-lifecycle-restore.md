@@ -10,7 +10,7 @@
 > 状态：已定稿（app-lynx 缩小恢复修复 initiative 的共享词汇基准，配合 ADR-0102）。
 > 本文档**不改变任何代码**，只统一说话方式。
 > 覆盖范围：`packages/app`（webview 客户端）、`packages/app-lynx`（lynx 客户端）与 `packages/app/android`（Android 原生宿主，双 client 共用）之间的 Android 前后台 / task 恢复语义。
-> 已阅读基线：`CONTEXT-MAP.md`、`packages/app-lynx/CONTEXT.md`、`packages/app/CONTEXT.md`、`docs/adr/glossary-cross-engine.md`、ADR-0049/0051/0066/0102。
+> 已阅读基线：`GLOSSARY-MAP.md`、`packages/app-lynx/GLOSSARY.md`、`packages/app/CONTEXT.md`、`docs/adr/glossary-cross-engine.md`、ADR-0049/0051/0066/0102。
 
 ## 范围与目的
 

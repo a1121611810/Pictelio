@@ -55,7 +55,7 @@ Pictelio full 包支持 webview / lynx 双 client 切换（ADR-0062）。入口 
 | `packages/app/android/app/src/full/java/io/pictelio/app/MainActivity.java` | lynx 分支 `super.onCreate` 后、`startActivity` 前插入 `if (!isTaskRoot()) { finish(); return; }` + 机制注释（实证依据） |
 | `packages/app/tests/android-e2e/specs/background-resume.spec.ts` | **新增** Appium E2E：lynx 客户端导航到非推荐页 → `driver.background()`（模拟 Home）→ `driver.activateApp()`（模拟点图标）→ 断言仍在该页 / Activity 未被重建 |
 | `docs/adr/glossary-android-lifecycle-restore.md` | 新增统一术语文档（前后台 / task 恢复契约 / launcher 重投递 / 实例堆叠 / 会话重置等） |
-| `packages/app-lynx/CONTEXT.md` | 新增「前后台与任务恢复」术语节 |
+| `packages/app-lynx/GLOSSARY.md` | 新增「前后台与任务恢复」术语节 |
 
 注：webview 包 / lynx-only 包无此缺陷（宿主即 launcher，实例常驻），不改动。
 

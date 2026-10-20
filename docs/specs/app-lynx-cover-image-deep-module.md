@@ -2,7 +2,7 @@
 
 - 状态：draft（决策已定，ADR-0117 accepted；本阶段仅产出 spec，不写代码）
 - 日期：2026-08-28
-- 关联：`docs/adr/ADR-0117-app-lynx-cover-image-deep-module.md`（决策记录，本文档承载功能规格）、`docs/specs/app-lynx-recommended-carousel-image-fab-polish.md`（**前一轮「图片三态」spec**——当时的方案是各组件自写三态；本 spec 把它从「组件自写三态」重构为「深 `CoverImage` 承载」）、`packages/app-lynx/CONTEXT.md`（「图片三态」词条）、`packages/app-lynx/src/utils/coverImage.ts` + `coverImage.test.ts`、`packages/app-lynx/src/components/RecommendedCover.vue`、`packages/app-lynx/src/components/SkeletonImage.vue`、`packages/app-lynx/src/components/skeletonStyle.ts`
+- 关联：`docs/adr/ADR-0117-app-lynx-cover-image-deep-module.md`（决策记录，本文档承载功能规格）、`docs/specs/app-lynx-recommended-carousel-image-fab-polish.md`（**前一轮「图片三态」spec**——当时的方案是各组件自写三态；本 spec 把它从「组件自写三态」重构为「深 `CoverImage` 承载」）、`packages/app-lynx/GLOSSARY.md`（「图片三态」词条）、`packages/app-lynx/src/utils/coverImage.ts` + `coverImage.test.ts`、`packages/app-lynx/src/components/RecommendedCover.vue`、`packages/app-lynx/src/components/SkeletonImage.vue`、`packages/app-lynx/src/components/skeletonStyle.ts`
 - 前置：本 spec 是「图片三态」的**收敛 / 重构**——不改变三态语义、不迁移 `SkeletonImage` 现有调用点、不改图片数据层（`coverSrc` / 代理 URL / feed）。
 
 ## Problem Statement

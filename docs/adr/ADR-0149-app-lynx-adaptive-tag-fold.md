@@ -4,7 +4,7 @@
 - 日期：2026-09-10
 - 关联：ADR-0118（标签胶囊行首版，固定 3+N）、ADR-0133（标签点击 → 全局搜索，推翻「纯展示不可点」前提）、ADR-0107（SelectorQuery 漏 XElement 教训）、ADR-0123 / ADR-0147（list-item 内 absolute 与 hit-testing 平台约束）、packages/app/src/components/home/AdaptiveTags.tsx（webview 对照实现）
 - 来源：用户要求把 app-lynx 列表标签对齐 webview AdaptiveTags 效果；先做 throwaway spike 双端验证可行性，结论为「可行」，本 ADR 固化该决策。
-- 术语：见 packages/app-lynx/CONTEXT.md「标签胶囊行」「标签自适应折叠」（本文档只记录决策）。
+- 术语：见 packages/app-lynx/GLOSSARY.md「标签胶囊行」「标签自适应折叠」（本文档只记录决策）。
 
 ## 背景
 
@@ -35,7 +35,7 @@ throwaway spike（src/prototype/AdaptiveTagSpike.vue）在 **web-core**（__web_
 4. **降级显式可见**：createSelectorQuery 缺失 / 回调超时 / 重试若干帧后容器宽仍为 0 → 回落**固定上限**（3 个完整 chip，无省略号）+ console.warn；禁止静默降级。
 5. **交互语义**：chip 点击 → 全局搜索弹层（原始 tag.name，ADR-0133），@tap.stop 防冒泡；「+N」与截断 chip → 进作品详情（对齐 webview onOverflowClick）。
 6. **纯算法修正一处**：贪心条件用 used + gap + w + gap + plusWidth <= width（webview 版漏算「最后一个 chip 与 +N 之间的 gap」，会多放一个导致溢出）。
-7. **同步修订术语**：packages/app-lynx/CONTEXT.md 删除「纯展示不可点」与 _Avoid_ 省略号截断（理由随 ADR-0133 失效），新增「标签自适应折叠」词条。
+7. **同步修订术语**：packages/app-lynx/GLOSSARY.md 删除「纯展示不可点」与 _Avoid_ 省略号截断（理由随 ADR-0133 失效），新增「标签自适应折叠」词条。
 
 ## 被考虑的方案
 

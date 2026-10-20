@@ -4,11 +4,11 @@
 
 | 类别 | 数量 |
 | --- | --- |
-| 编号 ADR（ADR-NNNN） | 203 |
+| 编号 ADR（ADR-NNNN） | 204 |
 | 术语表（glossary-*.md） | 47 |
 | 遗留编号（0001-0021，无 ADR- 前缀） | 21 |
 | 其他（迁移计划 / spikes 等） | 2 |
-| **合计** | **273** |
+| **合计** | **274** |
 
 ## 编号 ADR（按编号排序）
 
@@ -215,6 +215,7 @@
 - [ADR-0221-row-action-leaves-trailing-band.md](ADR-0221-row-action-leaves-trailing-band.md) — ADR-0221：行内动作离开行尾——遮挡带是行尾的「固定占用者」
 - [ADR-0222-image-cache-redesign-decisions-and-glossary-baseline.md](ADR-0222-image-cache-redesign-decisions-and-glossary-baseline.md) — ADR-0222：图片缓存重设计——单一策略决策点与「两层缓存」词汇基线
 - [ADR-0223-runtime-ui-tree-observation-channel.md](ADR-0223-runtime-ui-tree-observation-channel.md) — ADR-0223：运行时 UI 树观测通道——上游 UI source map 的 React-only 边界与本仓选定形态
+- [ADR-0224-domain-doc-rename-to-glossary.md](ADR-0224-domain-doc-rename-to-glossary.md) — ADR-0224：领域文档约定对齐上游——`CONTEXT.md` / `CONTEXT-MAP.md` 改名为 `GLOSSARY.md` / `GLOSSARY-MAP.md`
 
 ## 术语表（glossary）
 
@@ -301,7 +302,7 @@
 | --- | --- |
 | ADR-0207 | 103 |
 | ADR-0205 | 64 |
-| ADR-0203 | 55 |
+| ADR-0203 | 61 |
 | ADR-0123 | 47 |
 | ADR-0171 | 47 |
 | ADR-0103 | 43 |

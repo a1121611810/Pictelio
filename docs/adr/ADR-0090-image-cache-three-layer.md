@@ -7,7 +7,7 @@
 > ⚠️ **本 ADR 标题中的「三层」是历史编号，不是现行层数**（2026-10-11 登记）。
 > 其层 B（WebView 浏览器缓存头）随 WebView 客户端整体删除，在 Lynx 下**已无载体**（ADR-0203）。
 > 现行层数为**两层缓存**（内存层 / 磁盘层），见 [ADR-0222](./ADR-0222-image-cache-redesign-decisions-and-glossary-baseline.md)
-> 与 `packages/android-host/CONTEXT.md`「图片代理」节。引用本 ADR 时须按该处重新对号入座。
+> 与 `packages/android-host/GLOSSARY.md`「图片代理」节。引用本 ADR 时须按该处重新对号入座。
 
 ## 日期
 
