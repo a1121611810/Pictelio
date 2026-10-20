@@ -5,9 +5,87 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 
 # Code Review（Pictelio 统一三审计版 · 翻转完备性 + 输入源接线 + Oracle check + 平台与宿主契约）
 
+<!-- upstream-section: intro -->
+<!-- upstream-override: OV-1 -->
+<!-- upstream-override: OV-12 -->
 对 `git diff <fixed-point>...HEAD`（three-dot，基于 merge-base）的双轴审查：**Standards**（是否符合仓库文档化的编码规范）与 **Spec**（是否忠实实现源起 issue/PRD/spec）。两条轴作为**并行 sub-agent** 运行，互不污染上下文，最后汇总。
 
-## 为什么存在这个版本
+## 与上游的关系
+
+本文件以 `mattpocock/skills` 的 `skills/engineering/code-review/SKILL.md` 为**骨架**（上游基线 commit 与逐条裁决见 `docs/agents/code-review-upstream.md`），其上叠加本仓专属的三审计、触发式维度卡点与仓库锚点。
+
+**上游改了不会自动跟过来，必须手工搬。** 骨架锚点（HTML 注释）标出本仓与上游一一对应的段落；凡与上游不同之处，用同形的 override 标记写明 ID，ID 指向 `docs/agents/code-review-upstream.md` 裁决表的一行——**那里是唯一事实源，本文件不抄**。
+
+> **OV-12 说明**：本条落在 frontmatter（上游的英文短描述不搬，本仓描述承载三审计的触发线索）。YAML 里放不了 HTML 标记，所以它的标记跟在上方 `OV-1` 旁边——frontmatter 的差异由裁决表登记，不由块内标记承载。
+>
+> ⚠️ **标记语法只准以真标记出现**：正文里不要内联引用标记字面量（代码 span 里也不行）——闸与测试都按「出现次数 == 解析出的标记数」核对，内联引用会被当成违规报错。
+
+<!-- upstream-section: ## Process -->
+<!-- upstream-override: OV-1 -->
+上游的五步是骨架，本仓在每一步上加本仓专属的纪律；本仓的额外机制集中在文末「本仓 overlay」一节。
+
+### 1. Pin the fixed point
+
+<!-- upstream-section: ### 1. Pin the fixed point -->
+<!-- upstream-override: OV-2 -->
+用户给定 commit/branch/tag/`main`/`HEAD~N`；确认 `git rev-parse` 可解析、diff 非空。记录 diff 命令与 commit 列表。bad ref 或空 diff 在此失败，不进入 sub-agent。
+
+**用户没给就问，不要自己猜** —— 猜错 = 审了错的 diff，而报告看着像是对的。
+
+### 2. Identify the spec source
+
+<!-- upstream-section: ### 2. Identify the spec source -->
+<!-- upstream-override: OV-3 -->
+<!-- upstream-override: OV-4 -->
+按序——commit message 的 issue 引用（`#123` 等）→ 用户传入路径 → `docs/specs/`、`docs/adr/` 下与分支/功能匹配的 spec 文件 → 询问用户。无 spec 则 Spec 轴跳过并注明 "no spec available"。
+
+- ① issue 引用：**经 AGENTS.md 的 `### Issue tracker` 块指向的 tracker doc** 取正文与验收条件；用哪个命令取由那份 doc 写明（本仓当前 = `docs/agents/issue-tracker.md` + `gh`）。该 doc 缺失 → 按那份 doc 的流程重建，**不要自己换命令**。
+- ② 用户传入的路径。
+- ③ `docs/specs/`、`docs/adr/` 下与分支/功能匹配的文档（**只认这两处**：根 `specs/` 不存在，`.scratch/` 是未跟踪的实验目录，不作 spec 来源）。
+<!-- upstream-override: OV-14 -->
+- ④ 都不命中 → **询问用户**，不得默认挑一份最像的 ADR；用户确认没有 spec 时，Spec 轴跳过并注明 "no spec available"。
+
+### 3. Identify the standards sources
+
+<!-- upstream-section: ### 3. Identify the standards sources -->
+<!-- upstream-override: OV-5 -->
+<!-- upstream-override: OV-13 -->
+发现式——派发前**实搜**仓内所有「写码规范」文档，产出清单并**随 brief 传给 sub-agent**（sub-agent 看不见你没给的文件）。本仓**必有**的几份：`AGENTS.md`（含测试硬约束 #1-6、Fluent 设计规范、即时导航硬约束）、`docs/testing/conventions.md`、`GLOSSARY-MAP.md` + `packages/*/GLOSSARY.md`、`docs/adr/`、README。
+
+**`CODING_STANDARDS.md` / `CONTRIBUTING.md` 存在时也必须在清单上**（上游硬规则）：从记忆列清单会漏掉唯一带规则的那份——本仓当前**两者都不存在**，将来引入必须立刻进清单。
+
+之上始终叠加 Fowler smell baseline——但**不粘在本步**：12 条实体化在本仓 overlay 的「Standards 轴」一节。
+
+### 4. Spawn both sub-agents in parallel
+
+<!-- upstream-section: ### 4. Spawn both sub-agents in parallel -->
+<!-- upstream-override: OV-6 -->
+<!-- upstream-override: OV-7 -->
+<!-- upstream-override: OV-8 -->
+**两个调用一起发出、都走前台、并消费它们返回的报告再汇总**。禁止后台派发后另等消息——前台调用返回的就是报告本身。
+
+- Standards 轴与 Spec 轴各一个 sub-agent（general-purpose），上下文互不污染。
+- Spec sub-agent 的 brief **必须**逐字包含下方「Spec 轴强制增量」全部指令原文（brief 注入），不得改写、缩写或"酌情执行"。
+- **两个 brief 都要带这句禁令**（上游已知未修的 bug，本仓同样裸奔）：`Do not invoke /code-review or spawn additional agents: perform this review directly.` —— 否则 sub-agent 会重新找到本 skill 再派一轮（上游记录有人跑到 50+ 个 agent）。
+- brief **不设字数上限**：本仓 brief 承载三审计原文 + 测试硬约束 + 声明—读点对照表，装不下上游那 400 字。
+
+### 5. Aggregate
+
+<!-- upstream-section: ### 5. Aggregate -->
+<!-- upstream-override: OV-9 -->
+两轴报告分列 `## Standards` / `## Spec`，**不合并不重排、不跨轴选 winner**。每条 finding 引用 spec 行号 / 标准条款 / 文件行号。结尾一行：每轴 finding 数 + 最严重项。
+
+**Spec 轴必含「声明—读点对照」行**（见共享强制机制）——「由 Y 驱动」的每条声明都要有读点证据或显式挂账，禁止静默。
+
+<!-- upstream-section: ## Why two axes -->
+<!-- upstream-override: OV-10 -->
+一个改动可以只过一轴：符合全部规范但实现错了东西 → Standards 过、Spec 挂；忠实实现 issue 但破坏仓库约定 → Spec 过、Standards 挂。分列报告防止一轴掩盖另一轴。
+
+<!-- upstream-section: ## 本仓 overlay（上游无此段） -->
+<!-- upstream-override: OV-11 -->
+上游没有本节。以下是本仓专属的三审计、维度卡点与锚点，只在本仓成立。
+
+### 为什么存在这个版本
 
 五个来源，缺一不可：
 
@@ -17,26 +95,18 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 4. **平台运行时与跨组件契约层对 diff 评审结构性失明**。Lynx 运行时语义 ≠ 浏览器语义（URL polyfill `.hostname` 为 undefined）、vue-lynx 原生 `<list>` 结构变更被 patch 静默丢弃（ADR-0162）、init-only props 在复用宿主下状态冻结——这类缺陷单测全绿、review 通过，只在真机状态转换（返回/翻页/切筛选/换卡）中暴露（2026-09-15/16 四缺陷实证，ADR-0163）。拦截只能靠审查纪律前置（见审计三）。
 5. **「承诺的数据源未接线」不进 diff**（silent misconfiguration）。spec/ADR 声明「行为 X 由数据源 Y 驱动」，而生产代码中不存在 Y 的**读取点**——写入/注册/持久化/备份全部存在，失败静默（无报错）。diff 只含已写下的代码，缺席的读点是 omission（SmartBear/Cisco 实证：最难发现的缺陷类型，"difficult to review something that isn't there"）；「机制存在（API 有 guard、函数可调用）验证通过」恰好绕过它。实证：lynx 夜间模式 T3/T5（ADR-0180 D7——`settings_dark_mode` 在 Java 侧零读点，两轮 review 才由文档对照抓到）；调研依据：`docs/research/review-data-flow-blindspot.md`（ConfigX/OOPSLA 2021 命名 + DO-178C 双向追溯 + 工具链形态）。
 
-## 流程
+### Spec 轴强制增量（阻塞项）：三审计 + 共享强制机制
 
-1. **Pin fixed point**：用户给定 commit/branch/tag/`main`/`HEAD~N`；确认 `git rev-parse` 可解析、diff 非空。记录 diff 命令与 commit 列表。bad ref 或空 diff 在此失败，不进入 sub-agent。
-2. **Identify spec source**：按序——commit message 的 issue 引用（`#123` 等，经 `docs/agents/issue-tracker.md` 流程获取）→ 用户传入路径 → `docs/`、`specs/`、`.scratch/` 下与分支/功能匹配的 spec 文件 → 询问用户。无 spec 则 Spec 轴跳过并注明 "no spec available"。
-3. **Identify standards sources**：发现式——`AGENTS.md`（含测试硬约束 #1-6、Fluent 设计规范、即时导航硬约束）、`packages/app/tests/TESTING.md`、`GLOSSARY-MAP.md` + `packages/*/GLOSSARY.md`、`CONTRIBUTING.md`、`docs/adr/`、`docs/development/`、README，存在即用。之上始终叠加下方 Fowler smell baseline。
-4. **并行 spawn 两个 sub-agent**（general-purpose）：Standards 轴与 Spec 轴，上下文互不污染。Spec sub-agent 的 brief **必须**逐字包含下方「Spec 轴强制增量」全部指令原文（brief 注入），不得改写、缩写或"酌情执行"。
-5. **汇总**：两轴报告分列 `## Standards` / `## Spec`，不合并不重排。结尾一行总结每轴 finding 数与最严重项；不跨轴选 winner。
-
-## Spec 轴强制增量（阻塞项）：三审计 + 共享强制机制
-
-### 共享强制机制（三审计都必须执行）
+#### 共享强制机制（三审计都必须执行）
 
 - **必须+禁止配对**：指令以「必须…/禁止…」成对书写，不留灰色地带。
 - **brief 注入**：Spec sub-agent 的 brief **必须**逐字包含审计一、审计二、审计三全部指令原文——强制指令穿透到 sub-agent。
 - **证据要求 + 声称成功无效**：声称完成了枚举/溯源但拿不出证据（grep 命令、索引工具查询结果、未截断计数）＝无效，视为未执行。**不信任 agent 的自述**。
 - **characterization 识别**：期望值只是"当前行为"锁定（快照、从实现输出抄写）而无规格依据的测试，是 characterization（防回归）而非 specification（防错误）——不能作为"实现正确"的证据，必须标出。
 - **心智判据**：每个审计配一个可证伪检验（见下），用反事实回答"这样审会不会漏"。
-- **声明—实现对照（statement wiring check）**：Spec 轴报告**必须**为每条「由 Y 驱动」的声明输出一行对照：`声明（引用 spec/ADR 行号）| Y 的读点证据（file:line 或未截断检索清单）| 判定（已接线 / 未接线-阻塞 / 显式挂账+issue 号）`。**禁止静默**：无法给出读点且无法立即修复时，唯一合法退路是**显式挂账**——订正文档到交付现状 + 建 follow-up issue（报告中引用 issue 号），不得以「后续处理」字样带过（本仓先例：ADR-0180 D7 → issue #692）。第二心智判据：「这行对照，我能给第二个人复现吗？」不能复现 ≠ 证据。
+- **声明—实现对照（statement wiring check）**：Spec 轴报告**必须**为每条「由 Y 驱动」的声明输出一行对照：`声明（引用 spec/ADR 行号）| Y 的读点证据（file:line 或未截断检索清单）| 判定（已接线 / 未接线-阻塞 / 显式挂账+issue 号）`。**禁止静默**：无法给出读点且无法立即修复时，唯一合法退路是**显式挂账**（订正文档到交付现状 + 建 follow-up issue，报告中引用 issue 号），不得以「后续处理」字样带过（本仓先例：ADR-0180 D7 → issue #692）。第二心智判据：「这行对照，我能给第二个人复现吗？」不能复现 ≠ 证据。
 
-### 审计一 · 调用点完备性（blast radius）
+#### 审计一 · 调用点完备性（blast radius）
 
 **触发信号**（命中任一即触发审计）：
 
@@ -77,7 +147,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
   **「设置键 → 行为」读点防线模板**（调研 §4 R3）：模板 A 键完整性（已有：`settingsStore.test.ts` 的 `*_KEY ⊆ BACKUP_DEVICE_KEYS` 双守卫，覆盖**写入侧**）；模板 B **读点存在性**（source-scan 断言每条键在生产源码中有读取引用；抽取器**必须断言集合非空且数量下界**——ArchUnit `failOnEmptyShould` 教训：正则失效会让全称断言静默恒真）；模板 C **跨语言键契约**（原生读取键名/序列化/读取时机与 JS 写入侧成对契约测试）。注意边界：守卫证明「有读取语法」，不证明「值流入承诺行为」——后者仍需人工值流过一遍。
 - **心智判据**：把 diff 当作「唯一被改的文件集」是否成立？成立 = 完备；不成立 = 找出缺失文件。再反问一次：**值流呢？** 结构图（调用/导入边）证明不了"什么值流进了什么参数"——三元分支/变量间接传参必须人工过一遍，不能只信图。
 
-### 审计二 · 期望值溯源（Oracle check）
+#### 审计二 · 期望值溯源（Oracle check）
 
 **触发信号**：diff 含新增或修改的测试。
 
@@ -97,7 +167,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 - **心智判据**：把实现改成"显然错误但符合该测试断言"的版本，测试会红吗？不会 = conformance 嫌疑。
 - **Test strength**：每个测试必须能说清它防的 **intended regression**（目标回归）；断言必须验证**可观察行为**（事件流、存储、日志、输出），**禁止** restate implementation；说不出的 = 嫌疑。
 
-### 审计三 · 平台与宿主契约（Lynx 双引擎防线）
+#### 审计三 · 平台与宿主契约（Lynx 双引擎防线）
 
 **触发信号**（命中任一即触发审计）：
 
@@ -115,7 +185,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 - **禁止**以「单测全绿」作为平台语义或宿主契约无缺陷的证据——缺陷只在真 Lynx 运行时、复用宿主、状态转换中出现。
 - **心智判据**：这段代码依赖的平台行为，有一份真机/模拟器取证记录吗？该组件被第二种宿主形态复用时，生命周期契约写下了吗（测试或注释）？任一答「没有」= 审计不完备。
 
-## 触发式维度卡点（命中才强制；tooling 已强制的不报）
+### 触发式维度卡点（命中才强制；tooling 已强制的不报）
 
 | 维度 | 触发信号 | 必查项 |
 |---|---|---|
@@ -131,7 +201,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 | UI/用户可见变更 | 用户可见行为变化 | 只读代码看不出体验：要求验证（demo/截图）或仔细推理；对照 E2E 锚点机制 |
 | 数据迁移 | schema/数据变更、backfill、枚举转换 | 迁移当运维审：只跑一次、对生产数据、不可回滚——查幂等与回滚路径 |
 
-## Standards 轴
+### Standards 轴
 
 文档化标准（第 3 步发现的来源）+ Fowler smell baseline（_Refactoring_, ch.3）。两条绑定规则：**仓库文档化标准优先**（其认可的做法压制 baseline 的标记）；**baseline smell 永远是 judgement call**，标注「possible X」，非硬违规；**跳过 tooling 已强制项**（linter/formatter/类型检查管的不重复报）。
 
@@ -150,25 +220,18 @@ Smell baseline（每个读「是什么 → 怎么修」）：
 - **Middle Man** — 类/函数大半只是转发 → 砍掉，直接调真目标
 - **Refused Bequest** — 子类忽略/重写大部分继承 → 弃继承用组合
 
-## 汇总
-
-两轴报告分列（verbatim 或轻清理），不合并、不重排、不跨轴选 winner。每条 finding 引用 spec 行号 / 标准条款 / 文件行号。结尾一行：每轴 finding 数与最严重项。**Spec 轴必含「声明—读点对照」行**（见共享强制机制）——「由 Y 驱动」的每条声明都要有读点证据或显式挂账，禁止静默。
-
-## 仓库锚点（overlay 层）
+### 仓库锚点（overlay 层）
 
 - **审计一防线判定锚**：`docs/adr/ADR-0097-agent-skill-repo-localization.md`（治理记录：无机器防线 = 审计不完备）
 - **审计一（输入源接线）锚**：`docs/research/review-data-flow-blindspot.md`（silent misconfiguration 一手文献、工具链形态、R1-R6 建议原文）
 - **审计二锚点**：AGENTS.md 测试硬约束 #1-6（完整清单）+ `docs/research/ai-generated-test-quality.md`（Oracle check / Test strength 原始出处）
 - **审计三锚点**：`docs/adr/ADR-0162-lynx-related-inline-section.md`（lynx 瀑布流 list 结构变更三态 + spike 方法）+ `docs/adr/ADR-0163-qa-defense-lines.md`（QA 防线三网：转换矩阵 / 宿主矩阵 / 平台一致性自检；平台事实 = 探针记录 + 源级守卫；init-only props 宿主契约）+ spec `docs/specs/qa-defense-lines.md`
 - **机器证据工具**：CodeGraph（`.codegraph/` 已建图，`codegraph explore` 提供调用路径与 blast radius 机器证据；健康检查 `codegraph status`）；不可用时退化为全仓 grep + 显式声明证据命令
+- **上游基线**：本 skill 的上游 fork 点、逐条裁决表、刻意偏离上游之处、重同步命令 = `docs/agents/code-review-upstream.md`（唯一事实源）
 
-## 本仓库测试硬约束对照（核心 4 条，完整清单见 AGENTS.md「测试硬约束」#1-#6；审查测试时逐条过）
+### 本仓库测试硬约束对照（核心 4 条，完整清单见 AGENTS.md「测试硬约束」#1-#6；审查测试时逐条过）
 
 1. IO 边界成功/失败双路径都有单测？（硬约束 #1）
 2. 契约 mock 来自真实样例？（硬约束 #2，backupRulesConsistency.test.ts 模式）
 3. 降级路径有 warn 或显式错误状态？（硬约束 #3）
 4. 期望值能指向独立来源？（本 skill Oracle check）
-
-## 为什么双轴
-
-一个改动可以只过一轴：符合全部规范但实现错了东西 → Standards 过、Spec 挂；忠实实现 issue 但破坏仓库约定 → Spec 过、Standards 挂。分列报告防止一轴掩盖另一轴。

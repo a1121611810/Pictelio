@@ -48,8 +48,8 @@
 | --- | --- | --- |
 | **触达探测**（delivery probe） | 「送达通道」的**单点信号实验**，不是功能名。别名「通知功能/推送功能」须避免 | `docs/adr/glossary-notification-center.md:36` |
 | **送达通道**（delivery channel） | 通知 + 角标 + 已读记忆**三层**总称 | `glossary-notification-center.md:35` |
-| **read-point evidence** | 声明「X 由 Y 驱动」必须有 Y 的**生产读点**；无读点标 `possible silent misconfiguration` | `.agents/skills/code-review/SKILL.md:60-66` |
-| **characterization ≠ specification** | 期望值只是当前行为锁定，**不能**作「实现正确」的证据 | `code-review/SKILL.md:35` |
+| **read-point evidence** | 声明「X 由 Y 驱动」必须有 Y 的**生产读点**；无读点标 `possible silent misconfiguration` | `.agents/skills/code-review/SKILL.md:139-145` |
+| **characterization ≠ specification** | 期望值只是当前行为锁定，**不能**作「实现正确」的证据 | `code-review/SKILL.md:105` |
 | **conformance problem / oracle problem** | 精确判别定义 | `docs/research/ai-generated-test-quality.md:28-52` |
 | **防空转断言** | 抽取器/剥除器必须有「结果非空 / 长度下界」，否则全称断言**静默恒真** | `docs/adr/glossary-top-inset-and-verification.md:40` |
 | **别名标注格式** | 表头写「别名（避免使用）」 | `docs/adr/glossary-app-lynx-rate-limit-backoff.md:8` |

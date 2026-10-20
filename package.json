@@ -42,6 +42,7 @@
     "test:all": "pnpm vp run --parallel --concurrency-limit ${RUN_CONCURRENCY:-2} --filter pictelio-app-lynx --filter @pictelio/ugoira --filter @pictelio/update-check --filter @pictelio/novel-export --filter @pictelio/net-diagnostics --filter @pictelio/search-core --filter @pictelio/ranking-core --filter @pictelio/android-host test",
     "lint": "pnpm vp lint",
     "lint:all": "pnpm vp lint",
+    "check:code-review-upstream": "node scripts/check-code-review-upstream.mjs",
     "fmt": "pnpm vp fmt --write",
     "fmt:all": "pnpm vp fmt --write",
     "fmt:check": "pnpm vp fmt --check",

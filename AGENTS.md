@@ -304,6 +304,10 @@ Issues 托管在 GitHub（`a1121611810/Pictelio`），通过 `gh` CLI 操作。�
 
 多上下文布局 —— 根目录 `GLOSSARY-MAP.md` 指向各上下文的 `GLOSSARY.md`。详见 `docs/agents/domain.md`。
 
+### Code review skill
+
+本仓 `.agents/skills/code-review/SKILL.md` 是上游 `mattpocock/skills` 的 fork，**不自动跟随上游**——上游基线、逐条裁决（adopt / adapt / not-ported / local-only）与重同步命令见 `docs/agents/code-review-upstream.md`；机械闸 `pnpm run check:code-review-upstream`（联网，发布前手动位）。
+
 <!-- ai-memory:start -->
 **ai-memory（跨会话记忆）**：本仓跨会话记忆的权威说明在
 [`docs/agents/ai-memory.md`](docs/agents/ai-memory.md)——**要检索项目历史、先前决策、收尾交接，
