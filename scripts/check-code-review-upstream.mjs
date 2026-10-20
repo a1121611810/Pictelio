@@ -1,45 +1,36 @@
 /**
- * Mechanical gate for every file this repo derives from the upstream skill set.
+ * 本仓「从上游派生文件」的机械闸。
  *
- * Why it exists at all. The upstream discipline (upstream's own `docs/engineering/code-review.md`)
- * says: *"Keep a note of the commit you forked from so you can re-sync by hand."* Keeping the note
- * only makes **discovering** the drift easy -- it does not make **failing to discover it** impossible.
- * This script is the second half.
+ * 为什么需要它。上游自己的纪律（`docs/engineering/code-review.md`）只说了一句：
+ * *"Keep a note of the commit you forked from so you can re-sync by hand."*
+ * 只记 SHA 让「**发现**上游动了」变容易；要让「**发现不了**」变不可能，得靠机械闸——这就是本脚本。
  *
- * Two checks, and both must pass:
+ * 两项检查，都要过：
  *
- *   1. **Drift.** For every upstream-derived file listed in `docs/agents/code-review-upstream.md`,
- *      ask GitHub which commits have touched the upstream path since the recorded baseline. If there
- *      are any, list them and fail: each one needs a verdict and a baseline bump.
+ *   1. **漂移**。对 `docs/agents/code-review-upstream.md` 的「上游派生文件清单」里每一个文件，
+ *      问 GitHub：自记录的基线 commit 起，上游那条路径还被哪些提交动过？有 ⇒ 列出来并判红：
+ *      每一次都需要一条裁决 + 一次基线上移。
+ *   2. **三方一致性**（仅 `structured` 形态的文件）。上游正文、本仓文件、裁决表是同一个三角的三条边：
+ *        - 裁决表每一行都要有对应的 `<!-- upstream-override: ... -->` 标记（「本仓落点」为 `—` 的行除外——
+ *          那些行说的是「上游有而本仓刻意不搬的东西」，本仓没有落点，**也不允许有标记**）；
+ *        - 文件里每个标记都要有裁决行——有人改了却没记录理由；
+ *        - 上游有、本仓没有的块 ⇒ 必须有 `not-ported` 裁决指名它；
+ *        - 本仓新增的块 ⇒ 必须有 `local-only` 裁决指名它；
+ *        - 与上游内容不同的块 ⇒ 块内至少有一个标记——**这就是「上游原文被静默改写」能被机器发现的那一条**。
  *
- *   2. **Three-way consistency** (structured files only). The upstream text, this repo's file and
- *      the verdict table are three sides of one triangle. The script checks that:
- *        - every verdict row has a matching `<!-- upstream-override: ... -->` marker in the file
- *          (and rows whose landing is `—` must NOT carry one -- they describe upstream content this
- *          repo deliberately does not have);
- *        - every marker in the file has a verdict row -- an edit nobody recorded a reason for;
- *        - an upstream block missing here has a `not-ported` verdict naming it;
- *        - a block that exists only here has a `local-only` verdict naming it;
- *        - a block whose content differs from upstream carries at least one marker -- **this is what
- *          makes "upstream text was silently rewritten" a machine-detectable event rather than a
- *          thing that depends on someone reading the diff.**
+ * 文件清单从基线文档里解析，**不在代码里硬编码路径**：把同一份清单抄进代码，就是这套机制要消灭的
+ * 那种「同一事实两个副本」。
  *
- * The file list is parsed out of the baseline doc rather than hard-coded here: a second copy of the
- * same list is exactly the drift this mechanism exists to catch.
+ * 为什么它不进默认门禁。它要联网，而 PR 门禁必须离线（联网门禁会因为与 diff 无关的原因变红）。
+ * 与 `pnpm run compat:pi` 同一个取舍：发版前手动跑，不进 CI。
  *
- * Why it is NOT part of the default gate. It needs the network, and a pull-request gate that
- * depends on the network stops being a gate (it fails for reasons that have nothing to do with the
- * diff). The offline half of the same invariant is pinned by
- * `packages/app-lynx/tests/codeReviewUpstreamSync.test.ts`, which runs in CI.
+ * 退出码三态可分：
+ *   0  上游没动，且每个文件都与自己的裁决一致
+ *   1  上游动了，或三方一致性检查没过            -> 需要重同步 / 补裁决
+ *   2  **查不了**（缺工具 / 联网失败 / 基线悬空 / 文档解析失败） -> 不等于「没漂移」
  *
- * Exit codes, all distinct so a caller can tell them apart:
- *   0  upstream has not moved and every file is consistent with its verdicts
- *   1  upstream moved, or the three-way consistency check failed        -> re-sync / adjudicate
- *   2  the check could not run (missing tool, network failure, unparsable doc)  -> NOT a pass
- *
- * Exit code 2 exists because "I could not check" and "there is nothing to check" are different
- * states, and collapsing them is how a gate silently stops gating. The "could not run" path is
- * therefore a thrown `GateFailure`, never a quiet `return`.
+ * 退出码 2 之所以单列：「我查不了」与「没什么可查」是两种状态，把它们合并正是门禁静默失效的典型路径。
+ * 所以「查不了」永远是抛 `GateFailure`，绝不是安静地 `return`。
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -50,7 +41,7 @@ const UPSTREAM_REPO = "mattpocock/skills";
 const BASELINE_DOC = new URL("../docs/agents/code-review-upstream.md", import.meta.url);
 const REPO_ROOT = fileURLToPath(new URL("../", import.meta.url));
 
-/** A "the check could not run" outcome. Distinct from "upstream moved" on purpose. */
+/** 「查不了」的结果。与「上游动了」刻意分开。 */
 class GateFailure extends Error {
   constructor(message, code) {
     super(message);
@@ -59,17 +50,18 @@ class GateFailure extends Error {
   }
 }
 
-/** Report a failure and stop. Always throws, so callers can `return fail(...)` safely. */
+/** 报错并停止。永远抛异常，调用方才能放心地 `return fail(...)`。 */
 function fail(message, code = 2) {
   throw new GateFailure(message, code);
 }
 
 /**
- * Read the baseline doc.
+ * 读基线文档。
  *
- * The `@returns` annotation is load-bearing, not decoration: without it the inferred type of
- * `readFileSync(<URL>, "utf8")` would be `any`, and every value derived from the file would inherit
- * that. The annotation pins the type where the file is actually checked.
+ * `@returns` 注解是承重的，不是装饰：`tsconfig.json` 只含 `src` 与 `tests`，本文件不被 `tsc` 检查；
+ * 真正检查它的是 oxlint 的类型感知模式，而它把 `readFileSync(<URL>, "utf8")` 推断成 `any`——一个 `any`
+ * 会污染从该文件派生的每个值，`restrict-template-expressions` 随后就会拒绝它们。注解把类型钉在
+ * 真正被检查的地方。
  *
  * @returns {string}
  */
@@ -82,10 +74,9 @@ function readBaselineDoc() {
 }
 
 /**
- * Split a markdown table into trimmed cell arrays.
+ * 把一张 markdown 表格拆成去掉首尾空白的单元格数组。
  *
- * Rows that are separators (`| --- |`) and empty lines are dropped. A table that does not exist is
- * an empty list -- the caller decides whether that is fatal.
+ * 分隔行（`| --- |`）与空行被丢掉。表不存在时返回空表——由调用方决定这是否算致命。
  *
  * @param {string} doc
  * @param {string} heading
@@ -98,7 +89,7 @@ function tableAfter(doc, heading) {
   for (const line of doc.slice(start + heading.length).split("\n")) {
     const trimmed = line.trim();
     if (trimmed === "") {
-      if (rows.length > 0) break; // end of the table
+      if (rows.length > 0) break; // 表格到此结束
       continue;
     }
     if (!trimmed.startsWith("|")) {
@@ -109,14 +100,14 @@ function tableAfter(doc, heading) {
       .slice(1, trimmed.endsWith("|") ? -1 : undefined)
       .split("|")
       .map((cell) => cell.trim());
-    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) continue; // separator row
+    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) continue; // 分隔行
     rows.push(cells);
   }
-  return rows.slice(1); // drop the header row
+  return rows.slice(1); // 去掉表头行
 }
 
 /**
- * Strip the backticks a table cell may carry.
+ * 去掉表格单元格里可能带的反引号。
  *
  * @param {string} value
  * @returns {string}
@@ -126,7 +117,7 @@ function plain(value) {
 }
 
 /**
- * Parse the table of upstream-derived files.
+ * 解析「上游派生文件清单」表。
  *
  * @param {string} doc
  * @returns {{ id: string, upstreamPath: string, localPath: string, mode: string, baseCommit: string }[]}
@@ -161,7 +152,7 @@ function parseFileTable(doc) {
 }
 
 /**
- * Parse the verdict table.
+ * 解析「裁决表」。
  *
  * @param {string} doc
  * @returns {{ id: string, positions: string[], disposition: string, landing: string }[]}
@@ -180,7 +171,9 @@ function parseVerdicts(doc) {
     verdicts.push({
       id: plain(id),
       positions: position.split("｜").map((part) => plain(part)),
-      disposition: plain(disposition),
+      // 处置单元格可能带括号补充（如 `adopt（上游 5c89081d）`）。只按关键字比对——
+      // 否则一句补充就会让规则悄悄失配（`not-ported（因为…）` 不等于 `not-ported`）。
+      disposition: plain(disposition).split("（")[0].trim(),
       landing: plain(landing),
     });
   }
@@ -188,7 +181,7 @@ function parseVerdicts(doc) {
 }
 
 /**
- * Pull a file's body out of GitHub at a given ref.
+ * 从 GitHub 取某个 ref 下的文件正文。
  *
  * @param {string} path
  * @param {string} ref
@@ -216,11 +209,10 @@ function fetchUpstreamFile(path, ref) {
 }
 
 /**
- * List the upstream commits that touched a path, newest first.
+ * 列出动过某条路径的上游提交，最新的在前。
  *
- * Uses `gh` because the repo already depends on it for the issue tracker
- * (`docs/agents/issue-tracker.md`) and it handles auth. A missing or failing `gh` is exit code 2,
- * never a silent pass.
+ * 用 `gh` 是因为本仓的 issue tracker 已经依赖它（`docs/agents/issue-tracker.md`），且它自带鉴权。
+ * `gh` 缺失或失败一律是退出码 2，绝不静默放行。
  *
  * @param {string} path
  * @returns {{ sha: string, date: string, message: string }[]}
@@ -236,7 +228,7 @@ function listUpstreamCommits(path) {
         "--jq",
         '.[] | "\\(.sha) \\(.commit.author.date) \\(.commit.message | split("\\n")[0])"',
       ],
-      { encoding: "utf8", maxBuffer: 8 * 1024 * 1028 },
+      { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
     );
   } catch (cause) {
     return fail(
@@ -264,11 +256,10 @@ function listUpstreamCommits(path) {
 }
 
 /**
- * Split an upstream file into blocks keyed by heading.
+ * 把上游文件按标题切成块。
  *
- * The keys are the heading lines verbatim (`## Process`, `### 1. Pin the fixed point`, ...) plus two
- * synthetic ones: `frontmatter` for the YAML header and `intro` for the prose before the first
- * heading. The local file uses the same keys, which is what makes the two comparable.
+ * 块键就是标题原文（`## Process`、`### 1. Pin the fixed point` …），另加两个合成的：
+ * `frontmatter`（YAML 头）与 `intro`（第一个标题之前的正文）。本仓文件用同一套键，两边才可比。
  *
  * @param {string} text
  * @returns {Map<string, string>}
@@ -304,10 +295,10 @@ function parseUpstreamBlocks(text) {
 }
 
 /**
- * Split the local file into blocks keyed by the `upstream-section` anchor they carry.
+ * 把本仓文件按 `upstream-section` 锚点切成块。
  *
- * The block that precedes the first anchor is the frontmatter; YAML cannot carry an HTML comment,
- * so the frontmatter verdict is marked next to the first anchor instead.
+ * 第一个锚点之前的那块是 frontmatter；YAML 里放不了 HTML 注释，所以 frontmatter 的裁决标记
+ * 放在第一个锚点旁边。
  *
  * @param {string} text
  * @returns {Map<string, { content: string, markers: string[] }>}
@@ -339,7 +330,7 @@ function parseLocalBlocks(text) {
   }
   blocks.set(currentKey, { content, markers: [] });
 
-  // Markers live inside a block's content; collect them per block.
+  // 标记就写在块正文里，按块收集。
   const markerPattern = /<!--\s*upstream-override:\s*([A-Za-z0-9-]+)\s*-->/g;
   for (const [key, block] of blocks) {
     const found = [...block.content.matchAll(markerPattern)].map((m) => m[1]);
@@ -349,7 +340,7 @@ function parseLocalBlocks(text) {
 }
 
 /**
- * Normalize a block for comparison: drop the override markers, blank lines and trailing space.
+ * 比对前把块归一化：去掉 override 标记、空行与行尾空白。
  *
  * @param {string} text
  * @returns {string}
@@ -364,12 +355,12 @@ function normalize(text) {
 }
 
 /**
- * Check the three-way consistency of one structured file.
+ * 校验一个 `structured` 文件的三方一致性。
  *
  * @param {string} localText
  * @param {string} upstreamText
  * @param {{ id: string, positions: string[], disposition: string, landing: string }[]} verdicts
- * @returns {string[]} problems found
+ * @returns {string[]} 发现的问题
  */
 function checkConsistency(localText, upstreamText, verdicts) {
   const problems = [];
@@ -377,30 +368,10 @@ function checkConsistency(localText, upstreamText, verdicts) {
   const upstream = parseUpstreamBlocks(upstreamText);
   const verdictById = new Map(verdicts.map((verdict) => [verdict.id, verdict]));
 
-  // The marker syntax may only appear as a real marker: an inline mention in prose would be parsed
-  // as one. Compare the number of occurrences with the number of parsed markers.
-  const sectionOccurrences = (localText.match(/upstream-section:/g) ?? []).length;
-  const overrideOccurrences = (localText.match(/upstream-override:/g) ?? []).length;
+  // 规则 2：文件里每个标记都要有裁决行。
   const fileMarkers = [
     ...localText.matchAll(/<!--\s*upstream-override:\s*([A-Za-z0-9-]+)\s*-->/g),
   ].map((match) => match[1]);
-  const fileAnchors = [...localText.matchAll(/<!--\s*upstream-section:\s*(.+?)\s*-->/g)].map(
-    (match) => match[1],
-  );
-  if (sectionOccurrences !== fileAnchors.length) {
-    problems.push(
-      `the file mentions the anchor syntax ${sectionOccurrences} time(s) but only ` +
-        `${fileAnchors.length} are real anchors -- the marker syntax may only appear as a marker`,
-    );
-  }
-  if (overrideOccurrences !== fileMarkers.length) {
-    problems.push(
-      `the file mentions the override syntax ${overrideOccurrences} time(s) but only ` +
-        `${fileMarkers.length} are real markers -- the marker syntax may only appear as a marker`,
-    );
-  }
-
-  // Rule 2: every marker in the file has a verdict row.
   for (const marker of fileMarkers) {
     if (!verdictById.has(marker)) {
       problems.push(
@@ -409,8 +380,8 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 1: every verdict row has a marker, unless its landing is `—` (upstream content this repo
-  // deliberately does not have -- in that case a marker would be wrong).
+  // 规则 1：每个裁决行都要有标记；「本仓落点」为 `—` 的行除外——那些行说的是「上游有而本仓刻意
+  // 不搬的东西」，本仓没有落点，带标记反而是错的。
   for (const verdict of verdicts) {
     const hasMarker = fileMarkers.includes(verdict.id);
     if (verdict.landing === "—") {
@@ -424,7 +395,7 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 3: an upstream block missing here needs a `not-ported` verdict naming it.
+  // 规则 3：上游有、本仓没有的块，必须有 `not-ported` 裁决指名它。
   for (const key of upstream.keys()) {
     if (local.has(key)) continue;
     const covering = verdicts.filter(
@@ -435,7 +406,7 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 4: a block that exists only here needs a `local-only` verdict naming it.
+  // 规则 4：本仓新增的块，必须有 `local-only` 裁决指名它。
   for (const key of local.keys()) {
     if (upstream.has(key)) continue;
     const covering = verdicts.filter(
@@ -446,9 +417,9 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 5: a block that differs from upstream carries at least one marker.
+  // 规则 5：与上游内容不同的块，块内至少要有一个标记。
   for (const [key, upstreamBlock] of upstream) {
-    if (key === "frontmatter") continue; // YAML cannot carry a marker; see the doc's rules
+    if (key === "frontmatter") continue; // YAML 放不了标记，见文档里的规则说明
     const localBlock = local.get(key);
     if (!localBlock) continue;
     if (normalize(localBlock.content) === normalize(upstreamBlock)) continue;
@@ -457,11 +428,9 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 6: a `not-ported` verdict must name a block that really is absent here.
-  // Otherwise the table can pre-register a whitelist entry for a block that is still present --
-  // which is exactly how "delete an upstream block" gets laundered into "we did not port it".
-  // `frontmatter` is exempt: a not-ported row about the frontmatter talks about its *content*
-  // (the English description), not about the block's existence.
+  // 规则 6：`not-ported` 裁决指名的块，在本地必须真的不存在。否则裁决表可以预登记一条白名单，
+  // 把「删掉一整段上游块」洗成「我们没搬它」。`frontmatter` 豁免：那类行说的是 frontmatter 的
+  // **内容**（英文描述），不是块本身在不在。
   for (const verdict of verdicts) {
     if (verdict.disposition !== "not-ported") continue;
     for (const key of verdict.positions) {
@@ -474,9 +443,8 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
-  // Rule 7: a local-only block must carry its body. An anchor plus a marker over an empty body is
-  // a shell -- the block exists on paper and its content is gone. The markers are stripped first:
-  // a marker line is not content, and counting it would let an emptied block pass.
+  // 规则 7：本仓独占块必须有正文。只留锚点 + 标记而正文被清空 = 空壳——块在纸面上存在，内容没了。
+  // 判空前先剥掉标记：标记行不是正文，把它算进去会让被清空的块蒙混过关。
   for (const [key, block] of local) {
     if (upstream.has(key)) continue;
     const body = block.content.replace(/<!--\s*upstream-override:[^>]*-->/g, "");

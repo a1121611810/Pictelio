@@ -11,7 +11,7 @@
 ## 1. 背景
 
 本仓的 `.agents/skills/code-review/SKILL.md` 是上游 `mattpocock/skills` 的
-`skills/engineering/code-review/SKILL.md` 的 fork（引入于 `4bf64232`，2026-08-14）。它承载本仓的
+`skills/engineering/code-review/SKILL.md` 的 fork（引入于 `4bf64232`，2026-08-20）。它承载本仓的
 **三审计**（调用点完备性 + 输入源接线 + 期望值溯源 + 平台与宿主契约）、触发式维度卡点与仓库锚点——
 比上游那份更严。
 
@@ -43,11 +43,20 @@
 本仓 `SKILL.md` 按**上游的段落顺序与标题**组织，每个上游标题在本仓文件里有一个同名锚点
 （`<!-- upstream-section: <上游标题> -->`），上游没有的机制集中在 `## 本仓 overlay（上游无此段）` 一节。
 
-**为什么不是逐字保留上游 89 行**：本仓**否决**了上游 6 处机制——12 条 Fowler smell 全文粘进第 3 步
-（OV-13）、spec 来源放宽到 `specs/` 与 `.scratch/`（OV-4）、brief 400 字上限（OV-8）、英文短描述
-（OV-12）、`agents/openai.yaml`（OV-15）、上游自己的用户说明页（OV-16）。逐字保留会让 skill 指示
-agent 去做本仓明确拒斥的事。另有 1 处上游句子**行为保留、措辞被压缩**（OV-14：无 spec 则跳过 Spec 轴）——
-它不算否决，单列一行以免裁决表漏记。
+**为什么不是逐字保留上游 89 行**：本仓**不采纳**上游 4 处做法、**不搬**上游 2 个文件——
+
+- 不采纳但**有替代物**（裁决表记 `adapt`）：12 条 Fowler smell 全文粘进第 3 步（OV-13，移到
+  `### Standards 轴`）、spec 来源放宽到 `specs/` 与 `.scratch/`（OV-4，收紧到 `docs/specs/` +
+  `docs/adr/`）、brief 400 字上限（OV-8，改为不设上限）、英文短描述（OV-12，改用承载三审计
+  触发线索的长中文描述）。
+- 不搬且**本仓没有对应物**（裁决表记 `not-ported`）：`agents/openai.yaml`（OV-15）、上游自己的
+  用户说明页（OV-16）。
+
+逐字保留会让 skill 指示 agent 去做本仓明确拒斥的事。另有 1 处上游句子**行为保留、措辞被压缩**
+（OV-14：无 spec 则跳过 Spec 轴）——它不算否决，单列一行以免裁决表漏记。
+
+> ⚠️ **「不采纳 / 不搬」与裁决表的 `adapt` / `not-ported` 是同一件事的两种说法**，判据只有一个：
+> **本仓有没有对应物**。两处措辞若不一致，读者会以为矛盾——§2.2 的表是准的。
 
 **骨架对齐 + 显式 override** 才能同时保住「上游的意图」与「本仓的判断」。
 
@@ -101,9 +110,10 @@ agent 去做本仓明确拒斥的事。另有 1 处上游句子**行为保留、
 
 - **联网**（`pnpm run check:code-review-upstream`，发布前手动位）：上游漂移 + 与上游正文的块级比对
   （规则 3、4、5）。
-- **离线**（`packages/app-lynx/tests/codeReviewUpstreamSync.test.ts`，进 `test:all`）：标记 ↔ 裁决表
-  双向一致、锚点合法性、标记语法只以真标记出现、基线齐全，**加上两条不依赖上游也能判的规则**——
-  `not-ported` 行不得指名本地仍存在的块（规则 6）、本仓独占块正文不得为空（规则 7）。
+- **离线**（`packages/app-lynx/tests/codeReviewUpstreamSync.test.ts`，11 项，进 `test:all`）：标记 ↔ 裁决表
+  双向一致、锚点合法性、落点标题真实存在、标记语法只以真标记出现、基线 sha 齐全，**加上两条不依赖
+  上游也能判的规则**——`not-ported` 行不得指名本地仍存在的块（规则 6）、本仓独占块正文不得为空
+  （规则 7），**以及闸的「查不了」路径必须退出 2 而不是 0**（三态退出码里最容易被静默吞掉的一档）。
 
 ⚠️ **联网闸没有任何注册触发点**：它只挂在发布前手动位（`ci.yml` 没有对应 job，发布清单未列）。
 **没人记得手跑 = 上游漂移零信号**——这是本轮遗留的已知缺口，见 §4。
@@ -128,7 +138,8 @@ agent 去做本仓明确拒斥的事。另有 1 处上游句子**行为保留、
 - **另三个上游派生文件尚未纳入闸**：`docs/agents/triage-labels.md`、`docs/agents/issue-tracker.md`、
   `docs/agents/domain.md`。它们是 setup skill 的**种子模板**经本仓本地化改编后的产物（不是逐字
   fork），上游在各自引入之后都动过（实测 **1 次 / 8 次 / 2 次**提交，按种子模板路径
-  `skills/engineering/setup-matt-pocock-skills/{triage-labels,issue-tracker-github,domain}.md` 计）。
+  `skills/engineering/setup-matt-pocock-skills/{triage-labels,issue-tracker-github,domain}.md` 计，
+  口径与机械闸一致：含 merge commit）。
   三者需各自裁决「跟到什么程度」才能进表——**未裁决前不纳入闸，避免用「基线一填就绿」掩盖真实漂移**。
 - ⚠️ **上游 `docs/agents/triage-labels.md` 不是本仓文件的祖先**：本仓这三个文件来自种子模板
   `skills/engineering/setup-matt-pocock-skills/`，不是上游仓自己的 `docs/agents/`（后者是 setup 在
@@ -191,6 +202,7 @@ check:code-review-upstream: 1 upstream-derived file(s) checked; upstream has not
 | M7 | 删掉本仓专属的 overlay 块 | **红**（OV-11 无标记） | **红** |
 | CF-F | 预登记一条 `not-ported` 行，指名**仍在本地**的上游块 | **红**（规则 6：白名单不能给删掉的上游块洗白） | **红** |
 | CF-E | 整段清空 overlay 正文 152 行（留锚点 + 标记） | **红**（规则 7：空壳） | **红** |
+| CF-T | 把裁决表**整段删空** | 不适用（表没了，闸读到 0 行即报解析失败） | **红**（判据 4 改成断言解析出的行 ⇒ 恒真断言已消除） |
 | **CF-B** | **静默改写一个已带标记的块的正文** | ⚠️ **绿（已知盲区）** | ⚠️ **绿（已知盲区）** |
 
 **CF-B 是这套机制的判别力边界，第一版 ADR 曾把它说成「机器可判定事件」，本版订正**（见 §2.3）：

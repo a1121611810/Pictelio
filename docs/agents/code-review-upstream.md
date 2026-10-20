@@ -11,7 +11,7 @@
 
 - **上游**：`mattpocock/skills`（`github.com/mattpocock/skills`），skill 路径
   `skills/engineering/code-review/SKILL.md`（**不在仓根**，`code-review/SKILL.md` 会 404）
-- **local-fork-of**：`4bf64232`（2026-08-14，本仓加入这个 skill 的提交）
+- **local-fork-of**：`4bf64232`（2026-08-20，本仓加入这个 skill 的提交）
 - **last-synced**：2026-10-20
 - **各文件的基线 commit**：见下方「上游派生文件清单」表的「基线 commit」列——**sha 只有这一处**，
   闸从表里解析；此处再抄一份就是「同一事实两个副本」，正是这套机制要消灭的东西。
@@ -87,7 +87,7 @@
 | OV-10 | `## Why two axes` | adapt | 语义逐字保留，中文本地化（与本仓其余正文同语言） | `## Why two axes（为什么双轴）` |
 | OV-11 | `## 本仓 overlay（上游无此段）` | local-only | 三审计 / 触发式维度卡点 / Standards 轴细则 / 仓库锚点 / 测试硬约束对照 —— 上游没有这些机制 | `## 本仓 overlay（上游无此段）` |
 | OV-12 | `frontmatter` | adapt | 上游是英文短描述；本仓**不采纳**它，改用承载三审计触发线索的长中文描述（换短的会掉可发现性） | `frontmatter` |
-| OV-13 | `### 3. Identify the standards sources` | adapt | 上游把 12 条 Fowler smell **全文粘在第 3 步**；本仓移到 `## Standards 轴` 独立节（第 3 步只留「发现式清单 + 存在项必须在列」），避免第 3 步过长 | `## Standards 轴` |
+| OV-13 | `### 3. Identify the standards sources` | adapt | 上游把 12 条 Fowler smell **全文粘在第 3 步**；本仓移到 `### Standards 轴` 独立节（第 3 步只留「发现式清单 + 存在项必须在列」），避免第 3 步过长 | `### Standards 轴` |
 | OV-14 | `### 2. Identify the spec source` | adapt | 上游那句「If they say there isn't one, the Spec sub-agent will skip」被本仓压缩成一句，**行为保留**（无 spec 则跳过并注明 "no spec available"），不是否决 | 第 2 步 ④ |
 | OV-15 | `skills/engineering/code-review/agents/openai.yaml`（文件级） | not-ported | 上游的 Codex UI 元数据；本仓 `.agents/skills/` 只被 pi 扫，pi 只读 `SKILL.md` —— 加一个没人读的文件 = 孤儿产物 | — |
 | OV-16 | `docs/engineering/code-review.md`（文件级，上游自己的用户说明页） | not-ported | 本仓 `docs/` 分层是「`docs/agents/` 给 agent、`docs/usage/` 给用户」；这个 skill 是 agent 工具不是产品功能，不需要一层用户说明页 | — |
@@ -165,7 +165,8 @@ pnpm run check:code-review-upstream
 
 - **另三个上游派生文件尚未纳入机械闸**（本表只有 F1）。实测漂移：上游 `setup-matt-pocock-skills`
   的种子模板在本仓引入之后都动过——`triage-labels.md`（本仓 2026-08-06 引入，上游 2026-10-07 改过
-  一行措辞）、`issue-tracker.md`（本仓 2026-07-26 引入，上游动了 7 次）、`domain.md`（本仓 2026-07-26
+  一行措辞）、`issue-tracker.md`（本仓 2026-07-26 引入，上游动了 **8 次**，口径与机械闸一致：含 merge
+  commit）、`domain.md`（本仓 2026-07-26
   引入，上游 2026-08-15 做过 CONTEXT→GLOSSARY 改名、2026-08-19 去 em-dash）。三者本仓都已本地化
   改编，需各自裁决「跟到什么程度」才能进表——**未裁决前不纳入闸，避免用「基线一填就绿」掩盖真实漂移**。
 - **上游 `docs/agents/triage-labels.md` 不是本仓文件的祖先**：本仓 `docs/agents/*.md` 来自 setup skill

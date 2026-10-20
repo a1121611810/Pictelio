@@ -1,49 +1,46 @@
 /**
- * Pins the relationship between the code-review skill's upstream-override markers and the verdict
- * table that documents them.
+ * 钉住 code-review skill 的 upstream-override 标记与记录它们的裁决表之间的关系。
  *
- * Why this exists. `.agents/skills/code-review/SKILL.md` is a **fork** of the upstream
- * `mattpocock/skills` code-review skill, and the fork is now *structured*: the upstream's own
- * headings are the skeleton (`<!-- upstream-section: ... -->` anchors), and every place this repo
- * deviates carries an `<!-- upstream-override: ... -->` marker whose id names a row in
- * `docs/agents/code-review-upstream.md`. The payoff is that "the upstream text was silently
- * rewritten" becomes a machine-detectable event — but only if the two sides stay in step.
+ * 为什么需要这个文件。`.agents/skills/code-review/SKILL.md` 是上游 `mattpocock/skills` 的
+ * code-review skill 的**fork**，而这个 fork 现在是**有结构**的：上游自己的标题作骨架
+ * （`<!-- upstream-section: ... -->` 锚点），本仓每一处偏离都带一个
+ * `<!-- upstream-override: ... -->` 标记，其 ID 指向 `docs/agents/code-review-upstream.md` 裁决表
+ * 的一行。收益是「上游原文被静默改写」能被机器发现——**前提是两边始终对得上**。
  *
- * A marker with no verdict row is an edit nobody recorded a reason for. A verdict row with no
- * marker is a decision nobody landed (or one that was reverted without the record changing).
- * Either way the document claims something the file does not do.
+ * 标记没有裁决行 = 有人改了却没记录理由；裁决行没有标记 = 有个决定没人落地（或落地后被回退、
+ * 记录却没改）。两种情况都是**文档声称的东西文件里没有**。
  *
- * Expected-value sources are the two artifacts themselves, and they are independent of each other:
- * the markers come from the skill file, the rows from the baseline doc. Nothing here infers an
- * expectation from the implementation it checks.
+ * 期望值来源是那两个产物本身，且互相独立：标记来自 skill 文件，裁决行来自基线文档。
+ * 这里没有任何一条期望值是从被测实现反推的。
  *
- * The network half of the same triangle (does the upstream text still match the recorded baseline?)
- * lives in `scripts/check-code-review-upstream.mjs`; it is not a test because it needs the network,
- * and a pull-request gate that depends on the network stops being a gate. What this file pins is
- * the half that must hold offline.
+ * 同一个三角的**联网那半**（上游正文是否仍与记录的基线一致）在
+ * `scripts/check-code-review-upstream.mjs` 里；它不是测试，因为它要联网，而依赖联网的 PR 门禁
+ * 就不再是门禁。本文件钉的是**离线也必须成立的那半**。
  *
- * Counterfactuals (the upstream gate checks the network side of the same triangle):
- *   - delete a marker from the skill file        -> "no verdict row" test goes red
- *   - add a marker whose id is not in the table  -> "no verdict row" test goes red
- *   - change a verdict's landing to `—`          -> "landing without a marker" test goes red
- *   - remove a verdict row from the table        -> "row without a marker" test goes red
- *   - inline the marker syntax into prose       -> "syntax only as a marker" test goes red
+ * 反事实（联网侧由上游机械闸检查）：
+ *   - 从 skill 文件里删掉一个标记        → 「标记无裁决行」转红
+ *   - 加一个表里没有的标记              → 「标记无裁决行」转红
+ *   - 把某裁决的落点改成 `—`            → 「无落点却带标记」转红
+ *   - 从表里删掉一整行裁决              → 「有裁决行却无标记」转红
+ *   - 正文里内联引用标记语法            → 「语法只以真标记出现」转红
+ *   - 把裁决表整段删空                  → 「裁决表记录了每一次同步的裁决」转红
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { spawnSync } from "node:child_process";
+import { describe, expect, it } from "vitest";
 
-// This file lives in packages/app-lynx/tests/, so the repo root is three levels up.
+// 本文件在 packages/app-lynx/tests/ 下，故仓根在三层之上。
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const SKILL_PATH = join(REPO_ROOT, ".agents/skills/code-review/SKILL.md");
 const BASELINE_PATH = join(REPO_ROOT, "docs/agents/code-review-upstream.md");
 
 /**
- * Read a file or fail loudly.
+ * 读文件，读不到就大声失败。
  *
- * A missing file must not read as an empty string: every assertion below would then pass
- * vacuously, and a guard that passes because its input vanished is not a guard.
+ * 文件缺失**不能**读成空字符串：那会让下面每条断言都空过，而「因为输入消失所以通过」的守卫
+ * 不是守卫。
  */
 function readText(path: string, label: string): string {
   try {
@@ -53,7 +50,7 @@ function readText(path: string, label: string): string {
   }
 }
 
-/** Rows of the markdown table that follows a heading, header row excluded. */
+/** 取某个标题之后那张 markdown 表格的行（不含表头行）。 */
 function tableAfter(doc: string, heading: string): string[][] {
   const start = doc.indexOf(heading);
   if (start === -1) return [];
@@ -78,16 +75,16 @@ function tableAfter(doc: string, heading: string): string[][] {
   return rows.slice(1);
 }
 
-/** Strip the backticks a table cell may carry. */
+/** 去掉表格单元格可能带的反引号。 */
 function plain(value: string): string {
   return value.replace(/`/g, "").trim();
 }
 
 /**
- * The body of the block that carries the given upstream-section anchor.
+ * 取带指定 upstream-section 锚点的那一块的正文。
  *
- * `String.prototype.split` with a capturing group yields [before, key1, body1, key2, body2, ...],
- * so the keys and bodies alternate and can be read off in pairs.
+ * `String.prototype.split` 带捕获组会得到 [前文, 键1, 正文1, 键2, 正文2, ...]，
+ * 键与正文交替出现，按对读取即可。
  */
 function blockBody(key: string): string {
   const parts = skill.split(/<!--\s*upstream-section:\s*(.+?)\s*-->/);
@@ -110,7 +107,8 @@ const verdicts = tableAfter(baseline, "## 裁决表").map((row) => {
   return {
     id: plain(id),
     positions: position.split("｜").map((part) => plain(part)),
-    disposition: plain(disposition),
+    // 处置单元格可能带括号补充；只按关键字比对。
+    disposition: plain(disposition).split("（")[0].trim(),
     landing: plain(landing),
   };
 });
@@ -126,9 +124,9 @@ const files = tableAfter(baseline, "### 上游派生文件清单").map((row) => 
   };
 });
 
-describe("the code-review skill's upstream-override markers", () => {
-  test("every override marker in the skill file has a verdict row", () => {
-    // Vacuity guard: an extractor that stopped matching would make this loop check nothing.
+describe("code-review skill 的 upstream-override 标记", () => {
+  it("skill 文件里的每个 override 标记都有对应的裁决行", () => {
+    // 防空转守卫：抽取器一旦失配，下面这个循环就什么都没查。
     expect(
       markers.length,
       "no override marker was extracted; the guard would be vacuous",
@@ -139,10 +137,9 @@ describe("the code-review skill's upstream-override markers", () => {
     expect(orphans, "override markers with no verdict row").toEqual([]);
   });
 
-  test("every verdict row with a landing has a marker, and a row without a landing has none", () => {
-    // The landing column is what separates "this repo has an override for it" from "upstream has
-    // something this repo deliberately does not have". A `—` landing must not carry a marker;
-    // anything else must.
+  it("有落点的裁决行必有标记，无落点的裁决行必无标记", () => {
+    // 「本仓落点」列是「本仓有对应物」与「上游有而本仓刻意不搬」的分界：落点为 `—` 的行不许带标记，
+    // 其余的必须带。
     expect(verdicts.length, "no verdict row was parsed").toBeGreaterThan(0);
 
     const marked = new Set(markers);
@@ -159,9 +156,8 @@ describe("the code-review skill's upstream-override markers", () => {
     expect(stray, "verdict rows without a landing that nevertheless carry a marker").toEqual([]);
   });
 
-  test("every upstream-section anchor in the skill file is named by a verdict row", () => {
-    // An anchor that no verdict row mentions is a block whose provenance is undocumented -- the
-    // same failure mode as an unrecorded edit, one level up.
+  it("skill 文件里的每个 upstream-section 锚点都被某条裁决行指名", () => {
+    // 没有裁决行指名的锚点 = 那个块的来历没被登记——与「改了却没记录理由」同一种失败，只是高一层。
     expect(anchors.length, "no upstream-section anchor was extracted").toBeGreaterThan(0);
 
     const named = new Set(verdicts.flatMap((verdict) => verdict.positions));
@@ -169,10 +165,9 @@ describe("the code-review skill's upstream-override markers", () => {
     expect(undocumented, "upstream-section anchors no verdict row names").toEqual([]);
   });
 
-  test("every local-only verdict names an anchor that exists in the skill file", () => {
-    // A local-only row points at a block that exists here and not upstream. If the anchor is gone,
-    // the row describes a block that no longer exists. `frontmatter` is the one key that is not an
-    // anchor: YAML cannot carry a marker, so the frontmatter verdict sits next to the first anchor.
+  it("每条 local-only 裁决都指名一个文件里真实存在的锚点", () => {
+    // local-only 行指的是「本仓有、上游没有」的块。锚点没了，这行就在描述一个已经不存在的块。
+    // `frontmatter` 是唯一不是锚点的键：YAML 放不了标记，所以 frontmatter 的裁决标记放在第一个锚点旁边。
     const localOnly = verdicts.filter((verdict) => verdict.disposition === "local-only");
     expect(localOnly.length, "no local-only verdict was parsed").toBeGreaterThan(0);
 
@@ -183,10 +178,9 @@ describe("the code-review skill's upstream-override markers", () => {
     expect(missing, "local-only verdicts naming an anchor the file does not have").toEqual([]);
   });
 
-  test("the marker syntax appears only as a real marker", () => {
-    // The gate and this test both parse the file by regex. An inline mention of the syntax in
-    // prose (even inside a code span) would be read as a real marker -- and would silently change
-    // which block a verdict belongs to. So the count of mentions must equal the count of markers.
+  it("标记语法只以真标记出现", () => {
+    // 闸与本测试都用正则解析文件。正文里内联引用标记语法（哪怕在代码 span 里）会被读成真标记，
+    // 还会悄悄改变某条裁决归属哪个块 ⇒ 提及次数必须等于解析出的标记数。
     const overrideMentions = (skill.match(/upstream-override:/g) ?? []).length;
     expect(
       overrideMentions,
@@ -200,10 +194,9 @@ describe("the code-review skill's upstream-override markers", () => {
     ).toBe(anchors.length);
   });
 
-  test("a not-ported verdict does not name a block that is present here", () => {
-    // Otherwise the table can pre-register a whitelist entry for a block that is still right
-    // there -- which is how "an upstream block was deleted" gets laundered into "we did not
-    // port it". `frontmatter` is exempt: such a row is about the frontmatter's *content*.
+  it("not-ported 裁决不得指名本地仍然存在的块", () => {
+    // 否则裁决表可以预登记一条白名单，把「删掉一整段上游块」洗成「我们没搬它」。
+    // `frontmatter` 豁免：那类行说的是 frontmatter 的**内容**。
     const notPorted = verdicts.filter((verdict) => verdict.disposition === "not-ported");
     expect(notPorted.length, "no not-ported verdict was parsed").toBeGreaterThan(0);
 
@@ -215,16 +208,15 @@ describe("the code-review skill's upstream-override markers", () => {
     expect(wrong, "not-ported verdicts naming a block that is still present").toEqual([]);
   });
 
-  test("every local-only block has a body", () => {
-    // An anchor plus a marker over an empty body is a shell: the block exists on paper and its
-    // content is gone. The local-only rows name the blocks, so the body can be checked offline.
+  it("每个 local-only 块都有正文", () => {
+    // 只留锚点 + 标记而正文被清空 = 空壳：块在纸面上存在，内容没了。
+    // local-only 行指明了这些块，所以正文能离线检查。
     const localOnly = verdicts.filter((verdict) => verdict.disposition === "local-only");
     expect(localOnly.length, "no local-only verdict was parsed").toBeGreaterThan(0);
 
     for (const key of localOnly.flatMap((verdict) => verdict.positions)) {
       if (key === "frontmatter") continue;
-      // The marker lines are stripped before the emptiness check: a marker is not content, and
-      // counting it would let an emptied block pass.
+      // 判空前先剥掉标记行：标记不是正文，把它算进去会让被清空的块蒙混过关。
       const body = blockBody(key).replace(/<!--\s*upstream-override:[^>]*-->/g, "");
       expect(body, `local-only block "${key}" is not an anchor in the skill file`).not.toBe("");
       expect(body.trim(), `local-only block "${key}" has an empty body`).not.toBe("");
@@ -232,9 +224,9 @@ describe("the code-review skill's upstream-override markers", () => {
   });
 });
 
-describe("the upstream baseline record", () => {
-  test("every upstream-derived file has a hex baseline commit and a local path", () => {
-    // The gate parses exactly these cells: a row without a hex sha would compare against nothing.
+describe("上游基线记录", () => {
+  it("每个上游派生文件都有十六进制基线 commit 与本仓路径", () => {
+    // 闸解析的就是这几个单元格：没有十六进制 sha 的行等于「拿它跟空气比」。
     expect(files.length, "no upstream-derived file was parsed").toBeGreaterThan(0);
 
     for (const file of files) {
@@ -249,11 +241,49 @@ describe("the upstream baseline record", () => {
     }
   });
 
-  test("the baseline doc records a verdict for every upstream change it synced", () => {
-    // A baseline SHA with no verdict table means "we synced" and "we decided" have been
-    // conflated. The table's verdict column is the record of the decision.
-    expect(baseline).toContain("裁决");
-    expect(baseline).toContain("adopt");
-    expect(baseline).toContain("adapt");
+  it("基线文档为每一次同步的变更都留了裁决", () => {
+    // 断言必须打在**解析出来的裁决行**上，而不是对全文做 `toContain`——「裁决 / adopt / adapt」
+    // 这三个子串在裁决表之外的散文里也各出现过，全文匹配会在「整张表被删空」时仍然全绿：
+    // 那是一条**恒真断言**（违反本仓「防空转断言」纪律：抽取器必须断言结果非空 / 有下界）。
+    expect(verdicts.length, "no verdict row was parsed").toBeGreaterThan(0);
+
+    const dispositions = verdicts.map((verdict) => verdict.disposition);
+    expect(dispositions, "no adopt verdict").toContain("adopt");
+    expect(dispositions, "no adapt verdict").toContain("adapt");
+    expect(dispositions, "no not-ported verdict").toContain("not-ported");
+    expect(dispositions, "no local-only verdict").toContain("local-only");
+  });
+
+  it("裁决的落点若指向标题，该标题必须真实存在", () => {
+    // 落点列是「本仓对应物在哪」的指针。按它去找必须找得到——否则读者扑空，而本仓 skill 自己
+    // 的「文档交叉引用」卡点也会判它违规（落点不存在 = 悬空指针）。
+    const headings = new Set(
+      skill
+        .split("\n")
+        .filter((line) => /^#{1,6}\s/.test(line))
+        .map((line) => line.trim()),
+    );
+    const dangling = verdicts
+      .map((verdict) => verdict.landing)
+      .filter((landing) => landing.startsWith("#"))
+      .filter((landing) => !headings.has(landing));
+    expect(dangling, "verdict landings naming a heading that does not exist").toEqual([]);
+  });
+
+  it("闸的「查不了」路径退出码是 2 而不是 0", () => {
+    // 「查不了」必须与「没漂移」分开：三态退出码里 exit 2 = 查不了。给它一个没有 gh 的 PATH，
+    // 闸应当报「查不了」并以 2 退出，而不是静默当成「上游没动」（那正是假绿）。
+    const result = spawnSync(
+      process.execPath,
+      [join(REPO_ROOT, "scripts/check-code-review-upstream.mjs")],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PATH: "/nonexistent-for-the-upstream-gate" },
+      },
+    );
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+
+    expect(result.status, `expected exit 2, got ${result.status}: ${output}`).toBe(2);
+    expect(output, "the gate did not say it could not check").toContain("could not query GitHub");
   });
 });

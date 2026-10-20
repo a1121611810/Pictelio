@@ -22,6 +22,8 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 
 <!-- upstream-section: ## Process -->
 <!-- upstream-override: OV-1 -->
+## Process（流程）
+
 上游的五步是骨架，本仓在每一步上加本仓专属的纪律；本仓的额外机制集中在文末「本仓 overlay」一节。
 
 ### 1. Pin the fixed point
@@ -50,7 +52,7 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 <!-- upstream-section: ### 3. Identify the standards sources -->
 <!-- upstream-override: OV-5 -->
 <!-- upstream-override: OV-13 -->
-发现式——派发前**实搜**仓内所有「写码规范」文档，产出清单并**随 brief 传给 sub-agent**（sub-agent 看不见你没给的文件）。本仓**必有**的几份：`AGENTS.md`（含测试硬约束 #1-6、Fluent 设计规范、即时导航硬约束）、`docs/testing/conventions.md`、`GLOSSARY-MAP.md` + `packages/*/GLOSSARY.md`、`docs/adr/`、README。
+发现式——派发前**实搜**仓内所有「写码规范」文档，产出清单并**随 brief 传给 sub-agent**（sub-agent 看不见你没给的文件）。本仓**必有**的几份：`AGENTS.md`（含测试硬约束 #1-6、即时导航硬约束）、`docs/testing/conventions.md`、`GLOSSARY-MAP.md` + `packages/*/GLOSSARY.md`、`docs/adr/`、README。
 
 **`CODING_STANDARDS.md` / `CONTRIBUTING.md` 存在时也必须在清单上**（上游硬规则）：从记忆列清单会漏掉唯一带规则的那份——本仓当前**两者都不存在**，将来引入必须立刻进清单。
 
@@ -79,10 +81,14 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 
 <!-- upstream-section: ## Why two axes -->
 <!-- upstream-override: OV-10 -->
+## Why two axes（为什么双轴）
+
 一个改动可以只过一轴：符合全部规范但实现错了东西 → Standards 过、Spec 挂；忠实实现 issue 但破坏仓库约定 → Spec 过、Standards 挂。分列报告防止一轴掩盖另一轴。
 
 <!-- upstream-section: ## 本仓 overlay（上游无此段） -->
 <!-- upstream-override: OV-11 -->
+## 本仓 overlay（上游无此段）
+
 上游没有本节。以下是本仓专属的三审计、维度卡点与锚点，只在本仓成立。
 
 ### 为什么存在这个版本
