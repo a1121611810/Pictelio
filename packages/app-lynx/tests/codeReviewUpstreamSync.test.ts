@@ -124,6 +124,11 @@ const files = tableAfter(baseline, "### 上游派生文件清单").map((row) => 
   };
 });
 
+const relations = tableAfter(baseline, "### 块级关系表").map((row) => {
+  const [key = "", relation = "", , verdicts = ""] = row;
+  return { key: plain(key), relation: plain(relation), verdicts: plain(verdicts) };
+});
+
 describe("code-review skill 的 upstream-override 标记", () => {
   it("skill 文件里的每个 override 标记都有对应的裁决行", () => {
     // 防空转守卫：抽取器一旦失配，下面这个循环就什么都没查。
@@ -221,6 +226,28 @@ describe("code-review skill 的 upstream-override 标记", () => {
       expect(body, `local-only block "${key}" is not an anchor in the skill file`).not.toBe("");
       expect(body.trim(), `local-only block "${key}" has an empty body`).not.toBe("");
     }
+  });
+  it("每个块都声明了它与上游的关系", () => {
+    // 关系表是「块与上游什么关系」的唯一记录。没声明关系的块 = 关系不明 ⇒ 闸（联网侧）会红。
+    // 这里离线能查的是「覆盖」：skill 文件里的每一个块（含 frontmatter）都在表里，且表里的块键
+    // 都真实存在。关系值是否合法也在这里查。
+    expect(relations.length, "no relation row was parsed").toBeGreaterThan(0);
+
+    const declared = new Set(relations.map((relation) => relation.key));
+    const blocks = new Set([...anchors, "frontmatter"]);
+    const undeclared = [...blocks].filter((key) => !declared.has(key));
+    expect(undeclared, "blocks with no declared relation to upstream").toEqual([]);
+
+    const dangling = relations
+      .map((relation) => relation.key)
+      .filter((key) => !blocks.has(key));
+    expect(dangling, "relation rows naming a block the skill file does not have").toEqual([]);
+
+    const legal = ["逐字照抄", "整块改写", "本仓新增"];
+    const illegal = relations
+      .map((relation) => relation.relation)
+      .filter((relation) => !legal.includes(relation));
+    expect(illegal, "relations with an unknown value").toEqual([]);
   });
 });
 

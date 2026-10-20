@@ -181,6 +181,33 @@ function parseVerdicts(doc) {
 }
 
 /**
+ * 解析「块级关系表」：每个块与上游是什么关系。
+ *
+ * 这张表与「裁决表」分工：裁决表记「我们改了什么」，关系表记「这个块整体跟上游是什么关系」。
+ * `逐字照抄` 的块一旦内容与上游不同，「我们照抄了上游」这个事实就不成立 ⇒ 必须红；
+ * `整块改写` 的块本来就是本仓的版本，块内改写不影响与上游的关系 ⇒ 豁免（**这不是放水**——
+ * 对整块重写做逐处登记没有信息量，那块的内容归本仓自己的 review 流程管）。
+ *
+ * @param {string} doc
+ * @returns {{ key: string, relation: string, verdicts: string }[]}
+ */
+function parseRelations(doc) {
+  const rows = tableAfter(doc, "### 块级关系表");
+  if (rows.length === 0) {
+    return fail("docs/agents/code-review-upstream.md has no '### 块级关系表' table");
+  }
+  const relations = [];
+  for (const row of rows) {
+    const [key = "", relation = "", , verdicts = ""] = row;
+    if (!key || !relation) {
+      return fail(`relation row is incomplete: ${row.join(" | ")}`);
+    }
+    relations.push({ key: plain(key), relation: plain(relation), verdicts: plain(verdicts) });
+  }
+  return relations;
+}
+
+/**
  * 从 GitHub 取某个 ref 下的文件正文。
  *
  * @param {string} path
@@ -365,7 +392,7 @@ function normalize(text) {
  * @param {{ id: string, positions: string[], disposition: string, landing: string }[]} verdicts
  * @returns {string[]} 发现的问题
  */
-function checkConsistency(localText, upstreamText, verdicts) {
+function checkConsistency(localText, upstreamText, verdicts, relations) {
   const problems = [];
   const local = parseLocalBlocks(localText);
   const upstream = parseUpstreamBlocks(upstreamText);
@@ -456,6 +483,63 @@ function checkConsistency(localText, upstreamText, verdicts) {
     }
   }
 
+  // 规则 8/9：块级关系表。
+  // 规则 8：声明「逐字照抄」的块，内容必须与上游逐字一致（去掉标记后）——「我们照抄了上游」这个
+  // 事实一旦不成立，机器必须看见。
+  // 规则 9：声明「本仓新增」的块，上游不得有同名块——上游追上了，关系声明就该更新。
+  const relationByKey = new Map(relations.map((relation) => [relation.key, relation]));
+  for (const relation of relations) {
+    const upstreamBlock = upstream.get(relation.key);
+    const localBlock = local.get(relation.key);
+    if (relation.relation === "逐字照抄") {
+      if (!upstreamBlock) {
+        problems.push(
+          `block "${relation.key}" is declared verbatim but upstream has no such block`,
+        );
+        continue;
+      }
+      if (!localBlock) {
+        problems.push(`block "${relation.key}" is declared verbatim but is missing here`);
+        continue;
+      }
+      if (normalize(localBlock.content) !== normalize(upstreamBlock)) {
+        problems.push(
+          `block "${relation.key}" is declared verbatim but its content differs from upstream`,
+        );
+      }
+    } else if (relation.relation === "本仓新增") {
+      if (upstreamBlock) {
+        problems.push(
+          `block "${relation.key}" is declared local-only but upstream now has a block with that key`,
+        );
+      }
+    } else if (relation.relation === "整块改写") {
+      // 「整块改写」的前提是**上游有这个块**；没有的话它就该声明成「本仓新增」。
+      if (!upstreamBlock) {
+        problems.push(
+          `block "${relation.key}" is declared as a rewrite of upstream but upstream has no such block`,
+        );
+      }
+    }
+  }
+
+  // 规则 10：每个块都必须声明关系——没声明关系的块 = 关系不明（本地块与上游块都要覆盖）。
+  for (const key of local.keys()) {
+    if (!relationByKey.has(key)) {
+      problems.push(`block "${key}" has no declared relation to upstream`);
+    }
+  }
+  for (const key of upstream.keys()) {
+    if (!relationByKey.has(key)) {
+      problems.push(`upstream block "${key}" has no declared relation`);
+    }
+  }
+  for (const relation of relations) {
+    if (!["逐字照抄", "整块改写", "本仓新增"].includes(relation.relation)) {
+      problems.push(`block "${relation.key}" has an unknown relation "${relation.relation}"`);
+    }
+  }
+
   return problems;
 }
 
@@ -463,6 +547,7 @@ function main() {
   const doc = readBaselineDoc();
   const files = parseFileTable(doc);
   const verdicts = parseVerdicts(doc);
+  const relations = parseRelations(doc);
   const problems = [];
 
   for (const file of files) {
@@ -499,7 +584,7 @@ function main() {
       return fail(`cannot read ${structured.localPath}: ${String(cause)}`);
     }
     const upstreamText = fetchUpstreamFile(structured.upstreamPath, structured.baseCommit);
-    problems.push(...checkConsistency(localText, upstreamText, verdicts));
+    problems.push(...checkConsistency(localText, upstreamText, verdicts, relations));
   }
 
   if (problems.length > 0) {
