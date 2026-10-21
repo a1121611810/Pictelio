@@ -105,6 +105,7 @@ import {
 import {
   FAB_CLASS_TOKENS,
   PINNED_DENSITY_SCALE,
+  assertFabTree,
   captureUiTree,
   describeNode,
   dpToPx,
@@ -854,33 +855,29 @@ describe.skipIf(SKIPPED)(
       // ── 树：布局盒（元素「在哪、多大」）──
       // 这一问像素答不了：像素只能反推「长得像按钮的那团颜色」，说不出「这个元素
       // 声明的盒子有多大」——而触控目标尺寸（48dp）是**布局契约**。
-      const ctas = findByClass(tree, FAB_CLASS_TOKENS);
-      expect(ctas, "A4：按 class 定位主 CTA 应唯一").toHaveLength(1);
-      const node = ctas[0]!;
-      const frame = screenFrame(node);
-      expect(frame, `A4：CTA 节点缺 frameInScreen（${describeNode(node)}）`).not.toBeNull();
-      const f = frame!;
+      //
+      // 判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）⇒
+      // 「唯一命中 / 有 frame / 绑了 `tap` / ≥48dp / 盒不越内容区」这几条与
+      // `fab-hit-testing-regression` / `transition-matrix` **同源** ⇒
+      // 「改一处、另一处静默留着旧口径」的漂被消除（第 7 轮 Standards 轴 S-N2）。
+      // ⚠️ `densityScale` 传**设备实读**值（与本 spec 其余部分同口径）；默认是
+      //   `PINNED_DENSITY_SCALE`，两者在 density=480 时同值。
+      const f = assertFabTree(tree, {
+        prefix: "A4：",
+        contentRight: SCREEN_W,
+        contentBottom: CONTENT_BOTTOM,
+        densityScale,
+      });
       console.log(
         `[md3-visual-tokens] A4 树布局盒 = (${f.x},${f.y},${f.width},${f.height})` +
           ` → ${f.width}×${f.height}px（= ${(f.width / densityScale).toFixed(1)}×${(f.height / densityScale).toFixed(1)}dp）` +
-          ` / ${describeNode(node)}`,
+          ` / ${describeNode(findFab(tree))}`,
       );
-      expect(f.width, `A4 树布局盒宽 ${f.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
-      expect(f.height, `A4 树布局盒高 ${f.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
-        minPx,
-      );
+      // ── A4 独有判据（不在共享判据里 ⇒ 留在本 spec）──
       expect(
         f.width,
         `A4 树布局盒宽 ${f.width}px > 屏宽 80%=${maxWidthPx}px（控件铺满全宽 = 布局异常）`,
       ).toBeLessThanOrEqual(maxWidthPx);
-      expect(
-        f.x + f.width,
-        `A4 树布局盒右界 ${f.x + f.width} 越过屏宽 ${SCREEN_W}`,
-      ).toBeLessThanOrEqual(SCREEN_W);
-      expect(
-        f.y + f.height,
-        `A4 树布局盒下界 ${f.y + f.height} 越过内容区底界 ${CONTENT_BOTTOM}`,
-      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
       // 树推导的位置必须仍落在旧粗扫描域内 —— 两条口径打架就转红，而不是各说各的
       // ⚠️ 失败文案**不归因**（第 3 轮 Standards 轴 N2）：「布局变了」与「旧粗域本身
       //   该更新了」从这一项测量上**分不开** ⇒ 只报事实 + 列出两个候选成因。

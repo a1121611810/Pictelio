@@ -426,7 +426,9 @@ export function describeNode(node: UiTreeNode): string {
  *
  * @param tree 抓回来的运行时 UI 树
  * @param opts `prefix` = 各 spec 的场景标识（如「R2：」，空串表示不加前缀）；
- *   `contentRight` / `contentBottom` = 内容区右界 / 下界（物理像素）
+ *   `contentRight` / `contentBottom` = 内容区右界 / 下界（物理像素）；
+ *   `densityScale` = 触控目标门限用的 dp→px 比例（默认 `PINNED_DENSITY_SCALE`）
+ * @returns 树给的**布局盒**——调用方还要用它做像素侧对照（`expectVisibleWithinLayout`）
  */
 export interface FabTreeAssertOptions {
   /** 失败信息前缀（各 spec 自带场景标识，如「R2：」）；空串表示不加前缀。 */
@@ -435,10 +437,29 @@ export interface FabTreeAssertOptions {
   contentRight: number;
   /** 内容区下界（物理像素）——树给的盒下缘不得越过。 */
   contentBottom: number;
+  /**
+   * 触控目标门限用的 dp→px 比例。
+   *
+   * ⚠️ 默认 `PINNED_DENSITY_SCALE`（3）——密度由 `assertDeviceGeometry` 钉在 480。
+   *   `md3-visual-tokens` 传**设备实读**的 density（那边同时要把 dp 值打印进证据），
+   *   两者在 density=480 时**同值** ⇒ 口径不变，只是取值来源不同。
+   */
+  densityScale?: number;
 }
 
-/** 见 {@link FabTreeAssertOptions}。判据只有这一份，各 spec 调它。 */
-export function assertFabTree(tree: UiTreeNode, opts: FabTreeAssertOptions): void {
+/**
+ * 见 {@link FabTreeAssertOptions}。
+ *
+ * ⚠️ **「判据只有一份」的准确范围**（第 7 轮 Standards 轴 S-N2 实测校准）：本函数覆盖
+ *   **FAB 的几何与可点性判据**（7 条）。三个消费方里：
+ *   - `fab-hit-testing-regression` / `transition-matrix` ⇒ **完全**用它；
+ *   - `md3-visual-tokens` 的 **A4** ⇒ 用它 + 自己两条独有判据（宽 ≤ 屏宽 80% /
+ *     盒上界仍在旧粗扫描域内）；
+ *   - `md3-visual-tokens` 的 **A3** ⇒ **仍内联**它自己的三条（唯一命中 / 有 frame /
+ *     绑了 `tap`）——那三条回答的是**另一个问题**（「主题切换不改布局与可点性」），
+ *     且要对**两个主题态各跑一遍** ⇒ 已登记为 ADR §3.4 row 7 的已知失效面。
+ */
+export function assertFabTree(tree: UiTreeNode, opts: FabTreeAssertOptions): UiTreeFrame {
   const p = opts.prefix ?? "";
   const hits = findByClass(tree, FAB_CLASS_TOKENS);
   expect(hits, `${p}按 class 定位主 FAB 应唯一`).toHaveLength(1);
@@ -450,7 +471,7 @@ export function assertFabTree(tree: UiTreeNode, opts: FabTreeAssertOptions): voi
   expect(f, `${p}FAB 节点缺 frameInScreen：${describeNode(node)}`).not.toBeNull();
   // 触控目标门限：density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
   // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
-  const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
+  const minPx = dpToPx(48, opts.densityScale ?? PINNED_DENSITY_SCALE);
   expect(f!.width, `${p}FAB 布局盒宽 ${f!.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
     minPx,
   );
@@ -466,6 +487,7 @@ export function assertFabTree(tree: UiTreeNode, opts: FabTreeAssertOptions): voi
     f!.y + f!.height,
     `${p}FAB 盒下缘 ${f!.y + f!.height}px 越过内容区下界 ${opts.contentBottom}px`,
   ).toBeLessThanOrEqual(opts.contentBottom);
+  return f!;
 }
 
 // ── 设备侧：触发 → 等落齐 → pull → 解析 ──────────────────────────────────
