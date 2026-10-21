@@ -8,7 +8,22 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // 允许 import `.mjs`（#1047）。**检查面不变**：`checkJs` 默认关 ⇒ `.mjs` 只被
+    // 当作依赖读进来做类型推断，**自身不被类型检查**；`include` 也没动。
+    //
+    // 为什么需要它：`tests/android-e2e` **在**类型检查面内（下方 include），
+    // 而 `scripts/lib/ui-tree-dump-core.mjs` 是 UI 树通道的**协议常量单一事实源**
+    // （`REMOTE_DIR` / `EXTRA_TRIGGER` / 采样档位 / 落齐判据 / 摘要口径）。
+    // e2e 侧要复用它，就必须能 import 一个 `.mjs`。
+    //
+    // ⚠️ **为什么不用手写 `.d.mts` 声明**：那会把导出签名抄第二份 ⇒ 签名漂移时
+    //   编译期类型会说谎（静默错），而这里类型是**从真实实现推断**的 ⇒ 零漂移。
+    //   本仓吃过「复制抽取器」的亏（见 spec「③ 脱敏形态」条），同理。
+    //
+    // ⚠️ `tests/unit` 那条「有意不在类型检查面内」的口径**不因本项改变**——
+    //   它说的是 include，`include` 未动。
+    "allowJs": true
   },
   // 门禁范围与迁移前**逐项对齐**，不扩大也不缩小（ADR-0203 决策 2「保真迁移 = 逐件搬走，不改写」）。
   //
