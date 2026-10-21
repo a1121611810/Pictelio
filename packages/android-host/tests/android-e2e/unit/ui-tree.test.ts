@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * `ui-tree.ts` 纯查询层单测（issue #1047 · ADR-0223；不碰 adb / 模拟器）。
+ * `ui-tree.ts` 纯查询层 + **共享树断言**单测（issue #1047 · ADR-0223；不碰 adb / 模拟器）。
  *
  * ## oracle 溯源（测试硬约束 #2「契约测试必须使用真实样例」）
  *
@@ -341,7 +341,7 @@ describe("ui-tree · FAB 定位口径（findFab / fabCenter）", () => {
     expect(() => findFab(noFrame)).toThrow(/没有 frameInScreen/);
   });
 
-  it("fabCenter = 布局盒圆心（873+81=953 / 1808+81=1889）", () => {
+  it("fabCenter = 布局盒圆心（872+81=953 / 1808+81=1889）", () => {
     // oracle：162px 见方的盒子 ⇒ 圆心 = 左上角 + 81
     expect(fabCenter(tree)).toEqual({ x: 953, y: 1889 });
   });
@@ -431,6 +431,20 @@ describe("ui-tree · FAB 树断言（共享判据 assertFabTree）", () => {
   it("盒子小于 48dp ⇒ 抛错（触控目标尺寸不达标）", () => {
     const small = fabTree({ x: 872, y: 1808, width: 100, height: 100 });
     expect(() => assertFabTree(small, opts)).toThrow(/< 48dp=144px/);
+  });
+
+  it("**宽**不足 48dp（高够）⇒ 抛错（宽高两条判据**分维度**钉住）", () => {
+    // ⚠️ 为什么要分维度：只给「宽高同时不足」的样本时，**单独去掉宽比较或单独去掉
+    //   高比较，测试仍全绿** ⇒ 判据变成「联合钉住」，任一条被写坏都发现不了
+    //   （第 7 轮 Spec 轴 P-N1 的变异实测：M3 / M10 去掉任一条比较 ⇒ 40 例全绿）。
+    //   本例的盒高 162 合格 ⇒ 只有宽那条判据能触发 ⇒ 宽比较被去掉就会漏。
+    const narrow = fabTree({ x: 872, y: 1808, width: 100, height: 162 });
+    expect(() => assertFabTree(narrow, opts)).toThrow(/布局盒宽/);
+  });
+
+  it("**高**不足 48dp（宽够）⇒ 抛错（同上：把高比较单独钉住）", () => {
+    const flat = fabTree({ x: 872, y: 1808, width: 162, height: 100 });
+    expect(() => assertFabTree(flat, opts)).toThrow(/布局盒高/);
   });
 
   it("盒右缘越过内容区右界 ⇒ 抛错（**坐标系用错时这条才转红**）", () => {
