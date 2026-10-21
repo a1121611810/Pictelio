@@ -39,6 +39,7 @@ import {
   deriveBleedLowerBound,
   describeNode,
   dpToPx,
+  expectSettled,
   fabCenter,
   findByClass,
   findBySemanticId,
@@ -50,6 +51,8 @@ import {
   screenFrame,
   surfaceWindowsFromTree,
   walkNodes,
+  type CaptureUiTreeResult,
+  type UiTreeArtifact,
   type UiTreeFrame,
   type UiTreeNode,
 } from "../ui-tree";
@@ -501,5 +504,47 @@ describe("ui-tree · 「哪一份最完整」（pickBest）", () => {
 
   it("空集合 ⇒ 抛错（不返回 undefined 让调用方拿到空树）", () => {
     expect(() => pickBest([])).toThrow(/产物集合为空/);
+  });
+});
+
+/**
+ * 「采样落齐」共享判据 `expectSettled`——第 10 轮 Standards 轴 S-N1 补上的 CI 覆盖。
+ *
+ * **为什么必须有**：它原本只活在三个 e2e spec 里（e2e 不进 CI ⇒ ADR-0084）⇒ 把它**变异成
+ * 空操作**（`void captured; void prefix;`）后，整条 CI 门禁仍 **59/59 全绿**（第 10 轮变异
+ * 实测）。它现在被三处 spec 共用 ⇒ 判据写坏了要等真机手动跑才看得见。
+ *
+ * **oracle**：判据自身对失败的承诺（不是从实现反推）——落齐 ⇒ 放行；未落齐 ⇒ 抛错，且信息
+ * 必须说清「没等齐」并带**场景前缀**（否则三处 spec 的失败信息分不清是哪一段没落齐）。
+ */
+describe("ui-tree · 「采样落齐」共享判据 expectSettled", () => {
+  /** 造一份抓树结果（判据只读 `settled`，其余字段占位）。 */
+  function capture(settled: boolean): CaptureUiTreeResult {
+    const best: UiTreeArtifact = {
+      name: "ui-tree-hot-4000ms-0-0.json",
+      point: "hot",
+      delayMs: 4000,
+      tree: { tag: "page" },
+      nodeCount: 1,
+      bytes: 1,
+      localPath: "/tmp/fake-ui-tree.json",
+    };
+    return { artifacts: [best], best, settled, timedOut: !settled };
+  }
+
+  it("落齐 ⇒ 放行（不抛）", () => {
+    expect(() => expectSettled(capture(true), "Me 页")).not.toThrow();
+  });
+
+  it("未落齐 ⇒ 抛错，且失败信息说清「没等齐」并带场景前缀", () => {
+    let message = "";
+    try {
+      expectSettled(capture(false), "Me 页");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message, "未落齐时必须抛错，不能静默继续往下走").not.toBe("");
+    expect(message).toContain("Me 页");
+    expect(message).toContain("未落齐");
   });
 });
