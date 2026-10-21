@@ -39,13 +39,13 @@ _Avoid_: 把 `LruCache`（容器）与 `ImageMemoryCache`（容器的使用者�
 `capacitor-storage_*` / `CapacitorStorage` 是历史用户数据格式：**一字不改**（ADR-0050）。首启由 `SecureStorageCompat` 迁移进 Keystore 体系。
 
 ### 运行时 UI 树观测通道（runtime UI tree dump）
-**第三条观测通道**：绕开「a11y 树不暴露节点」与「`uiautomator dump` 被 SIGKILL」两条既有死路，直接从引擎拿运行时 UI 节点树。宿主侧承载类是 `UiTreeDump`（`src/lynx/java/io/pictelio/app/`），诊断脚本是 `scripts/dump-ui-tree.mjs`，纯逻辑在 `scripts/lib/ui-tree-dump-core.mjs`。
+**第三条观测通道**：绕开「a11y 树不暴露节点」与「`uiautomator dump` 被 SIGKILL」两条既有死路，直接从引擎拿运行时 UI 节点树。宿主侧承载类是 `UiTreeDump`（`src/lynx/java/io/pictelio/app/`），诊断脚本是 `scripts/dump-ui-tree.mjs`，纯逻辑在 `scripts/lib/ui-tree-dump-core.mjs`，**e2e 消费侧**共享模块是 `tests/android-e2e/ui-tree.ts`（触发 → 等落齐 → `adb pull` → 解析 → 按 class / 文本定位；#1047）。
 - **触发**：intent extra `uiTreeDump=1`（非空串即触发）；两个采样点——冷启动 `onLoadSuccess`（`cold`）、热启动 `onNewIntent`（`hot`）；一次触发**连拍三档**（0 / 1500 / 4000ms）。
 - **产物**：应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json`，引擎原始 JSON **不加工**落盘（摘要由脚本现算）。
 - **门禁**：`BuildConfig.DEBUG` 作为**判定函数的入参**（非埋在分支里）⇒ release 变体下为恒 false 死代码、被 R8 移除。
 - **能力边界**：**拿不到源码位置**——官方 UI source map 的构建期打标（`enableUiSourceMap`）是 React-only，vue-lynx 侧无 producer（ADR-0223 §2.1）。**「拿不到源码位置」≠「拿不到组件身份」**：树里带 Tailwind `class` / 语义 `id` / `accessibility-label` / `vue-ref` / 事件 / 两套坐标系。⚠️ 组件身份是**反推**出来的（靠 `class` / 语义 `id` 人工推断）——**树里没有组件名 / 文件名字段**，别写成「直接看出是哪个组件」。
 - **跨端协议**：触发键、目录名、产物名前后缀、采样档位、采样点标识**同时存在于 Java 与 Node 两侧且无共享代码** ⇒ 由 `UiTreeDumpProtocolContractTest` 做逐字比对（含行为面）。
-_Avoid_: 「UI source map / 源码反解」（Vue 侧无 producer，判死）·「e2e 断言接入」（另开票 #1047）· 把本通道说成「能定位到源码行」
+_Avoid_: 「UI source map / 源码反解」（Vue 侧无 producer，判死）·「树能给出颜色 / 圆角 / alpha」（树只给**布局盒与结构**，颜色类量一律留像素）· 把本通道说成「能定位到源码行」
 
 ### 测试分层
 - `tests/unit/`（vitest，随 CI `test:all`）：契约测试（`agentsMd.contract` / `webviewRemovalInvariants` / `e2eContractSuiteCollected`）+ `scripts/` 发布链与 git 校验测试。
