@@ -459,7 +459,7 @@ describe.skipIf(SKIPPED)(
       });
       // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」
       // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
-      expectSettled(captured);
+      expectSettled(captured, "主界面");
       capturedTree = captured.best.tree;
       const treeCenter = fabCenter(captured.best.tree);
       fabTap = { x: Math.round(treeCenter.x), y: Math.round(treeCenter.y) };

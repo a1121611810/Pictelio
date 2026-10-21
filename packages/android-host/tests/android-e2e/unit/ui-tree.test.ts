@@ -186,6 +186,15 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(text).toContain("pictelio-hero-source-<n>");
     // nodeId 是**序号**不是作品 id ⇒ 不脱敏（它是定位节点的关键）
     expect(text).toContain("nodeId=42");
+    // ⚠️ **阈值下界从两侧钉住**（#1047 第 11 轮 Spec 轴 F2）：本用例原本只喂 **9 位**
+    //   id ⇒ 正则从 `\d{3,}` 放宽到 `\d{5,}` / `\d{7,}` / `\d{9,}` 时 CI **仍全绿**
+    //   ⇒ 实现里写下的「只脱敏连续 **3 位以上**的数字」这条承诺没有任何机器防线。
+    //   期望值出处 = 实现自身的**文档化契约**（`ui-tree.ts` `redactArtworkId` 的
+    //   JSDoc「只脱敏**连续 3 位以上的数字**」），不是从实现反推。
+    const three = describeNode({ ...node, attributes: { id: "pictelio-hero-source-123" } });
+    const two = describeNode({ ...node, attributes: { id: "pictelio-hero-source-12" } });
+    expect(three, "3 位数字串也必须脱敏（阈值下界 = 3）").toContain("pictelio-hero-source-<n>");
+    expect(two, "不足 3 位的不脱敏（阈值不是 1 也不是 2）").toContain("pictelio-hero-source-12");
   });
 
   it("describeNode 对**非字符串** id 不崩（引擎哪天改成数字 id，失败信息不能变成崩溃）", () => {
