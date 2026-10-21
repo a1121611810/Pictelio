@@ -360,6 +360,11 @@ function redactArtworkId(id: string): string {
  *   类型**不保证**是 string（今天实测是 string，但引擎某天改成数字型就会让
  *   `.replace` 抛 `TypeError` ⇒ 把一条可读的断言失败变成崩溃）。
  *   ⇒ 非字符串一律 `String(...)` 化（数字 id 转成字符串后再脱敏）。
+ *
+ * ⚠️ **返回值已经是脱敏后的**（第 4 轮 Standards 轴 S-N5）：调用方**直接用**，
+ *   **不要**再套一层 `redactArtworkId(...)` —— 同一份 id 在同一文件里脱敏两次
+ *   看着无害（`\d{3,}` → `<n>` 是幂等的），但那是两份同形逻辑，正是本文件
+ *   自己反复强调要避免的「抄两份就会漂」。
  */
 function redactedIdOf(node: UiTreeNode): string {
   const raw = node.id || node.attributes?.id;
@@ -376,7 +381,7 @@ export function describeNode(node: UiTreeNode): string {
   return [
     `tag=${node.tag ?? "?"}`,
     `nodeId=${node.nodeId ?? "?"}`,
-    id ? `id=${redactArtworkId(id)}` : null,
+    id ? `id=${id}` : null,
     frame,
     events.length ? `events=[${events.join(",")}]` : null,
     `class=[${classTokens(node).join(" ")}]`,

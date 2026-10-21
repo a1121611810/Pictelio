@@ -323,8 +323,21 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
  *
  * 首跑写死 (906,1760)：距推导圆心 80px > 圆盘半径 57.6px ⇒ 点在环项之间的**空隙**，
  * 菜单收起、回到列表，报错却写「SearchSheet 未打开」，把排查引向布局回归。已由单测钉死。
+ *
+ * ⚠️ 这里存的是**相对 FAB 圆心的偏移**，不是绝对坐标（第 4 轮 Standards 轴 S-N1）：
+ *   `fabSearchItemPx` = `fabCenterPx` + 极坐标偏移 ⇒ 它**几何上就是相对圆心定义的**。
+ *   圆心改用**树给的**之后，若这里仍写绝对坐标 ⇒ FAB 一动它就偏 ⇒ 第二跳点空 ⇒
+ *   报出「点击内环搜索项后放射菜单未收起」这种**误导性**失败信息（把排查引向
+ *   布局回归，而真实原因是本测试的坐标口径陈旧）。
+ *
+ * ⚠️ **今天的落点逐字不变**：偏移取**取整后**两者之差（(901,1680) − (953,1889)
+ *   = (-52,-209)）⇒ 树给的圆心 (953,1889) + 该偏移 = **(901,1680)**，与改动前的
+ *   绝对常量**逐字一致** ⇒ 本次改动**不改变任何当前行为**。
  */
-const FAB_SEARCH_ITEM_TAP = roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT));
+const FAB_SEARCH_ITEM_OFFSET = {
+  x: roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT)).x - FAB_TAP.x,
+  y: roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT)).y - FAB_TAP.y,
+};
 
 // ── 帧对比阈值（差异采样点数，步长 2；fab spec 同量纲。首跑如误判优先校准这里）──
 /** 稳定判定：两次连拍差异 ≤ 此值视为画面已静止 */
@@ -1186,7 +1199,13 @@ describe.skipIf(SKIPPED)(
         await diffRegion(beforeFab, afterFab, REGION_TOPREF),
         "点击 FAB 后放射菜单未展开（坐标或层级回归，证据 r2-*-fab.png）",
       ).toBeGreaterThan(CHANGE_TH);
-      tap(FAB_SEARCH_ITEM_TAP.x, FAB_SEARCH_ITEM_TAP.y);
+      // 内环「搜索」项：**树给的圆心 + 固定偏移**（见 `FAB_SEARCH_ITEM_OFFSET`
+      // 的说明）——今天与旧的绝对常量逐字相同 (901,1680)，布局变了才跟着走。
+      const searchItemTap = {
+        x: tapX + FAB_SEARCH_ITEM_OFFSET.x,
+        y: tapY + FAB_SEARCH_ITEM_OFFSET.y,
+      };
+      tap(searchItemTap.x, searchItemTap.y);
       await SLEEP(2_000);
       const afterSearchItem = await screenshot("r2-search-sheet");
       const menuRegion: Region = { x0: 500, y0: 1400, x1: 1000, y1: 2050 };
