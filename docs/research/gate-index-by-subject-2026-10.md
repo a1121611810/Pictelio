@@ -288,7 +288,7 @@
 
 1. 被测对象的判定 = 同名配对（`X.test.ts` ↔ `X.ts`）**或**测试源码内出现该文件路径字面量。**仅 `import` 的依赖不算**——构建过程中 `src/api/types.ts` 曾因类型导入被误挂 16 个门禁，已剔除。
 2. 全仓扫描型的判定 = 测试内出现共享遍历器 / 硬编码扫描根，**且**其路径字面量里没有具体`.vue`/`.ts` 文件名（判据对象是目录而非文件）。矩阵型门禁（如 `md3GuardScans`、`hardcodeColorGate`、`bottomOcclusionAllowance`）扫描的是**具名组件列表**，已归入第一节按组件索引。
-3. 覆盖范围：app-lynx 的 158 个「引用文档」测试文件。`packages/android-host` 的测试与其余共享包的测试未纳入（JVM/纯逻辑，与 lynx 源码不同源）。⚠️ **这里不写 android-host 的测试文件数**：该数字随分支增删而漂，写死必然过期（第 4 轮 Standards 轴 S-N6 实测：本仓此处的旧值在 `main` 上就不成立）⇒ 要核实时按 `find packages/android-host -name "*.test.ts" -not -path "*/node_modules/*" | wc -l` 现算。
+3. 覆盖范围：app-lynx 的 158 个「引用文档」测试文件。`packages/android-host` 的测试与其余共享包的测试未纳入（JVM/纯逻辑，与 lynx 源码不同源）。⚠️ **这里不写 android-host 的测试文件数**：该数字随分支增删而漂，写死必然过期（#1047 第 4 轮 Standards 轴 S-N6 实测：本仓此处的旧值在 `main` 上就不成立）⇒ 要核实时按 `find packages/android-host -name "*.test.ts" -not -path "*/node_modules/*" | wc -l` 现算。
 4. 档位与误红数来自两轮盘点，**未复核的反向锁候选不在其中**——见普查文档的复核状态表。
 5. 本表由静态路径引用提取得出，**不含运行时动态加载的对象**；若某门禁在运行期读文件而源码里只有变量拼接路径，可能漏映射。发现漏映射时以本文档第 2 条口径手工补。
 

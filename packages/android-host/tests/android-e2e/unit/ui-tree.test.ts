@@ -186,19 +186,22 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(text).toContain("pictelio-hero-source-<n>");
     // nodeId 是**序号**不是作品 id ⇒ 不脱敏（它是定位节点的关键）
     expect(text).toContain("nodeId=42");
-    // ⚠️ **阈值下界从两侧钉住**（#1047 第 11 轮 Spec 轴 F2）：本用例原本只喂 **9 位**
-    //   id ⇒ 正则从 `\d{3,}` 放宽到 `\d{5,}` / `\d{7,}` / `\d{9,}` 时 CI **仍全绿**
-    //   ⇒ 实现里写下的「只脱敏连续 **3 位以上**的数字」这条承诺没有任何机器防线。
+    // ⚠️ **阈值两侧都钉住**（下界 = #1047 第 11 轮 Spec 轴 F2 · 上界 = #1047 第 14 轮
+    //   Standards 轴 S-R14-N2）：**下界**——本用例原本只喂 **9 位** id ⇒ 正则从 `\d{3,}`
+    //   放宽到 `\d{5,}` / `\d{7,}` / `\d{9,}` 时 CI **仍全绿**；**上界**——只钉下界时
+    //   正则收窄成 `\d{3}` CI **也仍全绿**（4 位串脱敏成 `<n>4` ⇒ 尾部数字照样泄漏）。
     //   期望值出处 = 实现自身的**文档化契约**（`ui-tree.ts` `redactArtworkId` 的
-    //   JSDoc「只脱敏**连续 3 位以上的数字**」），不是从实现反推。
+    //   JSDoc「只脱敏**连续 3 位以上的数字**」= 上不封顶 ⇒ 整段脱敏），不是从实现反推。
     const three = describeNode({ ...node, attributes: { id: "pictelio-hero-source-123" } });
     const two = describeNode({ ...node, attributes: { id: "pictelio-hero-source-12" } });
     expect(three, "3 位数字串也必须脱敏（阈值下界 = 3）").toContain("pictelio-hero-source-<n>");
     expect(two, "不足 3 位的不脱敏（阈值不是 1 也不是 2）").toContain("pictelio-hero-source-12");
+    const four = describeNode({ ...node, attributes: { id: "pictelio-hero-source-1234" } });
+    expect(four, "4 位串必须整段脱敏（上不封顶）").toMatch(/id=pictelio-hero-source-<n> /);
   });
 
   it("describeNode 对**非字符串** id 不崩（引擎哪天改成数字 id，失败信息不能变成崩溃）", () => {
-    // 第 3 轮 Standards 轴 N6：`id` 来自引擎 JSON，类型不保证；直接 `.replace`
+    // #1047 第 3 轮 Standards 轴 N6：`id` 来自引擎 JSON，类型不保证；直接 `.replace`
     // 会抛 TypeError ⇒ 把一条可读的断言失败变成崩溃。
     const node: UiTreeNode = {
       tag: "view",
@@ -448,7 +451,7 @@ describe("ui-tree · FAB 树断言（共享判据 assertFabTree）", () => {
   it("**宽**不足 48dp（高够）⇒ 抛错（宽高两条判据**分维度**钉住）", () => {
     // ⚠️ 为什么要分维度：只给「宽高同时不足」的样本时，**单独去掉宽比较或单独去掉
     //   高比较，测试仍全绿** ⇒ 判据变成「联合钉住」，任一条被写坏都发现不了
-    //   （第 7 轮 Spec 轴 P-N1 的变异实测：M3 / M10 去掉任一条比较 ⇒ 40 例全绿）。
+    //   （#1047 第 7 轮 Spec 轴 P-N1 的变异实测：M3 / M10 去掉任一条比较 ⇒ 40 例全绿）。
     //   本例的盒高 162 合格 ⇒ 只有宽那条判据能触发 ⇒ 宽比较被去掉就会漏。
     const narrow = fabTree({ x: 872, y: 1808, width: 100, height: 162 });
     expect(() => assertFabTree(narrow, opts)).toThrow(/布局盒宽/);
@@ -517,10 +520,10 @@ describe("ui-tree · 「哪一份最完整」（pickBest）", () => {
 });
 
 /**
- * 「采样落齐」共享判据 `expectSettled`——第 10 轮 Standards 轴 S-N1 补上的 CI 覆盖。
+ * 「采样落齐」共享判据 `expectSettled`——#1047 第 10 轮 Standards 轴 S-N1 补上的 CI 覆盖。
  *
  * **为什么必须有**：它原本只活在三个 e2e spec 里（e2e 不进 CI ⇒ ADR-0084）⇒ 把它**变异成
- * 空操作**（`void captured; void prefix;`）后，整条 CI 门禁仍 **59/59 全绿**（第 10 轮变异
+ * 空操作**（`void captured; void prefix;`）后，整条 CI 门禁仍 **59/59 全绿**（#1047 第 10 轮变异
  * 实测）。它现在被三处 spec 共用 ⇒ 判据写坏了要等真机手动跑才看得见。
  *
  * **oracle**：判据自身对失败的承诺（不是从实现反推）——落齐 ⇒ 放行；未落齐 ⇒ 抛错，且信息

@@ -319,7 +319,7 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
  * 首跑写死 (906,1760)：距推导圆心 80px > 圆盘半径 57.6px ⇒ 点在环项之间的**空隙**，
  * 菜单收起、回到列表，报错却写「SearchSheet 未打开」，把排查引向布局回归。已由单测钉死。
  *
- * ⚠️ 这里存的是**相对 FAB 圆心的偏移**，不是绝对坐标（第 4 轮 Standards 轴 S-N1）：
+ * ⚠️ 这里存的是**相对 FAB 圆心的偏移**，不是绝对坐标（#1047 第 4 轮 Standards 轴 S-N1）：
  *   `fabSearchItemPx` = `fabCenterPx` + 极坐标偏移 ⇒ 它**几何上就是相对圆心定义的**。
  *   圆心改用**树给的**之后，若这里仍写绝对坐标 ⇒ FAB 一动它就偏 ⇒ 第二跳点空 ⇒
  *   报出「点击内环搜索项后放射菜单未收起」这种**误导性**失败信息（把排查引向
@@ -1105,7 +1105,7 @@ describe.skipIf(SKIPPED)(
       // 「那个元素在不在 / 能不能点 / 多大」只有树能答；像素只能答「画面变没变」。
       // 树断言判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）。
       // ⚠️ 原先本 spec 与 `fab-hit-testing-regression` 各写了一份 32 行、归一化后只差
-      //   变量名与消息前缀（第 6 轮 Standards 轴 S-N3）⇒ 收口到共享模块，
+      //   变量名与消息前缀（#1047 第 6 轮 Standards 轴 S-N3）⇒ 收口到共享模块，
       //   避免「改一处漏一处」。
       assertFabTree(r2Tree, {
         prefix: "R2：",
@@ -1149,7 +1149,7 @@ describe.skipIf(SKIPPED)(
             `vw 推算口径 fabCenterPx 需要重新校准，或在树已全面接管后直接删掉。`,
         );
       }
-      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（第 3 轮 Standards 轴 B1）：
+      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（#1047 第 3 轮 Standards 轴 B1）：
       //   点击坐标 `fabPoint` 就是**这棵树同一个节点**的布局盒中心
       //   （`fabCenter(r2Tree)` 算出来的），断言「圆心落在自己那个盒内」
       //   在**结构上不可能失败** ⇒ 它是一条恒真断言。

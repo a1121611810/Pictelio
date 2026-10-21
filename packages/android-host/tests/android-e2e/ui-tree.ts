@@ -331,7 +331,7 @@ export function dpToPx(dp: number, densityScale: number): number {
  *   抄三份就会漂」）。密度本身由 `assertDeviceGeometry`（`pixel.ts`）逐台校验
  *   `wm density` 匹配 `/480/` ⇒ 写死 480 推出的 3 是**有依据的**，不是随手取的魔数。
  *
- * ⚠️ **三个 spec 用它的方式并不完全一样**（第 3 轮 Standards 轴 N3 订正）：
+ * ⚠️ **三个 spec 用它的方式并不完全一样**（#1047 第 3 轮 Standards 轴 N3 订正）：
  *   `fab-hit-testing` / `transition-matrix` **直接**用本常量；
  *   `md3-visual-tokens` 用**设备实读**的 `wm density`（初值取自本常量）——
  *   那是个**更强**的口径（以设备为准），且因为 `assertDeviceGeometry` 钉死 480，
@@ -360,12 +360,12 @@ function redactArtworkId(id: string): string {
 /**
  * 取节点的语义 id 并**脱敏**。
  *
- * ⚠️ 为什么要有类型兜底（第 3 轮 Standards 轴 N6）：`id` 来自引擎吐出的 JSON，
+ * ⚠️ 为什么要有类型兜底（#1047 第 3 轮 Standards 轴 N6）：`id` 来自引擎吐出的 JSON，
  *   类型**不保证**是 string（今天实测是 string，但引擎某天改成数字型就会让
  *   `.replace` 抛 `TypeError` ⇒ 把一条可读的断言失败变成崩溃）。
  *   ⇒ 非字符串一律 `String(...)` 化（数字 id 转成字符串后再脱敏）。
  *
- * ⚠️ **返回值已经是脱敏后的**（第 4 轮 Standards 轴 S-N5）：调用方**直接用**，
+ * ⚠️ **返回值已经是脱敏后的**（#1047 第 4 轮 Standards 轴 S-N5）：调用方**直接用**，
  *   **不要**再套一层 `redactArtworkId(...)` —— 同一份 id 在同一文件里脱敏两次
  *   看着无害（`\d{3,}` → `<n>` 是幂等的），但那是两份同形逻辑，正是本文件
  *   自己反复强调要避免的「抄两份就会漂」。
@@ -402,7 +402,7 @@ export function describeNode(node: UiTreeNode): string {
  * ## 为什么是共享函数而不是各 spec 各写一段
  *
  * 这组判据在 `fab-hit-testing-regression` 与 `transition-matrix` 里**完全同形**
- * （第 6 轮 Standards 轴实测：归一化后 32 行 vs 32 行，只差变量名与消息前缀）。
+ * （#1047 第 6 轮 Standards 轴实测：归一化后 32 行 vs 32 行，只差变量名与消息前缀）。
  * 而本文件自己反复强调「抄三份就会漂」（见 `FAB_CLASS_TOKENS` 的注释）⇒
  * **判据必须只有一份**，否则改了一处、另一处就静默留着旧口径。
  *
@@ -421,7 +421,7 @@ export function describeNode(node: UiTreeNode): string {
  *   **完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错时门禁是绿的。
  *
  * ⚠️ **刻意不含**「点击坐标 ∈ 屏幕盒」那类断言：点击坐标就是这个节点的盒中心
- *   （树值对树值）⇒ 结构上不可能失败 ⇒ 那是恒真断言（第 3 轮 Standards 轴 B1）。
+ *   （树值对树值）⇒ 结构上不可能失败 ⇒ 那是恒真断言（#1047 第 3 轮 Standards 轴 B1）。
  *   「点到的到底是不是那个元素」由**独立来源**回答。
  *
  * @param tree 抓回来的运行时 UI 树
@@ -450,7 +450,7 @@ export interface FabTreeAssertOptions {
 /**
  * 见 {@link FabTreeAssertOptions}。
  *
- * ⚠️ **「判据只有一份」的准确范围**（第 7 轮 Standards 轴 S-N2 实测校准）：本函数覆盖
+ * ⚠️ **「判据只有一份」的准确范围**（#1047 第 7 轮 Standards 轴 S-N2 实测校准）：本函数覆盖
  *   **FAB 的几何与可点性判据**（7 条）。三个消费方里：
  *   - `fab-hit-testing-regression` / `transition-matrix` ⇒ **完全**用它；
  *   - `md3-visual-tokens` 的 **A4** ⇒ 用它 + 自己两条独有判据（宽 ≤ 屏宽 80% /

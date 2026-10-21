@@ -42,7 +42,7 @@ import { pickBestArtifact } from "../../../scripts/lib/ui-tree-dump-core.mjs";
 //
 // ── 已知失效面（显式登记，非缺陷）──
 //
-// - **源文本守卫只认「排序 / 比较」这两种自带规则的写法**。第 3 轮 Standards 轴
+// - **源文本守卫只认「排序 / 比较」这两种自带规则的写法**。#1047 第 3 轮 Standards 轴
 //   实测：手写 `reduce` 找最大**会**被「比较 nodeCount」那条抓到；真正漏掉的是
 //   **先解构再比较**（`const { nodeCount: n } = a; n > m`）——字段名不出现 ⇒ 模式
 //   全部落空。⇒ 守卫是**纵深防御**，不是完备证明（真正的完备性来自「两侧共用同一
@@ -73,7 +73,7 @@ function artifact(name: string, nodeCount: number, delayMs: number, bytes: numbe
  *
  * ① **比较运算符**（`>` / `<` / `===` …）：最直接的写法。
  * ② **同字段相减**（`b.bytes - a.bytes`）：core 层 tie-break 用的就是这一形式 ⇒
- *    只禁比较运算符会**漏掉它**（第 3 轮实测：`bytes` 那条比较模式在 core 层
+ *    只禁比较运算符会**漏掉它**（#1047 第 3 轮实测：`bytes` 那条比较模式在 core 层
  *    根本不命中 ⇒ 阳性对照当场抓到「这条模式可能写坏了」）。
  *
  * ⚠️ 两处写法细节（都是被实测逼出来的）：
@@ -155,7 +155,7 @@ describe("UI 树产物选档 · 两个消费侧都不得自带规则（纵深防
   });
 
   it("e2e 消费层同样从 core 层 import 并调用 pickBestArtifact（两侧对称）", () => {
-    // ⚠️ 第 3 轮 Spec 轴 N-C：守卫原先**只覆盖编排层** ⇒ e2e 侧若把排序规则就地
+    // ⚠️ #1047 第 3 轮 Spec 轴 N-C：守卫原先**只覆盖编排层** ⇒ e2e 侧若把排序规则就地
     //   复制一份（行为不变），两侧就分叉而无人察觉 ⇒ 守卫必须对称。
     expect(e2eConsumerSrc).toMatch(
       /import\s*\{[^}]*\bpickBestArtifact\b[^}]*\}\s*from\s*"\.\.\/\.\.\/scripts\/lib\/ui-tree-dump-core\.mjs"/u,
@@ -184,7 +184,7 @@ describe("UI 树产物选档 · 两个消费侧都不得自带规则（纵深防
   });
 
   it("阳性对照：**逐条**模式在 core 层都命中（证明这条守卫不是恒绿，也不是半绿）", () => {
-    // ⚠️ 第 3 轮 Standards 轴 N4：原写法只断言「命中任意一条」⇒ 单条模式写错
+    // ⚠️ #1047 第 3 轮 Standards 轴 N4：原写法只断言「命中任意一条」⇒ 单条模式写错
     //   仍会绿（其它两条照样命中）。⇒ 逐条断言。
     for (const b of [...ORCHESTRATOR_ONLY_PATTERNS, ...SELF_RULE_PATTERNS]) {
       expect(

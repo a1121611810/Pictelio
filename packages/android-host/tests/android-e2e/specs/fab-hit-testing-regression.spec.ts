@@ -154,7 +154,7 @@ let capturedTree: UiTreeNode | null = null;
 /**
  * 外环「我的」项相对 FAB 圆心的 **x 偏移**（px，负 = 在圆心左侧）。
  *
- * ⚠️ 为什么是「偏移」而不是绝对坐标 576（第 4 轮 Standards 轴 S-N1）：
+ * ⚠️ 为什么是「偏移」而不是绝对坐标 576（#1047 第 4 轮 Standards 轴 S-N1）：
  *   该项是**外环**上的一项 ⇒ 几何上就是**相对 FAB 圆心**定义的（r≈377px、
  *   角度 -89.7°）。若圆心改用**树给的**、而 x 仍写绝对常量 576 ⇒ FAB 一动，
  *   这一项就偏 ⇒ 第二跳点空 ⇒ 报出「点击外环项后放射菜单未收起」这种
@@ -470,7 +470,7 @@ describe.skipIf(SKIPPED)(
           `；差 ${Math.round(Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y))}px`,
       );
       // 外环「我的」项跟着**树给的圆心**走（偏移量固定，圆心不固定）——
-      // 见 `ME_RING_OFFSET_X` 的说明（第 4 轮 Standards 轴 S-N1）。
+      // 见 `ME_RING_OFFSET_X` 的说明（#1047 第 4 轮 Standards 轴 S-N1）。
       meRingTap = { x: fabTap.x + ME_RING_OFFSET_X, y: fabTap.y };
       // ── 两套独立推导的**对照**（#1047 review 第 2 轮 Standards 轴 N5）──
       // 树给的圆心（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
@@ -516,10 +516,10 @@ describe.skipIf(SKIPPED)(
       if (!tree) throw new Error("缺运行时 UI 树");
       // 树断言判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）。
       // ⚠️ 原先本 spec 与 `transition-matrix` 各写了一份 32 行、归一化后只差变量名与
-      //   消息前缀（第 6 轮 Standards 轴 S-N3）⇒ 改一处漏一处的「漂」是必然的，
+      //   消息前缀（#1047 第 6 轮 Standards 轴 S-N3）⇒ 改一处漏一处的「漂」是必然的，
       //   而本仓的门禁纪律明令「抄三份就会漂」⇒ 收口到共享模块。
       assertFabTree(tree, { contentRight: CONTENT_RIGHT, contentBottom: CONTENT_BOTTOM });
-      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（第 3 轮 Standards 轴 B1）：
+      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（#1047 第 3 轮 Standards 轴 B1）：
       //   点击坐标 `fabTap` 就是**这棵树同一个节点**的布局盒中心
       //   （`beforeAll` 里 `fabCenter(captured.best.tree)` 算出来的），断言
       //   「圆心落在自己那个盒内」在**结构上不可能失败** ⇒ 它是一条恒真断言。
