@@ -31,11 +31,17 @@
  *   （登录页无 FAB 必红）。
  *
  * ── AVD 迁移：pictelio_low → pictelio_ui ──────────────────────────────────
- * 本用例的坐标常量（FAB_TAP / ME_RING_TAP / BOOKMARKS_ROW_TAP / SCRIM_CLOSE_TAP）
+ * 本用例的**剩余**坐标常量（`FAB_TAP` / `BOOKMARKS_ROW_TAP` / `SCRIM_CLOSE_TAP`）
  * 是按 pictelio_ui（android-34，1080×2160 / density 480）的 vw 几何静态推导的，
  * 换设备会静默失准（点空 → 假绿/假红）。故缺省 pin 到 pictelio_ui，并显式
  * ANDROID_E2E_AVD=pictelio_low 时整文件 skip（beforeAll 的 assertDeviceGeometry
  * 也会按分辨率/密度兜底）。**不可因为「不再需要 WebView」就放开到 pictelio_low。**
+ *
+ * ⚠️ **#1047 起 FAB 圆心不再来自常量**：`FAB_TAP` 已降级为**对照**（树给的圆心与它
+ *   差 >8px 就告警），实际点击用的是**运行时 UI 树给出的真实盒子**算出的圆心；
+ *   外环「我的」项的 y 跟随树给的圆心（`ME_RING_TAP` 这个标识符已随之消失）。
+ *   仍由常量决定的只剩 `BOOKMARKS_ROW_TAP`（Me 页那行的真实文本/层级**未取证**，
+ *   按文本定位会误伤，故本轮不改——理由已登记在 #1047）与 `SCRIM_CLOSE_TAP`。
  *
  * 纯 adb 驱动（仿 lynx-boot-renders.spec.ts 轻量模式；登录走 am start hook，无需
  * Appium webview context）。用例本体坐标常量推导式见常量注释；
@@ -54,7 +60,17 @@ import {
   startMainActivity,
 } from "../prefs";
 import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
-import { captureUiTree, fabCenter } from "../ui-tree";
+import {
+  FAB_CLASS_TOKENS,
+  captureUiTree,
+  describeNode,
+  dpToPx,
+  fabCenter,
+  findByClass,
+  nodeHasEvent,
+  screenFrame,
+  type UiTreeNode,
+} from "../ui-tree";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
@@ -110,6 +126,13 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
  * ⇒ 推算值降级为**对照**：两者差得多 ⇒ 布局变了（推算口径已陈旧），打日志点出来。
  */
 let fabTap = FAB_TAP;
+
+/**
+ * 本次抓到的运行时 UI 树（控制组用例的**树断言**用它）。
+ *
+ * ⚠️ 为什么单独存一份：`beforeAll` 抓树、后续 `it` 断言 ⇒ 跨用例传递。
+ */
+let capturedTree: UiTreeNode | null = null;
 
 // 外环「我的」项：实测落点 (576, 1887)，相对 FAB 圆心 r=377px、角度 -89.7°
 // （同帧另三项：推荐 (890,1520) r=374 -9.7°、插画 (735,1612) r=352 -38.2°、
@@ -394,6 +417,13 @@ describe.skipIf(SKIPPED)(
       const captured = await captureUiTree(serial, {
         outDir: resolve(EVIDENCE_DIR, "ui-tree"),
       });
+      // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」
+      // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
+      expect(
+        captured.settled,
+        "UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到",
+      ).toBe(true);
+      capturedTree = captured.best.tree;
       const treeCenter = fabCenter(captured.best.tree);
       fabTap = { x: Math.round(treeCenter.x), y: Math.round(treeCenter.y) };
       console.log(
@@ -425,6 +455,32 @@ describe.skipIf(SKIPPED)(
     });
 
     it("控制组：FAB 点击有反应（菜单展开，证明应用未假死）", async () => {
+      // ── 树断言：这一问像素答不了 ──
+      // 像素只能答「画面变没变」；「那个元素**在不在**、**能不能点**、**多大**」只有树能答。
+      // 树给的圆心就是下面实际点击的坐标 ⇒ 这几条把「点到了那个元素」钉成可复核的断言。
+      const tree = capturedTree;
+      expect(tree, "抓树失败：FAB 的树断言需要运行时 UI 树").not.toBeNull();
+      if (!tree) throw new Error("缺运行时 UI 树");
+      const hits = findByClass(tree, FAB_CLASS_TOKENS);
+      expect(hits, "按 class 定位主 FAB 应唯一").toHaveLength(1);
+      const node = hits[0]!;
+      expect(nodeHasEvent(node, "tap"), `FAB 节点未绑定 tap 事件：${describeNode(node)}`).toBe(
+        true,
+      );
+      const f = screenFrame(node);
+      expect(f, `FAB 节点缺 frameInScreen：${describeNode(node)}`).not.toBeNull();
+      // 触控目标门限：density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
+      const minPx = dpToPx(48, 3);
+      expect(f!.width, `FAB 布局盒宽 ${f!.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
+        minPx,
+      );
+      expect(f!.height, `FAB 布局盒高 ${f!.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
+        minPx,
+      );
+      // 实际点击的坐标 == 树给的盒子算出的圆心（不是 vw 推算值）
+      expect(Math.round(fabCenter(tree).x), "实际点击的 x 应等于树给的 FAB 圆心 x").toBe(fabTap.x);
+      expect(Math.round(fabCenter(tree).y), "实际点击的 y 应等于树给的 FAB 圆心 y").toBe(fabTap.y);
+
       const before = screenshot(serial, "ctl-before-fab-tap");
       tap(serial, fabTap.x, fabTap.y);
       await SLEEP(1_200);

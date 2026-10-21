@@ -79,7 +79,18 @@ import {
   runCapture,
   runOrThrow,
 } from "../env";
-import { collectUiTree, fabCenter, snapshotRemoteArtifacts, type UiTreeNode } from "../ui-tree";
+import {
+  FAB_CLASS_TOKENS,
+  collectUiTree,
+  describeNode,
+  dpToPx,
+  fabCenter,
+  findByClass,
+  nodeHasEvent,
+  screenFrame,
+  snapshotRemoteArtifacts,
+  type UiTreeNode,
+} from "../ui-tree";
 import {
   currentTopActivity,
   forceStopApp,
@@ -607,6 +618,12 @@ async function launchBenchNav(
     before,
     outDir: resolve(EVIDENCE_DIR, "ui-tree", scenario),
   });
+  // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」可能
+  // 没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
+  expect(
+    captured.settled,
+    `benchNav ${scenario}：UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到`,
+  ).toBe(true);
   console.log(
     `[transition-matrix] benchNav ${scenario} 树：${captured.best.name}（${captured.best.point} / ` +
       `${captured.best.delayMs}ms / ${captured.best.nodeCount} 节点）`,
@@ -1074,6 +1091,31 @@ describe.skipIf(SKIPPED)(
     it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async (t) => {
       // 深链重进 /illusts（与 R1 状态解耦），经放射 FAB 内环搜索项打开 SearchSheet
       const r2Tree = await launchBenchNav("illust", { captureTree: true });
+      // 树抓不到 ⇒ **显式失败**，不静默退回 vw 推算常量（#1047 review 第 1 轮 Standards 轴 J1：
+      // 静默回退会让「树缺失」表现为「点偏了」，两种病因混成一种症状）。
+      expect(r2Tree, "R2：抓不到运行时 UI 树 ⇒ 无法用树给的 FAB 落点").not.toBeNull();
+      if (!r2Tree) throw new Error("缺运行时 UI 树");
+      // ── 树断言（#1047）：这一问像素答不了 ──
+      // 「那个元素在不在 / 能不能点 / 多大」只有树能答；像素只能答「画面变没变」。
+      const fabHits = findByClass(r2Tree, FAB_CLASS_TOKENS);
+      expect(fabHits, "R2：按 class 定位主 FAB 应唯一").toHaveLength(1);
+      const fabNode = fabHits[0]!;
+      expect(
+        nodeHasEvent(fabNode, "tap"),
+        `R2：FAB 节点未绑定 tap 事件：${describeNode(fabNode)}`,
+      ).toBe(true);
+      const fabFrame = screenFrame(fabNode);
+      expect(fabFrame, `R2：FAB 节点缺 frameInScreen：${describeNode(fabNode)}`).not.toBeNull();
+      // density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
+      const minFabPx = dpToPx(48, 3);
+      expect(
+        fabFrame!.width,
+        `R2：FAB 布局盒宽 ${fabFrame!.width}px < 48dp=${minFabPx}px`,
+      ).toBeGreaterThanOrEqual(minFabPx);
+      expect(
+        fabFrame!.height,
+        `R2：FAB 布局盒高 ${fabFrame!.height}px < 48dp=${minFabPx}px`,
+      ).toBeGreaterThanOrEqual(minFabPx);
       // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
       // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
       // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
@@ -1085,7 +1127,20 @@ describe.skipIf(SKIPPED)(
       const beforeFab = await screenshot("r2-before-fab");
       // FAB 落点**树优先**（#1047）：树给的真实盒子 vs vw 推算的常量
       // （推算口径是「设计常量 + 稳定区高度」⇒ 布局一改就偏）。
-      const fabPoint = r2Tree ? fabCenter(r2Tree) : FAB_TAP;
+      // ⚠️ 不再有「树缺失就退回推算常量」的分支：树缺失是**显式失败**（见上）。
+      const fabPoint = fabCenter(r2Tree);
+      // 与 vw 推算口径**对照**：差得多 ⇒ 布局已变（推算口径陈旧）。以树为准。
+      const fabDrift = Math.hypot(fabPoint.x - FAB_TAP.x, fabPoint.y - FAB_TAP.y);
+      console.log(
+        `[transition-matrix] R2 FAB 落点：树 = (${Math.round(fabPoint.x)}, ${Math.round(fabPoint.y)})` +
+          `；vw 推算 = (${FAB_TAP.x}, ${FAB_TAP.y})；差 ${Math.round(fabDrift)}px`,
+      );
+      if (fabDrift > 8) {
+        console.warn(
+          `[transition-matrix] R2 树给的 FAB 落点与 vw 推算口径相差 >8px ⇒ 布局已变` +
+            "（以树为准，但推算口径 `fabCenterPx` 该重新校准了）。",
+        );
+      }
       tap(Math.round(fabPoint.x), Math.round(fabPoint.y));
       await SLEEP(1_500);
       const afterFab = await screenshot("r2-after-fab");

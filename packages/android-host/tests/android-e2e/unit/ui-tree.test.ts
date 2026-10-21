@@ -29,15 +29,19 @@ import { fileURLToPath } from "node:url";
 
 import * as uiTree from "../ui-tree";
 import {
+  FAB_CLASS_TOKENS,
   classTokens,
   deriveBleedLowerBound,
   describeNode,
   dpToPx,
+  fabCenter,
   findByClass,
   findBySemanticId,
   findByText,
+  findFab,
   nodeEventNames,
   nodeHasEvent,
+  pickBest,
   screenFrame,
   surfaceWindowsFromTree,
   walkNodes,
@@ -53,11 +57,15 @@ const FIXTURE = resolvePath(
 const tree = JSON.parse(readFileSync(FIXTURE, "utf-8")) as UiTreeNode;
 
 /**
- * 主 CTA 的 class 定位口径（与 spec `md3-visual-tokens` 的 A4 断言同口径）。
+ * 主 CTA 的 class 定位口径**直接取共享模块的 `FAB_CLASS_TOKENS`**（不复制一份）。
+ *
+ * ⚠️ 为什么不能在本文件里手写一份（`["absolute","z-30","bg-primary-container"]`）：
+ *   手写副本 ⇒ 出厂常量漂移时（加/减 token）本文件**仍全绿** ⇒ 护栏失守，
+ *   而「按 class 定位的唯一性」恰恰是本文件要守的东西。测试硬约束 #2：
+ *   契约测试必须使用**真实来源**的字段，不得手写自洽副本。
  *
  * ⚠️ 三个 token **必须全部命中**：`absolute` / `z-30` 单独用都命中几十处。
  */
-const CTA_CLASS_TOKENS = ["absolute", "z-30", "bg-primary-container"] as const;
 
 /**
  * 取出唯一命中的节点。
@@ -87,12 +95,12 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
   });
 
   it("按 class 全命中定位到**唯一**的主 CTA", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
-    expect(classTokens(cta)).toEqual(expect.arrayContaining([...CTA_CLASS_TOKENS]));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    expect(classTokens(cta)).toEqual(expect.arrayContaining([...FAB_CLASS_TOKENS]));
   });
 
   it("坐标系口径：CTA 的 frameInScreen = (872,1808,162,162)，与像素实测经验值逐字一致", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     expect(screenFrame(cta)).toEqual({ x: 872, y: 1808, width: 162, height: 162 });
     // 既有 e2e 的像素实测经验值（md3-visual-tokens 的注释里逐字记着 x 872..1033 / y 1808..1969）
     const f = frameOf(cta);
@@ -101,7 +109,7 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
   });
 
   it("坐标系口径：frameInRoot 与 frameInScreen 差 81px ⇒ 用错坐标系会静默挂错盒", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     const screen = frameOf(cta);
     const root = cta.position?.frameInRoot;
     if (!root) throw new Error("样本节点应带 frameInRoot（用于对照两套坐标系）");
@@ -126,14 +134,14 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
   });
 
   it("可交互性：CTA 绑定了 tap 事件（树能答「能不能点」，像素答不了）", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     expect(nodeEventNames(cta)).toEqual(["tap"]);
     expect(nodeHasEvent(cta, "tap")).toBe(true);
     expect(nodeHasEvent(cta, "longpress")).toBe(false);
   });
 
   it("尺寸换算：162px = 54dp ≥ 48dp（触控目标门限成立）", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     const f = frameOf(cta);
     const minPx = dpToPx(48, 3);
     expect(minPx).toBe(144);
@@ -142,7 +150,7 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
   });
 
   it("describeNode 把 frame / events / class 都带进失败信息", () => {
-    const cta = only(findByClass(tree, CTA_CLASS_TOKENS));
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     const text = describeNode(cta);
     expect(text).toContain("frame=(872,1808,162,162)");
     expect(text).toContain("events=[tap]");
@@ -198,14 +206,14 @@ describe("ui-tree · 采样窗推导（树给布局事实，不用像素反推�
 
 describe("ui-tree 纯查询层 · 反事实（判据不是恒真）", () => {
   it("不存在的 class token ⇒ 命中 0 处（定位失败要能显式判否）", () => {
-    expect(findByClass(tree, [...CTA_CLASS_TOKENS, "no-such-class-xyz"])).toEqual([]);
+    expect(findByClass(tree, [...FAB_CLASS_TOKENS, "no-such-class-xyz"])).toEqual([]);
   });
 
   it("单 token 命中多处 ⇒ 「全部命中」这条口径承重", () => {
     // 若实现退化成「任一命中」，这一条会从「多处」变成「唯一」——反证用的就是它。
     const absoluteOnly = findByClass(tree, ["absolute"]);
     expect(absoluteOnly.length).toBeGreaterThan(1);
-    expect(findByClass(tree, CTA_CLASS_TOKENS)).toHaveLength(1);
+    expect(findByClass(tree, FAB_CLASS_TOKENS)).toHaveLength(1);
   });
 
   it("不存在的语义 id ⇒ 命中 0 处", () => {
@@ -218,5 +226,82 @@ describe("ui-tree 纯查询层 · 反事实（判据不是恒真）", () => {
       position: { frameInRoot: { x: 1, y: 2, width: 3, height: 4 } },
     };
     expect(screenFrame(bare)).toBeNull();
+  });
+});
+
+describe("ui-tree · FAB 定位口径（findFab / fabCenter）", () => {
+  it("findFab 在真实样本上唯一命中，且就是那个 class 组合的节点", () => {
+    const fab = findFab(tree);
+    expect(classTokens(fab)).toEqual(expect.arrayContaining([...FAB_CLASS_TOKENS]));
+    expect(screenFrame(fab)).toEqual({ x: 872, y: 1808, width: 162, height: 162 });
+  });
+
+  it("树里没有 FAB ⇒ 抛错并说清「可能不是推荐页 / FAB 未挂载」（0 命中分支）", () => {
+    const bare: UiTreeNode = { tag: "page", children: [{ tag: "view" }] };
+    expect(() => findFab(bare)).toThrow(/定位到 0 个节点/);
+  });
+
+  it("命中多处 ⇒ 抛错并说清「口径漂了」（>1 命中分支：改 token 组合前先转红）", () => {
+    const dup: UiTreeNode = {
+      tag: "page",
+      children: [1, 2].map((i) => ({
+        tag: "view",
+        attributes: { class: [...FAB_CLASS_TOKENS] },
+        position: { frameInScreen: { x: i, y: 0, width: 10, height: 10 } },
+      })),
+    };
+    expect(() => findFab(dup)).toThrow(/定位到 2 个节点/);
+  });
+
+  it("命中了但没有 frameInScreen ⇒ 抛错（不静默用 frameInRoot 顶替）", () => {
+    const noFrame: UiTreeNode = {
+      tag: "page",
+      children: [{ tag: "view", attributes: { class: [...FAB_CLASS_TOKENS] } }],
+    };
+    expect(() => findFab(noFrame)).toThrow(/没有 frameInScreen/);
+  });
+
+  it("fabCenter = 布局盒圆心（873+81=953 / 1808+81=1889）", () => {
+    // oracle：162px 见方的盒子 ⇒ 圆心 = 左上角 + 81
+    expect(fabCenter(tree)).toEqual({ x: 953, y: 1889 });
+  });
+});
+
+describe("ui-tree · 「哪一份最完整」（pickBest）", () => {
+  /** 造一份产物（只有排序用的三个字段与名字是承重的）。 */
+  function artifact(
+    name: string,
+    nodeCount: number,
+    delayMs: number,
+    bytes: number,
+  ): uiTree.UiTreeArtifact {
+    return {
+      name,
+      point: "hot",
+      delayMs,
+      tree: { tag: "page" },
+      nodeCount,
+      bytes,
+      localPath: `/tmp/${name}`,
+    };
+  }
+
+  it("节点数多者胜（这是主键：半成品树的节点数少）", () => {
+    const best = pickBest([artifact("a", 10, 4000, 100), artifact("b", 140, 0, 50)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("节点数相同 ⇒ 比**采样档位**（4s 档通常是完整树）", () => {
+    const best = pickBest([artifact("a", 140, 0, 900), artifact("b", 140, 4000, 100)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("节点数与档位都相同 ⇒ 比字节数", () => {
+    const best = pickBest([artifact("a", 140, 4000, 100), artifact("b", 140, 4000, 900)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("空集合 ⇒ 抛错（不返回 undefined 让调用方拿到空树）", () => {
+    expect(() => pickBest([])).toThrow(/产物集合为空/);
   });
 });

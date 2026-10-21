@@ -57,24 +57,27 @@
  *   intent 上 ⇒ 抓到的树正好就是被断言的那个状态。
  * - **单独触发**（本模块默认）：App 在前台时另发一条 ⇒ 走 hot 采样点，状态不变。
  *
- * ## 门禁边界（不变）
+ * ## 门禁边界
  *
  * e2e **不进 CI**（ADR-0084）——它是发版前手动跑的那一组。本模块的**纯函数部分**
  * （树的查询与几何换算）另有单测（`tests/android-e2e/unit/ui-tree.test.ts`）随
- * `pnpm test:all` 进 CI；**真机链路**（触发 / 等落盘 / pull）没有 CI 防线。
+ * `pnpm test:all` 进 CI；**设备侧 IO 边界**（触发 / 等落齐 / 拉回 / 解析）另有单测
+ * （`tests/android-e2e/unit/ui-tree.io.test.ts`，adb 调用以 `vi.mock("../env")` 顶掉）
+ * 随 `pnpm test:all` 进 CI ⇒ **失败/降级路径在 CI 里是红的**。
+ * ⚠️ 真正跑设备的那一段（adb 真连、引擎真吐树）仍**没有** CI 防线。
  */
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { adbPath, runCapture } from "./env";
+import { adbPath, runCapture, runOrThrow } from "./env";
 import {
   EXTRA_TRIGGER,
   LYNX_ACTIVITY,
   REMOTE_DIR,
   SAMPLE_DELAYS_MS,
   parseArtifactName,
+  pickBestArtifact,
   planWait,
   summarize,
 } from "../../scripts/lib/ui-tree-dump-core.mjs";
@@ -519,6 +522,13 @@ export async function collectUiTree(
   }
 
   const best = pickBest(artifacts);
+  // 成功路径的观测出口：落齐与否只在异常时才有 warn ⇒ 正常运行时从日志查不到
+  // 「这次抓树到底等齐没有」。这行把它与最完整那份的元数据一起打出来。
+  console.log(
+    `[android-e2e] UI 树抓取：${artifacts.length} 份产物，落齐=${settled ? "是" : "否"}` +
+      `（超时=${timedOut ? "是" : "否"}）；最完整的一份 = ${best.name}` +
+      `（${best.point} 采样点 / ${best.delayMs}ms 档 / ${best.nodeCount} 节点 / ${best.bytes} 字节）`,
+  );
   return { artifacts, best, settled, timedOut };
 }
 
@@ -551,28 +561,37 @@ export async function captureUiTree(
 
 /**
  * 选「最完整的那一份」：节点数多者胜；同数比**档位**（4s 那份通常是完整树），
- * 再同比字节。与诊断脚本 `dump-ui-tree.mjs` 的口径一致（两份产物谁才是完整树，
- * 两处不能各说各的）。
+ * 再同比字节。
+ *
+ * ⚠️ 规则本体在 `scripts/lib/ui-tree-dump-core.mjs` 的 `pickBestArtifact`——
+ * 诊断脚本 `dump-ui-tree.mjs` 与本模块**共用同一份**（两处各写一份排序规则时，
+ * 一旦键序改了就会选出不同的产物，而「最完整的那份」正是断言要挂的那份 ⇒
+ * 分叉的症状与「树抓坏了」无法区分）。
  */
 export function pickBest(artifacts: readonly UiTreeArtifact[]): UiTreeArtifact {
-  return artifacts.toSorted((a, b) => {
-    if (b.nodeCount !== a.nodeCount) return b.nodeCount - a.nodeCount;
-    if (b.delayMs !== a.delayMs) return b.delayMs - a.delayMs;
-    return b.bytes - a.bytes;
-  })[0] as UiTreeArtifact;
+  const best = pickBestArtifact(artifacts.map((a) => ({ ...a })));
+  if (!best) {
+    throw new Error("[android-e2e] pickBest：产物集合为空（没有可比的产物）");
+  }
+  return best;
 }
 
-/** 拉回一份产物并解析。拉取失败 / JSON 非法 ⇒ `console.warn` 后返回 `null`（不静默）。 */
+/**
+ * 拉回一份产物并解析。拉取失败 / 拉回后本地无文件 / JSON 非法 ⇒ `console.warn` 后返回
+ * `null`（**不静默**：调用方会看到「这份产物没拿到」）。
+ *
+ * ⚠️ 拉取走 `env.runOrThrow`（与本模块其它 adb 调用同一个接缝）——不是直接
+ * `execFileSync`：直接 spawn 就**没法在单测里顶掉**，IO 边界的失败路径将永远没有
+ * 机器防线（测试硬约束 #1「IO 边界测试强制覆盖」）。先例：`unit/prefs.devLogin.test.ts`。
+ */
 function pullArtifact(serial: string, name: string, outDir: string): UiTreeArtifact | null {
   const local = join(outDir, name);
   try {
-    execFileSync(adbPath(), ["-s", serial, "pull", `${REMOTE_DIR}/${name}`, local], {
-      stdio: ["ignore", "pipe", "pipe"],
-      maxBuffer: 64 * 1024 * 1024,
-    });
+    runOrThrow(adbPath(), ["-s", serial, "pull", `${REMOTE_DIR}/${name}`, local]);
   } catch (e) {
-    const stderr = (e as { stderr?: Buffer }).stderr?.toString() ?? "";
-    console.warn(`[android-e2e] UI 树产物拉回失败：${name} ${stderr.trim()}`);
+    console.warn(
+      `[android-e2e] UI 树产物拉回失败：${name} ${e instanceof Error ? e.message : String(e)}`,
+    );
     return null;
   }
   if (!existsSync(local)) {

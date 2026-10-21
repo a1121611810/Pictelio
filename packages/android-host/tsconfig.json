@@ -9,8 +9,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    // 允许 import `.mjs`（#1047）。**检查面不变**：`checkJs` 默认关 ⇒ `.mjs` 只被
-    // 当作依赖读进来做类型推断，**自身不被类型检查**；`include` 也没动。
+    // 允许 import `.mjs`（#1047）。**类型检查面不变**：`checkJs` 默认关 ⇒ `.mjs` 自身
+    // 不被类型检查，只是被读进来做类型推断。
+    //
+    // ⚠️ 但**程序文件集变大了**（别把「检查面不变」读成「文件集不变」）：`tests/android-e2e`
+    //   这条 include 是**目录 glob** ⇒ 该目录下的 2 个 `.mjs` 工具脚本
+    //   （`tools/mock-fail-then-recover.mjs` / `tools/mock-responses-sse-server.mjs`）也被
+    //   扫进 program。实测 `tsc --listFiles`：3 个 `.mjs` = 1 个预期依赖
+    //   （`scripts/lib/ui-tree-dump-core.mjs`）+ 2 个 tools 脚本。`checkJs` 关着 ⇒ 今天零诊断；
+    //   将来若开 `checkJs`，这 2 个文件会立刻报错 ⇒ 届时需把它们移出 include 或补声明。
     //
     // 为什么需要它：`tests/android-e2e` **在**类型检查面内（下方 include），
     // 而 `scripts/lib/ui-tree-dump-core.mjs` 是 UI 树通道的**协议常量单一事实源**

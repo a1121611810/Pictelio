@@ -10,7 +10,7 @@ export default defineConfig({
     // 也不进 `pnpm test:all` / CI（CI 只跑 `test:all`）——静默失明数月。
     // `passWithNoTests: false` 只能发现「一个都没收集到」，发现不了「少了一个目录」，
     // 所以两条 glob 都**逐条列出**，不合并成一条 `tests/**`。
-    // 回归防线：`tests/unit/e2eContractSuiteCollected.test.ts` 断言这 11 个文件既在
+    // 回归防线：`tests/unit/e2eContractSuiteCollected.test.ts` 断言这 12 个文件既在
     // 磁盘上、又被本配置的 include 命中。守门人**故意放在 tests/unit/** 而不是
     // 被守目录里——放进去的话，glob 一被摘掉守门人自己也一起消失，防线归零
     // （2026-09-29 实测：放里面的那版，摘 glob 后 vitest 直接报 "No test files found"）。

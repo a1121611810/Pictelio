@@ -70,6 +70,11 @@ const CONTRACT_UNIT_TESTS = [
     file: "ui-tree.test.ts",
     covers: "运行时 UI 树查询层（坐标系口径 / class 唯一性定位，#1047）",
   },
+  {
+    file: "ui-tree.io.test.ts",
+    covers:
+      "运行时 UI 树的设备侧 IO 边界（触发 / 列目录 / 拉回 / 等落齐的成功与失败双路径，#1047）",
+  },
 ] as const;
 
 /**
@@ -184,7 +189,7 @@ describe("收集防线：android-e2e 契约单测必须进 pnpm test → test:al
   it("清单非空锚点：清单条数不是抄来的常量（防止有人把数组清空后全绿）", () => {
     // 刻意写死条数：新增/删除契约单测时**必须**回来改这里，否则「清单」会与磁盘
     // 悄悄分叉——而这个文件存在的全部意义就是让那种分叉立刻红。
-    expect(CONTRACT_UNIT_TESTS.length).toBe(11);
+    expect(CONTRACT_UNIT_TESTS.length).toBe(12);
     for (const t of CONTRACT_UNIT_TESTS) expect(t.covers.length).toBeGreaterThan(0);
   });
 });

@@ -62,6 +62,7 @@ import {
   artifactsToRemove,
   exitCodeFor,
   parseArtifactName,
+  pickBestArtifact,
   planWait,
   resolveOutDir,
   summarize,
@@ -300,26 +301,32 @@ async function main() {
 
   let pullFailures = 0;
   let invalidJson = 0;
-  /** 本次最完整的一份（节点数多者胜，同数比字节）。收工时点名，避免读者被字典序里最空的那份误导。 */
-  let best = null;
+  /**
+   * 本次拉回成功的全部产物。
+   *
+   * ⚠️ 「哪一份最完整」由 core 层的 `pickBestArtifact` 判定——**与 e2e 消费侧同一份规则**
+   *   （`tests/android-e2e/ui-tree.ts` 也调它）⇒ 两处不会选出不同的产物。
+   */
+  const pulled = [];
   for (const name of appeared) {
     const r = pullAndReportArtifact(serial, name, opts.out);
     if (r.failure === "pull") pullFailures += 1;
     else if (r.failure === "json") invalidJson += 1;
-    else if (
-      !best ||
-      r.nodeCount > best.nodes ||
-      (r.nodeCount === best.nodes && r.bytes > best.bytes)
-    ) {
-      best = { name, nodes: r.nodeCount, bytes: r.bytes };
-    }
+    else
+      pulled.push({
+        name,
+        nodeCount: r.nodeCount,
+        delayMs: parseArtifactName(name)?.delayMs ?? -1,
+        bytes: r.bytes,
+      });
   }
+  const best = pickBestArtifact(pulled);
   console.log(`\n[ui-tree] 产物已拉回: ${opts.out}`);
   if (best) {
     // ⚠️ 产物按文件名字典序打印 ⇒ **最空的那份排在最前**（0ms 档常只有几十个节点）。
     //   读者若只看第一段字段清单，会把「半棵树」当成结论——故收工时点名最完整的那一份。
     console.log(
-      `[ui-tree] 最完整的一份：${best.name}（节点数=${best.nodes} 字节=${best.bytes}）` +
+      `[ui-tree] 最完整的一份：${best.name}（节点数=${best.nodeCount} 字节=${best.bytes}）` +
         "——「三档落齐」只说明产物齐，不说明每份都完整，以这一份为准。",
     );
   }

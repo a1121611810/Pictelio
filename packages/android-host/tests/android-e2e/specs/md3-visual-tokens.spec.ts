@@ -160,7 +160,8 @@ const SCREEN_W = 1080;
  * 逐 60px 分段的纯度：x=0..60 与 x=1020..1080 为 1.00；x=360..780 **连续七段均 1.00**；
  * x=60..300（状态栏时钟）与 x=840..1020（系统图标）为 0.72~0.94。旧设计分左右两窗正是
  * 为躲开居中标题，而该标题已随顶栏撤除 ⇒ **中央反而是全宽最干净的一段**。
- * 窗取中央两段（各 220×48），既避开系统元素，又保留「采两处」降低蒙对概率。
+ * 窗取中央两段（各宽 220px；**高由树推导**，见下），既避开系统元素，
+ * 又保留「采两处」降低蒙对概率。
  *
  * **x 区间仍靠人工校准、y 区间改由树推导**（#1047）：
  *   · **y 下界** ⇒ 树推导（`deriveBleedLowerBound`）：树里第一个「全宽且非零起始 y」
@@ -203,23 +204,37 @@ interface SurfaceWindow {
 const CTA_SCAN_H = 320;
 
 /**
- * 由树给出 CTA 的像素扫描域 = **树的布局盒本身**。
+ * 由树给出 CTA 的像素扫描域 = **树的布局盒**（可外扩 `margin` 像素）。
  *
  * 为什么可以直接用布局盒当扫描域：布局盒是 CTA **应该**被画的位置；在这块里找
  * 「与 `--md-primary-container` 相近的连通域」，量到的就是**实际画出来的可见区域**。
  * ⇒ 树负责「它应该在哪」，像素负责「它真的画出来没有、画全了没」，两者一交一答。
  *
+ * ⚠️ **`margin` 不是装饰，是判据的前提**（#1047 review 第 1 轮 Standards 轴抓出）：
+ *   扫描域**恰好等于**布局盒时，`boxesOf` 产出的包围盒**必然**是扫描域的子集 ⇒
+ *   「可见盒 ⊆ 布局盒」那几条断言**结构上恒真**，永远转不了红（它守的恰恰是
+ *   「画到盒外」这个被裁掉的方向）。把扫描域外扩 `margin`（= 断言的容差）后，
+ *   画到盒外的像素才会进扫描域 ⇒ 那几条断言才成为**真判据**。
+ *
  * 旧口径（右下 1/2 屏宽 × 底部 320px）会把插画里的大片近似色扫进来 ⇒ 只能取
  * 「最大连通域」来抗干扰；树给出精确盒后，连通域选择不再是唯一的抗干扰手段。
  */
-function ctaScanRegionFromTree(tree: UiTreeNode): {
+function ctaScanRegionFromTree(
+  tree: UiTreeNode,
+  margin = 0,
+): {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
 } {
   const f = screenFrame(findFab(tree))!;
-  return { x0: f.x, y0: f.y, x1: f.x + f.width, y1: f.y + f.height };
+  return {
+    x0: f.x - margin,
+    y0: f.y - margin,
+    x1: f.x + f.width + margin,
+    y1: f.y + f.height + margin,
+  };
 }
 
 /** 颜色命中容差（每通道）。实测三个态的令牌色都**逐位精确**渲染（偏差 0），
@@ -462,6 +477,13 @@ async function relaunchAndSample(
   const captured = await captureUiTree(serial, {
     outDir: resolve(EVIDENCE_DIR, "ui-tree", label),
   });
+  // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：采样未落齐 ⇒「最完整的那份」
+  // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到节点」报出**误导性**的失败信息。
+  // 只在模块里 warn 是不够的：断言失败信息必须直接说清「没等齐」。
+  expect(
+    captured.settled,
+    `${label}：UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到`,
+  ).toBe(true);
   const tree = captured.best.tree;
   // ② 采样窗：由树推导（布局变了窗跟着走，不再靠「纯度不达标 ⇒ 手工重校准」）
   const windows = surfaceWindowsFromTree(tree, SCREEN_W, SURFACE_WINDOW_X_RANGES);
@@ -793,11 +815,13 @@ describe.skipIf(SKIPPED)(
       ).toBeGreaterThanOrEqual(CONTENT_BOTTOM - CTA_SCAN_H);
 
       // ── 像素：可见区域（元素「真被画出来没有」）──
-      // 扫描域 = 树给的布局盒 ⇒ 量到的就是「实际画出来的那部分」：
+      // 扫描域 = 树给的布局盒**外扩 EDGE_TOL** ⇒ 画到盒外的像素会进扫描域，
+      // 下面「可见盒 ⊆ 布局盒」那几条才是**真判据**（扫描域恰好等于布局盒时，
+      // 量到的盒必然是它的子集 ⇒ 恒真、转不了红）。
       // 画全了 ⇒ 可见盒 ≈ 布局盒；被裁 / 没画 ⇒ 可见盒小于布局盒 ⇒ 下面 ≥48dp 判红。
-      const region = ctaScanRegionFromTree(tree);
       /** 可见盒允许比布局盒大 2px（圆角与抗锯齿的边缘像素），超出这个量就是画到了盒外。 */
       const EDGE_TOL = 2;
+      const region = ctaScanRegionFromTree(tree, EDGE_TOL);
       for (const [i, p] of pixels.entries()) {
         const box = largestBoxOfColor(p, region, cta, CTA_TOL);
         expect(box, `A4 第 ${i} 帧：CTA 扫描域内找不到 ${fmt(cta)} 的连通域`).not.toBeNull();
@@ -829,11 +853,14 @@ describe.skipIf(SKIPPED)(
         ).toBeLessThanOrEqual(f.y + f.height - 1 + EDGE_TOL);
       }
 
-      // ── 负向对照：注入「只渲染了一半」的失败态，门限必须判红 ──
-      // 做法：把扫描域下界裁到 CTA 自身的中线（人为制造半高），同一个测量 + 同一组门限。
-      // 若这条仍判过，说明 48dp 门限形同虚设 / 测量根本没在看尺寸。
+      // ── 负向对照：同一组像素、同一个门限，只把「画了一半」喂进去 ⇒ 必须判红 ──
+      // 做法：把扫描域下界裁到 CTA 自身的中线（人为制造半高），同一测量 + 同一门限。
+      // ⚠️ 这条证明的是「**门限是所测高度的函数**」：同一张图上，完整测量过门限、
+      //   裁半后不过 ⇒ 若实现改成「不看高度、恒判过」，这一条会转红。
+      //   它**不**证明「48dp 这个具体数值选得对」——那件事由上面的 `minPx` 断言负责。
       const p = pixels[0];
       const full = largestBoxOfColor(p, region, cta, CTA_TOL) as Box;
+      const fullH = full.y1 - full.y0 + 1;
       const half = largestBoxOfColor(
         p,
         region,
@@ -842,6 +869,10 @@ describe.skipIf(SKIPPED)(
         Math.floor((full.y0 + full.y1) / 2),
       ) as Box;
       const halfH = half.y1 - half.y0 + 1;
+      expect(
+        fullH,
+        `A4 负向对照失效：完整测量的高度 ${fullH}px 竟不满足 ${minPx}px 门限（对照前提不成立）`,
+      ).toBeGreaterThanOrEqual(minPx);
       expect(
         halfH,
         `A4 负向对照失效：裁半后的高度 ${halfH}px 仍 ≥ ${minPx}px，说明 48dp 门限不承重`,
