@@ -81,6 +81,8 @@ import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { expect } from "vitest";
+
 import { adbPath, runCapture, runOrThrow } from "./env";
 import {
   EXTRA_TRIGGER,
@@ -161,7 +163,8 @@ export function classTokens(node: UiTreeNode): string[] {
  *
  * 为什么是「全部命中」而不是「任一命中」：class 数组是 Tailwind 类名（如
  * `["absolute","z-30","flex","items-center","bg-primary-container"]`），单个 token
- * （如 `absolute`）在树里命中几十处 ⇒ 「任一命中」返回的不是一个元素。
+ * （如 `absolute`）在树里命中多处（实测样本 `recommend-page.sample.json`：`absolute`
+ * **5** 处 / `z-30` **2** 处 / `flex` **34** 处）⇒ 「任一命中」返回的不是一个元素。
  *
  * @param tokens 必须**全部**出现在该节点 class 里的 token
  */
@@ -186,8 +189,9 @@ export function findBySemanticId(tree: UiTreeNode, id: string): UiTreeNode[] {
 /**
  * 全局放射 FAB **主按钮**的 class 定位口径（三个 token 必须**全部命中**）。
  *
- * ⚠️ 为什么三个 token 而不是一个：`absolute` 在树里命中几十处、`z-30` 也一样
- * ⇒「任一命中」返回的不是一个元素。三个合起来在实测样本上**唯一**命中 FAB 主按钮。
+ * ⚠️ 为什么三个 token 而不是一个：`absolute` 在树里命中多处（实测样本 `absolute` **5** 处）、
+ * `z-30` 也一样（**2** 处）⇒「任一命中」返回的不是一个元素。
+ * 三个合起来在实测样本上**唯一**命中 FAB 主按钮（140 节点样本上恰好 1 个）。
  *
  * 为什么放在共享模块而不是各 spec 各写一份：这是**定位口径**（跨三个 spec 的同一件事），
  * 抄三份就会漂——而漂了的代价是「点空 → 假绿/假红」，且失败信息会指向另一份旧口径。
@@ -388,6 +392,80 @@ export function describeNode(node: UiTreeNode): string {
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+// ── 共享的树断言（跨 spec 的同一件事 ⇒ 只有一份）────────────────────────────
+
+/**
+ * FAB 的**树断言**——「在不在 / 能不能点 / 盒子多大 / 有没有越出内容区」四条判据。
+ *
+ * ## 为什么是共享函数而不是各 spec 各写一段
+ *
+ * 这组判据在 `fab-hit-testing-regression` 与 `transition-matrix` 里**完全同形**
+ * （第 6 轮 Standards 轴实测：归一化后 32 行 vs 32 行，只差变量名与消息前缀）。
+ * 而本文件自己反复强调「抄三份就会漂」（见 `FAB_CLASS_TOKENS` 的注释）⇒
+ * **判据必须只有一份**，否则改了一处、另一处就静默留着旧口径。
+ *
+ * ## 判据清单（每条都有存在的理由）
+ *
+ * | 判据 | 挡住什么 |
+ * |---|---|
+ * | 按 class **唯一**命中 | 定位口径漂了（token 组合不再唯一） |
+ * | 绑定了 `tap` 事件 | 「点得动」这条契约没了 |
+ * | `frameInScreen` 存在 | 坐标口径用错（`frameInRoot` 与它差 81px） |
+ * | 宽 / 高 ≥ 48dp | 触控目标尺寸不达标 |
+ * | 盒右缘 ≤ 内容区右界 | **坐标系用错**（`frameInRoot` ⇒ 右缘 1115 > 1080 ⇒ 转红） |
+ * | 盒下缘 ≤ 内容区下界 | 同上（纵向） |
+ *
+ * ⚠️ 最后两条**不是装饰**：「盒多大 / 有没有 tap 事件」那几条对坐标系替换
+ *   **完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错时门禁是绿的。
+ *
+ * ⚠️ **刻意不含**「点击坐标 ∈ 屏幕盒」那类断言：点击坐标就是这个节点的盒中心
+ *   （树值对树值）⇒ 结构上不可能失败 ⇒ 那是恒真断言（第 3 轮 Standards 轴 B1）。
+ *   「点到的到底是不是那个元素」由**独立来源**回答。
+ *
+ * @param tree 抓回来的运行时 UI 树
+ * @param opts `prefix` = 各 spec 的场景标识（如「R2：」，空串表示不加前缀）；
+ *   `contentRight` / `contentBottom` = 内容区右界 / 下界（物理像素）
+ */
+export interface FabTreeAssertOptions {
+  /** 失败信息前缀（各 spec 自带场景标识，如「R2：」）；空串表示不加前缀。 */
+  prefix?: string;
+  /** 内容区右界（物理像素）——树给的盒右缘不得越过。 */
+  contentRight: number;
+  /** 内容区下界（物理像素）——树给的盒下缘不得越过。 */
+  contentBottom: number;
+}
+
+/** 见 {@link FabTreeAssertOptions}。判据只有这一份，各 spec 调它。 */
+export function assertFabTree(tree: UiTreeNode, opts: FabTreeAssertOptions): void {
+  const p = opts.prefix ?? "";
+  const hits = findByClass(tree, FAB_CLASS_TOKENS);
+  expect(hits, `${p}按 class 定位主 FAB 应唯一`).toHaveLength(1);
+  const node = hits[0]!;
+  expect(nodeHasEvent(node, "tap"), `${p}FAB 节点未绑定 tap 事件：${describeNode(node)}`).toBe(
+    true,
+  );
+  const f = screenFrame(node);
+  expect(f, `${p}FAB 节点缺 frameInScreen：${describeNode(node)}`).not.toBeNull();
+  // 触控目标门限：density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
+  // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
+  const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
+  expect(f!.width, `${p}FAB 布局盒宽 ${f!.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
+    minPx,
+  );
+  expect(f!.height, `${p}FAB 布局盒高 ${f!.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
+    minPx,
+  );
+  expect(
+    f!.x + f!.width,
+    `${p}FAB 盒右缘 ${f!.x + f!.width}px 越过内容区右界 ${opts.contentRight}px` +
+      `（若这是 frameInRoot，坐标系用错了——两套坐标系实测差 81px）`,
+  ).toBeLessThanOrEqual(opts.contentRight);
+  expect(
+    f!.y + f!.height,
+    `${p}FAB 盒下缘 ${f!.y + f!.height}px 越过内容区下界 ${opts.contentBottom}px`,
+  ).toBeLessThanOrEqual(opts.contentBottom);
 }
 
 // ── 设备侧：触发 → 等落齐 → pull → 解析 ──────────────────────────────────

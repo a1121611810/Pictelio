@@ -13,8 +13,8 @@
  *
  * ① **坐标系口径**（`frameInScreen` vs `frameInRoot`，实测差 81px）——这条错了，
  *    所有几何断言都会挂在偏了 81px 的盒上，而**数字看着仍然合理**（不报错、只是错）。
- * ② **按 class 定位的唯一性**——`absolute` 这类 token 在树里命中几十处，
- *    「任一命中」返回的就不是一个元素。
+ * ② **按 class 定位的唯一性**——`absolute` 这类 token 在树里命中多处（实测样本
+ *    `absolute` 5 处），「任一命中」返回的就不是一个元素。
  * ③ **模块不导出 `frameInRoot` 访问器**——把口径从「写在注释里」变成「运行时导出守卫」
  *    （⚠️ **不是**「编译期做不到」：`UiTreeNode` 类型仍导出 `position.frameInRoot`，
  *    消费方写 `node.position?.frameInRoot` 仍能编译；真正的防线是「只提供一个
@@ -34,6 +34,7 @@ import * as uiTree from "../ui-tree";
 import {
   FAB_CLASS_TOKENS,
   PINNED_DENSITY_SCALE,
+  assertFabTree,
   classTokens,
   deriveBleedLowerBound,
   describeNode,
@@ -68,7 +69,8 @@ const tree = JSON.parse(readFileSync(FIXTURE, "utf-8")) as UiTreeNode;
  *   而「按 class 定位的唯一性」恰恰是本文件要守的东西。测试硬约束 #2：
  *   契约测试必须使用**真实来源**的字段，不得手写自洽副本。
  *
- * ⚠️ 三个 token **必须全部命中**：`absolute` / `z-30` 单独用都命中几十处。
+ * ⚠️ 三个 token **必须全部命中**：`absolute` / `z-30` 单独用都命中多处
+ *   （实测样本 `absolute` **5** 处 / `z-30` **2** 处）。
  */
 
 /**
@@ -342,6 +344,110 @@ describe("ui-tree · FAB 定位口径（findFab / fabCenter）", () => {
   it("fabCenter = 布局盒圆心（873+81=953 / 1808+81=1889）", () => {
     // oracle：162px 见方的盒子 ⇒ 圆心 = 左上角 + 81
     expect(fabCenter(tree)).toEqual({ x: 953, y: 1889 });
+  });
+});
+
+/**
+ * FAB 的**树断言**（共享判据 `assertFabTree`）——两个 e2e spec 的那 32 行判据收口到一处。
+ *
+ * ## 为什么这些断言要有 CI 内单测
+ *
+ * 它们原先只存在于 e2e spec 里，而 **e2e 不进 CI**（ADR-0084）⇒ 这组判据在 CI 里
+ * 覆盖率为零：判据写坏了（阈值改了、容差写反了）只有真机手动跑才看得见。
+ * 收口到共享模块后，它变成**纯函数**（吃一棵树 ⇒ 断言或抛错）⇒ 可以在这里钉住。
+ *
+ * ## oracle 的独立来源
+ *
+ * 期望值全部来自**真实样本** `recommend-page.sample.json`（主 CTA 实测
+ * `frameInScreen = (872,1808,162,162)` ⇒ 162px = 54dp）与**设备几何常量**
+ * （内容区右界 1080 = 屏宽；下界 2016 = 2160 − 144 系统栏），**不是**从实现反推。
+ */
+describe("ui-tree · FAB 树断言（共享判据 assertFabTree）", () => {
+  const CONTENT_RIGHT = 1080;
+  const CONTENT_BOTTOM = 2016;
+
+  /** 造一棵只含一个 FAB 的树（`frame` 是它的 `frameInScreen`）。 */
+  function fabTree(
+    frame: { x: number; y: number; width: number; height: number },
+    opts: { tap?: boolean } = {},
+  ): UiTreeNode {
+    return {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          attributes: { class: [...FAB_CLASS_TOKENS] },
+          position: { frameInScreen: frame },
+          events: opts.tap === false ? [] : [{ eventName: "tap" }],
+        },
+      ],
+    };
+  }
+
+  const opts = { contentRight: CONTENT_RIGHT, contentBottom: CONTENT_BOTTOM };
+
+  it("真实样本上通过（162px = 54dp ≥ 48dp=144px，且盒不越出内容区）", () => {
+    expect(() => assertFabTree(tree, opts)).not.toThrow();
+  });
+
+  it("树上没有 FAB ⇒ 抛错（不是「安静地跳过」）", () => {
+    const bare: UiTreeNode = { tag: "page", children: [{ tag: "view" }] };
+    expect(() => assertFabTree(bare, opts)).toThrow(/按 class 定位主 FAB 应唯一/);
+  });
+
+  it("FAB 命中多处 ⇒ 抛错（定位口径漂了 ⇒ 先转红，别拿错的那个继续断言）", () => {
+    const dup: UiTreeNode = {
+      tag: "page",
+      children: [1, 2].map((i) => ({
+        tag: "view",
+        attributes: { class: [...FAB_CLASS_TOKENS] },
+        position: { frameInScreen: { x: i, y: 0, width: 162, height: 162 } },
+      })),
+    };
+    expect(() => assertFabTree(dup, opts)).toThrow(/按 class 定位主 FAB 应唯一/);
+  });
+
+  it("没绑 tap 事件 ⇒ 抛错（「点得动」这条契约没了）", () => {
+    const noTap = fabTree({ x: 872, y: 1808, width: 162, height: 162 }, { tap: false });
+    expect(() => assertFabTree(noTap, opts)).toThrow(/未绑定 tap 事件/);
+  });
+
+  it("缺 frameInScreen ⇒ 抛错（不静默用 frameInRoot 顶替）", () => {
+    // ⚠️ 必须**先**绑上 `tap`：判据顺序是「唯一 → tap → frameInScreen」⇒
+    //   不绑 tap 会先被上一条拦下，测不到 frame 这条。
+    const noFrame: UiTreeNode = {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          attributes: { class: [...FAB_CLASS_TOKENS] },
+          events: [{ eventName: "tap" }],
+        },
+      ],
+    };
+    expect(() => assertFabTree(noFrame, opts)).toThrow(/缺 frameInScreen/);
+  });
+
+  it("盒子小于 48dp ⇒ 抛错（触控目标尺寸不达标）", () => {
+    const small = fabTree({ x: 872, y: 1808, width: 100, height: 100 });
+    expect(() => assertFabTree(small, opts)).toThrow(/< 48dp=144px/);
+  });
+
+  it("盒右缘越过内容区右界 ⇒ 抛错（**坐标系用错时这条才转红**）", () => {
+    // ⚠️ 这正是 `frameInRoot` 的坐标：(953,1889,162,162) ⇒ 右缘 1115 > 1080。
+    //   「盒多大 / 有没有 tap」那几条对坐标系替换**完全不敏感** ⇒ 只有这条能拦住它。
+    const wrongCoords = fabTree({ x: 953, y: 1889, width: 162, height: 162 });
+    expect(() => assertFabTree(wrongCoords, opts)).toThrow(/越过内容区右界 1080px/);
+  });
+
+  it("盒下缘越过内容区下界 ⇒ 抛错（纵向同上）", () => {
+    const tooLow = fabTree({ x: 872, y: 1889, width: 162, height: 162 });
+    expect(() => assertFabTree(tooLow, opts)).toThrow(/越过内容区下界 2016px/);
+  });
+
+  it("prefix 进失败信息（各 spec 的场景标识不丢）", () => {
+    const small = fabTree({ x: 872, y: 1808, width: 100, height: 100 });
+    expect(() => assertFabTree(small, { ...opts, prefix: "R2：" })).toThrow(/R2：/);
   });
 });
 

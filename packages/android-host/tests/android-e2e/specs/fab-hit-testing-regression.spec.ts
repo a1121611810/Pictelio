@@ -61,18 +61,7 @@ import {
   startMainActivity,
 } from "../prefs";
 import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
-import {
-  FAB_CLASS_TOKENS,
-  PINNED_DENSITY_SCALE,
-  captureUiTree,
-  describeNode,
-  dpToPx,
-  fabCenter,
-  findByClass,
-  nodeHasEvent,
-  screenFrame,
-  type UiTreeNode,
-} from "../ui-tree";
+import { assertFabTree, captureUiTree, fabCenter, type UiTreeNode } from "../ui-tree";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
@@ -506,44 +495,18 @@ describe.skipIf(SKIPPED)(
       const tree = capturedTree;
       expect(tree, "抓树失败：FAB 的树断言需要运行时 UI 树").not.toBeNull();
       if (!tree) throw new Error("缺运行时 UI 树");
-      const hits = findByClass(tree, FAB_CLASS_TOKENS);
-      expect(hits, "按 class 定位主 FAB 应唯一").toHaveLength(1);
-      const node = hits[0]!;
-      expect(nodeHasEvent(node, "tap"), `FAB 节点未绑定 tap 事件：${describeNode(node)}`).toBe(
-        true,
-      );
-      const f = screenFrame(node);
-      expect(f, `FAB 节点缺 frameInScreen：${describeNode(node)}`).not.toBeNull();
-      // 触控目标门限：density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
-      // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
-      const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
-      expect(f!.width, `FAB 布局盒宽 ${f!.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
-        minPx,
-      );
-      expect(f!.height, `FAB 布局盒高 ${f!.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
-        minPx,
-      );
-      // ── 位置断言：把「用的是 screen 坐标系」钉住 ──
-      // ⚠️ 不是装饰：实测两套坐标系差 81px（横向 swiper 偏移）——若有人把
-      //   `screenFrame` 换成 `frameInRoot`，FAB 盒会变成 x 953..1115 ⇒ 越过内容区
-      //   右界 1080 ⇒ 这两条转红。而「盒多大 / 有没有 tap 事件」那几条对坐标系
-      //   替换**完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错是绿的。
-      expect(
-        f!.x + f!.width,
-        `FAB 盒右缘 ${f!.x + f!.width}px 越过内容区右界 ${CONTENT_RIGHT}px` +
-          `（若这是 frameInRoot，坐标系用错了——两套坐标系实测差 81px）`,
-      ).toBeLessThanOrEqual(CONTENT_RIGHT);
-      expect(
-        f!.y + f!.height,
-        `FAB 盒下缘 ${f!.y + f!.height}px 越过内容区下界 ${CONTENT_BOTTOM}px`,
-      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
+      // 树断言判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）。
+      // ⚠️ 原先本 spec 与 `transition-matrix` 各写了一份 32 行、归一化后只差变量名与
+      //   消息前缀（第 6 轮 Standards 轴 S-N3）⇒ 改一处漏一处的「漂」是必然的，
+      //   而本仓的门禁纪律明令「抄三份就会漂」⇒ 收口到共享模块。
+      assertFabTree(tree, { contentRight: CONTENT_RIGHT, contentBottom: CONTENT_BOTTOM });
       // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（第 3 轮 Standards 轴 B1）：
       //   点击坐标 `fabTap` 就是**这棵树同一个节点**的布局盒中心
       //   （`beforeAll` 里 `fabCenter(captured.best.tree)` 算出来的），断言
       //   「圆心落在自己那个盒内」在**结构上不可能失败** ⇒ 它是一条恒真断言。
       //   旧写法 `expect(fabCenter(tree).x).toBe(fabTap.x)` 同理（树值对树值）。
       // ⇒ 「点到的到底是不是那个元素」由**独立来源**回答，不由树自证：
-      //   ① 上面那两条**位置判据**（盒子不越出内容区 ⇒ 坐标系用错就转红）；
+      //   ① `assertFabTree` 里那两条**位置判据**（盒子不越出内容区 ⇒ 坐标系用错就转红）；
       //   ② 点击**之后**的像素 diff（`pngDiff(before, after) > 100`）——画面真的变了，
       //      说明这一击打到了 FAB（没点空）。
       //   ③ 「树给的圆心」与「vw 推算的圆心」是否一致 ⇒ 那是 beforeAll 里的

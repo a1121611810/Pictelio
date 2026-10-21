@@ -80,15 +80,9 @@ import {
   runOrThrow,
 } from "../env";
 import {
-  FAB_CLASS_TOKENS,
-  PINNED_DENSITY_SCALE,
+  assertFabTree,
   collectUiTree,
-  describeNode,
-  dpToPx,
   fabCenter,
-  findByClass,
-  nodeHasEvent,
-  screenFrame,
   snapshotRemoteArtifacts,
   type UiTreeNode,
 } from "../ui-tree";
@@ -1111,40 +1105,15 @@ describe.skipIf(SKIPPED)(
       if (!r2Tree) throw new Error("缺运行时 UI 树");
       // ── 树断言（#1047）：这一问像素答不了 ──
       // 「那个元素在不在 / 能不能点 / 多大」只有树能答；像素只能答「画面变没变」。
-      const fabHits = findByClass(r2Tree, FAB_CLASS_TOKENS);
-      expect(fabHits, "R2：按 class 定位主 FAB 应唯一").toHaveLength(1);
-      const fabNode = fabHits[0]!;
-      expect(
-        nodeHasEvent(fabNode, "tap"),
-        `R2：FAB 节点未绑定 tap 事件：${describeNode(fabNode)}`,
-      ).toBe(true);
-      const fabFrame = screenFrame(fabNode);
-      expect(fabFrame, `R2：FAB 节点缺 frameInScreen：${describeNode(fabNode)}`).not.toBeNull();
-      // density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
-      // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
-      const minFabPx = dpToPx(48, PINNED_DENSITY_SCALE);
-      expect(
-        fabFrame!.width,
-        `R2：FAB 布局盒宽 ${fabFrame!.width}px < 48dp=${minFabPx}px`,
-      ).toBeGreaterThanOrEqual(minFabPx);
-      expect(
-        fabFrame!.height,
-        `R2：FAB 布局盒高 ${fabFrame!.height}px < 48dp=${minFabPx}px`,
-      ).toBeGreaterThanOrEqual(minFabPx);
-      // ── 位置断言：把「用的是 screen 坐标系」钉住 ──
-      // ⚠️ 不是装饰：实测两套坐标系差 81px（横向 swiper 偏移）——若有人把
-      //   `screenFrame` 换成 `frameInRoot`，FAB 盒会变成 x 953..1115 ⇒ 越过内容区
-      //   右界 1080 ⇒ 这两条转红。而「盒多大 / 有没有 tap 事件」那几条对坐标系
-      //   替换**完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错是绿的。
-      expect(
-        fabFrame!.x + fabFrame!.width,
-        `R2：FAB 盒右缘 ${fabFrame!.x + fabFrame!.width}px 越过内容区右界 ${CONTENT_RIGHT}px` +
-          `（若这是 frameInRoot，坐标系用错了——两套坐标系实测差 81px）`,
-      ).toBeLessThanOrEqual(CONTENT_RIGHT);
-      expect(
-        fabFrame!.y + fabFrame!.height,
-        `R2：FAB 盒下缘 ${fabFrame!.y + fabFrame!.height}px 越过内容区下界 ${CONTENT_BOTTOM}px`,
-      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
+      // 树断言判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）。
+      // ⚠️ 原先本 spec 与 `fab-hit-testing-regression` 各写了一份 32 行、归一化后只差
+      //   变量名与消息前缀（第 6 轮 Standards 轴 S-N3）⇒ 收口到共享模块，
+      //   避免「改一处漏一处」。
+      assertFabTree(r2Tree, {
+        prefix: "R2：",
+        contentRight: CONTENT_RIGHT,
+        contentBottom: CONTENT_BOTTOM,
+      });
       // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
       // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
       // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
