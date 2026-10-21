@@ -2,7 +2,7 @@
 
 > **一句话**：把 ADR-0223 已落地的运行时 UI 树通道**接进消费侧**（e2e 断言），并把它承诺的「release 不导出」**从代码级推论变成机器断言**（dex 级），同时收口该通道剩余 **6 项已登记盲区**。
 >
-> **上游**：spec `app-lynx-ui-tree-dump-t0.md`（#1045，通道本体已落地）· 决策 `docs/adr/ADR-0223-runtime-ui-tree-observation-channel.md` · 词汇 `packages/android-host/CONTEXT.md`「运行时 UI 树观测通道」
+> **上游**：spec `app-lynx-ui-tree-dump-t0.md`（#1045，通道本体已落地）· 决策 `docs/adr/ADR-0223-runtime-ui-tree-observation-channel.md` · 词汇 `packages/android-host/GLOSSARY.md`「运行时 UI 树观测通道」
 >
 > **本规格覆盖的票**：#1047（**四处** e2e 树断言——2026-10-21 由三处扩为四处，新增 `md3-visual-tokens.spec.ts`）· #1048（dex 级移除断言）· #1049（6 项盲区）——三票同源、互相咬合，故合并为一份规格、拆为 6 张可独立执行的票。
 
@@ -21,7 +21,7 @@
 
 三件事，按「先让观测面可用、再让承诺可证、最后把防线补齐」推进：
 
-1. **e2e 侧**：三处 e2e spec 各自接上一条**基于运行时 UI 树**的断言（**叠加**，不替换现有像素断言），并把抓树能力做成三处共用的一份实现。
+1. **e2e 侧**：**四处** e2e spec 各接一条**基于运行时 UI 树**的断言（**叠加**，不替换现有像素断言），并把抓树能力做成共用的一份实现。⚠️ **四处的落点不同**：`md3-visual-tokens` / `fab-hit-testing-regression` / `transition-matrix` 三处**实做**（树断言）；`lynx-bookmark-tags` **明确不改**——它按**颜色**识别 chip，而树给不出颜色（属性级覆盖不足）⇒ 树接管不了「识别」，只能接管采样窗几何 ⇒ 登记在「Out of Scope」里，**不是漏做**。
 2. **产物侧**：一道 **dex 级**断言，输入 = release APK，判定「UI 树导出能力在不在 dex 里」，且判定**不是自证**（对照变体必须被检出）。
 3. **门禁侧**：6 项盲区逐项收口——每项要么有机器防线，要么按承诺流程登记为例外。涉及判据强度变更的，收口后**按最终 HEAD 重算**门禁规模线台账。
 
@@ -111,7 +111,7 @@
 ## Testing Decisions
 
 - **测外部行为，不测实现细节**。三条线的「外部」分别是：**e2e 的页面状态**、**APK 的 dex 内容**、**门禁对违规源码的判定**。
-- **e2e 线（#1047）**：断言写在**三处既有 spec 内**（不是新 spec），期望值来自**真机抓到的树**；断言只用 §Implementation Decisions 一节列出的**可作基线**的那些量。判别力靠**反事实**：把被测的树产物换成一份结构不同的树（字段缺失 / 语义 id 不存在）时断言必须转红。
+- **e2e 线（#1047）**：断言写在**既有 spec 内**（不是新 spec），期望值来自**真机抓到的树**；断言只用 §Implementation Decisions 一节列出的**可作基线**的那些量。判别力靠**反事实**：把被测的树产物换成一份结构不同的树（字段缺失 / 语义 id 不存在）时断言必须转红。⚠️ **「至少各有一条基于树的断言」这条验收项的兑现口径**：三处**实做**的 spec（`md3-visual-tokens` / `fab-hit-testing-regression` / `transition-matrix`）**每处都有一条 `expect` 的期望值直接来自树**（class 定位唯一性 / `tap` 事件 / 布局盒尺寸），**不是**「树只用来取坐标、断言仍是像素 diff」。
 - **dex 线（#1048）**：判别力靠**阳性对照**——加 keep 规则的对照变体必须被检出；正常 release 变体必须报告「不在」。红绿都实跑并留记录。
 - **门禁线（#1049）**：每条收紧的判据都必须带**阳性对照**（反事实源码 ⇒ 守卫打红），且 ⑥ 的对照须在 **≥3 个调用点**的配置下做。③④⑤⑥ 属判据强度变更 ⇒ 收口后按最终 HEAD 重算规模线台账并登记。
 - **既有先例**：`uiTreeDumpReleaseGate.test.ts`（源级守卫 + 阳性对照 + 对真实源码的反事实替换）· `ui-tree-dump-core.test.ts`（真实样本回放 + 六形态脱敏 + 两条反向对照）· `ui-tree-dump-outdir.test.ts`（符号链接别名 / 大小写变体 / inode 判定）· `webviewRemovalInvariants.test.ts`（源级守卫）· `PictelioAppModuleDebugBuildTest`（BuildConfig.DEBUG 门禁）。
@@ -121,7 +121,7 @@
 
 - **改宿主侧 `UiTreeDump` 的实现本身**（抓取 / 连拍 / 落盘 / 告警语义）——本规格只消费与断言它。
 - **诊断脚本的落齐判据、摘要统计、清理范围、目录安全校验**——那些已有门禁，本规格不动。
-- **把 UI 树接进任何其它 e2e spec**（本规格只覆盖三处既有 spec）。
+- **把 UI 树接进本规格范围外的其它 e2e spec**（本规格只覆盖上列**四处**既有 spec；`lynx-bookmark-tags` 虽在范围内但**明确不改**，理由见「Solution」第 1 条）。
 - **断言源码位置**——上游 UI source map 的构建期打标是 React-only，vue-lynx 无 producer，此路已判死。
 - **把 e2e 搬进 CI**（ADR-0084 的门禁边界不变）。
 - **用树断言替换现有像素断言**——是叠加。
@@ -133,10 +133,12 @@
 ## Further Notes
 
 - **票的切分（6 张）**：`#1047` · `#1048` · `#1049-①` · `#1049-②` · `#1049-③` · `#1049-④⑤⑥`（④⑤⑥ 同文件、同抽取器、⑥ 是 ④⑤ 的前置 ⇒ 同票内有序；② 与 ④⑤⑥ 同属 release 接线守卫 ⇒ 「先 ② 后 ④⑤⑥」）。
-- **规模线台账当前基线**（收口后须重算）：分子 **1,646**（407 / 369 / 173 / 431 / 266）· 分母 **808**（Node 侧）· **1,610**（宿主侧）· **729**（协议侧）· 扫描面 **15,922**（57 文件）· 比例 **2.6% / 45.7% / 21.4% / 26.8% / 36.5%** · 总量比 **1.38×**。⚠️ 「比例」列一律是**百分数**（历史上曾混用百分数与裸比值，读反方向）。
-  - ⚠️ **as-of 锚点**：本行数值经 **2026-10-21 实测复算**（分子 = 五个真门禁文件行数 `wc -l`；分母 = 消费侧口径；扫描面 = `src/lynx/java` + `src/main/java` 递归的全部 Java 源文件）⇒ 与 `ca790b62` 时点**逐项一致**（本轮 T1 的改动**不触碰**这五个门禁文件与四个分母中的任何一个 ⇒ 台账零漂移）。
+- **规模线台账当前基线**（收口后须重算）：分子 **1,646**（407 / 369 / 173 / 431 / 266）· 分母 **843**（Node 侧）· **1,610**（宿主侧）· **757**（协议侧）· 扫描面 **15,922**（57 文件，**工作区**口径）· 比例 **2.6% / 43.8% / 20.5% / 26.8% / 35.1%** · 总量比 **1.34×**。⚠️ 「比例」列一律是**百分数**（历史上曾混用百分数与裸比值，读反方向）。
+  - ⚠️ **as-of 锚点**：本行数值经 **2026-10-21 实测复算**（分子 = 五个真门禁文件行数 `wc -l`；分母 = 消费侧口径；扫描面 = `src/lynx/java` + `src/main/java` 递归的全部 Java 源文件）⇒ 与 `ca790b62` 时点相比：**分子未动**（1,646，仍是那五个真门禁文件）、宿主侧分母与扫描面**未动**；**Node 侧分母 808 → 843、协议侧 729 → 757、新增生产代码 1,196 → 1,231**（#1047 把「哪一份产物最完整」的规则**下沉**到 `lib/ui-tree-dump-core.mjs` 成为单一出口 `pickBestArtifact`，诊断编排层与 e2e 消费侧共用 ⇒ 那两个 lib 文件各增行）⇒ 比例与总量比**相应重算**（45.7%→43.8% / 21.4%→20.5% / 36.5%→35.1% / 1.38×→1.34×）。
+  - ⚠️ **扫描面数字的复现口径**：台账登记的 57 文件 / 15,922 行是**工作区**口径；**干净 checkout / CI 复算得 56 文件 / 15,879 行**——差的 1 个文件是 `io.pictelio.app.config/OAuthConfig.java`（43 行），由 `sync-credentials.mjs` **生成**且被 gitignore ⇒ **第三方按本文命令在干净 checkout 上复算会对不上这 1 个文件 / 43 行**（门禁本身不受影响：守卫只断言「至少 2 个调用点」，无文件数断言）。
+  - ⚠️ **e2e 消费侧的两道门禁（`ui-tree.test.ts` / `ui-tree.io.test.ts`）不并进上面那个「1,646」的分子**——它们守的是 `tests/android-e2e/ui-tree.ts`（#1047 新增的 e2e 消费模块），**被测对象不同 ⇒ 分母也不同**；其自身比例（623 行 / 3,386 行 = **18.4%**）与失效面登记见 ADR-0223 §3.4。
 - **执行环境（本规格实测）**：模拟器 `emulator-5556` 在跑、1080×2160@480dpi（= `pictelio_ui` 几何）、`io.pictelio.app` 已装且 DEBUGGABLE；Appium 3.7.0 + `uiautomator2` driver 就位；设备到 `app-api.pixiv.net:443` 直连通；签名环境变量已就位 ⇒ **#1048 的真实签名 release APK 本地可构建**。
 - **e2e 运行前置**：须带 `BENCH_NAV=1`（`lynx.config.ts` 据此注入 `__BENCH_NAV__`；e2e 自己的构建 spawn 继承环境变量）——否则 `transition-matrix` 的深链钩子不存在，beforeAll 的 bundle grep 会快速失败。
 - **既有结论沿用**（不重测）：`nodeIndex` 恒 0（140/140）· `nodeId` 140/140 唯一 · 入库 fixture = 140 节点 / 深度 10 / class 138/140 · 活体与 fixture 的**属性级**覆盖数会漂（同一页面活体非空语义 id = 19、fixture = 16）⇒ 属性级计数不作跨次抓取契约。
 - **实施落点（#1047 / T1，2026-10-21）**：共享抓树模块 `packages/android-host/tests/android-e2e/ui-tree.ts`（触发 → 等落齐 → `adb pull` → 解析 → 按 class / 文本定位 + `frameInScreen` 口径）· 纯查询层单测 `packages/android-host/tests/android-e2e/unit/ui-tree.test.ts` · 消费侧 `specs/md3-visual-tokens.spec.ts` / `specs/fab-hit-testing-regression.spec.ts` / `specs/transition-matrix.spec.ts`。
-- **指针**：决策与逐轮史 `docs/adr/ADR-0223-runtime-ui-tree-observation-channel.md`（§3.3 尚未覆盖 / §3.4 逐门禁登记表 + 规模线台账 + 复算命令）· 上游 spec `docs/specs/app-lynx-ui-tree-dump-t0.md` · 词汇 `packages/android-host/CONTEXT.md`「运行时 UI 树观测通道」· 闭环纪律 `workflows/review-fix-loop.md`。
+- **指针**：决策与逐轮史 `docs/adr/ADR-0223-runtime-ui-tree-observation-channel.md`（§3.3 尚未覆盖 / §3.4 逐门禁登记表 + 规模线台账 + 复算命令）· 上游 spec `docs/specs/app-lynx-ui-tree-dump-t0.md` · 词汇 `packages/android-host/GLOSSARY.md`「运行时 UI 树观测通道」· 闭环纪律 `workflows/review-fix-loop.md`。
