@@ -104,6 +104,7 @@ import {
 } from "../pixel";
 import {
   FAB_CLASS_TOKENS,
+  PINNED_DENSITY_SCALE,
   captureUiTree,
   describeNode,
   dpToPx,
@@ -139,6 +140,19 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
  * 在两次运行里推出不同的窗。
  */
 const SCREEN_W = 1080;
+
+/**
+ * 屏幕物理高度（px）——同 `SCREEN_W` 的口径（设备被 `assertDeviceGeometry` 钉死
+ * 为 1080×2160）。
+ *
+ * ⚠️ **它存在的唯一理由是把像素扫描域钳在屏幕内**：`pixel.ts` 的 `colorAt` **不做
+ *   边界检查**（越界索引读到 `undefined` ⇒ 通道值 `NaN` ⇒ 颜色比较恒为否 ⇒
+ *   **静默少采样、不报错**）。扫描域一旦越出屏幕，量到的连通域就会**悄悄少一块**，
+ *   断言还在跑、结论却已失真 ⇒ 钳制让「越界」变成「可预期的边界」。
+ *   （今天 CTA 在 (872,1808,162,162)，外扩 8px 后全在屏内 ⇒ 钳制当前不改变任何
+ *   实测值；它防的是**布局把元素推到屏幕边缘**的那种将来。）
+ */
+const SCREEN_H = 2160;
 
 /**
  * 页面底色采样窗的 **x 区间** ×2（中央带内左右各一）。
@@ -210,12 +224,15 @@ function scanRegionOf(
   frame: { x: number; y: number; width: number; height: number },
   margin: number,
 ): { x0: number; y0: number; x1: number; y1: number } {
-  return {
-    x0: frame.x - margin,
-    y0: frame.y - margin,
-    x1: frame.x + frame.width + margin,
-    y1: frame.y + frame.height + margin,
-  };
+  // ⚠️ 钳到屏幕内（第 3 轮 Standards 轴 N8）：`pixel.ts` 的 `colorAt` 不做边界检查，
+  //   越界读到 `undefined` ⇒ 通道值 NaN ⇒ 颜色比较恒否 ⇒ **静默少采样、不报错**。
+  //   扫描域越出屏幕时，量到的连通域会悄悄少一块而断言照样跑 ⇒ 这里钳住，
+  //   让「越界」变成可预期的边界（今天的 CTA 在屏内 ⇒ 钳制不改变任何实测值）。
+  const x0 = Math.max(0, frame.x - margin);
+  const y0 = Math.max(0, frame.y - margin);
+  const x1 = Math.min(SCREEN_W, frame.x + frame.width + margin);
+  const y1 = Math.min(SCREEN_H, frame.y + frame.height + margin);
+  return { x0, y0, x1, y1 };
 }
 
 /**
@@ -463,7 +480,12 @@ function largestBoxOfColor(
 let serial = "";
 /** 设备原始 `CapacitorStorage.xml` 原文：afterAll 原样写回，别把别人的设备改脏。 */
 let originalPrefsXml = "";
-let densityScale = 3;
+/**
+ * 设备 density scale（`wm density` / 160）。运行时会用设备实读值覆盖它；
+ * 这里的初值取自 `PINNED_DENSITY_SCALE`（= 3）——**硬编码只此一处**，
+ * 另两处 spec 直接用该常量。
+ */
+let densityScale = PINNED_DENSITY_SCALE;
 
 async function waitForTopActivity(activity: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -851,10 +873,13 @@ describe.skipIf(SKIPPED)(
         f.y + f.height,
         `A4 树布局盒下界 ${f.y + f.height} 越过内容区底界 ${CONTENT_BOTTOM}`,
       ).toBeLessThanOrEqual(CONTENT_BOTTOM);
-      // 树推导的位置必须仍落在旧粗扫描域内 —— 两条口径打架 = 布局变了，转红而不是各说各的
+      // 树推导的位置必须仍落在旧粗扫描域内 —— 两条口径打架就转红，而不是各说各的
+      // ⚠️ 失败文案**不归因**（第 3 轮 Standards 轴 N2）：「布局变了」与「旧粗域本身
+      //   该更新了」从这一项测量上**分不开** ⇒ 只报事实 + 列出两个候选成因。
       expect(
         f.y,
-        `A4 树布局盒上界 ${f.y} 越出旧粗扫描域上界 ${CONTENT_BOTTOM - CTA_SCAN_H} —— 布局已变`,
+        `A4 树布局盒上界 ${f.y} 不在旧粗扫描域 [${CONTENT_BOTTOM - CTA_SCAN_H}, ${CONTENT_BOTTOM}] 内` +
+          ` —— **成因分不开**：布局变了 / 旧粗扫描域该更新了（两者都与此兼容，不要据此断定是产品回归）`,
       ).toBeGreaterThanOrEqual(CONTENT_BOTTOM - CTA_SCAN_H);
 
       // ── 像素：可见区域（元素「真被画出来没有」）──

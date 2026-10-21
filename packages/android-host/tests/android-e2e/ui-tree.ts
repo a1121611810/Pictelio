@@ -51,7 +51,8 @@
  *
  * pictelio_ui 固定 density 480（`assertDeviceGeometry` 逐台校验 `wm density` 匹配
  * `/480/`）⇒ **1dp = 3px**。三处 spec 的「≥48dp」判据同形，把 `3` 写死在三处
- * 就是三份可漂移的副本 ⇒ 收敛到下面这个常量（**改这里 = 改三处**）。
+ * 就是三份可漂移的副本 ⇒ 收敛到下面这个常量（**硬编码只有这一份**；`md3` 另用
+ * 设备实读的 density，初值取自它——见常量的注释）。
  *
  * ## 抓树不破坏被测状态（硬约束）
  *
@@ -321,11 +322,17 @@ export function dpToPx(dp: number, densityScale: number): number {
 /**
  * pictelio_ui 的 density scale（`wm density` = 480 ⇒ 480/160 = **3**）。
  *
- * ⚠️ 为什么单独抽一个常量：三个 spec 的「触控目标 ≥48dp」判据同形，
- *   把 `3` 写死在三处就是**三份可漂移的副本**（`ui-tree.ts` 自己的注释写过这条：
- *   「这是定位口径，抄三份就会漂」）。密度本身由 `assertDeviceGeometry`
- *   （`pixel.ts`）逐台校验 `wm density` 匹配 `/480/` ⇒ 写死 480 推出的 3 是**有依据的**，
- *   不是随手取的魔数。
+ * ⚠️ 为什么单独抽一个常量：三个 spec 的「触控目标 ≥48dp」判据同形，把 `3` 写死在
+ *   三处就是**三份可漂移的副本**（`ui-tree.ts` 自己的注释写过这条：「这是定位口径，
+ *   抄三份就会漂」）。密度本身由 `assertDeviceGeometry`（`pixel.ts`）逐台校验
+ *   `wm density` 匹配 `/480/` ⇒ 写死 480 推出的 3 是**有依据的**，不是随手取的魔数。
+ *
+ * ⚠️ **三个 spec 用它的方式并不完全一样**（第 3 轮 Standards 轴 N3 订正）：
+ *   `fab-hit-testing` / `transition-matrix` **直接**用本常量；
+ *   `md3-visual-tokens` 用**设备实读**的 `wm density`（初值取自本常量）——
+ *   那是个**更强**的口径（以设备为准），且因为 `assertDeviceGeometry` 钉死 480，
+ *   两者今天**相等**。⇒ 「改这里 = 改三处」的准确说法是「**改这里 = 改三处硬编码
+ *   里的那一份**」；**不是**「三处都只由它决定」。
  */
 export const PINNED_DENSITY_SCALE = 3;
 
@@ -346,11 +353,25 @@ function redactArtworkId(id: string): string {
   return id.replace(/\d{3,}/gu, "<n>");
 }
 
+/**
+ * 取节点的语义 id 并**脱敏**。
+ *
+ * ⚠️ 为什么要有类型兜底（第 3 轮 Standards 轴 N6）：`id` 来自引擎吐出的 JSON，
+ *   类型**不保证**是 string（今天实测是 string，但引擎某天改成数字型就会让
+ *   `.replace` 抛 `TypeError` ⇒ 把一条可读的断言失败变成崩溃）。
+ *   ⇒ 非字符串一律 `String(...)` 化（数字 id 转成字符串后再脱敏）。
+ */
+function redactedIdOf(node: UiTreeNode): string {
+  const raw = node.id || node.attributes?.id;
+  if (raw === undefined || raw === null) return "";
+  return redactArtworkId(typeof raw === "string" ? raw : String(raw));
+}
+
 /** 节点的一行描述（进断言失败信息用）。 */
 export function describeNode(node: UiTreeNode): string {
   const f = screenFrame(node);
   const frame = f ? `frame=(${f.x},${f.y},${f.width},${f.height})` : "frame=(缺失)";
-  const id = node.id || node.attributes?.id || "";
+  const id = redactedIdOf(node);
   const events = nodeEventNames(node);
   return [
     `tag=${node.tag ?? "?"}`,

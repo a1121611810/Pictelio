@@ -183,6 +183,20 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(text).toContain("nodeId=42");
   });
 
+  it("describeNode 对**非字符串** id 不崩（引擎哪天改成数字 id，失败信息不能变成崩溃）", () => {
+    // 第 3 轮 Standards 轴 N6：`id` 来自引擎 JSON，类型不保证；直接 `.replace`
+    // 会抛 TypeError ⇒ 把一条可读的断言失败变成崩溃。
+    const node: UiTreeNode = {
+      tag: "view",
+      nodeId: 7,
+      attributes: { id: 123456789 as unknown as string },
+    };
+    const text = describeNode(node);
+    expect(text).not.toContain("123456789");
+    expect(text).toContain("id=<n>");
+    expect(text).toContain("nodeId=7");
+  });
+
   it("按文本定位：样本里的文本节点可被 findByText 命中（脱敏后是「文本#N」形态）", () => {
     // 样本的文本被脱敏成「文本#N」⇒ 这里只断言「机制可用」：命中数与位置自洽。
     const hits = findByText(tree, "文本#1");

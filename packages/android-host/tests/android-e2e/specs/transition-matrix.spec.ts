@@ -1169,18 +1169,16 @@ describe.skipIf(SKIPPED)(
             `vw 推算口径 fabCenterPx 需要重新校准，或在树已全面接管后直接删掉。`,
         );
       }
-      // ── 实际点击坐标必须落在 FAB 的屏幕盒内（不用「树值对树值」的同源自证）──
-      // 若点击坐标取自别的坐标系、或圆心算错，点会落到盒外 ⇒ 转红。
+      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（第 3 轮 Standards 轴 B1）：
+      //   点击坐标 `fabPoint` 就是**这棵树同一个节点**的布局盒中心
+      //   （`fabCenter(r2Tree)` 算出来的），断言「圆心落在自己那个盒内」
+      //   在**结构上不可能失败** ⇒ 它是一条恒真断言。
+      // ⇒ 「点到的到底是不是那个元素」由**独立来源**回答，不由树自证：
+      //   ① 上面那两条**位置判据**（盒子不越出内容区 ⇒ 坐标系用错就转红）；
+      //   ② 点击**之后**的帧差（`diffRegion(beforeFab, afterFab) > CHANGE_TH`）
+      //      ——画面真的变了，说明这一击打到了 FAB（没点空）。
       const tapX = Math.round(fabPoint.x);
       const tapY = Math.round(fabPoint.y);
-      expect(
-        tapX >= fabFrame!.x && tapX <= fabFrame!.x + fabFrame!.width,
-        `R2：实际点击的 x=${tapX} 不在 FAB 屏幕盒 x∈[${fabFrame!.x}, ${fabFrame!.x + fabFrame!.width}] 内`,
-      ).toBe(true);
-      expect(
-        tapY >= fabFrame!.y && tapY <= fabFrame!.y + fabFrame!.height,
-        `R2：实际点击的 y=${tapY} 不在 FAB 屏幕盒 y∈[${fabFrame!.y}, ${fabFrame!.y + fabFrame!.height}] 内`,
-      ).toBe(true);
       tap(tapX, tapY);
       await SLEEP(1_500);
       const afterFab = await screenshot("r2-after-fab");

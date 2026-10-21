@@ -17,7 +17,7 @@ import { pickBestArtifact } from "../../../scripts/lib/ui-tree-dump-core.mjs";
 // ⇒ 规则下沉到 core 层 `pickBestArtifact`（单一出口），两侧共用。
 // 本文件守两件事：
 //   ① `pickBestArtifact` 本身的**直接**行为（键序 / 空集合 / 不改入参）；
-//   ② **诊断编排层不得自带选档规则**——它一旦自己长出一份排序，① 的防线就只剩一半。
+//   ② **两个消费侧都不得自带选档规则**——任一侧自己长出一份排序，① 的防线就只剩一半。
 //
 // ── 为什么单开一个文件（不并进 core 门禁）──
 //
@@ -42,20 +42,26 @@ import { pickBestArtifact } from "../../../scripts/lib/ui-tree-dump-core.mjs";
 //
 // ── 已知失效面（显式登记，非缺陷）──
 //
-// - **源文本守卫只认「排序 / 比较」这两种自带规则的写法**。若有人用别的写法
-//   （例如手写 reduce 找最大）绕过，它不会被 ② 抓到 ⇒ ② 是**纵深防御**而非完备证明。
-//   真正的完备性来自「两侧共用同一个函数」这件事本身——编排层若不用它，两侧就分叉了。
+// - **源文本守卫只认「排序 / 比较」这两种自带规则的写法**。第 3 轮 Standards 轴
+//   实测：手写 `reduce` 找最大**会**被「比较 nodeCount」那条抓到；真正漏掉的是
+//   **先解构再比较**（`const { nodeCount: n } = a; n > m`）——字段名不出现 ⇒ 模式
+//   全部落空。⇒ 守卫是**纵深防御**，不是完备证明（真正的完备性来自「两侧共用同一
+//   个函数」这件事本身——任一侧不用它，两侧就分叉了）。
 // - 守卫读的是**源文件文本**，不是运行时行为：改文件名 / 改 import 写法会让它**误报**
 //   （fail-closed，宁可红不可漏）。
+// - e2e 消费侧**不**禁排序（它要把产物文件名排序后逐份拉回，那是编排需要）⇒ 只禁
+//   「对三个可比字段做比较」。
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 /** 宿主包根 = scripts → unit → tests → android-host，共 3 级。 */
 const HOST_DIR = resolvePath(testDir, "../../..");
 const CORE_LIB = resolvePath(HOST_DIR, "scripts/lib/ui-tree-dump-core.mjs");
 const ORCHESTRATOR = resolvePath(HOST_DIR, "scripts/dump-ui-tree.mjs");
+const E2E_CONSUMER = resolvePath(HOST_DIR, "tests/android-e2e/ui-tree.ts");
 
 const coreSrc = readFileSync(CORE_LIB, "utf8");
 const orchestratorSrc = readFileSync(ORCHESTRATOR, "utf8");
+const e2eConsumerSrc = readFileSync(E2E_CONSUMER, "utf8");
 
 /** 一份候选产物（排序用的三个字段是承重的，其余字段只为可读性）。 */
 function artifact(name: string, nodeCount: number, delayMs: number, bytes: number) {
@@ -63,27 +69,36 @@ function artifact(name: string, nodeCount: number, delayMs: number, bytes: numbe
 }
 
 /**
- * 编排层里**不允许**出现的写法（自带选档规则的特征）。
+ * 「自带选档规则」的特征。
  *
- * ⚠️ 比较运算符写成 `(===|!==|>=|<=|>|<)` 的**完整**形式，而不是 `[<>]=?`——
+ * ① **比较运算符**（`>` / `<` / `===` …）：最直接的写法。
+ * ② **同字段相减**（`b.bytes - a.bytes`）：core 层 tie-break 用的就是这一形式 ⇒
+ *    只禁比较运算符会**漏掉它**（第 3 轮实测：`bytes` 那条比较模式在 core 层
+ *    根本不命中 ⇒ 阳性对照当场抓到「这条模式可能写坏了」）。
+ *
+ * ⚠️ 两处写法细节（都是被实测逼出来的）：
+ * - 比较运算符写成 `(===|!==|>=|<=|>|<)` 的**完整**形式，而不是 `[<>]=?`——
  *   后者会把模板字符串里的 `字节=${bytes}` 误判成比较（`=` 命中 `=?`）。
+ * - 用**否定回顾** `(?<!<)` 排除「尖括号包裹」的情形：JSDoc 里的
+ *   `ui-tree-<point>-<delayMs>ms-<seq>.json` 会让 `<delayMs>` 命中 `>`——
+ *   那是**文档标记**，不是比较。
  */
-const BANNED_IN_ORCHESTRATOR: { pattern: RegExp; why: string }[] = [
+const SELF_RULE_PATTERNS: { pattern: RegExp; why: string }[] = [
+  {
+    pattern: /(?<!<)\b(?:nodeCount|delayMs|bytes)\s*(?:===|!==|>=|<=|>|<)/u,
+    why: "不得对 nodeCount / delayMs / bytes 做比较",
+  },
+  {
+    pattern: /(?<!<)\b(?:nodeCount|delayMs|bytes)\s*-\s*\w+\.(?:nodeCount|delayMs|bytes)/u,
+    why: "不得用同字段相减来挑产物（tie-break 的写法）",
+  },
+];
+
+/** 编排层额外禁「排序」——它没有任何排序需要（e2e 侧有：产物名要排序后逐份拉回）。 */
+const ORCHESTRATOR_ONLY_PATTERNS: { pattern: RegExp; why: string }[] = [
   {
     pattern: /\.toSorted\(|\.sort\(/u,
     why: "编排层不得自己排序产物（选档规则只在 core 层）",
-  },
-  {
-    pattern: /nodeCount\s*(?:===|!==|>=|<=|>|<)/u,
-    why: "编排层不得按 nodeCount 比较产物",
-  },
-  {
-    pattern: /delayMs\s*(?:===|!==|>=|<=|>|<)/u,
-    why: "编排层不得按 delayMs 比较产物",
-  },
-  {
-    pattern: /bytes\s*(?:===|!==|>=|<=|>|<)/u,
-    why: "编排层不得按 bytes 比较产物",
   },
 ];
 
@@ -130,8 +145,8 @@ describe("UI 树产物选档 · 单一出口（pickBestArtifact）", () => {
   });
 });
 
-describe("UI 树产物选档 · 编排层不得自带规则（纵深防御）", () => {
-  it("编排层从 core 层 import pickBestArtifact（选档规则的唯一来源）", () => {
+describe("UI 树产物选档 · 两个消费侧都不得自带规则（纵深防御）", () => {
+  it("诊断编排层从 core 层 import 并调用 pickBestArtifact（选档规则的唯一来源）", () => {
     expect(orchestratorSrc).toMatch(
       /import\s*\{[^}]*\bpickBestArtifact\b[^}]*\}\s*from\s*"\.\/lib\/ui-tree-dump-core\.mjs"/u,
     );
@@ -139,10 +154,19 @@ describe("UI 树产物选档 · 编排层不得自带规则（纵深防御）", 
     expect(orchestratorSrc).toMatch(/\bpickBestArtifact\(/u);
   });
 
-  it("编排层源码里不出现「自带选档规则」的写法", () => {
-    const hits = BANNED_IN_ORCHESTRATOR.filter((b) => b.pattern.test(orchestratorSrc)).map(
-      (b) => b.why,
+  it("e2e 消费层同样从 core 层 import 并调用 pickBestArtifact（两侧对称）", () => {
+    // ⚠️ 第 3 轮 Spec 轴 N-C：守卫原先**只覆盖编排层** ⇒ e2e 侧若把排序规则就地
+    //   复制一份（行为不变），两侧就分叉而无人察觉 ⇒ 守卫必须对称。
+    expect(e2eConsumerSrc).toMatch(
+      /import\s*\{[^}]*\bpickBestArtifact\b[^}]*\}\s*from\s*"\.\.\/\.\.\/scripts\/lib\/ui-tree-dump-core\.mjs"/u,
     );
+    expect(e2eConsumerSrc).toMatch(/\bpickBestArtifact\(/u);
+  });
+
+  it("诊断编排层源码里不出现「自带选档规则」的写法", () => {
+    const hits = [...ORCHESTRATOR_ONLY_PATTERNS, ...SELF_RULE_PATTERNS]
+      .filter((b) => b.pattern.test(orchestratorSrc))
+      .map((b) => b.why);
     expect(
       hits,
       `诊断脚本 dump-ui-tree.mjs 疑似自带选档规则：${hits.join("；")}。` +
@@ -150,9 +174,23 @@ describe("UI 树产物选档 · 编排层不得自带规则（纵深防御）", 
     ).toEqual([]);
   });
 
-  it("阳性对照：同样的模式在 core 层**确实命中**（证明这条守卫不是恒绿）", () => {
-    // 若模式写错（永远匹配不到），上面那条会永远绿 ⇒ 这里证明它有区分力。
-    const hits = BANNED_IN_ORCHESTRATOR.filter((b) => b.pattern.test(coreSrc));
-    expect(hits.length).toBeGreaterThan(0);
+  it("e2e 消费层源码里不出现「对可比字段做比较」的写法", () => {
+    const hits = SELF_RULE_PATTERNS.filter((b) => b.pattern.test(e2eConsumerSrc)).map((b) => b.why);
+    expect(
+      hits,
+      `e2e 消费层 tests/android-e2e/ui-tree.ts 疑似自带选档规则：${hits.join("；")}。` +
+        "选档规则只能有一份（core 层的 pickBestArtifact）。",
+    ).toEqual([]);
+  });
+
+  it("阳性对照：**逐条**模式在 core 层都命中（证明这条守卫不是恒绿，也不是半绿）", () => {
+    // ⚠️ 第 3 轮 Standards 轴 N4：原写法只断言「命中任意一条」⇒ 单条模式写错
+    //   仍会绿（其它两条照样命中）。⇒ 逐条断言。
+    for (const b of [...ORCHESTRATOR_ONLY_PATTERNS, ...SELF_RULE_PATTERNS]) {
+      expect(
+        b.pattern.test(coreSrc),
+        `阳性对照失效：core 层没有命中「${b.why}」这条模式 ⇒ 该模式可能写坏了（永远匹配不到）`,
+      ).toBe(true);
+    }
   });
 });

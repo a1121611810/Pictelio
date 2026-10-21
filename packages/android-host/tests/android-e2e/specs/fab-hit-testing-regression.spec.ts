@@ -518,20 +518,17 @@ describe.skipIf(SKIPPED)(
         f!.y + f!.height,
         `FAB 盒下缘 ${f!.y + f!.height}px 越过内容区下界 ${CONTENT_BOTTOM}px`,
       ).toBeLessThanOrEqual(CONTENT_BOTTOM);
-      // ── 实际点击坐标必须落在 FAB 的屏幕盒内（不用「树值对树值」的同源自证）──
-      // 旧写法 `expect(fabCenter(tree).x).toBe(fabTap.x)` 是**树值对树值**：两边都来自
-      // 同一棵树 ⇒ 恒真，证明不了任何事。改成「点击坐标 ∈ 屏幕盒」后才有独立价值：
-      // 点击坐标取自别的坐标系、或圆心算错，都会让点落到盒外 ⇒ 转红。
-      expect(
-        fabTap.x >= f!.x && fabTap.x <= f!.x + f!.width,
-        `实际点击的 x=${fabTap.x} 不在 FAB 屏幕盒 x∈[${f!.x}, ${f!.x + f!.width}] 内`,
-      ).toBe(true);
-      expect(
-        fabTap.y >= f!.y && fabTap.y <= f!.y + f!.height,
-        `实际点击的 y=${fabTap.y} 不在 FAB 屏幕盒 y∈[${f!.y}, ${f!.y + f!.height}] 内`,
-      ).toBe(true);
-      // ⚠️ 上面两条**不区分**「树给的圆心」与「vw 推算的圆心」——今天两者恰好相同
-      //   （差 ≤0.8px）。区分它们的是 beforeAll 里那条**交叉校验断言**，不是这里。
+      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（第 3 轮 Standards 轴 B1）：
+      //   点击坐标 `fabTap` 就是**这棵树同一个节点**的布局盒中心
+      //   （`beforeAll` 里 `fabCenter(captured.best.tree)` 算出来的），断言
+      //   「圆心落在自己那个盒内」在**结构上不可能失败** ⇒ 它是一条恒真断言。
+      //   旧写法 `expect(fabCenter(tree).x).toBe(fabTap.x)` 同理（树值对树值）。
+      // ⇒ 「点到的到底是不是那个元素」由**独立来源**回答，不由树自证：
+      //   ① 上面那两条**位置判据**（盒子不越出内容区 ⇒ 坐标系用错就转红）；
+      //   ② 点击**之后**的像素 diff（`pngDiff(before, after) > 100`）——画面真的变了，
+      //      说明这一击打到了 FAB（没点空）。
+      //   ③ 「树给的圆心」与「vw 推算的圆心」是否一致 ⇒ 那是 beforeAll 里的
+      //      **对照告警**（不是断言）：布局合法变更不该让本门禁变红。
 
       const before = screenshot(serial, "ctl-before-fab-tap");
       tap(serial, fabTap.x, fabTap.y);
