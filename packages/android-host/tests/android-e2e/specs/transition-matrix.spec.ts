@@ -79,6 +79,7 @@ import {
   runCapture,
   runOrThrow,
 } from "../env";
+import { collectUiTree, fabCenter, snapshotRemoteArtifacts, type UiTreeNode } from "../ui-tree";
 import {
   currentTopActivity,
   forceStopApp,
@@ -573,10 +574,18 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
  * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:504`
  * getStringExtra("benchNav") 后按场景 sendGlobalEvent；单引擎下已无 MainActivity 转发环节）。
  */
-async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
+async function launchBenchNav(
+  scenario: "illust" | "carousel",
+  opts: { captureTree?: boolean } = {},
+): Promise<UiTreeNode | null> {
   forceStopApp(serial);
   runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
-  runOrThrow(adbPath(), [
+  // ⚠️ #1047：抓树时**合并进这条 intent**（`--es uiTreeDump 1`），**不另发一条**——
+  //   另发会走 `onNewIntent` → `setIntent` **覆盖 Activity 的 intent** ⇒ 把 benchNav
+  //   这个深链目标冲掉（`LynxActivity` 是 singleTask，intent 会被替换）。合并则：
+  //   ① 抓到的树正好就是这条深链打开的那个页面；② 不动既有 intent 的语义。
+  const before = opts.captureTree ? snapshotRemoteArtifacts(serial) : null;
+  const args = [
     "-s",
     serial,
     "shell",
@@ -587,10 +596,22 @@ async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
     "--es",
     "benchNav",
     scenario,
-  ]);
+  ];
+  if (opts.captureTree) args.push("--es", "uiTreeDump", "1");
+  runOrThrow(adbPath(), args);
   await waitForTopActivity(LYNX_ACTIVITY);
   await waitForLynxRenderReady();
   await SLEEP(2_000);
+  if (!before) return null;
+  const captured = await collectUiTree(serial, {
+    before,
+    outDir: resolve(EVIDENCE_DIR, "ui-tree", scenario),
+  });
+  console.log(
+    `[transition-matrix] benchNav ${scenario} 树：${captured.best.name}（${captured.best.point} / ` +
+      `${captured.best.delayMs}ms / ${captured.best.nodeCount} 节点）`,
+  );
+  return captured.best.tree;
 }
 
 /**
@@ -1052,7 +1073,7 @@ describe.skipIf(SKIPPED)(
 
     it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async (t) => {
       // 深链重进 /illusts（与 R1 状态解耦），经放射 FAB 内环搜索项打开 SearchSheet
-      await launchBenchNav("illust");
+      const r2Tree = await launchBenchNav("illust", { captureTree: true });
       // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
       // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
       // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
@@ -1062,7 +1083,10 @@ describe.skipIf(SKIPPED)(
         t.skip(untrustedContentSkip("R2", r2IllustsLoad));
       }
       const beforeFab = await screenshot("r2-before-fab");
-      tap(FAB_TAP.x, FAB_TAP.y);
+      // FAB 落点**树优先**（#1047）：树给的真实盒子 vs vw 推算的常量
+      // （推算口径是「设计常量 + 稳定区高度」⇒ 布局一改就偏）。
+      const fabPoint = r2Tree ? fabCenter(r2Tree) : FAB_TAP;
+      tap(Math.round(fabPoint.x), Math.round(fabPoint.y));
       await SLEEP(1_500);
       const afterFab = await screenshot("r2-after-fab");
       expect(

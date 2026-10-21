@@ -10,13 +10,33 @@
  *  3. 主题色真的可切：`settings_theme_color=violet` 后主 CTA 色带命中 violet 色板；
  *  4. 主 CTA 的**可见包围盒** ≥ 48dp 且 ≤ 屏宽 80%。
  *
- * **不证**（B/C 类，本引擎做不到，**不是「暂时没做」而是「做不了」**）：
- *  - Lynx 4.0.1 **不暴露无障碍树节点**（全仓 199 处 `accessibility-element` 标注也
- *    不出节点，uiautomator dump 在 pictelio_ui 上必被 SIGKILL），`getCSSValue` 对非 DOM
- *    的 Lynx 同样无效 ⇒ **拿不到元素边界框**。触控目标尺寸、圆角、对比度、状态层 alpha
- *    全部只能靠像素测量，而这类度量在本仓**从未实测过、容差无依据** ⇒ 本票一律不塞。
+ * **不证**（B/C 类，**树与像素都答不了**，不是「暂时没做」而是「做不了」）：
+ *  - **颜色 / 圆角 / 状态层 alpha / 对比度**：运行时 UI 树给的是**布局盒**与**结构**，
+ *    **给不出颜色**——实测 140 节点样本上 `attributes.style` 只覆盖 51/140，其键集里
+ *    **没有** `border-radius` / `background-color` / `color` / `opacity`，且 `background`
+ *    的值是 `var(--md-…)` **引用**而非计算值 ⇒ 这几类量一律留像素。
  *  - 观感类（排版节奏、elevation 观感、图标观感、整体贴合度）机器判不了，
  *    仍须人眼兜底 —— 详见 `README.md` §机器断言覆盖面。
+ *
+ * ## 树与像素的分工（#1047 引入 · ADR-0223 运行时 UI 树通道）
+ *
+ * ⚠️ 本文件头此前写的是「Lynx 拿不到元素边界框 ⇒ B 类只能靠像素」——**该前提已因
+ *   ADR-0223 的 UI 树通道落地而失效**（树的 `position.frameInScreen` 140/140 节点可读）。
+ *   现在按「各答各的问」分工：
+ *
+ * | 量 | 树（`../ui-tree`） | 像素 |
+ * |---|---|---|
+ * | 元素**在不在 / 在哪 / 多大** | ✅ 布局盒 `frameInScreen` | — |
+ * | 元素**能不能点** | ✅ `events` 里有 `tap` | — |
+ * | 元素**长什么样**（颜色 / 圆角 / alpha） | ❌ | ✅ |
+ * | 元素**有没有被盖住 / 真的画出来了吗** | ❌ | ✅ |
+ *
+ * ⇒ **能用树定位的一律用树定位**（A1/A2 的采样窗位置、A3/A4 的 CTA 位置）；
+ *   **树答不了的留像素**（色值、纯度、可见包围盒）。两边**叠加**而非互相替代。
+ *
+ * ⚠️ **坐标只用 `frameInScreen`**（禁 `frameInRoot`）：两套坐标系实测差 81px
+ *   （横向 swiper 滚动偏移），且 `frameInScreen` 与既有像素实测经验值**逐字一致**。
+ *   详见 `../ui-tree` 文件头「坐标口径」。
  *
  * ## 不进 CI、不挂发布门
  *
@@ -36,7 +56,7 @@
  *
  * ⚠️ **2026-10-03 随 ADR-0216（根页去实体顶栏）整体重校准**。旧窗 `y=[150,290]` 落在
  * 旧的顶栏带上，唯一非底色内容是居中的页面标题；顶栏撤掉后该带被二级 tab 与首屏
- * 内容占据，实测纯度掉到 0.363 / 0.368 ⇒ A1/A2 转红。详见 `SURFACE_WINDOWS` 的推导。
+ * 内容占据，实测纯度掉到 0.363 / 0.368 ⇒ A1/A2 转红。详见「采样窗」区块的推导。
  *
  * 现窗落回 Root 的 `padding-top = safeTop` 渗色带（y<72），并避开状态栏系统元素：
  *  - 状态栏时钟占 x≈60..300、系统图标占 x≈840..1020（实测该两段纯度 0.72~0.94）→
@@ -82,6 +102,18 @@ import {
   type Pixels,
   type Rgb,
 } from "../pixel";
+import {
+  FAB_CLASS_TOKENS,
+  captureUiTree,
+  describeNode,
+  dpToPx,
+  findByClass,
+  findFab,
+  nodeHasEvent,
+  screenFrame,
+  surfaceWindowsFromTree,
+  type UiTreeNode,
+} from "../ui-tree";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,7 +134,14 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── 采样窗（物理像素；推导依据写在各自注释里，见文件头「采样窗」）──────────
 /**
- * 页面底色采样窗 ×2（中央带内左右各一）。
+ * 屏幕物理宽度（px）。`assertDeviceGeometry` 已断言设备就是 1080×2160 / density 480
+ * ⇒ 这里取常量而不是再问一次设备：窗口推导的基准必须是**确定值**，否则同一份树
+ * 在两次运行里推出不同的窗。
+ */
+const SCREEN_W = 1080;
+
+/**
+ * 页面底色采样窗的 **x 区间** ×2（中央带内左右各一）。
  *
  * **落在 Root 的 `padding-top = safeTop` 渗色带上**：根页 `topInset: 'bleed'`
  * （ADR-0216）⇒ 页面背景一直画到屏幕顶边，故 y<72 在**任何主题/明暗**下都是纯
@@ -123,24 +162,65 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
  * 为躲开居中标题，而该标题已随顶栏撤除 ⇒ **中央反而是全宽最干净的一段**。
  * 窗取中央两段（各 220×48），既避开系统元素，又保留「采两处」降低蒙对概率。
  *
+ * **x 区间仍靠人工校准、y 区间改由树推导**（#1047）：
+ *   · **y 下界** ⇒ 树推导（`deriveBleedLowerBound`）：树里第一个「全宽且非零起始 y」
+ *     的节点就是「渗色带」的下边界（实测 72，与 `safeTop` 吻合）⇒ 布局变了（内容上移）
+ *     窗会**跟着走**，不再需要「实测纯度掉到 0.363 ⇒ 手工重校准」。
+ *   · **x 区间** ⇒ 树**看不见**：状态栏时钟 / 系统图标是**系统 UI**，不在 Lynx 树里
+ *     ⇒ 仍靠上面那段人工校准的实测值。
+ *
  * 期望值仍直接取 `tokens.css` 的 `.theme-sky` / `.theme-sky.dark` 的 `--md-surface`，
  * **不是**从实现反推；变异验证（改令牌值必须让 A1/A2 转红）见该文件提交说明。
  */
-const SURFACE_WINDOWS = [
-  { x0: 380, y0: 0, x1: 600, y1: 48 },
-  { x0: 620, y0: 0, x1: 840, y1: 48 },
+const SURFACE_WINDOW_X_RANGES = [
+  { x0: 380, x1: 600 },
+  { x0: 620, x1: 840 },
 ] as const;
 
+/** 采样窗（物理像素矩形）。 */
+interface SurfaceWindow {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 /**
- * 主 CTA（全局放射 FAB 主按钮）的扫描域：内容区右下 1/2 屏宽 × 底部 320px。
+ * 主 CTA（全局放射 FAB 主按钮）的**树定位**口径 = 共享模块的 `FAB_CLASS_TOKENS`
+ * （三个 token 全部命中才唯一；口径本体在 `../ui-tree`，三个 spec 共用一份）。
+ */
+
+/**
+ * 主 CTA（全局放射 FAB 主按钮）的**像素扫描域**下界高度：内容区右下 320px。
  *
- * 选「右下」而非写死一个点，是因为 Lynx 拿不到边界框（见文件头）——只能按
- * **颜色连通域**反推包围盒。`FAB_SIZE_VW = 14.933` → 14.933vw × 1080 = 161px，
- * 加上 `right/bottom = 4.267vw = 46px` 尾随边距，实测恒落在 x 872..1033 / y 1808..1969，
- * 完整含在本网内。扫描域下界用 `CONTENT_BOTTOM`（稳定区 2016）而非全屏 2160，
- * 避免把手势条的死像素算进包围盒（transition-matrix 2026-09-28 踩过同一坑）。
+ * ⚠️ **#1047 起，扫描域本身改由树给出**（见 `ctaScanRegionFromTree`）：树的
+ * `frameInScreen` 精确到像素（实测 CTA 盒 = (872,1808,162,162)），比「右下 1/2 屏宽 ×
+ * 底部 320px」这种粗域精确得多，且**不依赖 FAB 尺寸常量**。
+ *
+ * 本常量保留作**对照**：它同时是「树推导的扫描域必须落在旧粗域内」这条断言的基准
+ * （扫描域越界 ⇒ 布局变了，树推导与旧口径打架 ⇒ 转红而不是各自说了算）。
  */
 const CTA_SCAN_H = 320;
+
+/**
+ * 由树给出 CTA 的像素扫描域 = **树的布局盒本身**。
+ *
+ * 为什么可以直接用布局盒当扫描域：布局盒是 CTA **应该**被画的位置；在这块里找
+ * 「与 `--md-primary-container` 相近的连通域」，量到的就是**实际画出来的可见区域**。
+ * ⇒ 树负责「它应该在哪」，像素负责「它真的画出来没有、画全了没」，两者一交一答。
+ *
+ * 旧口径（右下 1/2 屏宽 × 底部 320px）会把插画里的大片近似色扫进来 ⇒ 只能取
+ * 「最大连通域」来抗干扰；树给出精确盒后，连通域选择不再是唯一的抗干扰手段。
+ */
+function ctaScanRegionFromTree(tree: UiTreeNode): {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+} {
+  const f = screenFrame(findFab(tree))!;
+  return { x0: f.x, y0: f.y, x1: f.x + f.width, y1: f.y + f.height };
+}
 
 /** 颜色命中容差（每通道）。实测三个态的令牌色都**逐位精确**渲染（偏差 0），
  *  ±6 是给 PNG 解码 / 色彩管理引入的亚像素抖动的余量，不是「差不多就行」。 */
@@ -351,7 +431,7 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 }
 
 /**
- * 播种外观 → 重启 → 等渲染 → 连采 N 帧**已收敛**的帧返回。
+ * 播种外观 → 重启 → 等渲染 → **抓 UI 树** → 连采 N 帧**已收敛**的帧返回。
  *
  * 收敛判据 = 连续 3 帧同时满足：①底色众数**完全相同**（不是「彼此接近」——完全相同才说明
  * 画面真的停住了，接近会把缓慢渐变当成已收敛）；②**画面已有内容**（非底色像素占比
@@ -362,8 +442,14 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
  *   于是采到骨架/空屏帧。旧窗压在内容上时①隐含了②，收敛才真的代表画面稳定。
  *   实测：A1/A2 因此采到 0.018 非底色占比的近纯色帧。
  *   ②同时充当票面要求的「多帧采样兜底」：单帧可能是骨架屏/半渲染中间态。
+ *
+ * ⚠️ **抓树排在采像素帧之前**（#1047）：采样窗的位置由树推导 ⇒ 必须先有树。
+ *   抓树走 hot 采样点（`am start` + `uiTreeDump=1`）⇒ `singleTask` 下 Activity
+ *   **不重建**、页面不重载 ⇒ 不影响随后的像素采样（页面仍是同一屏）。
  */
-async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; surface: Rgb }> {
+async function relaunchAndSample(
+  label: string,
+): Promise<{ pixels: Pixels[]; surface: Rgb; tree: UiTreeNode; windows: SurfaceWindow[] }> {
   forceStopApp(serial);
   await SLEEP(500);
   runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
@@ -372,8 +458,21 @@ async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; sur
   await waitForLynxRenderReady();
   await SLEEP(2_000);
 
+  // ① 树：hot 采样点抓一份（`am start` + `uiTreeDump=1`，不重建 Activity）
+  const captured = await captureUiTree(serial, {
+    outDir: resolve(EVIDENCE_DIR, "ui-tree", label),
+  });
+  const tree = captured.best.tree;
+  // ② 采样窗：由树推导（布局变了窗跟着走，不再靠「纯度不达标 ⇒ 手工重校准」）
+  const windows = surfaceWindowsFromTree(tree, SCREEN_W, SURFACE_WINDOW_X_RANGES);
+  console.log(
+    `[md3-visual-tokens] ${label} 树：${captured.best.name}（${captured.best.point} 采样点 / ` +
+      `${captured.best.delayMs}ms 档 / ${captured.best.nodeCount} 节点 / ${captured.best.bytes}B）` +
+      ` ⇒ 渗色带下界 ${windows[0]?.y1}px，采样窗 ${JSON.stringify(windows)}`,
+  );
+
   const frames: Pixels[] = [];
-  const surfaceOf = (p: Pixels): Rgb => modalColor(p, SURFACE_WINDOWS[0]).rgb;
+  const surfaceOf = (p: Pixels): Rgb => modalColor(p, windows[0]!).rgb;
   // 最多采 10 帧拿到 3 帧一致；拿不到就返回最后 3 帧（后续断言会带着实测值转红）
   for (let i = 0; i < 10 && frames.length < FRAMES_PER_SAMPLE * 3; i++) {
     frames.push(await toPixels(screenshot(serial, `${label}-f${i}`, EVIDENCE_DIR)));
@@ -391,7 +490,7 @@ async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; sur
           `（连采 3 帧底色一致 = ${fmt(surfaceOf(recent[0]))}，且画面已有内容 ` +
           `非底色占比 ${nonSurfaceRatio(recent[0], surfaceOf(recent[0])).toFixed(3)}）`,
       );
-      return { pixels: recent, surface: surfaceOf(recent[0]) };
+      return { pixels: recent, surface: surfaceOf(recent[0]), tree, windows };
     }
     await SLEEP(FRAME_INTERVAL_MS);
   }
@@ -400,7 +499,7 @@ async function relaunchAndSample(label: string): Promise<{ pixels: Pixels[]; sur
       "返回最后 3 帧——后续断言会带着实测值转红",
   );
   const tail = frames.slice(-FRAMES_PER_SAMPLE);
-  return { pixels: tail, surface: surfaceOf(tail[0]) };
+  return { pixels: tail, surface: surfaceOf(tail[0]), tree, windows };
 }
 
 describe.skipIf(SKIPPED)(
@@ -454,7 +553,7 @@ describe.skipIf(SKIPPED)(
       const want = readToken(".theme-sky", "--md-surface");
       const darkWant = readToken(".theme-sky.dark", "--md-surface");
       seedAppearance(serial, { themeColor: "sky", darkMode: "light" });
-      const { pixels, surface } = await relaunchAndSample("a1-sky-light");
+      const { pixels, surface, windows } = await relaunchAndSample("a1-sky-light");
 
       // 前置：屏上必须有内容。采样窗在渗色带上，**任何**页面（含登录页/空屏）都满足
       // 「纯度达标 + 色值命中」⇒ 缺这条时空屏会空洞转绿（见 NON_BLANK_MIN_RATIO 注释）。
@@ -469,7 +568,7 @@ describe.skipIf(SKIPPED)(
       }
 
       for (const [i, p] of pixels.entries()) {
-        for (const w of SURFACE_WINDOWS) {
+        for (const w of windows) {
           const { rgb, purity } = modalColor(p, w);
           expect(
             purity,
@@ -506,7 +605,7 @@ describe.skipIf(SKIPPED)(
       const lightWant = readToken(".theme-sky", "--md-surface");
       const darkWant = readToken(".theme-sky.dark", "--md-surface");
       seedAppearance(serial, { themeColor: "sky", darkMode: "dark" });
-      const { pixels, surface } = await relaunchAndSample("a2-sky-dark");
+      const { pixels, surface, windows } = await relaunchAndSample("a2-sky-dark");
 
       // 与 A1 同一条前置：暗色空屏同样是纯 --md-surface，会让底色断言空洞转绿
       for (const [i, p] of pixels.entries()) {
@@ -519,7 +618,7 @@ describe.skipIf(SKIPPED)(
       }
 
       for (const [i, p] of pixels.entries()) {
-        for (const w of SURFACE_WINDOWS) {
+        for (const w of windows) {
           const { rgb, purity } = modalColor(p, w);
           expect(
             purity,
@@ -559,21 +658,48 @@ describe.skipIf(SKIPPED)(
       seedAppearance(serial, { themeColor: "violet", darkMode: "light" });
       const after = await relaunchAndSample("a3-after-violet");
 
-      const scanRegion = (p: Pixels) => ({
-        x0: Math.floor(p.w / 2),
-        y0: CONTENT_BOTTOM - CTA_SCAN_H,
-        x1: p.w,
-        y1: CONTENT_BOTTOM,
-      });
+      // 扫描域改由**树**给出（#1047）：CTA 的布局盒，而不是「右下 1/2 屏宽 × 底部 320px」
+      // 那种粗域 ⇒ 定位精度从「右下角一大片」变成「按钮自己那一块」。
+      const scanRegion = (tree: UiTreeNode) => ctaScanRegionFromTree(tree);
       /** 按给定令牌在扫描域里定位 CTA，并回读连通域内的实测众数色。 */
-      const measureCta = (p: Pixels, token: Rgb): { box: Box | null; color: Rgb } => {
-        const box = largestBoxOfColor(p, scanRegion(p), token, CTA_TOL);
+      const measureCta = (
+        p: Pixels,
+        tree: UiTreeNode,
+        token: Rgb,
+      ): { box: Box | null; color: Rgb } => {
+        const box = largestBoxOfColor(p, scanRegion(tree), token, CTA_TOL);
         return { box, color: box ? modalColor(p, box).rgb : ([-1, -1, -1] as Rgb) };
       };
 
+      // ── 树断言：两个主题态下 CTA 都在树上、都在同一位置、且可点 ──
+      // 这是像素答不了的那一问（「元素在不在」）：色板切换只改颜色，不该改位置。
+      for (const [tag, s] of [
+        ["前态(sky)", before],
+        ["后态(violet)", after],
+      ] as const) {
+        const ctas = findByClass(s.tree, FAB_CLASS_TOKENS);
+        expect(ctas, `A3 ${tag}：按 class 定位主 CTA 应唯一`).toHaveLength(1);
+        const f = screenFrame(ctas[0]!);
+        expect(
+          f,
+          `A3 ${tag}：CTA 节点缺 frameInScreen（${describeNode(ctas[0]!)}）`,
+        ).not.toBeNull();
+        expect(
+          nodeHasEvent(ctas[0]!, "tap"),
+          `A3 ${tag}：CTA 节点没有 tap 事件绑定 —— 全局 FAB 应当可点（${describeNode(ctas[0]!)}）`,
+        ).toBe(true);
+      }
+      const beforeFrame = screenFrame(findByClass(before.tree, FAB_CLASS_TOKENS)[0]!)!;
+      const afterFrame = screenFrame(findByClass(after.tree, FAB_CLASS_TOKENS)[0]!)!;
+      expect(
+        [afterFrame.x, afterFrame.y, afterFrame.width, afterFrame.height],
+        `A3 主题切换后 CTA 的位置/尺寸变了：${JSON.stringify(beforeFrame)} → ${JSON.stringify(afterFrame)}` +
+          " —— 主题只该改颜色，不该改布局",
+      ).toEqual([beforeFrame.x, beforeFrame.y, beforeFrame.width, beforeFrame.height]);
+
       // 前态按 sky 色板定位、后态按 violet 色板定位：颜色真变了。若还按旧色板去找
       // 就找不到 —— 找不到即转红（**不是**「找不到就跳过」，那是冒充通过）。
-      const b0 = measureCta(before.pixels[0], skyCta);
+      const b0 = measureCta(before.pixels[0], before.tree, skyCta);
       expect(
         b0.box,
         "A3 前态：按 sky 的 --md-primary-container 在 CTA 扫描域里找不到连通域——" +
@@ -585,7 +711,7 @@ describe.skipIf(SKIPPED)(
       ).toBe(true);
 
       for (const [i, p] of after.pixels.entries()) {
-        const a = measureCta(p, violetCta);
+        const a = measureCta(p, after.tree, violetCta);
         expect(
           a.box,
           `A3 第 ${i} 帧：按 violet 的 --md-primary-container ${fmt(violetCta)} 在 CTA 扫描域里` +
@@ -616,63 +742,101 @@ describe.skipIf(SKIPPED)(
         `A3 负向对照失效：切换前实测 ${fmt(b0.color)} 也命中了 violet ${fmt(violetCta)}`,
       ).toBe(false);
       // ── 负向对照 ②：切换后那一帧（真·violet 色板）喂给 sky 判据，必须判否 ──
-      const a0 = measureCta(after.pixels[0], violetCta);
+      const a0 = measureCta(after.pixels[0], after.tree, violetCta);
       expect(
         near(a0.color, skyCta, COLOR_TOL),
         `A3 负向对照失效：切换后实测 ${fmt(a0.color)} 也命中了 sky ${fmt(skyCta)}`,
       ).toBe(false);
     }, 300_000);
 
-    it("A4 主 CTA 可见包围盒 ≥ 48dp 且 ≤ 屏宽 80%", async () => {
+    it("A4 主 CTA：树给布局盒（≥48dp 且 ≤屏宽 80%），像素证它真被画出来", async () => {
       seedAppearance(serial, { themeColor: "sky", darkMode: "light" });
-      const { pixels } = await relaunchAndSample("a4-sky-light");
+      const { pixels, tree } = await relaunchAndSample("a4-sky-light");
       const cta = readToken(".theme-sky", "--md-primary-container");
-      const minPx = Math.round(48 * densityScale);
-      const maxWidthPx = Math.round(1080 * 0.8);
+      const minPx = dpToPx(48, densityScale);
+      const maxWidthPx = Math.round(SCREEN_W * 0.8);
 
+      // ── 树：布局盒（元素「在哪、多大」）──
+      // 这一问像素答不了：像素只能反推「长得像按钮的那团颜色」，说不出「这个元素
+      // 声明的盒子有多大」——而触控目标尺寸（48dp）是**布局契约**。
+      const ctas = findByClass(tree, FAB_CLASS_TOKENS);
+      expect(ctas, "A4：按 class 定位主 CTA 应唯一").toHaveLength(1);
+      const node = ctas[0]!;
+      const frame = screenFrame(node);
+      expect(frame, `A4：CTA 节点缺 frameInScreen（${describeNode(node)}）`).not.toBeNull();
+      const f = frame!;
+      console.log(
+        `[md3-visual-tokens] A4 树布局盒 = (${f.x},${f.y},${f.width},${f.height})` +
+          ` → ${f.width}×${f.height}px（= ${(f.width / densityScale).toFixed(1)}×${(f.height / densityScale).toFixed(1)}dp）` +
+          ` / ${describeNode(node)}`,
+      );
+      expect(f.width, `A4 树布局盒宽 ${f.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
+      expect(f.height, `A4 树布局盒高 ${f.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
+        minPx,
+      );
+      expect(
+        f.width,
+        `A4 树布局盒宽 ${f.width}px > 屏宽 80%=${maxWidthPx}px（控件铺满全宽 = 布局异常）`,
+      ).toBeLessThanOrEqual(maxWidthPx);
+      expect(
+        f.x + f.width,
+        `A4 树布局盒右界 ${f.x + f.width} 越过屏宽 ${SCREEN_W}`,
+      ).toBeLessThanOrEqual(SCREEN_W);
+      expect(
+        f.y + f.height,
+        `A4 树布局盒下界 ${f.y + f.height} 越过内容区底界 ${CONTENT_BOTTOM}`,
+      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
+      // 树推导的位置必须仍落在旧粗扫描域内 —— 两条口径打架 = 布局变了，转红而不是各说各的
+      expect(
+        f.y,
+        `A4 树布局盒上界 ${f.y} 越出旧粗扫描域上界 ${CONTENT_BOTTOM - CTA_SCAN_H} —— 布局已变`,
+      ).toBeGreaterThanOrEqual(CONTENT_BOTTOM - CTA_SCAN_H);
+
+      // ── 像素：可见区域（元素「真被画出来没有」）──
+      // 扫描域 = 树给的布局盒 ⇒ 量到的就是「实际画出来的那部分」：
+      // 画全了 ⇒ 可见盒 ≈ 布局盒；被裁 / 没画 ⇒ 可见盒小于布局盒 ⇒ 下面 ≥48dp 判红。
+      const region = ctaScanRegionFromTree(tree);
+      /** 可见盒允许比布局盒大 2px（圆角与抗锯齿的边缘像素），超出这个量就是画到了盒外。 */
+      const EDGE_TOL = 2;
       for (const [i, p] of pixels.entries()) {
-        const box = largestBoxOfColor(
-          p,
-          { x0: Math.floor(p.w / 2), y0: CONTENT_BOTTOM - CTA_SCAN_H, x1: p.w, y1: CONTENT_BOTTOM },
-          cta,
-          CTA_TOL,
-        );
+        const box = largestBoxOfColor(p, region, cta, CTA_TOL);
         expect(box, `A4 第 ${i} 帧：CTA 扫描域内找不到 ${fmt(cta)} 的连通域`).not.toBeNull();
         const b = box as Box;
         const w = b.x1 - b.x0 + 1;
         const h = b.y1 - b.y0 + 1;
         console.log(
-          `[md3-visual-tokens] A4 第 ${i} 帧 CTA bbox = (${b.x0},${b.y0})-(${b.x1},${b.y1})` +
+          `[md3-visual-tokens] A4 第 ${i} 帧 CTA 可见 bbox = (${b.x0},${b.y0})-(${b.x1},${b.y1})` +
             ` → ${w}×${h}px（= ${(w / densityScale).toFixed(1)}×${(h / densityScale).toFixed(1)}dp）`,
         );
-        expect(w, `A4 宽 ${w}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
-        expect(h, `A4 高 ${h}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
+        expect(w, `A4 可见宽 ${w}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
+        expect(h, `A4 可见高 ${h}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
+        // 可见区域不得明显超出树给的布局盒（画到盒外 = 布局与绘制不一致）
         expect(
-          w,
-          `A4 宽 ${w}px > 屏宽 80%=${maxWidthPx}px（控件铺满全宽 = 布局异常）`,
-        ).toBeLessThanOrEqual(maxWidthPx);
+          b.x0,
+          `A4 可见盒左界 ${b.x0} 越出树布局盒左界 ${f.x}（容差 ${EDGE_TOL}px）`,
+        ).toBeGreaterThanOrEqual(f.x - EDGE_TOL);
         expect(
           b.y0,
-          `A4 包围盒上界 ${b.y0} 越出 CTA 扫描域上界 ${CONTENT_BOTTOM - CTA_SCAN_H}`,
-        ).toBeGreaterThanOrEqual(CONTENT_BOTTOM - CTA_SCAN_H);
-        expect(b.y1, `A4 包围盒下界 ${b.y1} 越过内容区底界 ${CONTENT_BOTTOM}`).toBeLessThanOrEqual(
-          CONTENT_BOTTOM,
-        );
+          `A4 可见盒上界 ${b.y0} 越出树布局盒上界 ${f.y}（容差 ${EDGE_TOL}px）`,
+        ).toBeGreaterThanOrEqual(f.y - EDGE_TOL);
+        expect(
+          b.x1,
+          `A4 可见盒右界 ${b.x1} 越出树布局盒右界 ${f.x + f.width - 1}（容差 ${EDGE_TOL}px）`,
+        ).toBeLessThanOrEqual(f.x + f.width - 1 + EDGE_TOL);
+        expect(
+          b.y1,
+          `A4 可见盒下界 ${b.y1} 越出树布局盒下界 ${f.y + f.height - 1}（容差 ${EDGE_TOL}px）`,
+        ).toBeLessThanOrEqual(f.y + f.height - 1 + EDGE_TOL);
       }
 
       // ── 负向对照：注入「只渲染了一半」的失败态，门限必须判红 ──
       // 做法：把扫描域下界裁到 CTA 自身的中线（人为制造半高），同一个测量 + 同一组门限。
       // 若这条仍判过，说明 48dp 门限形同虚设 / 测量根本没在看尺寸。
       const p = pixels[0];
-      const full = largestBoxOfColor(
-        p,
-        { x0: Math.floor(p.w / 2), y0: CONTENT_BOTTOM - CTA_SCAN_H, x1: p.w, y1: CONTENT_BOTTOM },
-        cta,
-        CTA_TOL,
-      ) as Box;
+      const full = largestBoxOfColor(p, region, cta, CTA_TOL) as Box;
       const half = largestBoxOfColor(
         p,
-        { x0: Math.floor(p.w / 2), y0: CONTENT_BOTTOM - CTA_SCAN_H, x1: p.w, y1: CONTENT_BOTTOM },
+        region,
         cta,
         CTA_TOL,
         Math.floor((full.y0 + full.y1) / 2),

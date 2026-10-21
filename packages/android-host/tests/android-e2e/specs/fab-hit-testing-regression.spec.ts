@@ -54,6 +54,7 @@ import {
   startMainActivity,
 } from "../prefs";
 import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
+import { captureUiTree, fabCenter } from "../ui-tree";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
@@ -99,12 +100,27 @@ if (SKIPPED) {
 //   `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
 const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
 
+/**
+ * 主 FAB 的圆心：**树优先**（#1047）。
+ *
+ * ⚠️ 旧口径 `FAB_TAP` 是按 vw 常量**推算**的——输入是「设计常量 + 稳定区高度」，
+ *   布局一改就偏（本仓已因同类推算连续失准两次：#819、#920，两次都是「按旧布局推算
+ *   坐标」而点空）。树的 `position.frameInScreen` 给的是**当下这一帧**的真实盒子
+ *   （实测 162×162px ⇒ 圆心 (953, 1889)，与推算值差 ≤0.8px）。
+ * ⇒ 推算值降级为**对照**：两者差得多 ⇒ 布局变了（推算口径已陈旧），打日志点出来。
+ */
+let fabTap = FAB_TAP;
+
 // 外环「我的」项：实测落点 (576, 1887)，相对 FAB 圆心 r=377px、角度 -89.7°
 // （同帧另三项：推荐 (890,1520) r=374 -9.7°、插画 (735,1612) r=352 -38.2°、
 // 小说 (621,1749) r=360 -67.1° —— 半径一致 ⇒ 外环 R_OUTER ≈ 376px）。
 // x 沿用原常量 576（本就正确）；y 改取 **FAB 圆心 y**：该项几乎正左方（-89.7°），
 // 与圆心同高是几何必然，写成常量会再次把两处独立漂移绑在一起。
-const ME_RING_TAP = { x: 576, y: FAB_TAP.y };
+/**
+ * 外环「我的」项的落点：x 沿用常量 576，**y 跟随树给的 FAB 圆心**（该项几乎正左方，
+ * 与圆心同高是几何必然，写死会再次把两处独立漂移绑在一起）。
+ */
+let meRingTap = { x: 576, y: FAB_TAP.y };
 
 // Me 页「我的收藏」行（#819 订正；**票 #920 去顶栏后于 2026-10-03 重取帧**）。
 //
@@ -131,6 +147,13 @@ const ME_RING_TAP = { x: 576, y: FAB_TAP.y };
 // ⚠️ **下一个人若再改根页顶栏/安全区，必须重新取帧，不得用「减 N」推算** ——
 //   本仓已因同类推算连续失准两次（#819、#920）。推算看起来省事，但省掉的是验证。
 const BOOKMARKS_ROW_TAP = { x: 300, y: 437 };
+
+// ⚠️ **#1047 暂未把这一处改树**（诚实登记，不是漏做）：树里**能**按文本定位
+//   （`attributes.text`，实测登录页树里 5 条文本可命中），但「我的收藏」这一行在
+//   **Me 页**上的实际文本内容与所在层级**尚未在真机上取证**——文本对不上就会把一条
+//   当前能过的用例改成必红。⇒ 取证需要**已登录的 Me 页**（当前 refresh_token 已失效，
+//   见 #1047 阻塞项），补跑取证后再改。⚠️ 本仓已因「按推算坐标点空」返工两次
+//   （#819 / #920），所以这里宁可不改，也不改成一个没验过的口径。
 
 // 遮罩空白区（点空白收起菜单）：远离 FAB 与环。
 const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
@@ -364,6 +387,28 @@ describe.skipIf(SKIPPED)(
       // ── 阶段 C：确认已登录的 Lynx 主界面（登录态恢复不产生登录页 marker，见函数注释）──
       await waitForLynxLoggedInHome(serial);
       await SLEEP(5_000); // 主界面 settle：FAB 挂载完成（/recommended）
+
+      // ── 阶段 D：抓运行时 UI 树，取主 FAB 的**真实圆心**（#1047 树优先）──
+      // 抓树走 hot 采样点（`am start` + `uiTreeDump=1`）：`LynxActivity` 是 singleTask
+      // ⇒ intent 走 onNewIntent 投递，Activity **不重建**、页面不重载 ⇒ 不影响后续用例。
+      const captured = await captureUiTree(serial, {
+        outDir: resolve(EVIDENCE_DIR, "ui-tree"),
+      });
+      const treeCenter = fabCenter(captured.best.tree);
+      fabTap = { x: Math.round(treeCenter.x), y: Math.round(treeCenter.y) };
+      console.log(
+        `[fab] 主 FAB 圆心：树 = (${fabTap.x}, ${fabTap.y})（${captured.best.point} 采样点 / ` +
+          `${captured.best.delayMs}ms 档 / ${captured.best.nodeCount} 节点）` +
+          `；vw 推算 = (${FAB_TAP.x}, ${FAB_TAP.y})` +
+          `；差 ${Math.round(Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y))}px`,
+      );
+      meRingTap = { x: 576, y: fabTap.y };
+      if (Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y) > 8) {
+        console.warn(
+          `[fab] 树给的 FAB 圆心与 vw 推算口径相差 >8px ⇒ 布局已变（推算口径陈旧）。` +
+            "以树为准（树是当下这一帧的真实盒子），但推算口径 `fabCenterPx` 该重新校准了。",
+        );
+      }
     }, 600_000);
 
     afterAll(async () => {
@@ -381,7 +426,7 @@ describe.skipIf(SKIPPED)(
 
     it("控制组：FAB 点击有反应（菜单展开，证明应用未假死）", async () => {
       const before = screenshot(serial, "ctl-before-fab-tap");
-      tap(serial, FAB_TAP.x, FAB_TAP.y);
+      tap(serial, fabTap.x, fabTap.y);
       await SLEEP(1_200);
       const after = screenshot(serial, "ctl-after-fab-tap");
       const changed = await pngDiff(before, after);
@@ -396,9 +441,9 @@ describe.skipIf(SKIPPED)(
 
     it("回归：经 FAB 进 Me 页后，『我的收藏』行点击有反应（导航到 /bookmarks）", async () => {
       // 1. 展开菜单 → 点「我的」外环项 → Me 页（KeepAlive 常驻，无需等待数据）
-      tap(serial, FAB_TAP.x, FAB_TAP.y);
+      tap(serial, fabTap.x, fabTap.y);
       await SLEEP(1_500);
-      tap(serial, ME_RING_TAP.x, ME_RING_TAP.y);
+      tap(serial, meRingTap.x, meRingTap.y);
       await SLEEP(3_000);
       // 2. 探针：点「我的收藏」行 → 应导航（修复前被全屏容器吞掉 → 0 变化）
       const before = screenshot(serial, "row-before-tap");
