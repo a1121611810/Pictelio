@@ -9,6 +9,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
+    // **不发射产物**（与 app-lynx 的两个 tsconfig 对齐）。本仓的 `check` 脚本恒带
+    // `--noEmit`，但**裸跑** `tsc -p tsconfig.json` 会把编译产物（实测 41 个 `.js`）
+    // 吐进源码树——本仓已踩过：`tsc --listFiles` 漏带 `--noEmit` ⇒ 发射 41 个 `.js`
+    // ⇒ `fmt:check` 假红 ⇒ 清理了半天不是产品缺陷。
+    // ⚠️ 本项**历史上没设**（本票之前即如此，非本票引入）⇒ 设上它只是把
+    //   「误操作会发射」变成「误操作什么都不发生」。
+    "noEmit": true,
     // 允许 import `.mjs`（#1047）。**类型检查面不变**：`checkJs` 默认关 ⇒ `.mjs` 自身
     // 不被类型检查，只是被读进来做类型推断。
     //
@@ -16,8 +23,15 @@
     //   这条 include 是**目录 glob** ⇒ 该目录下的 2 个 `.mjs` 工具脚本
     //   （`tools/mock-fail-then-recover.mjs` / `tools/mock-responses-sse-server.mjs`）也被
     //   扫进 program。实测 `tsc --listFiles`：3 个 `.mjs` = 1 个预期依赖
-    //   （`scripts/lib/ui-tree-dump-core.mjs`）+ 2 个 tools 脚本。`checkJs` 关着 ⇒ 今天零诊断；
-    //   将来若开 `checkJs`，这 2 个文件会立刻报错 ⇒ 届时需把它们移出 include 或补声明。
+    //   （`scripts/lib/ui-tree-dump-core.mjs`）+ 2 个 tools 脚本。
+    //
+    // ⚠️ **`checkJs` 关着只压掉「类型」诊断，「语法」诊断照报**（第 6 轮 Standards 轴
+    //   实测：往那 2 个 tools 脚本里注入一处语法错误 ⇒ `TS1109` ⇒ `check:all` 转红）。
+    //   ⇒ 那 2 个文件的**语法**今天已经在 `check:all` 的失败面内（等于是白捡的一道
+    //   语法检查；它们同时也受 `oxlint` 覆盖）。**这不是失效面，是扩大的检查面**，
+    //   但必须写明，免得下一个人以为「checkJs 关着 ⇒ 那 2 个文件零诊断」。
+    //   将来若开 `checkJs`，连**类型**诊断也会立刻报错 ⇒ 届时需把它们移出 include
+    //   或补声明。
     //
     // 为什么需要它：`tests/android-e2e` **在**类型检查面内（下方 include），
     // 而 `scripts/lib/ui-tree-dump-core.mjs` 是 UI 树通道的**协议常量单一事实源**
