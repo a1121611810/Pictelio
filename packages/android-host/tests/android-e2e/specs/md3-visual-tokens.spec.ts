@@ -107,6 +107,7 @@ import {
   PINNED_DENSITY_SCALE,
   assertFabTree,
   captureUiTree,
+  expectSettled,
   describeNode,
   dpToPx,
   findByClass,
@@ -557,10 +558,7 @@ async function relaunchAndSample(
   // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：采样未落齐 ⇒「最完整的那份」
   // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到节点」报出**误导性**的失败信息。
   // 只在模块里 warn 是不够的：断言失败信息必须直接说清「没等齐」。
-  expect(
-    captured.settled,
-    `${label}：UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到`,
-  ).toBe(true);
+  expectSettled(captured, label);
   const tree = captured.best.tree;
   // ② 采样窗：由树推导（布局变了窗跟着走，不再靠「纯度不达标 ⇒ 手工重校准」）
   const windows = surfaceWindowsFromTree(tree, SCREEN_W, SURFACE_WINDOW_X_RANGES);

@@ -41,8 +41,10 @@
  *   差 >8px ⇒ **告警**，提示 vw 推算口径该重新校准；且**不替读者猜成因**），
  *   实际点击用的是**运行时 UI 树给出的真实盒子**算出的圆心；
  *   外环「我的」项的 y 跟随树给的圆心（`ME_RING_TAP` 这个标识符已随之消失）。
- *   仍由常量决定的只剩 `SCRIM_CLOSE_TAP`；⚠️ **Me 页「我的收藏」行已改按树定位**
- *   （2026-10-22 真机取证：树里唯一命中、框 (81,847,184,69)；坐标常量已第三次失效）。
+ *   仍由常量决定的只剩 `SCRIM_CLOSE_TAP` 与**外环「我的」项的 x 偏移**
+ *   （`ME_RING_OFFSET_X` = −377，实测 oracle：576 − vw 圆心 953）——该偏移与圆心**无关**
+ *   ⇒ 不是死坐标；⚠️ **Me 页「我的收藏」行已改按树定位**（2026-10-22 真机取证：树里唯一命中、
+ *   框 (81,847,184,69)；坐标常量已第三次失效）。
  *
  * 纯 adb 驱动（仿 lynx-boot-renders.spec.ts 轻量模式；登录走 am start hook，无需
  * Appium webview context）。用例本体坐标常量推导式见常量注释；
@@ -64,6 +66,7 @@ import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../en
 import {
   assertFabTree,
   captureUiTree,
+  expectSettled,
   fabCenter,
   findByText,
   screenFrame,
@@ -203,10 +206,7 @@ async function locateBookmarksRow(serial: string): Promise<UiTreeFrame> {
   const captured = await captureUiTree(serial, {
     outDir: resolve(EVIDENCE_DIR, "ui-tree-me"),
   });
-  expect(
-    captured.settled,
-    "Me 页 UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 抓到的可能是半成品树",
-  ).toBe(true);
+  expectSettled(captured, "Me 页");
   const hits = findByText(captured.best.tree, BOOKMARKS_ROW_TEXT);
   expect(
     hits.length,
@@ -459,10 +459,7 @@ describe.skipIf(SKIPPED)(
       });
       // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」
       // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
-      expect(
-        captured.settled,
-        "UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到",
-      ).toBe(true);
+      expectSettled(captured);
       capturedTree = captured.best.tree;
       const treeCenter = fabCenter(captured.best.tree);
       fabTap = { x: Math.round(treeCenter.x), y: Math.round(treeCenter.y) };

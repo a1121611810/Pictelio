@@ -80,6 +80,7 @@ import {
   runOrThrow,
 } from "../env";
 import {
+  expectSettled,
   assertFabTree,
   collectUiTree,
   fabCenter,
@@ -628,10 +629,7 @@ async function launchBenchNav(
   });
   // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」可能
   // 没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
-  expect(
-    captured.settled,
-    `benchNav ${scenario}：UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到`,
-  ).toBe(true);
+  expectSettled(captured, `benchNav ${scenario}`);
   console.log(
     `[transition-matrix] benchNav ${scenario} 树：${captured.best.name}（${captured.best.point} / ` +
       `${captured.best.delayMs}ms / ${captured.best.nodeCount} 节点）`,

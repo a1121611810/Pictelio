@@ -724,6 +724,28 @@ export async function captureUiTree(
 }
 
 /**
+ * 「采样是否落齐」这条判据的**共享入口**（#1047 第 9 轮 Standards 轴 S-N2 收口）。
+ *
+ * 落齐判据的**本体**在 lib 层（`planWait`），而「把没落齐这件事说清楚」此前由三个消费
+ * spec **各写一份**同形的 `expect(captured.settled, "…").toBe(true)`——只有场景前缀不同。
+ * ⇒ 判据本体与失败信息这两件事本该各只有一份，收口到此处。
+ *
+ * ⚠️ **为什么必须进断言**（#1047 review 第 1 轮 Spec 轴）：只在模块里 warn 是不够的——
+ *   断言失败信息必须直接说清「没等齐」，否则下游「找不到节点」会报出**误导性**的失败信息
+ *   （半成品树 ≠ 树里没有那个节点）。
+ *
+ * @param captured `captureUiTree` 的结果
+ * @param prefix 场景前缀（如「Me 页」「benchNav recommended」「A1 浅色」）；省略 = 不带前缀
+ * @throws 采样未落齐 ⇒ 断言失败（信息里带 `prefix`）
+ */
+export function expectSettled(captured: CaptureUiTreeResult, prefix = ""): void {
+  expect(
+    captured.settled,
+    `${prefix ? `${prefix}：` : ""}UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 最完整的那份可能没到`,
+  ).toBe(true);
+}
+
+/**
  * 选「最完整的那一份」：节点数多者胜；同数比**档位**（4s 那份通常是完整树），
  * 再同比字节。
  *
