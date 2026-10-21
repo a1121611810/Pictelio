@@ -42,12 +42,12 @@
  *
  * ⇒ 本模块**只导出 `screenFrame()`** 这一个几何访问器，不导出 `frameInRoot`
  * —— 让「用错坐标系」这件事在**读代码时就能一眼看见**，而不是靠 review 抓。
- * ⚠️ **措辞要说准**（#1047 review 第 2 轮 Spec 轴订正）：`UiTreeNode` 类型**仍然导出**
+ * ⚠️ **措辞要说准**（#1047 第 2 轮 Spec 轴订正）：`UiTreeNode` 类型**仍然导出**
  *   `position.frameInRoot`（那是对照用的原始字段）⇒ 消费方写 `node.position?.frameInRoot`
  *   **仍能编译**。真正的防线是「**只提供一个 accessor**」这条**约定** + 单测守卫
  *   （断言本模块的运行时导出键名里不含 `root`）。**不是**「编译期不可能」——别夸大。
  *
- * ## 触控目标门限用的 density（#1047 review 第 2 轮 Standards 轴 F8）
+ * ## 触控目标门限用的 density（#1047 第 2 轮 Standards 轴 F8）
  *
  * pictelio_ui 固定 density 480（`assertDeviceGeometry` 逐台校验 `wm density` 匹配
  * `/480/`）⇒ **1dp = 3px**。三处 spec 的「≥48dp」判据同形，把 `3` 写死在三处
@@ -730,7 +730,7 @@ export async function captureUiTree(
  * spec **各写一份**同形的 `expect(captured.settled, "…").toBe(true)`——只有场景前缀不同。
  * ⇒ 判据本体与失败信息这两件事本该各只有一份，收口到此处。
  *
- * ⚠️ **为什么必须进断言**（#1047 review 第 1 轮 Spec 轴）：只在模块里 warn 是不够的——
+ * ⚠️ **为什么必须进断言**（#1047 第 1 轮 Spec 轴）：只在模块里 warn 是不够的——
  *   断言失败信息必须直接说清「没等齐」，否则下游「找不到节点」会报出**误导性**的失败信息
  *   （半成品树 ≠ 树里没有那个节点）。
  *

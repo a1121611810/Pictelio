@@ -186,18 +186,20 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(text).toContain("pictelio-hero-source-<n>");
     // nodeId 是**序号**不是作品 id ⇒ 不脱敏（它是定位节点的关键）
     expect(text).toContain("nodeId=42");
-    // ⚠️ **阈值两侧都钉住**（下界 = #1047 第 11 轮 Spec 轴 F2 · 上界 = #1047 第 14 轮
-    //   Standards 轴 S-R14-N2）：**下界**——本用例原本只喂 **9 位** id ⇒ 正则从 `\d{3,}`
-    //   放宽到 `\d{5,}` / `\d{7,}` / `\d{9,}` 时 CI **仍全绿**；**上界**——只钉下界时
-    //   正则收窄成 `\d{3}` CI **也仍全绿**（4 位串脱敏成 `<n>4` ⇒ 尾部数字照样泄漏）。
-    //   期望值出处 = 实现自身的**文档化契约**（`ui-tree.ts` `redactArtworkId` 的
-    //   JSDoc「只脱敏**连续 3 位以上的数字**」= 上不封顶 ⇒ 整段脱敏），不是从实现反推。
+    // ⚠️ **阈值两侧 + 带上界形态都钉住**（下界 = #1047 第 11 轮 Spec 轴 F2 · 上界 =
+    //   #1047 第 14 轮 Standards 轴 S-R14-N2 · 带上界 = #1047 第 15 轮 Standards 轴
+    //   S-R15-N6）：正则收窄成 `\d{3}` CI 仍全绿（4 位串脱敏成 `<n>4` ⇒ 尾部数字照样
+    //   泄漏）；`\d{3,N}`（带上界）会把长串**切段**、泄漏尾部 ⇒ 用 64 位长样本推出去。
+    //   期望值出处 = `ui-tree.ts` `redactArtworkId` 的 JSDoc 契约（上不封顶 ⇒ 整段脱敏），不是从实现反推。
     const three = describeNode({ ...node, attributes: { id: "pictelio-hero-source-123" } });
     const two = describeNode({ ...node, attributes: { id: "pictelio-hero-source-12" } });
     expect(three, "3 位数字串也必须脱敏（阈值下界 = 3）").toContain("pictelio-hero-source-<n>");
     expect(two, "不足 3 位的不脱敏（阈值不是 1 也不是 2）").toContain("pictelio-hero-source-12");
     const four = describeNode({ ...node, attributes: { id: "pictelio-hero-source-1234" } });
     expect(four, "4 位串必须整段脱敏（上不封顶）").toMatch(/id=pictelio-hero-source-<n> /);
+    const longId = `pictelio-hero-source-${"7".repeat(64)}`;
+    const long = describeNode({ ...node, attributes: { id: longId } });
+    expect(long, "64 位长串必须整段脱敏").toMatch(/id=pictelio-hero-source-<n> /);
   });
 
   it("describeNode 对**非字符串** id 不崩（引擎哪天改成数字 id，失败信息不能变成崩溃）", () => {

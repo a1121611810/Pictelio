@@ -25,7 +25,7 @@ import { pickBestArtifact } from "../../../scripts/lib/ui-tree-dump-core.mjs";
 // （AGENTS.md「门禁冻结线」：不得在其上新增判据）⇒ 本文件独立存在。
 // 先例：`ui-tree-dump-outdir.test.ts`（同为「脚本层行为」的独立门禁文件）。
 //
-// ── 行为变更登记（#1047 review 第 2 轮 Spec 轴 B2）──
+// ── 行为变更登记（#1047 第 2 轮 Spec 轴 B2）──
 //
 // 规则下沉到 core 层**之前**，诊断脚本的 tie-break 是 **nodeCount → bytes**；
 // 下沉后统一为 **nodeCount → delayMs → bytes** ⇒ 这是一次**行为变更**

@@ -25,7 +25,7 @@
     //   扫进 program。实测 `tsc --listFiles`：3 个 `.mjs` = 1 个预期依赖
     //   （`scripts/lib/ui-tree-dump-core.mjs`）+ 2 个 tools 脚本。
     //
-    // ⚠️ **`checkJs` 关着只压掉「类型」诊断，「语法」诊断照报**（第 6 轮 Standards 轴
+    // ⚠️ **`checkJs` 关着只压掉「类型」诊断，「语法」诊断照报**（#1047 第 6 轮 Standards 轴
     //   实测：往那 2 个 tools 脚本里注入一处语法错误 ⇒ `TS1109` ⇒ `check:all` 转红）。
     //   ⇒ 那 2 个文件的**语法**今天已经在 `check:all` 的失败面内（等于是白捡的一道
     //   语法检查；它们同时也受 `oxlint` 覆盖）。**这不是失效面，是扩大的检查面**，

@@ -627,7 +627,7 @@ async function launchBenchNav(
     before,
     outDir: resolve(EVIDENCE_DIR, "ui-tree", scenario),
   });
-  // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」可能
+  // 落齐判据**进断言**（#1047 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」可能
   // 没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
   expectSettled(captured, `benchNav ${scenario}`);
   console.log(
@@ -1097,7 +1097,7 @@ describe.skipIf(SKIPPED)(
     it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async (t) => {
       // 深链重进 /illusts（与 R1 状态解耦），经放射 FAB 内环搜索项打开 SearchSheet
       const r2Tree = await launchBenchNav("illust", { captureTree: true });
-      // 树抓不到 ⇒ **显式失败**，不静默退回 vw 推算常量（#1047 review 第 1 轮 Standards 轴 J1：
+      // 树抓不到 ⇒ **显式失败**，不静默退回 vw 推算常量（#1047 第 1 轮 Standards 轴 J1：
       // 静默回退会让「树缺失」表现为「点偏了」，两种病因混成一种症状）。
       expect(r2Tree, "R2：抓不到运行时 UI 树 ⇒ 无法用树给的 FAB 落点").not.toBeNull();
       if (!r2Tree) throw new Error("缺运行时 UI 树");
@@ -1125,7 +1125,7 @@ describe.skipIf(SKIPPED)(
       // （推算口径是「设计常量 + 稳定区高度」⇒ 布局一改就偏）。
       // ⚠️ 不再有「树缺失就退回推算常量」的分支：树缺失是**显式失败**（见上）。
       const fabPoint = fabCenter(r2Tree);
-      // ── 两套独立推导的**对照**（#1047 review 第 2 轮 Standards 轴 N5）──
+      // ── 两套独立推导的**对照**（#1047 第 2 轮 Standards 轴 N5）──
       // 树给的落点（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
       // **两个互相独立的来源**。今天实测两者**完全相同**（漂移 = 0）⇒ 这条是
       // 一支**哑炮**：它只会在布局真的动了之后才响。

@@ -117,7 +117,7 @@ if (SKIPPED) {
 //   (953.3, 1889.3) 差 ≤0.8px；该 bbox 也与 `transition-geometry.fabCenterPx`
 //   注释里早已记录的 `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
 //
-// ⚠️ **两种中心口径，别混着看**（#1047 review 第 2 轮 Standards 轴 N5）：
+// ⚠️ **两种中心口径，别混着看**（#1047 第 2 轮 Standards 轴 N5）：
 //   · **闭区间中点** (952.5, 1888.5) = 上面的像素扫描 bbox 两端取平均——
 //     亮簇是「离散像素集合」，两端像素各占半像素，中心落在两个像素之间。
 //   · **布局盒中心** (953, 1889) = 树的 `position.frameInScreen`
@@ -457,7 +457,7 @@ describe.skipIf(SKIPPED)(
       const captured = await captureUiTree(serial, {
         outDir: resolve(EVIDENCE_DIR, "ui-tree"),
       });
-      // 落齐判据**进断言**（#1047 review 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」
+      // 落齐判据**进断言**（#1047 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」
       // 可能没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
       expectSettled(captured, "主界面");
       capturedTree = captured.best.tree;
@@ -472,7 +472,7 @@ describe.skipIf(SKIPPED)(
       // 外环「我的」项跟着**树给的圆心**走（偏移量固定，圆心不固定）——
       // 见 `ME_RING_OFFSET_X` 的说明（#1047 第 4 轮 Standards 轴 S-N1）。
       meRingTap = { x: fabTap.x + ME_RING_OFFSET_X, y: fabTap.y };
-      // ── 两套独立推导的**对照**（#1047 review 第 2 轮 Standards 轴 N5）──
+      // ── 两套独立推导的**对照**（#1047 第 2 轮 Standards 轴 N5）──
       // 树给的圆心（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
       // **两个互相独立的来源**。今天实测两者**完全相同**（漂移 = 0）⇒ 这条是
       // 一支**哑炮**：它只会在布局真的动了之后才响。
