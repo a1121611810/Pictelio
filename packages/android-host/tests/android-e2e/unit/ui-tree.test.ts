@@ -15,7 +15,10 @@
  *    所有几何断言都会挂在偏了 81px 的盒上，而**数字看着仍然合理**（不报错、只是错）。
  * ② **按 class 定位的唯一性**——`absolute` 这类 token 在树里命中几十处，
  *    「任一命中」返回的就不是一个元素。
- * ③ **模块不导出 `frameInRoot` 访问器**——把口径从「写在注释里」变成「编译期做不到」。
+ * ③ **模块不导出 `frameInRoot` 访问器**——把口径从「写在注释里」变成「运行时导出守卫」
+ *    （⚠️ **不是**「编译期做不到」：`UiTreeNode` 类型仍导出 `position.frameInRoot`，
+ *    消费方写 `node.position?.frameInRoot` 仍能编译；真正的防线是「只提供一个
+ *    accessor」这条约定 + 下面那条运行时守卫断言）。
  *
  * ## 已知失效面
  *
@@ -30,6 +33,7 @@ import { fileURLToPath } from "node:url";
 import * as uiTree from "../ui-tree";
 import {
   FAB_CLASS_TOKENS,
+  PINNED_DENSITY_SCALE,
   classTokens,
   deriveBleedLowerBound,
   describeNode,
@@ -120,7 +124,11 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(root.x).not.toBe(screen.x);
   });
 
-  it("模块**不导出** frameInRoot 的访问器（让用错坐标系在编译期就做不到）", () => {
+  it("模块**不导出** frameInRoot 的访问器（把「只用 screen 坐标系」变成运行时守卫，不是编译期不可能）", () => {
+    // ⚠️ 措辞要说准：类型 `UiTreeNode` **仍然导出** `position.frameInRoot` ⇒ 消费方写
+    //   `node.position?.frameInRoot` **仍能编译**。这条断言守的是「模块的**运行时导出面**
+    //   里没有 root 访问器」——配合「只提供一个 accessor」的约定，让用错坐标系这件事
+    //   在读代码时就能看见，而不是靠 review 抓。
     const exported = Object.keys(uiTree);
     expect(
       exported.filter((k) => /root/iu.test(k)),
@@ -143,7 +151,8 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
   it("尺寸换算：162px = 54dp ≥ 48dp（触控目标门限成立）", () => {
     const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
     const f = frameOf(cta);
-    const minPx = dpToPx(48, 3);
+    // density scale 只写一处（`PINNED_DENSITY_SCALE`），三份副本会漂
+    const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
     expect(minPx).toBe(144);
     expect(f.width).toBeGreaterThanOrEqual(minPx);
     expect(f.height).toBeGreaterThanOrEqual(minPx);
@@ -155,6 +164,23 @@ describe("ui-tree 纯查询层（真实样本驱动）", () => {
     expect(text).toContain("frame=(872,1808,162,162)");
     expect(text).toContain("events=[tap]");
     expect(text).toContain("bg-primary-container");
+  });
+
+  it("describeNode 把**作品 id**脱敏（失败信息会被贴进 issue ⇒ 作品 id 会外发）", () => {
+    // 形状来自生产侧语义 id：`pictelio-hero-source-<illustId>`
+    // （`packages/app-lynx/src/composables/heroTransition.ts`）。
+    const node: UiTreeNode = {
+      tag: "view",
+      nodeId: 42,
+      attributes: { id: "pictelio-hero-source-123456789" },
+      position: { frameInScreen: { x: 1, y: 2, width: 3, height: 4 } },
+    };
+    const text = describeNode(node);
+    expect(text, "真实作品 id 不得出现在失败信息里").not.toContain("123456789");
+    // 可读部分保留 ⇒ 「这是哪一类节点」的信息不丢
+    expect(text).toContain("pictelio-hero-source-<n>");
+    // nodeId 是**序号**不是作品 id ⇒ 不脱敏（它是定位节点的关键）
+    expect(text).toContain("nodeId=42");
   });
 
   it("按文本定位：样本里的文本节点可被 findByText 命中（脱敏后是「文本#N」形态）", () => {
@@ -171,6 +197,44 @@ describe("ui-tree · 采样窗推导（树给布局事实，不用像素反推�
     // oracle：真实样本里全宽 x=0 节点的起始 y 集合 = {0, 72, 213, 1201} ⇒ 下界 72，
     // 与 spec 注释里的 safeTop=72 独立吻合。
     expect(deriveBleedLowerBound(tree, 1080)).toBe(72);
+  });
+
+  it("下界是**推出来的**不是写死的：换一棵 y=200 的树 ⇒ 返回 200（防「硬编码 72」蒙对）", () => {
+    // 样本那份恰好是 72 ⇒ 若实现把 72 写死，上面那条照样绿（判据恒真的老毛病）。
+    // 这里换一棵 y=200 的树，期望值就必须是 200 ⇒ 写死 72 会**当场转红**。
+    const shifted: UiTreeNode = {
+      tag: "page",
+      children: [
+        // y=0 的全宽节点（页面底色本身）按判据被排除（要求 y>0）
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 0, width: 1080, height: 400 } },
+        },
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 200, width: 1080, height: 400 } },
+        },
+      ],
+    };
+    expect(deriveBleedLowerBound(shifted, 1080)).toBe(200);
+  });
+
+  it("窄节点（宽 < 屏宽 90%）不参与 ⇒ 下界仍取全宽节点那个 y", () => {
+    // 「全宽」是判据的一半：卡片里的小元素（x≠0 / 窄）不是「横贯整屏的一行内容」。
+    const mixed: UiTreeNode = {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 100, y: 50, width: 200, height: 20 } },
+        },
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 300, width: 1080, height: 400 } },
+        },
+      ],
+    };
+    expect(deriveBleedLowerBound(mixed, 1080)).toBe(300);
   });
 
   it("采样窗：y 区间由树给出，x 区间沿用人工校准的中央带", () => {

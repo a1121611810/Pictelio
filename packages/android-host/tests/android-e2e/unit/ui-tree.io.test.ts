@@ -11,7 +11,8 @@
  * | `triggerUiTreeDump` | adb exit 0 | adb 非 0 ⇒ 抛错 |
  * | `listRemoteArtifacts` | 列出 `.json` | 目录不存在 ⇒ 空数组（正常态，不告警）；其它 adb 错误 ⇒ 告警 + 空数组 |
  * | 产物拉回 | 拉到本地 | 拉取失败 / 落本地后不在 / JSON 非法 ⇒ 告警 + 跳过该份 |
- * | `collectUiTree` | 等齐 + 至少一份产物 | 未落齐 ⇒ 告警；零产物 ⇒ 抛错 |
+ * | `collectUiTree` | 等齐 + 至少一份产物 | 未落齐 ⇒ 告警；零产物 ⇒ 抛错；静默期迟到的那份 ⇒ **照样捞回** |
+ * | `captureUiTree`（一体流程） | 触发 → 等齐 → 拉回 | 触发失败 ⇒ **抛错**（不带着空树继续往下走） |
  *
  * 只测纯函数而不测这四条 ⇒ 失败路径在 CI 里**永远不会被执行**，降级是否「不静默」
  * 也无从验证——那正是测试硬约束 #1 要防的事。
@@ -232,6 +233,32 @@ describe("ui-tree · IO 边界 · 等落齐 + 拉回（collectUiTree）", () => 
     ).rejects.toThrow(/未产出任何产物/);
   });
 
+  it("静默期：落齐之后**迟到**的那份产物也会被捞回（不被静默丢掉）", async () => {
+    // 场景：命中两个采样点时，两轮的 4s 档几乎同时落盘 ⇒ 采集阶段可能先看到 3 份
+    // （判为落齐），第 4 份随后才到。静默期的存在意义就是把它捞回来。
+    const before = snapshotRemoteArtifacts("emulator-5556");
+    const late = "ui-tree-hot-4000ms-4-1700000000003.json";
+    let lsCalls = 0;
+    runCapture.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes("ls")) {
+        lsCalls += 1;
+        const files =
+          lsCalls === 1 ? Object.keys(DEVICE_FILES) : [...Object.keys(DEVICE_FILES), late];
+        return { code: 0, stdout: files.join("\n"), stderr: "" };
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    });
+    pullSucceeds();
+    const r = await collectUiTree("emulator-5556", {
+      before,
+      outDir,
+      waitMs: 5_000,
+      quietPeriodMs: 400,
+    });
+    expect(r.artifacts.map((a) => a.name)).toContain(late);
+    expect(r.artifacts).toHaveLength(4);
+  });
+
   it("拉取失败 ⇒ 告警 + 跳过该份（其余产物照常拿回）", async () => {
     const before = snapshotRemoteArtifacts("emulator-5556");
     deviceFiles = Object.keys(DEVICE_FILES);
@@ -302,5 +329,18 @@ describe("ui-tree · IO 边界 · 一体流程（captureUiTree）", () => {
     // 只拿到**新增**的那份（旧的那份在触发前快照里）
     expect(r.artifacts.map((a) => a.name)).toEqual([fresh]);
     expect(r.best.nodeCount).toBe(11);
+  });
+
+  it("触发失败 ⇒ 抛错（不静默：不能带着空树继续往下走）", async () => {
+    // 触发（am start）失败 ⇒ 设备上不会有任何新产物；若这里不抛错，后面等落齐
+    // 会一路等到超时，最后报「未产出任何产物」——把「触发没成功」说成「产物没到」，
+    // 两种病因混成一种症状（与 J1 同型：树缺失必须显式失败）。
+    runCapture.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes("ls")) return { code: 0, stdout: "", stderr: "" };
+      return { code: 1, stdout: "", stderr: "device offline" };
+    });
+    await expect(
+      captureUiTree("emulator-5556", { outDir, quietPeriodMs: 0, waitMs: 10 }),
+    ).rejects.toThrow(/adb exit 1/);
   });
 });

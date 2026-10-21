@@ -81,6 +81,7 @@ import {
 } from "../env";
 import {
   FAB_CLASS_TOKENS,
+  PINNED_DENSITY_SCALE,
   collectUiTree,
   describeNode,
   dpToPx,
@@ -1107,7 +1108,8 @@ describe.skipIf(SKIPPED)(
       const fabFrame = screenFrame(fabNode);
       expect(fabFrame, `R2：FAB 节点缺 frameInScreen：${describeNode(fabNode)}`).not.toBeNull();
       // density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
-      const minFabPx = dpToPx(48, 3);
+      // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
+      const minFabPx = dpToPx(48, PINNED_DENSITY_SCALE);
       expect(
         fabFrame!.width,
         `R2：FAB 布局盒宽 ${fabFrame!.width}px < 48dp=${minFabPx}px`,
@@ -1116,6 +1118,20 @@ describe.skipIf(SKIPPED)(
         fabFrame!.height,
         `R2：FAB 布局盒高 ${fabFrame!.height}px < 48dp=${minFabPx}px`,
       ).toBeGreaterThanOrEqual(minFabPx);
+      // ── 位置断言：把「用的是 screen 坐标系」钉住 ──
+      // ⚠️ 不是装饰：实测两套坐标系差 81px（横向 swiper 偏移）——若有人把
+      //   `screenFrame` 换成 `frameInRoot`，FAB 盒会变成 x 953..1115 ⇒ 越过内容区
+      //   右界 1080 ⇒ 这两条转红。而「盒多大 / 有没有 tap 事件」那几条对坐标系
+      //   替换**完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错是绿的。
+      expect(
+        fabFrame!.x + fabFrame!.width,
+        `R2：FAB 盒右缘 ${fabFrame!.x + fabFrame!.width}px 越过内容区右界 ${CONTENT_RIGHT}px` +
+          `（若这是 frameInRoot，坐标系用错了——两套坐标系实测差 81px）`,
+      ).toBeLessThanOrEqual(CONTENT_RIGHT);
+      expect(
+        fabFrame!.y + fabFrame!.height,
+        `R2：FAB 盒下缘 ${fabFrame!.y + fabFrame!.height}px 越过内容区下界 ${CONTENT_BOTTOM}px`,
+      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
       // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
       // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
       // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
@@ -1129,7 +1145,16 @@ describe.skipIf(SKIPPED)(
       // （推算口径是「设计常量 + 稳定区高度」⇒ 布局一改就偏）。
       // ⚠️ 不再有「树缺失就退回推算常量」的分支：树缺失是**显式失败**（见上）。
       const fabPoint = fabCenter(r2Tree);
-      // 与 vw 推算口径**对照**：差得多 ⇒ 布局已变（推算口径陈旧）。以树为准。
+      // ── 两套独立推导的**对照**（#1047 review 第 2 轮 Standards 轴 N5）──
+      // 树给的落点（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
+      // **两个互相独立的来源**。今天实测两者**完全相同**（漂移 = 0）⇒ 这条是
+      // 一支**哑炮**：它只会在布局真的动了之后才响。
+      //
+      // ⚠️ 为什么**只告警、不升为断言**：布局**合法**变更同样会让两者分开
+      //   （那正是「树优先」要支持的方向）——做成断言就成了「布局一改就假红」。
+      // ⚠️ 文案也**不能**断言成因：「布局已变」与「推算口径陈旧」从这一项测量上
+      //   **分不开**（本仓 #819 / #920 两次返工的成因恰是后者）⇒ 只报事实 +
+      //   指明**该动哪一侧**（推算口径），不替读者猜。
       const fabDrift = Math.hypot(fabPoint.x - FAB_TAP.x, fabPoint.y - FAB_TAP.y);
       console.log(
         `[transition-matrix] R2 FAB 落点：树 = (${Math.round(fabPoint.x)}, ${Math.round(fabPoint.y)})` +
@@ -1137,11 +1162,26 @@ describe.skipIf(SKIPPED)(
       );
       if (fabDrift > 8) {
         console.warn(
-          `[transition-matrix] R2 树给的 FAB 落点与 vw 推算口径相差 >8px ⇒ 布局已变` +
-            "（以树为准，但推算口径 `fabCenterPx` 该重新校准了）。",
+          `[transition-matrix] R2 树给的 FAB 落点 (${Math.round(fabPoint.x)}, ${Math.round(fabPoint.y)}) ` +
+            `与 vw 推算口径 (${FAB_TAP.x}, ${FAB_TAP.y}) 相差 ${Math.round(fabDrift)}px > 8px。` +
+            `**从这一项测量本身分不出成因**（布局变了 / 推算口径陈旧了 / 抓到的树不是当前这一帧，` +
+            `三者都与此兼容——不要据此断定是产品回归）。以树为准（树是当下这一帧的真实盒子）；` +
+            `vw 推算口径 fabCenterPx 需要重新校准，或在树已全面接管后直接删掉。`,
         );
       }
-      tap(Math.round(fabPoint.x), Math.round(fabPoint.y));
+      // ── 实际点击坐标必须落在 FAB 的屏幕盒内（不用「树值对树值」的同源自证）──
+      // 若点击坐标取自别的坐标系、或圆心算错，点会落到盒外 ⇒ 转红。
+      const tapX = Math.round(fabPoint.x);
+      const tapY = Math.round(fabPoint.y);
+      expect(
+        tapX >= fabFrame!.x && tapX <= fabFrame!.x + fabFrame!.width,
+        `R2：实际点击的 x=${tapX} 不在 FAB 屏幕盒 x∈[${fabFrame!.x}, ${fabFrame!.x + fabFrame!.width}] 内`,
+      ).toBe(true);
+      expect(
+        tapY >= fabFrame!.y && tapY <= fabFrame!.y + fabFrame!.height,
+        `R2：实际点击的 y=${tapY} 不在 FAB 屏幕盒 y∈[${fabFrame!.y}, ${fabFrame!.y + fabFrame!.height}] 内`,
+      ).toBe(true);
+      tap(tapX, tapY);
       await SLEEP(1_500);
       const afterFab = await screenshot("r2-after-fab");
       expect(

@@ -41,7 +41,17 @@
  *   `frameInRoot` 不一致。
  *
  * ⇒ 本模块**只导出 `screenFrame()`** 这一个几何访问器，不导出 `frameInRoot`
- * —— 让「用错坐标系」这件事在编译期就做不到，而不是靠 review 抓。
+ * —— 让「用错坐标系」这件事在**读代码时就能一眼看见**，而不是靠 review 抓。
+ * ⚠️ **措辞要说准**（#1047 review 第 2 轮 Spec 轴订正）：`UiTreeNode` 类型**仍然导出**
+ *   `position.frameInRoot`（那是对照用的原始字段）⇒ 消费方写 `node.position?.frameInRoot`
+ *   **仍能编译**。真正的防线是「**只提供一个 accessor**」这条**约定** + 单测守卫
+ *   （断言本模块的运行时导出键名里不含 `root`）。**不是**「编译期不可能」——别夸大。
+ *
+ * ## 触控目标门限用的 density（#1047 review 第 2 轮 Standards 轴 F8）
+ *
+ * pictelio_ui 固定 density 480（`assertDeviceGeometry` 逐台校验 `wm density` 匹配
+ * `/480/`）⇒ **1dp = 3px**。三处 spec 的「≥48dp」判据同形，把 `3` 写死在三处
+ * 就是三份可漂移的副本 ⇒ 收敛到下面这个常量（**改这里 = 改三处**）。
  *
  * ## 抓树不破坏被测状态（硬约束）
  *
@@ -308,6 +318,34 @@ export function dpToPx(dp: number, densityScale: number): number {
   return Math.round(dp * densityScale);
 }
 
+/**
+ * pictelio_ui 的 density scale（`wm density` = 480 ⇒ 480/160 = **3**）。
+ *
+ * ⚠️ 为什么单独抽一个常量：三个 spec 的「触控目标 ≥48dp」判据同形，
+ *   把 `3` 写死在三处就是**三份可漂移的副本**（`ui-tree.ts` 自己的注释写过这条：
+ *   「这是定位口径，抄三份就会漂」）。密度本身由 `assertDeviceGeometry`
+ *   （`pixel.ts`）逐台校验 `wm density` 匹配 `/480/` ⇒ 写死 480 推出的 3 是**有依据的**，
+ *   不是随手取的魔数。
+ */
+export const PINNED_DENSITY_SCALE = 3;
+
+/**
+ * 把失败信息里的**作品 id**脱敏。
+ *
+ * ⚠️ 为什么：语义 id 形如 `pictelio-hero-source-<illustId>`，**含真实作品 id**
+ *   （生产侧见 `packages/app-lynx/src/composables/heroTransition.ts`）。e2e 的失败
+ *   信息会被贴进 issue ⇒ 作品 id 会外发。仓库的既有立场一致：入库 fixture 把作品
+ *   id 数字、标题/作者名文本全部脱敏（`tests/fixtures/ui-tree/recommend-page.sample.json`）。
+ * ⇒ 只脱敏**连续 3 位以上的数字**（作品 id 是长数字串）；语义 id 的可读部分
+ *   （`pictelio-hero-source`）保留 —— 「这是哪一类节点」的信息不丢。
+ *
+ * ⚠️ `nodeId`（引擎分配的内核序号）是**定位节点**的关键，**不脱敏**——它是序号，
+ *   不是作品 id。
+ */
+function redactArtworkId(id: string): string {
+  return id.replace(/\d{3,}/gu, "<n>");
+}
+
 /** 节点的一行描述（进断言失败信息用）。 */
 export function describeNode(node: UiTreeNode): string {
   const f = screenFrame(node);
@@ -317,7 +355,7 @@ export function describeNode(node: UiTreeNode): string {
   return [
     `tag=${node.tag ?? "?"}`,
     `nodeId=${node.nodeId ?? "?"}`,
-    id ? `id=${id}` : null,
+    id ? `id=${redactArtworkId(id)}` : null,
     frame,
     events.length ? `events=[${events.join(",")}]` : null,
     `class=[${classTokens(node).join(" ")}]`,

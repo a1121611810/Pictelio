@@ -38,7 +38,8 @@
  * 也会按分辨率/密度兜底）。**不可因为「不再需要 WebView」就放开到 pictelio_low。**
  *
  * ⚠️ **#1047 起 FAB 圆心不再来自常量**：`FAB_TAP` 已降级为**对照**（树给的圆心与它
- *   差 >8px 就告警），实际点击用的是**运行时 UI 树给出的真实盒子**算出的圆心；
+ *   差 >8px ⇒ **告警**，提示 vw 推算口径该重新校准；且**不替读者猜成因**），
+ *   实际点击用的是**运行时 UI 树给出的真实盒子**算出的圆心；
  *   外环「我的」项的 y 跟随树给的圆心（`ME_RING_TAP` 这个标识符已随之消失）。
  *   仍由常量决定的只剩 `BOOKMARKS_ROW_TAP`（Me 页那行的真实文本/层级**未取证**，
  *   按文本定位会误伤，故本轮不改——理由已登记在 #1047）与 `SCRIM_CLOSE_TAP`。
@@ -62,6 +63,7 @@ import {
 import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import {
   FAB_CLASS_TOKENS,
+  PINNED_DENSITY_SCALE,
   captureUiTree,
   describeNode,
   dpToPx,
@@ -111,9 +113,18 @@ if (SKIPPED) {
 // 且有单测钉住），FAB 圆心 = (953, 1889)：
 //   oracle（2026-09-29 实测帧 test-results/android-e2e/fab-probe/fab-open.png，
 //   在 (953,1889) 轻点即展开）：主 FAB 亮簇 bbox x872..1033 / y1808..1969
-//   ⇒ 圆心 (952.5, 1888.5)。与 `fabCenterPx(2016, 1080)` 推导值 (953.3, 1889.3)
-//   差 ≤0.8px；该 bbox 也与 `transition-geometry.fabCenterPx` 注释里早已记录的
-//   `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
+//   ⇒ 该**闭区间**的中点 (952.5, 1888.5)。与 `fabCenterPx(2016, 1080)` 推导值
+//   (953.3, 1889.3) 差 ≤0.8px；该 bbox 也与 `transition-geometry.fabCenterPx`
+//   注释里早已记录的 `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
+//
+// ⚠️ **两种中心口径，别混着看**（#1047 review 第 2 轮 Standards 轴 N5）：
+//   · **闭区间中点** (952.5, 1888.5) = 上面的像素扫描 bbox 两端取平均——
+//     亮簇是「离散像素集合」，两端像素各占半像素，中心落在两个像素之间。
+//   · **布局盒中心** (953, 1889) = 树的 `position.frameInScreen`
+//     (x 872 / y 1808 / w 162 / h 162) 的左上角 + 81 —— 布局盒是**连续**坐标，
+//     中心落在像素网格上。
+//   两者差 0.5px（不是测量误差，是两种口径的定义差）⇒ 本 spec 的点击坐标用
+//   **布局盒中心**（树给的），像素 oracle 用**闭区间中点**，写数字时必须标明是哪一种。
 const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
 
 /**
@@ -122,8 +133,9 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
  * ⚠️ 旧口径 `FAB_TAP` 是按 vw 常量**推算**的——输入是「设计常量 + 稳定区高度」，
  *   布局一改就偏（本仓已因同类推算连续失准两次：#819、#920，两次都是「按旧布局推算
  *   坐标」而点空）。树的 `position.frameInScreen` 给的是**当下这一帧**的真实盒子
- *   （实测 162×162px ⇒ 圆心 (953, 1889)，与推算值差 ≤0.8px）。
- * ⇒ 推算值降级为**对照**：两者差得多 ⇒ 布局变了（推算口径已陈旧），打日志点出来。
+ *   （实测 162×162px ⇒ **布局盒中心** (953, 1889)；与推算值今天**完全相同**）。
+ * ⇒ 推算值降级为**对照**：两者差得多 ⇒ **只报事实**（「推算口径可能陈旧了」），
+ *   **不归因**「布局变了」——从这一项测量上分不开这两者。
  */
 let fabTap = FAB_TAP;
 
@@ -433,10 +445,24 @@ describe.skipIf(SKIPPED)(
           `；差 ${Math.round(Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y))}px`,
       );
       meRingTap = { x: 576, y: fabTap.y };
-      if (Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y) > 8) {
+      // ── 两套独立推导的**对照**（#1047 review 第 2 轮 Standards 轴 N5）──
+      // 树给的圆心（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
+      // **两个互相独立的来源**。今天实测两者**完全相同**（漂移 = 0）⇒ 这条是
+      // 一支**哑炮**：它只会在布局真的动了之后才响。
+      //
+      // ⚠️ 为什么**只告警、不升为断言**：布局**合法**变更同样会让两者分开
+      //   （那正是「树优先」要支持的方向）——把它做成断言就成了「布局一改就假红」，
+      //   与方向相反。⚠️ 文案也**不能**断言成因：「布局已变」与「推算口径陈旧」
+      //   从这一项测量上**分不开**（本仓 #819 / #920 两次返工的成因恰是后者）⇒
+      //   只报事实 + 指明**该动哪一侧**（推算口径），不替读者猜。
+      const fabDrift = Math.hypot(fabTap.x - FAB_TAP.x, fabTap.y - FAB_TAP.y);
+      if (fabDrift > 8) {
         console.warn(
-          `[fab] 树给的 FAB 圆心与 vw 推算口径相差 >8px ⇒ 布局已变（推算口径陈旧）。` +
-            "以树为准（树是当下这一帧的真实盒子），但推算口径 `fabCenterPx` 该重新校准了。",
+          `[fab] 树给的 FAB 圆心 (${fabTap.x}, ${fabTap.y}) 与 vw 推算口径 ` +
+            `(${FAB_TAP.x}, ${FAB_TAP.y}) 相差 ${Math.round(fabDrift)}px > 8px。` +
+            `**从这一项测量本身分不出成因**（布局变了 / 推算口径陈旧了 / 抓到的树不是当前这一帧，` +
+            `三者都与此兼容——不要据此断定是产品回归）。以树为准（树是当下这一帧的真实盒子）；` +
+            `vw 推算口径 fabCenterPx 需要重新校准，或在树已全面接管后直接删掉。`,
         );
       }
     }, 600_000);
@@ -470,16 +496,42 @@ describe.skipIf(SKIPPED)(
       const f = screenFrame(node);
       expect(f, `FAB 节点缺 frameInScreen：${describeNode(node)}`).not.toBeNull();
       // 触控目标门限：density 由 assertDeviceGeometry 钉在 480 ⇒ 1dp = 3px
-      const minPx = dpToPx(48, 3);
+      // （`3` 只写在 `PINNED_DENSITY_SCALE` 一处；抄三份会漂）
+      const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
       expect(f!.width, `FAB 布局盒宽 ${f!.width}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
         minPx,
       );
       expect(f!.height, `FAB 布局盒高 ${f!.height}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(
         minPx,
       );
-      // 实际点击的坐标 == 树给的盒子算出的圆心（不是 vw 推算值）
-      expect(Math.round(fabCenter(tree).x), "实际点击的 x 应等于树给的 FAB 圆心 x").toBe(fabTap.x);
-      expect(Math.round(fabCenter(tree).y), "实际点击的 y 应等于树给的 FAB 圆心 y").toBe(fabTap.y);
+      // ── 位置断言：把「用的是 screen 坐标系」钉住 ──
+      // ⚠️ 不是装饰：实测两套坐标系差 81px（横向 swiper 偏移）——若有人把
+      //   `screenFrame` 换成 `frameInRoot`，FAB 盒会变成 x 953..1115 ⇒ 越过内容区
+      //   右界 1080 ⇒ 这两条转红。而「盒多大 / 有没有 tap 事件」那几条对坐标系
+      //   替换**完全不敏感**（box 尺寸两套坐标系一样）⇒ 没有它们，坐标系用错是绿的。
+      expect(
+        f!.x + f!.width,
+        `FAB 盒右缘 ${f!.x + f!.width}px 越过内容区右界 ${CONTENT_RIGHT}px` +
+          `（若这是 frameInRoot，坐标系用错了——两套坐标系实测差 81px）`,
+      ).toBeLessThanOrEqual(CONTENT_RIGHT);
+      expect(
+        f!.y + f!.height,
+        `FAB 盒下缘 ${f!.y + f!.height}px 越过内容区下界 ${CONTENT_BOTTOM}px`,
+      ).toBeLessThanOrEqual(CONTENT_BOTTOM);
+      // ── 实际点击坐标必须落在 FAB 的屏幕盒内（不用「树值对树值」的同源自证）──
+      // 旧写法 `expect(fabCenter(tree).x).toBe(fabTap.x)` 是**树值对树值**：两边都来自
+      // 同一棵树 ⇒ 恒真，证明不了任何事。改成「点击坐标 ∈ 屏幕盒」后才有独立价值：
+      // 点击坐标取自别的坐标系、或圆心算错，都会让点落到盒外 ⇒ 转红。
+      expect(
+        fabTap.x >= f!.x && fabTap.x <= f!.x + f!.width,
+        `实际点击的 x=${fabTap.x} 不在 FAB 屏幕盒 x∈[${f!.x}, ${f!.x + f!.width}] 内`,
+      ).toBe(true);
+      expect(
+        fabTap.y >= f!.y && fabTap.y <= f!.y + f!.height,
+        `实际点击的 y=${fabTap.y} 不在 FAB 屏幕盒 y∈[${f!.y}, ${f!.y + f!.height}] 内`,
+      ).toBe(true);
+      // ⚠️ 上面两条**不区分**「树给的圆心」与「vw 推算的圆心」——今天两者恰好相同
+      //   （差 ≤0.8px）。区分它们的是 beforeAll 里那条**交叉校验断言**，不是这里。
 
       const before = screenshot(serial, "ctl-before-fab-tap");
       tap(serial, fabTap.x, fabTap.y);

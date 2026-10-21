@@ -204,17 +204,33 @@ interface SurfaceWindow {
 const CTA_SCAN_H = 320;
 
 /**
+ * 由一个**布局盒**推出像素扫描域（外扩 `margin` 像素）。
+ */
+function scanRegionOf(
+  frame: { x: number; y: number; width: number; height: number },
+  margin: number,
+): { x0: number; y0: number; x1: number; y1: number } {
+  return {
+    x0: frame.x - margin,
+    y0: frame.y - margin,
+    x1: frame.x + frame.width + margin,
+    y1: frame.y + frame.height + margin,
+  };
+}
+
+/**
  * 由树给出 CTA 的像素扫描域 = **树的布局盒**（可外扩 `margin` 像素）。
  *
  * 为什么可以直接用布局盒当扫描域：布局盒是 CTA **应该**被画的位置；在这块里找
  * 「与 `--md-primary-container` 相近的连通域」，量到的就是**实际画出来的可见区域**。
  * ⇒ 树负责「它应该在哪」，像素负责「它真的画出来没有、画全了没」，两者一交一答。
  *
- * ⚠️ **`margin` 不是装饰，是判据的前提**（#1047 review 第 1 轮 Standards 轴抓出）：
- *   扫描域**恰好等于**布局盒时，`boxesOf` 产出的包围盒**必然**是扫描域的子集 ⇒
- *   「可见盒 ⊆ 布局盒」那几条断言**结构上恒真**，永远转不了红（它守的恰恰是
- *   「画到盒外」这个被裁掉的方向）。把扫描域外扩 `margin`（= 断言的容差）后，
- *   画到盒外的像素才会进扫描域 ⇒ 那几条断言才成为**真判据**。
+ * ⚠️ **`margin` 不是装饰，是判据的前提**（#1047 review 第 1 轮 Standards 轴抓出、
+ *   第 2 轮实测复现）：扫描域**恰好等于**布局盒时，`boxesOf` 产出的包围盒**必然**
+ *   是扫描域的子集 ⇒「可见盒 ⊆ 布局盒」那几条断言**结构上恒真**，永远转不了红
+ *   （它守的恰恰是「画到盒外」这个被裁掉的方向）。
+ * ⚠️ **但外扩量必须严格大于断言容差**（第 2 轮实测抓出：外扩量 == 容差时，
+ *   量到的像素域与断言允许域**逐字相同** ⇒ 仍然恒真）。⇒ 见 `SCAN_MARGIN`。
  *
  * 旧口径（右下 1/2 屏宽 × 底部 320px）会把插画里的大片近似色扫进来 ⇒ 只能取
  * 「最大连通域」来抗干扰；树给出精确盒后，连通域选择不再是唯一的抗干扰手段。
@@ -228,13 +244,7 @@ function ctaScanRegionFromTree(
   x1: number;
   y1: number;
 } {
-  const f = screenFrame(findFab(tree))!;
-  return {
-    x0: f.x - margin,
-    y0: f.y - margin,
-    x1: f.x + f.width + margin,
-    y1: f.y + f.height + margin,
-  };
+  return scanRegionOf(screenFrame(findFab(tree))!, margin);
 }
 
 /** 颜色命中容差（每通道）。实测三个态的令牌色都**逐位精确**渲染（偏差 0），
@@ -388,6 +398,39 @@ function modalColor(
     if (!best || v.n > best.n) best = v;
   }
   return { rgb: best?.rgb ?? [0, 0, 0], purity: total === 0 ? 0 : best!.n / total };
+}
+
+/**
+ * 可见盒必须落在**布局盒**内（容差 `tol` px）。
+ *
+ * ⚠️ 抽成函数的原因（#1047 review 第 2 轮）：负向对照要拿**同一个判据**跑
+ * 「把布局盒缩小 ⇒ 必红」——判据内联在 `it` 里就没法被复用，两份拷贝又会长歪。
+ *
+ * @param box 实测可见包围盒（像素）
+ * @param layout 布局盒（**树给的** `frameInScreen`）
+ * @param tol 允许的越界量（圆角与抗锯齿的边缘像素）
+ */
+function expectVisibleWithinLayout(
+  box: Box,
+  layout: { x: number; y: number; width: number; height: number },
+  tol: number,
+): void {
+  expect(
+    box.x0,
+    `可见盒左界 ${box.x0} 越出布局盒左界 ${layout.x}（容差 ${tol}px）`,
+  ).toBeGreaterThanOrEqual(layout.x - tol);
+  expect(
+    box.y0,
+    `可见盒上界 ${box.y0} 越出布局盒上界 ${layout.y}（容差 ${tol}px）`,
+  ).toBeGreaterThanOrEqual(layout.y - tol);
+  expect(
+    box.x1,
+    `可见盒右界 ${box.x1} 越出布局盒右界 ${layout.x + layout.width - 1}（容差 ${tol}px）`,
+  ).toBeLessThanOrEqual(layout.x + layout.width - 1 + tol);
+  expect(
+    box.y1,
+    `可见盒下界 ${box.y1} 越出布局盒下界 ${layout.y + layout.height - 1}（容差 ${tol}px）`,
+  ).toBeLessThanOrEqual(layout.y + layout.height - 1 + tol);
 }
 
 /**
@@ -815,13 +858,26 @@ describe.skipIf(SKIPPED)(
       ).toBeGreaterThanOrEqual(CONTENT_BOTTOM - CTA_SCAN_H);
 
       // ── 像素：可见区域（元素「真被画出来没有」）──
-      // 扫描域 = 树给的布局盒**外扩 EDGE_TOL** ⇒ 画到盒外的像素会进扫描域，
-      // 下面「可见盒 ⊆ 布局盒」那几条才是**真判据**（扫描域恰好等于布局盒时，
-      // 量到的盒必然是它的子集 ⇒ 恒真、转不了红）。
+      // 扫描域 = 树给的布局盒**外扩 SCAN_MARGIN** ⇒ 画到盒外的像素会进扫描域，
+      // 下面「可见盒 ⊆ 布局盒」那几条才是**真判据**（扫描域恰等于布局盒、或外扩量
+      // 等于容差时，量到的盒必然落在允许域内 ⇒ 恒真、转不了红）。
       // 画全了 ⇒ 可见盒 ≈ 布局盒；被裁 / 没画 ⇒ 可见盒小于布局盒 ⇒ 下面 ≥48dp 判红。
       /** 可见盒允许比布局盒大 2px（圆角与抗锯齿的边缘像素），超出这个量就是画到了盒外。 */
       const EDGE_TOL = 2;
-      const region = ctaScanRegionFromTree(tree, EDGE_TOL);
+      /**
+       * 像素扫描域的外扩量（px）——**必须严格大于 `EDGE_TOL`**。
+       *
+       * ⚠️ 为什么不等于容差就够（第 2 轮 Standards 轴实测：外扩量 = 容差 = 2 时，
+       *   扫描域是 `[f.x-2, f.x+w+2)`（上界排他）⇒ 可量到的像素恰在
+       *   `[f.x-2, f.x+w+1]`，而断言允许的域是 `[f.x-2, f.x+w-1+2]` = **同一个区间**
+       *   ⇒ 四条断言**结构上恒真**（实测：把 CTA 画到盒外 10px 仍全绿）。
+       *   严格大于 ⇒ 画到盒外超过容差时可见盒会越界 ⇒ 断言才能转红。
+       *
+       * ⚠️ 代价（如实登记）：外扩越大 ⇒ 扫描域里相邻近似色被并入的风险越高
+       *   ⇒ 仍靠「最大连通域」抗干扰；`SCAN_MARGIN` 远大于 `EDGE_TOL` 是为此留的余量。
+       */
+      const SCAN_MARGIN = 8;
+      const region = ctaScanRegionFromTree(tree, SCAN_MARGIN);
       for (const [i, p] of pixels.entries()) {
         const box = largestBoxOfColor(p, region, cta, CTA_TOL);
         expect(box, `A4 第 ${i} 帧：CTA 扫描域内找不到 ${fmt(cta)} 的连通域`).not.toBeNull();
@@ -835,30 +891,32 @@ describe.skipIf(SKIPPED)(
         expect(w, `A4 可见宽 ${w}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
         expect(h, `A4 可见高 ${h}px < 48dp=${minPx}px`).toBeGreaterThanOrEqual(minPx);
         // 可见区域不得明显超出树给的布局盒（画到盒外 = 布局与绘制不一致）
-        expect(
-          b.x0,
-          `A4 可见盒左界 ${b.x0} 越出树布局盒左界 ${f.x}（容差 ${EDGE_TOL}px）`,
-        ).toBeGreaterThanOrEqual(f.x - EDGE_TOL);
-        expect(
-          b.y0,
-          `A4 可见盒上界 ${b.y0} 越出树布局盒上界 ${f.y}（容差 ${EDGE_TOL}px）`,
-        ).toBeGreaterThanOrEqual(f.y - EDGE_TOL);
-        expect(
-          b.x1,
-          `A4 可见盒右界 ${b.x1} 越出树布局盒右界 ${f.x + f.width - 1}（容差 ${EDGE_TOL}px）`,
-        ).toBeLessThanOrEqual(f.x + f.width - 1 + EDGE_TOL);
-        expect(
-          b.y1,
-          `A4 可见盒下界 ${b.y1} 越出树布局盒下界 ${f.y + f.height - 1}（容差 ${EDGE_TOL}px）`,
-        ).toBeLessThanOrEqual(f.y + f.height - 1 + EDGE_TOL);
+        expectVisibleWithinLayout(b, f, EDGE_TOL);
       }
 
-      // ── 负向对照：同一组像素、同一个门限，只把「画了一半」喂进去 ⇒ 必须判红 ──
+      // ── 负向对照 ①：把「布局盒」假设为比实测小 4px（= 模拟画到了盒外 4px）──
+      // 同一张图、同一扫描逻辑、同一个判据 ⇒ 可见盒必然越出该（缩小的）布局盒
+      // 超过容差 ⇒ 判据必红。**若这条不红，说明包含关系判据是恒真的**
+      // （结构上不可能失败 ⇒ 它守的其实什么都没守）。
+      const shrunk = { x: f.x + 4, y: f.y + 4, width: f.width - 8, height: f.height - 8 };
+      const shrunkBox = largestBoxOfColor(
+        pixels[0]!,
+        scanRegionOf(shrunk, SCAN_MARGIN),
+        cta,
+        CTA_TOL,
+      );
+      expect(shrunkBox, "A4 负向对照：缩小布局盒后扫描域里仍应找得到 CTA 连通域").not.toBeNull();
+      expect(
+        () => expectVisibleWithinLayout(shrunkBox as Box, shrunk, EDGE_TOL),
+        "A4 负向对照失效：布局盒缩小 4px 后可见盒仍未越出 ⇒ 「可见盒 ⊆ 布局盒」是恒真断言",
+      ).toThrow();
+
+      // ── 负向对照 ②：同一组像素、同一个门限，只把「画了一半」喂进去 ⇒ 必须判红 ──
       // 做法：把扫描域下界裁到 CTA 自身的中线（人为制造半高），同一测量 + 同一门限。
       // ⚠️ 这条证明的是「**门限是所测高度的函数**」：同一张图上，完整测量过门限、
       //   裁半后不过 ⇒ 若实现改成「不看高度、恒判过」，这一条会转红。
       //   它**不**证明「48dp 这个具体数值选得对」——那件事由上面的 `minPx` 断言负责。
-      const p = pixels[0];
+      const p = pixels[0]!;
       const full = largestBoxOfColor(p, region, cta, CTA_TOL) as Box;
       const fullH = full.y1 - full.y0 + 1;
       const half = largestBoxOfColor(

@@ -189,12 +189,19 @@ Lynx 侧：`await ctx.driver.switchToNative()` 后用 accessibility id（`$("~la
 
 ⚠️ **坐标系只用 `frameInScreen`**（禁 `frameInRoot`）：两套坐标系实测差 81px
 （横向 swiper 滚动偏移），且 `frameInScreen` 与既有像素实测经验值**逐字一致**。
-`ui-tree.ts` **只导出 `screenFrame()`** ⇒ 用错坐标系在编译期就做不到。
+`ui-tree.ts` **只导出 `screenFrame()`** 这一个几何访问器 ⇒ 用错坐标系在**读代码时**
+就能看见。⚠️ 措辞要说准：这**不是**「编译期就做不到」——`UiTreeNode` 类型**仍导出**
+`position.frameInRoot`，消费方写 `node.position?.frameInRoot` **仍能编译**；真正的
+防线是「**只提供一个 accessor**」这条**约定** + `unit/ui-tree.test.ts` 里那条
+**运行时导出守卫**（断言本模块的运行时导出键名里不含 `root`）。
 
 ⚠️ **`ui-tree.ts` 有两道 CI 内的单测**（随 `pnpm test:all` 进 CI，e2e 本身不进 CI）：
 `unit/ui-tree.test.ts`（**纯查询层**：坐标系口径 / class 唯一性 / `findFab` 的抛错分支 /
-采样窗推导）· `unit/ui-tree.io.test.ts`（**设备侧 IO 边界**：触发 / 列目录 / 产物拉回 /
-等落齐的**成功与失败双路径**，adb 调用以 `vi.mock("../env")` 顶掉）。
+采样窗推导 / 作品 id 脱敏）· `unit/ui-tree.io.test.ts`（**设备侧 IO 边界**：触发 / 列目录 /
+产物拉回 / 等落齐 / 静默期迟到产物的**成功与失败双路径**，adb 调用以 `vi.mock("../env")` 顶掉）。
+⚠️ 选档规则（「哪一份产物最完整」）的机器防线在**第三道**门禁：
+`packages/android-host/tests/unit/scripts/ui-tree-dump-selection.test.ts`（lib 层
+`pickBestArtifact` 的直接行为 + 「诊断编排层不得自带选档规则」守卫）。
 ⚠️ 真机链路本身（adb 真连、引擎真吐树）**仍无 CI 防线**——那只有真机能证。
 
 ### `md3-visual-tokens.spec.ts` 逐条能证 / 不能证
