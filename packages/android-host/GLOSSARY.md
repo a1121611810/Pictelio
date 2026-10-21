@@ -39,7 +39,7 @@ _Avoid_: 把 `LruCache`（容器）与 `ImageMemoryCache`（容器的使用者�
 `capacitor-storage_*` / `CapacitorStorage` 是历史用户数据格式：**一字不改**（ADR-0050）。首启由 `SecureStorageCompat` 迁移进 Keystore 体系。
 
 ### 运行时 UI 树观测通道（runtime UI tree dump）
-**第三条观测通道**：绕开「a11y 树不暴露节点」与「`uiautomator dump` 被 SIGKILL」两条既有死路，直接从引擎拿运行时 UI 节点树。宿主侧承载类是 `UiTreeDump`（`src/lynx/java/io/pictelio/app/`），诊断脚本是 `scripts/dump-ui-tree.mjs`，纯逻辑在 `scripts/lib/ui-tree-dump-core.mjs`，**e2e 消费侧**共享模块是 `tests/android-e2e/ui-tree.ts`（触发 → 等落齐 → `adb pull` → 解析 → 按 class / 文本定位；#1047），其**两道 CI 内单测**是 `tests/android-e2e/unit/ui-tree.test.ts`（纯查询层）与 `tests/android-e2e/unit/ui-tree.io.test.ts`（设备侧 IO 边界的成功/失败双路径）。
+**第三条观测通道**：绕开「a11y 树不暴露节点」与「`uiautomator dump` 被 SIGKILL」两条既有死路，直接从引擎拿运行时 UI 节点树。宿主侧承载类是 `UiTreeDump`（`src/lynx/java/io/pictelio/app/`），诊断脚本是 `scripts/dump-ui-tree.mjs`，纯逻辑在 `scripts/lib/ui-tree-dump-core.mjs`，**e2e 消费侧**共享模块是 `tests/android-e2e/ui-tree.ts`（触发 → 等落齐 → `adb pull` → 解析 → 按 class / 文本定位 → **FAB 树断言共享判据 `assertFabTree`**；#1047），其**两道 CI 内单测**是 `tests/android-e2e/unit/ui-tree.test.ts`（纯查询层 + 共享树断言）与 `tests/android-e2e/unit/ui-tree.io.test.ts`（设备侧 IO 边界的成功/失败双路径）。
 - **触发**：intent extra `uiTreeDump=1`（非空串即触发）；两个采样点——冷启动 `onLoadSuccess`（`cold`）、热启动 `onNewIntent`（`hot`）；一次触发**连拍三档**（0 / 1500 / 4000ms）。
 - **产物**：应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json`，引擎原始 JSON **不加工**落盘（摘要由脚本现算）。
 - **门禁**：`BuildConfig.DEBUG` 作为**判定函数的入参**（非埋在分支里）⇒ release 变体下为恒 false 死代码、被 R8 移除。

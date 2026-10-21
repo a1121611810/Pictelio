@@ -197,7 +197,8 @@ Lynx 侧：`await ctx.driver.switchToNative()` 后用 accessibility id（`$("~la
 
 ⚠️ **`ui-tree.ts` 有两道 CI 内的单测**（随 `pnpm test:all` 进 CI，e2e 本身不进 CI）：
 `unit/ui-tree.test.ts`（**纯查询层**：坐标系口径 / class 唯一性 / `findFab` 的抛错分支 /
-采样窗推导 / 作品 id 脱敏）· `unit/ui-tree.io.test.ts`（**设备侧 IO 边界**：触发 / 列目录 /
+采样窗推导 / 作品 id 脱敏 / **FAB 树断言共享判据 `assertFabTree`**——唯一命中 / 绑了 `tap` /
+≥48dp / 盒不越内容区）· `unit/ui-tree.io.test.ts`（**设备侧 IO 边界**：触发 / 列目录 /
 产物拉回 / 等落齐 / 静默期迟到产物的**成功与失败双路径**，adb 调用以 `vi.mock("../env")` 顶掉）。
 ⚠️ 选档规则（「哪一份产物最完整」）的机器防线在**第三道**门禁：
 `packages/android-host/tests/unit/scripts/ui-tree-dump-selection.test.ts`（lib 层
