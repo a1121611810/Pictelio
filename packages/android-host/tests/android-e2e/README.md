@@ -201,7 +201,9 @@ Lynx 侧：`await ctx.driver.switchToNative()` 后用 accessibility id（`$("~la
 产物拉回 / 等落齐 / 静默期迟到产物的**成功与失败双路径**，adb 调用以 `vi.mock("../env")` 顶掉）。
 ⚠️ 选档规则（「哪一份产物最完整」）的机器防线在**第三道**门禁：
 `packages/android-host/tests/unit/scripts/ui-tree-dump-selection.test.ts`（lib 层
-`pickBestArtifact` 的直接行为 + 「诊断编排层不得自带选档规则」守卫）。
+`pickBestArtifact` 的直接行为 + 两条**对称**守卫：「诊断编排层不得自带选档规则」+
+「e2e 消费层同样从 core 层 import 并调用 `pickBestArtifact`」，且两侧源码里都**不出现**
+「对可比字段做比较」的自造排序写法）。
 ⚠️ 真机链路本身（adb 真连、引擎真吐树）**仍无 CI 防线**——那只有真机能证。
 
 ### `md3-visual-tokens.spec.ts` 逐条能证 / 不能证
