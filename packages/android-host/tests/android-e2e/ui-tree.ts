@@ -735,10 +735,10 @@ export async function captureUiTree(
  *   （半成品树 ≠ 树里没有那个节点）。
  *
  * @param captured `captureUiTree` 的结果
- * @param prefix 场景前缀（**必填且非空**，如「Me 页」「benchNav recommended」「主界面」）
- *   ——⚠️ 必填是刻意的（#1047 第 11 轮 Standards 轴 S-R11-N1 / Spec 轴 F1）：
- *   ADR-0223 §3.4 row 7 登记的契约是「失败信息带场景前缀」，而 prefix 一旦可选、
- *   就有调用点会漏传 ⇒ 交给编译期保证（漏传即 `tsc` 报错），不再靠自觉
+ * @param prefix 场景前缀（**必填**，如「Me 页」「benchNav recommended」「主界面」）——⚠️ 「非空」目前只是
+ *   文档化约束、**无机器防线**（传空串仍能编译 ⇒ 失败信息退化成「：UI 树采样未落齐…」，少了场景标识；
+ *   见 ADR-0223 §3.4 row 7 **失效面 ⑦**）。必填是刻意的（#1047 第 11 轮 Standards 轴 S-R11-N1 / Spec 轴 F1）：
+ *   row 7 登记的契约是「失败信息带场景前缀」，而 prefix 一旦可选、就有调用点会漏传 ⇒ 交给编译期保证（漏传即 `tsc` 报错），不再靠自觉
  * @throws 采样未落齐 ⇒ 断言失败（信息里带 `prefix`）
  */
 export function expectSettled(captured: CaptureUiTreeResult, prefix: string): void {
