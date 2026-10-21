@@ -31,7 +31,7 @@
  *   （登录页无 FAB 必红）。
  *
  * ── AVD 迁移：pictelio_low → pictelio_ui ──────────────────────────────────
- * 本用例的**剩余**坐标常量（`FAB_TAP` / `BOOKMARKS_ROW_TAP` / `SCRIM_CLOSE_TAP`）
+ * 本用例的**剩余**坐标常量（`FAB_TAP` / `SCRIM_CLOSE_TAP`）
  * 是按 pictelio_ui（android-34，1080×2160 / density 480）的 vw 几何静态推导的，
  * 换设备会静默失准（点空 → 假绿/假红）。故缺省 pin 到 pictelio_ui，并显式
  * ANDROID_E2E_AVD=pictelio_low 时整文件 skip（beforeAll 的 assertDeviceGeometry
@@ -41,8 +41,8 @@
  *   差 >8px ⇒ **告警**，提示 vw 推算口径该重新校准；且**不替读者猜成因**），
  *   实际点击用的是**运行时 UI 树给出的真实盒子**算出的圆心；
  *   外环「我的」项的 y 跟随树给的圆心（`ME_RING_TAP` 这个标识符已随之消失）。
- *   仍由常量决定的只剩 `BOOKMARKS_ROW_TAP`（Me 页那行的真实文本/层级**未取证**，
- *   按文本定位会误伤，故本轮不改——理由已登记在 #1047）与 `SCRIM_CLOSE_TAP`。
+ *   仍由常量决定的只剩 `SCRIM_CLOSE_TAP`；⚠️ **Me 页「我的收藏」行已改按树定位**
+ *   （2026-10-22 真机取证：树里唯一命中、框 (81,847,184,69)；坐标常量已第三次失效）。
  *
  * 纯 adb 驱动（仿 lynx-boot-renders.spec.ts 轻量模式；登录走 am start hook，无需
  * Appium webview context）。用例本体坐标常量推导式见常量注释；
@@ -61,7 +61,15 @@ import {
   startMainActivity,
 } from "../prefs";
 import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
-import { assertFabTree, captureUiTree, fabCenter, type UiTreeNode } from "../ui-tree";
+import {
+  assertFabTree,
+  captureUiTree,
+  fabCenter,
+  findByText,
+  screenFrame,
+  type UiTreeFrame,
+  type UiTreeNode,
+} from "../ui-tree";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
@@ -163,38 +171,52 @@ const ME_RING_OFFSET_X = 576 - FAB_TAP.x; // = -377（实测 oracle 576 − vw �
  */
 let meRingTap = { x: FAB_TAP.x + ME_RING_OFFSET_X, y: FAB_TAP.y };
 
-// Me 页「我的收藏」行（#819 订正；**票 #920 去顶栏后于 2026-10-03 重取帧**）。
-//
-// ⚠️ **本 oracle 已重取两次，两次都是因为「按旧布局推算坐标」而失效。**
-//
-// 【第一次失效（#819）】原写死 y=611 正落在「@1121611810」与「我的收藏」之间的
-//   分隔区——既不是可点行，也不是任何文字 ⇒ tap 无反应，断言只看到「差异 8」。
-//
-// 【第二次失效（票 #920）】#819 订正时取的是**含 64dp 实体顶栏**的帧。
-//   #920 去掉四个根页的实体顶栏后，内容整体上移 ⇒ 本坐标再次落空。
-//   ⚠️ 当时只登记了「需重取帧」的注释，**没真去取**（E2E 不进 CI，ADR-0084，
-//   没人会提醒）——「已登记」不是「已处理」。2026-10-03 已补取真帧。
-//
-// 【2026-10-03 重取帧 · 依据（emulator-5554 / Android 14 / 1080×2160 / density 480）】
-//   按 #819 的同一像素扫描法（卡片内 x 60..700 扫「深色文字带」，阈值 RGB>110，
-//   带高 ≥8px），在**去顶栏后**的 Me 页实测：
-//     头像卡 Hintaooda/@ID  y151..302（中心 226）
-//     **我的收藏            y415..459（中心 437）**  ← 本常量
-//     追更列表 y566..609（中心 587）/ 稍后看 738 / 好P友 887 /
-//     下载管理 1037 / 网络自检 1187 / 通知 1337（行距稳定 ≈149.6px）
-//   **探针实测（不靠推算）**：tap(300, 437) ⇒ 成功导航到「收藏」页；
-//   对照 tap(300, 587) ⇒ 进入「追更列表」（证明探针本身有效，不是"点了没反应"的静默失败）。
-//
-// ⚠️ **下一个人若再改根页顶栏/安全区，必须重新取帧，不得用「减 N」推算** ——
-//   本仓已因同类推算连续失准两次（#819、#920）。推算看起来省事，但省掉的是验证。
-const BOOKMARKS_ROW_TAP = { x: 300, y: 437 };
+// Me 页「我的收藏」行的**定位文本**（#1047：改按运行时 UI 树定位，不再用坐标常量）。
+const BOOKMARKS_ROW_TEXT = "我的收藏";
 
-// ⚠️ **#1047 暂未把这一处改树**（诚实登记，不是漏做）：树里**能**按文本定位
-//   （`attributes.text`，实测登录页树里 5 条文本可命中），但「我的收藏」这一行在
-//   **Me 页**上的实际文本内容与所在层级**尚未在真机上取证**——文本对不上就会把一条
-//   当前能过的用例改成必红。⇒ 取证需要**已登录的 Me 页**（当前 refresh_token 已失效，
-//   见 #1047 阻塞项），补跑取证后再改。⚠️ 本仓已因「按推算坐标点空」返工两次
-//   （#819 / #920），所以这里宁可不改，也不改成一个没验过的口径。
+/**
+ * 在**已登录的 Me 页**上按运行时 UI 树定位「我的收藏」行，返回它的屏幕布局盒。
+ *
+ * ⚠️ **为什么不再用坐标常量**：这个落点**已失效三次**，三次都是「按旧布局推算坐标」：
+ *   ① 【#819】原写死 y=611 正落在「@1121611810」与「我的收藏」之间的分隔区——既不是
+ *      可点行，也不是任何文字 ⇒ tap 无反应，断言只看到「差异 8」。
+ *   ② 【#920】#819 订正时取的是**含 64dp 实体顶栏**的帧；#920 去掉四个根页的实体顶栏后
+ *      内容整体上移 ⇒ 坐标再次落空。⚠️ 当时只登记了「需重取帧」的注释，**没真去取**
+ *      （E2E 不进 CI，ADR-0084，没人会提醒）——「已登记」不是「已处理」。
+ *   ③ 【2026-10-03 重取帧 → 2026-10-22 再次失效】那次按像素扫描法在去顶栏后的 Me 页
+ *      实测得「我的收藏 y415..459（中心 437）」并写死为 (300, 437)；⚠️ **2026-10-22
+ *      真机实测该行真实框是 (81, 847, 184, 69)**（中心 ≈ (173, 882)）⇒ **y 偏了 410px**
+ *      ⇒ tap 点空 ⇒ 画面「差异 0」⇒ 用例红。⇒ **坐标常量这条路已第三次证明不可靠。**
+ *
+ * ⇒ 改按树的 `attributes.text` 精确定位（`findByText`）：文本是**事实**，位置跟着布局走
+ *   ⇒ 顶栏 / 安全区 / 行序再变也不用重取帧。
+ *   实测（2026-10-22 · emulator-5556 / 1080×2160 / density 480 · 已登录 Me 页）：
+ *   树 **302 节点**、`findByText("我的收藏")` **唯一命中 1 个**、框 (81, 847, 184, 69)；
+ *   按该框中心 tap ⇒ 成功导航（对照：按旧常量 tap(300, 437) ⇒ 点空 ⇒ 差异 0 ⇒ 红）。
+ *
+ * @param serial 设备序列号
+ * @returns 该行节点的 `frameInScreen` 布局盒
+ * @throws 树采样未落齐 / 文本 0 命中或 >1 命中 / 节点缺 `frameInScreen` ⇒ 抛错
+ *   （**绝不静默退回任何常量**——退回常量就等于把「定位失败」藏回「点空 ⇒ 差异 0」）
+ */
+async function locateBookmarksRow(serial: string): Promise<UiTreeFrame> {
+  const captured = await captureUiTree(serial, {
+    outDir: resolve(EVIDENCE_DIR, "ui-tree-me"),
+  });
+  expect(
+    captured.settled,
+    "Me 页 UI 树采样未落齐（0/1500/4000 三档未齐）⇒ 抓到的可能是半成品树",
+  ).toBe(true);
+  const hits = findByText(captured.best.tree, BOOKMARKS_ROW_TEXT);
+  expect(
+    hits.length,
+    `Me 页树上「${BOOKMARKS_ROW_TEXT}」应唯一命中，实得 ${hits.length} 个` +
+      "（0 = 文本没对上、或抓到的不是 Me 页；>1 = 定位不唯一）",
+  ).toBe(1);
+  const frame = screenFrame(hits[0]!);
+  expect(frame, `「${BOOKMARKS_ROW_TEXT}」节点缺 frameInScreen`).not.toBeNull();
+  return frame!;
+}
 
 // 遮罩空白区（点空白收起菜单）：远离 FAB 与环。
 const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
@@ -532,9 +554,19 @@ describe.skipIf(SKIPPED)(
       await SLEEP(1_500);
       tap(serial, meRingTap.x, meRingTap.y);
       await SLEEP(3_000);
-      // 2. 探针：点「我的收藏」行 → 应导航（修复前被全屏容器吞掉 → 0 变化）
+      // 2. 落点由**树**给（坐标常量已第三次失效，见 locateBookmarksRow 的失效史）
+      const rowFrame = await locateBookmarksRow(serial);
+      const rowTap = {
+        x: Math.round(rowFrame.x + rowFrame.width / 2),
+        y: Math.round(rowFrame.y + rowFrame.height / 2),
+      };
+      console.log(
+        `[fab] 「我的收藏」行：树给框 (${rowFrame.x},${rowFrame.y},${rowFrame.width},${rowFrame.height})` +
+          ` ⇒ 落点 (${rowTap.x},${rowTap.y})`,
+      );
+      // 3. 探针：点「我的收藏」行 → 应导航（修复前被全屏容器吞掉 → 0 变化）
       const before = screenshot(serial, "row-before-tap");
-      tap(serial, BOOKMARKS_ROW_TAP.x, BOOKMARKS_ROW_TAP.y);
+      tap(serial, rowTap.x, rowTap.y);
       await SLEEP(2_000);
       const after = screenshot(serial, "row-after-tap");
       const changed = await pngDiff(before, after);
@@ -543,6 +575,6 @@ describe.skipIf(SKIPPED)(
         `点「我的收藏」行后画面几乎没变（差异 ${changed}，阈值 500）——证据 ` +
           `row-before-tap.png / row-after-tap.png。若两帧只差状态栏时钟，说明点击未生效。`,
       ).toBeGreaterThan(500);
-    }, 45_000);
+    }, 90_000);
   },
 );
