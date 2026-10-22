@@ -58,8 +58,8 @@
  *
  * ── 驱动方式（全部沿用既有 spec 已验证的交互，无新发明）────────────────────
  * - 深链：`am start -n <pkg>/.LynxActivity --es benchNav <scenario>`——benchNav extra
- *   由 LynxActivity 自行读取（`LynxActivity.java:504` getStringExtra("benchNav") +
- *   `:660` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
+ *   由 LynxActivity 自行读取（`LynxActivity.java:543` getStringExtra("benchNav") +
+ *   `:733` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
  * - 点击/滑动：adb `input tap|swipe|motionevent|keyevent`（fab / lynx-bookmark-tags 先例）；
  * - 登录：dev intent hook（prefs.loginViaDevIntent，替换原 webview 登录页注入）；
  * - 断言证据：截图逐帧落盘 test-results/android-e2e/transition-matrix/。
@@ -591,7 +591,7 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 
 /**
  * benchNav 深链启动（probe spec 同款）：force-stop → 清 logcat →
- * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:504`
+ * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:543`
  * getStringExtra("benchNav") 后按场景 sendGlobalEvent；单引擎下已无 MainActivity 转发环节）。
  */
 async function launchBenchNav(

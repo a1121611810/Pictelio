@@ -359,7 +359,7 @@ export function fabInnerItemPx(
  * 内环「搜索」项落点（px）= `innerPair[0]`。
  *
  * 恒定 `INNER_START` 的依据（不随内环项数变化，故不需在 spec 里数项数）：
- *   - `createGlobalFab.ts:131` 的 `const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]`
+ *   - `createGlobalFab.ts:159` 的 `const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]`
  *     以**数组字面量首元素**固定搜索项首位（激活页动作在其后 `push`）；
  *   - `GlobalFab.vue` 模板 `v-for="e in innerPair"` **不按 `visible()` 过滤**，序号即渲染序；
  *   - `spread(start, end, count)` 的第 0 项恒为 `start`（`i=0` 时分母项为 0）。
