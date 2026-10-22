@@ -1,7 +1,7 @@
 // backupWiring 单测（app-lynx，spec docs/specs/webdav-backup.md §3.1/§3.2/§6/§7；T7/T8/T9）
 // oracle：spec §3.1 键域、§6 merge-by-keys + uid 过滤、§6 应急快照保留、§7 启动钩子语义。
 // 与 app tests/unit/services/backupWiring.test.ts 同用例同判据（双端差分对齐）。
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { ref } from "vue"
 
@@ -164,6 +164,74 @@ describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => 
     expect(currentUid()).toBe(42)
     mockUser.id = null
     expect(currentUid()).toBeNull()
+  })
+})
+
+describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
+  // oracle 溯源（期望值不来自被测实现的输出）：
+  //   - 「非空 = 至少一个数组 length > 0」（≠ 键数 > 0）= #1059 裁定
+  //   - 「降级路径必须 console.warn 且带模块前缀」= docs/testing/conventions.md 硬约束 #3
+  //     「禁止静默降级」+ 本模块既有前缀约定（[backupWiring]）
+  //   - 键名与条数 = 输入夹具本身（blocked_user_ids / reported_ids 是 spec §3.2 钉住的键名）
+  beforeEach(() => {
+    env.prefs.clear()
+    env.idb.clear()
+    mockUser.id = 42
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    // 失败路径也收尾（约定 #6）：还原 console.warn spy，避免跨用例污染
+    vi.restoreAllMocks()
+  })
+
+  it("sets 含非空数组 → 恰好一条带前缀的 warn；写回与 applied/skipped 不变", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const store = fresh()
+    const res = await createLynxBackupWiring().apply({
+      apply: { settings_ugoira_mode: "range" },
+      sets: { blocked_user_ids: [111, 222], reported_ids: [333] },
+    })
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    const message = String(warn.mock.calls[0][0])
+    expect(message.startsWith("[backupWiring]")).toBe(true)
+    expect(message).toContain("屏蔽")
+    expect(message).toContain("无法恢复")
+    // 被丢弃的键名与条数（条数取自夹具：2 / 1）
+    expect(message).toMatch(/blocked_user_ids[^\d]*2/)
+    expect(message).toMatch(/reported_ids[^\d]*1/)
+
+    // 告警之外，apply 行为不变
+    expect(store.ugoiraMode).toBe("range")
+    expect(res.applied).toEqual(["settings_ugoira_mode"])
+    expect(res.skipped).toEqual([])
+  })
+
+  it("sets 为 {} → 零告警（本客户端自产备份的正常路径）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const store = fresh()
+    const res = await createLynxBackupWiring().apply({
+      apply: { settings_ugoira_mode: "range" },
+      sets: {},
+    })
+
+    expect(warn).not.toHaveBeenCalled()
+    expect(store.ugoiraMode).toBe("range")
+    expect(res.applied).toEqual(["settings_ugoira_mode"])
+  })
+
+  it("sets 有键但数组全空 → 零告警（键存在 ≠ 有数据）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const store = fresh()
+    const res = await createLynxBackupWiring().apply({
+      apply: { settings_ugoira_mode: "range" },
+      sets: { blocked_user_ids: [], reported_ids: [] },
+    })
+
+    expect(warn).not.toHaveBeenCalled()
+    expect(store.ugoiraMode).toBe("range")
+    expect(res.applied).toEqual(["settings_ugoira_mode"])
   })
 })
 

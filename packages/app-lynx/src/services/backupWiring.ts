@@ -41,6 +41,24 @@ export interface LynxBackupWiring {
   }>
 }
 
+/**
+ * sets 丢弃告警（#1059 裁定）。
+ * app-lynx 无屏蔽/举报落点，且 WebView 客户端已随 ADR-0203 删除 ⇒ **不再有对侧引擎承接 sets**，
+ * 恢复旧备份时 sets 里的数据会被丢弃。丢弃必须可见（测试硬约束 #3「禁止静默降级」）。
+ * 判定口径：**至少一个数组有元素**（≠ 键数 > 0；`{ blocked_user_ids: [] }` 无数据，不告警）。
+ * 只落日志，不做用户可见提示（恢复摘要页与 i18n 不变）。
+ */
+function warnDroppedSets(sets: BackupSets): void {
+  const dropped: string[] = []
+  for (const [key, value] of Object.entries(sets)) {
+    if (Array.isArray(value) && value.length > 0) dropped.push(`${key}(${value.length})`)
+  }
+  if (dropped.length === 0) return
+  console.warn(
+    `[backupWiring] 该备份含屏蔽/举报数据（sets），当前版本无落点、无法恢复，已丢弃：${dropped.join("、")}`,
+  )
+}
+
 export function createLynxBackupWiring(): LynxBackupWiring {
   return {
     async collect(): Promise<CollectedBackupData> {
@@ -54,7 +72,9 @@ export function createLynxBackupWiring(): LynxBackupWiring {
       return { raw, sets: {} }
     },
     async apply(plan) {
-      // sets 在 lynx 无落点：仅写回 apply 键（跨引擎恢复时 sets 由 app 侧处理）
+      // sets 在 lynx 无落点：仅写回 apply 键。对侧引擎已随 ADR-0203 删除，
+      // sets 真有数据时在此显式告警（#1059）——丢弃不得静默。
+      warnDroppedSets(plan.sets)
       return await useSettingsStore().importRawValues(plan.apply)
     },
   }

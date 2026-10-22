@@ -59,16 +59,24 @@
 ```
 
 > **`sets` 键名口径（2026-10-18 订正）**：两个键名以 app 侧 `BACKUP_SET_KEYS`
-> （原 `packages/app/src/services/backupWiring.ts:34`）为准，是 `blocked_user_ids` / `reported_ids`；
+> （原 `packages/app/src/services/backupWiring.ts:34`，该文件已随 `ADR-0203` 删除）为准，
+> 是 `blocked_user_ids` / `reported_ids`；
 > 本文此前示例写的 `blocked_users` / `report_records` **从未在任何实现或抓包中存在过**，属臆造名。
 > 交叉印证：`ADR-0187` §背景与 `docs/adr/glossary-tag-mute.md` 均以 `blocked_user_ids`
 > 指称屏蔽用户这一存量键。
 >
-> **跨引擎不对称（勿把示例当 lynx 现状读）**：本节示例是 **app 侧**产出的快照形态。
-> app-lynx 侧无屏蔽/举报 store，`collect()` 恒返回 `sets: {}`
-> （`packages/app-lynx/src/services/backupWiring.ts:53-54`），与 §3.1「屏蔽列表 / 举报记录」进备份域
-> 的描述是同一条规则的两种落点。恢复方向同样不对称：lynx 侧 `apply()` 只写回 `apply` 键，
-> `sets` 无落点即被丢弃（`backupWiring.ts:56-58`）。
+> **恢复方向的单侧丢弃（2026-10-23 订正，#1059）**：WebView 客户端已随 `ADR-0203` 删除，
+> 本仓库唯一客户端是 app-lynx，而它**没有屏蔽/举报 store**：`collect()` 恒返回 `sets: {}`
+> （`packages/app-lynx/src/services/backupWiring.ts:71-72`）。因此**不再有对侧引擎承接 `sets`**，
+> 恢复方向是单侧丢弃——app-lynx 的 `apply()` 只写回 `apply` 键，旧备份里的 `sets`
+> （屏蔽用户 / 举报记录）无落点即被丢弃。
+>
+> **丢弃必须可见（#1059 裁定）**：仅当 `sets` 里**至少有一个非空数组**时，
+> app-lynx 的 `apply()` 输出**一条**带模块前缀的 `console.warn`（前缀 `[backupWiring]`），
+> 点明「该备份含屏蔽/举报数据、当前版本无法恢复」并附被丢弃的键名与条数；
+> `sets` 为 `{}` 或全部数组为空时**不告警**（本客户端自产备份恒为空 ⇒ 零噪声）。
+> 依据：测试硬约束「禁止静默降级」（`docs/testing/conventions.md` #3）——有数据丢失就必须可见。
+> 该告警只落日志，不做用户可见提示（恢复摘要页与 i18n 文案不变）。
 
 引擎无关单文件；恢复端按自身已知键过滤（app/lynx 各自不认识的键跳过）。
 
