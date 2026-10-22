@@ -80,6 +80,23 @@
 
 实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；**R1 的注入段断言用「锚点卡下方区域帧对比」代理**（`belowAnchorRegion` 上的像素差 > `INJECT_TH`）——lynx 无文本读取通道（口径见**上方**「内容断言的「不可判定」口径（三态记账）」段；无文本通道的根因是单引擎下**没有承载 WebView 的 Activity**、Appium 永远等不到 `WEBVIEW` context，见**上方** R4 删除说明），**不用**页面文本「相关作品」定位；且该代理只证明「该区域内容变化」，不区分变化来源，行文按代理口径表述。
 
+> ⚠️ **R1 / R2 的待判定项（2026-10-23 登记 · **未落地**；出处 = #1055「关闭 ≠ 已修」的残留；**实测值 = 2026-10-22 票面**）**：
+> 发版门 `transition-matrix` 的一条 R1 断言与一条 R2 断言**于 2026-10-22 判红**（票面实测，**本轮未复跑**），但它们是**产品侧行为判定**、不是可直接修的门禁缺陷 ⇒ **判定结论尚未做出**：
+>
+> | # | 位置 | 断言 | 2026-10-22 实测 | 待判定 |
+> |---|---|---|---|---|
+> | ① | `packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts` · R1「断言② 滚动保持」 | 锚点卡上方区域与进详情前逐像素一致（差异占比 ≤ `PRESERVE_RATIO` = 0.04） | **0.7622**（两跑 0.6492 / 0.7622，量级稳定）⇒ 判红；断言**自带**释义「超限意味列表被重置/重排（滚动位置丢失回归）」——⚠️ **该释义是断言的失败文案，不是本次判定结论** | **产品缺陷**（返回后列表真被重排）**还是期望过时**（产品已改为不回顶、断言该更新）？⇒ 现象已观测、**归因未做**；**须产品侧拍板**，不宜由实现侧擅自改阈值 |
+> | ② | 同文件 · R2「断言① 翻页推进」 | 第 N 次上滑后结果底部带停止更新（`stallAt` 期望 `null`） | **`stallAt = 1`**（期望 `null`）⇒ 判红 | 三选一：**正常到底**（当次语料不足 10 屏）**/ 翻页失效** **/ 探针搜索词太窄** ⇒ 须**换更宽搜索词复跑**取得对照依据。⚠️ 代码注释已记录「`original` 结果**多达 30+ 屏**、四跑 30 次滑动仍未到底」（`:1247`）且该判据**刻意不去测「绝对底部」**（不适定）⇒「正常到底」的前提是**当次语料不足 10 屏**，属**数据依赖**、每次须实测确认 |
+> | ③ | 发版门台账的判红回调 `packages/android-host/tests/android-e2e/support/releaseGate.ts:184`（`deps.fail(...)`） | 发版门内容断言既未判定、也未声明不可判定 | 是 ①② 的**派生红**（用例抛错提前中断 ⇒ 台账停在**双 0**：`judged === 0 && skipped === 0`），**不是独立缺陷** | ①② 处置后**应自动转绿**；若仍红 ⇒ 才是发版门自身的问题（台账「没跑完」的判红逻辑） |
+>
+> ⚠️ **处置口径**：①② 的判定结论须落档在本 spec 或 ADR（**不留在 issue 评论里**）；判定前**不得**改阈值、也不得用 `t.skip()` 把「什么都没验到」伪装成「通过」（测试硬约束 #6「期望值出处可追溯」——若判定为「期望过时」，阈值更新须有**书面依据**，不得只改数字）。复现须**串行**跑（与其它 spec 同跑会双双假红）：
+> ```bash
+> cd packages/android-host
+> ANDROID_E2E_AVD=pictelio_ui ANDROID_E2E_SKIP_BUILD=1 npx vitest run \
+>   --config tests/android-e2e/vitest.config.ts specs/transition-matrix.spec.ts
+> ```
+> ⚠️ 帧证据落在 `packages/android-host/test-results/android-e2e/transition-matrix/`，该目录**只落帧、logcat 不落盘** ⇒ 判红后要尽快 `adb -s <serial> logcat -d` 取（环形 buffer 会滚）。
+
 ### T3 宿主矩阵测试（app-lynx 单测，P1）
 
 1. **审计**：grep `initial[A-Z]` + setup 读 props 模式，列出全部 init-only 组件清单写入测试文件头注释（已知：`BookmarkButton`；`CarouselSwiper` 为嫌疑宿主侧）。
