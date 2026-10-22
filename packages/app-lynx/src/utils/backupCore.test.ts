@@ -196,6 +196,8 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
   it("planRestore 零告警：丢弃可见性只由客户端接线层承担（spec §3.2「丢弃必须可见」）", () => {
     // oracle：spec §3.2 —— 告警落在 app-lynx 的 apply()（接线层），
     // 引擎无关的解析/计划层不得再发一条（否则一次恢复出两条重复告警）。
+    // 这里断言的是**进程级**零告警，属约定 #6「告警计数按模块前缀过滤」的适用边界：
+    // planRestore 是同步纯函数，窗口内无他模块告警可混入。
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     planRestore(snapshotWith(), 42)
     expect(warn).not.toHaveBeenCalled()

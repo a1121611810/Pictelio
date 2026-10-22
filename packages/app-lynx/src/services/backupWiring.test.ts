@@ -217,7 +217,14 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     const warnings = backupWiringWarnings(warn)
     expect(warnings).toHaveLength(1)
     const message = warnings[0]
-    expect(message.startsWith("[backupWiring]")).toBe(true)
+    // 前缀不能由上面的「按前缀过滤」白送（那会把本断言变成同义反复）：
+    // 另按载荷关键词独立选出该条，再断言它自带 `[backupWiring]` 前缀。
+    const dropped = warn.mock.calls
+      .map((call) => String(call[0]))
+      .filter((text) => text.includes("屏蔽"))
+    expect(dropped).toHaveLength(1)
+    expect(dropped[0].startsWith("[backupWiring]")).toBe(true)
+    expect(dropped[0]).toBe(message)
     expect(message).toContain("屏蔽")
     expect(message).toContain("无法恢复")
     // 被丢弃的键名与条数（条数取自夹具：2 / 1；锚到右括号 ⇒ 错误条数不能蒙混过关）
