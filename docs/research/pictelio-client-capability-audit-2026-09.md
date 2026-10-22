@@ -141,7 +141,7 @@
 1. **旧文档称"小说导出 9 种格式 = webview 独有"** → **错**。`packages/app-lynx/src/components/NovelExportSheet.vue` 与 webview 的 `ExportSheet.tsx` **共用同一个 `@pictelio/novel-export` 包**，双端都支持 9 格式。
 2. **旧文档称"屏蔽作品/标签/作者 双端都有"** → **错**。lynx 源码两处显式自述无此能力：
    - `packages/app-lynx/src/stores/relatedInjection.ts:6`：「…`isTagMuted`（静音标签，ADR-0187 / #732；**lynx 无屏蔽列表能力**）」
-   - `packages/app-lynx/src/services/backupWiring.ts:53`：「**app-lynx 暂无屏蔽/举报 store**（spec §3.1 sets 为空对象）」
+   - `packages/app-lynx/src/services/backupWiring.ts` 的 `collect()`：「**app-lynx 暂无屏蔽/举报 store**（spec §3.1 sets 为空对象）」
    实际形态：webview 有完整 `blockStore` + `BlocklistSheet` + `illustMenu.blockAuthor`；lynx 仅有**静音标签**（`MuteTags.vue` + `muteTagStore`），语义不同（静音 = feed 内隐藏标签，非屏蔽作者）。
 3. 附带纠正：`AGENTS.md` 记 agent-browser "6 个 spec"、android-e2e "19 个 spec"，实测为 **13 / 20**。
 

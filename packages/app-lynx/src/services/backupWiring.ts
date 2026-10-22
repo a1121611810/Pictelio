@@ -1,5 +1,5 @@
 // ─── WebDAV 备份接线（app-lynx，spec docs/specs/webdav-backup.md §5/§6/§7，T7/T8/T9）───
-// 与 app services/backupWiring.ts 同源同语义（差分对齐约定）：
+// 与 app services/backupWiring.ts 同源同语义（差分对齐约定；该文件已随 `ADR-0203` 删除）：
 //   collect = settingsStore.exportRawValues()（prefs 原始字符串）+ sets（lynx 无对应 store → {}）
 //   apply   = settingsStore.importRawValues()（merge-by-keys + 账号级键按当前 uid）
 //   T9      = pre-restore 应急快照（idbKV 单键，保留到下次成功备份）+ 撤销
@@ -36,7 +36,7 @@ export interface CollectedBackupData {
 export interface LynxBackupWiring {
   collect(): Promise<CollectedBackupData>
   /** sets 可缺省：撤销路径读的历史快照可能没有该字段（缺 = 无数据可丢 ⇒ 无告警） */
-  apply(plan: { apply: Record<string, string>; sets?: BackupSets | null }): Promise<{
+  apply(plan: { apply: Record<string, string>; sets?: BackupSets | undefined }): Promise<{
     applied: string[]
     skipped: string[]
   }>
@@ -49,11 +49,12 @@ export interface LynxBackupWiring {
  * 判定口径：**至少一个数组有元素**（≠ 键数 > 0；`{ blocked_user_ids: [] }` 无数据，不告警）。
  * 只落日志，不做用户可见提示（恢复摘要页与 i18n 不变）。
  *
- * 入参允许 null/undefined：撤销路径的应急快照是 idbKV 里的历史 JSON，
+ * 入参可能 undefined：撤销路径的应急快照是 idbKV 里的历史 JSON，
  * `loadPreRestoreSnapshot` 的结构校验只认 `at` + `raw`，`sets` 可能整个缺失。
  * 缺失 = 没有数据可丢 ⇒ 不告警；且绝不能抛（否则撤销被一条日志打断）。
+ * 运行时仍以 `sets ?? {}` 兜底（历史快照若出现 null 也不抛）。
  */
-function warnDroppedSets(sets: BackupSets | null | undefined): void {
+function warnDroppedSets(sets: BackupSets | undefined): void {
   const dropped: string[] = []
   for (const [key, value] of Object.entries(sets ?? {})) {
     if (Array.isArray(value) && value.length > 0) dropped.push(`${key}(${value.length})`)

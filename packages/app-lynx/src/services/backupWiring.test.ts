@@ -93,6 +93,14 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+/**
+ * 文件级收尾：失败路径也收尾（约定 #6）——还原 console.warn spy，避免跨用例污染。
+ * 提到文件级是为了让四个 describe 共享同一套失败安全收尾：断言失败时 spy 不会留给后续用例。
+ */
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => {
   it("collect：设备级键 + 当前账号级键进入 raw；异账号键排除；sets 为空", async () => {
     env.idb.set("settings_ugoira_mode", "fflate") // idbKV 源（ugoiraMode/detailQuality）
@@ -178,10 +186,7 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
   //   - 「降级路径必须 console.warn 且带模块前缀」= docs/testing/conventions.md 硬约束 #3
   //     「禁止静默降级」+ 本模块既有前缀约定（[backupWiring]）
   //   - 键名与条数 = 输入夹具本身（blocked_user_ids / reported_ids 是 spec §3.2 钉住的键名）
-  afterEach(() => {
-    // 失败路径也收尾（约定 #6）：还原 console.warn spy，避免跨用例污染
-    vi.restoreAllMocks()
-  })
+  // 失败路径的收尾由文件级 `afterEach(vi.restoreAllMocks)` 统一承担（约定 #6）。
 
   it("sets 含非空数组 → 恰好一条带前缀的 warn；写回与 applied/skipped 不变", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})

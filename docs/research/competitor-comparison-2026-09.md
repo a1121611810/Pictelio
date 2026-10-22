@@ -21,7 +21,7 @@
 |---|---|---|---|
 | **1** | 「开源阅读 Legado **活跃**（书源 v284，2026-09）」 | **主仓库已于 2026-05-27 被清空**（commit `9bb05692`「公告」，仓库仅剩 README + 一张图，52 KB），公告指**侵权**并外链阅文 IP 维权。继承者为 `Luoyacheng/legado-E`（阅读Sigma）；Pixiv 书源本体 `DowneyRem/PixivSource` ★1046 仍活跃（push 2026-09-22） | 「最好 Pixiv 小说阅读器」这条**赛道基准已动摇**——载体消失，但书源本体的阅读器能力（书架/离线/繁简/进度）仍是真实标杆 |
 | **2** | 「Pictelio **小说导出 9 格式 = webview 独有**」 | **错**。`app-lynx/src/components/NovelExportSheet.vue` 与 webview `ExportSheet.tsx` **共用同一个 `@pictelio/novel-export` 包** | 双端对等，不是 lynx 缺口 |
-| **3** | 「**屏蔽作品/作者 双端都有**」 | **错**。lynx 源码两处显式自述无此能力：`relatedInjection.ts:6`「lynx 无屏蔽列表能力」、`backupWiring.ts:53`「app-lynx 暂无屏蔽/举报 store」。lynx 只有**静音标签**（语义不同） | lynx 缺口，须补 |
+| **3** | 「**屏蔽作品/作者 双端都有**」 | **错**。lynx 源码两处显式自述无此能力：`relatedInjection.ts:6`「lynx 无屏蔽列表能力」、`backupWiring.ts` 的 `collect()`「app-lynx 暂无屏蔽/举报 store」。lynx 只有**静音标签**（语义不同） | lynx 缺口，须补 |
 | **4** | 「Pixiv-MultiPlatform = `Natsena/…`」 | **是另一个项目**。真实活跃项目是 `magic-cucumber/Pixiv-MultiPlatform`（GPL-3.0，v1.8.7 / 2026-07-24，Win/Linux/macOS/Android/iOS 五端） | 竞品池换人，且**过滤能力是全场最完整** |
 | **5** | 「Pixiv-Shaft = `h83939/Pixiv-Shaft`」 | 真实 owner 是 **`CeuiLiSA/Pixiv-Shaft`**，且直连方案比旧文档描述激进得多：**Cronet QUIC + No-SNI TLS 双通道**，并公开了完整的「试过但不行」清单 | 直连可行性判断整体改写 |
 | **6** | 「AGENTS.md：agent-browser 6 spec / android-e2e 19 spec」 | 实测 **13 / 20**；`package.json` 已是 **v6.1.0**（README 与 openwiki 仍写 5.5.0） | 文档滞后，非功能问题 |
@@ -171,7 +171,7 @@
 
 | 缺点 | 说明 |
 |---|---|
-| **无用户屏蔽能力** | 源码两处自述缺失（`relatedInjection.ts:6` / `backupWiring.ts:53`）；只有静音标签 |
+| **无用户屏蔽能力** | 源码两处自述缺失（`relatedInjection.ts:6` / `backupWiring.ts` 的 `collect()`）；只有静音标签 |
 | **无图片缓存设置** | `imageCache` 在 lynx 全库 0 命中，用户无法调磁盘上限/开关 |
 | **无镜像源设置 UI** | 仅部分命中，无完整 4 模式配置入口 |
 | **无三次级布局** | 仅单列，webview 有瀑布/网格 |

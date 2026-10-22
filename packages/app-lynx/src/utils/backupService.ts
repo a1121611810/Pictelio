@@ -66,9 +66,20 @@ export interface BackupConfig {
 export interface BackupDeps {
   bridge: BackupBridge;
   config: BackupConfig;
-  /** 收集备份域原始键值 + sets（T6/T7 接线到 settings registry / persisted sets） */
+  /**
+   * 收集备份域原始键值 + sets（T6/T7 接线到 settings registry / persisted sets）
+   *
+   * 注（#1059）：自 `ADR-0203` 删除对侧客户端后，**已无引擎实现 sets 写回**——
+   * app-lynx 无屏蔽/举报 store，`collect()` 恒返回 `sets: {}`。
+   */
   collect(): Promise<{ raw: Record<string, string>; sets: BackupSets }>;
-  /** 写回恢复计划（T6/T7 接线：settings 写回 + sets 写回）；返回实际写入/跳过键（spec §6.8） */
+  /**
+   * 写回恢复计划（T6/T7 接线：settings 写回 + sets 写回）；返回实际写入/跳过键（spec §6.8）
+   *
+   * 注（#1059）：`sets` 写回自 `ADR-0203` 起**无引擎实现**（见 `collect` 注）；
+   * sets 被丢弃的可见性由客户端接线层（`services/backupWiring.ts`）的 `[backupWiring]` 告警承担，
+   * **本层不告警**（避免同一次丢弃重复告警）。
+   */
   apply(plan: RestorePlan): Promise<{ applied: string[]; skipped: string[] }>;
   /** 读取两个密码（secure storage；登录密码必填，备份加密密码可选） */
   credentials(): Promise<{ loginPassword: string | null; backupPassword: string | null }>;
