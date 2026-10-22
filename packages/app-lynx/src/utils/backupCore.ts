@@ -30,7 +30,7 @@ export const ACCOUNT_KEY_PREFIXES = ["show_r18_", "show_r18g_", "ai_filter_mode_
 /** 备份引擎标识（快照元数据，仅供展示；恢复不依赖来源引擎） */
 export type BackupEngine = "webview" | "lynx"
 
-/** sets 数据（blockStore / reportStore 的原始集合） */
+/** sets 数据（备份文件里的屏蔽用户 / 举报记录集合；键名见 spec §3.2） */
 export type BackupSets = Record<string, unknown[]>
 
 /** 快照 v1（spec §3.2 逐字字段） */

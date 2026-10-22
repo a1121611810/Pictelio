@@ -37,7 +37,7 @@
 - 双端共享契约键（SharedPreferences `CapacitorStorage` 同键）：账号级 `show_r18_${uid}` / `show_r18g_${uid}` / `ai_filter_mode_${uid}`；设备级 `settings_ugoira_mode` / `settings_ugoira_download_format` / `settings_detail_quality` / `settings_theme_color` / `settings_novel_export_*`（4 键）
 - app 独有：settings registry 全部键、阅读器设置（readerSettingsStore）、主题亮暗（themeStore）、图片托管配置（imageHostStore）
 - app-lynx 独有：设备级设置键（settingsStore 中 idbKV/SharedPreferences 设备级部分）
-- 屏蔽列表（blockStore persisted set）、举报记录（reportStore persisted set）
+- 屏蔽列表（blockStore persisted set）、举报记录（reportStore persisted set）——**app-lynx 无屏蔽/举报落点，见 §3.2「恢复方向的单侧丢弃」**
 - WebDAV 连接配置（服务器地址/用户名/目录/自动备份开关，跨引擎共享键 `settings_webdav_*`）——**密码除外**
 
 **排除域**：凭证（refresh_token / WebDAV 密码）、浏览/搜索历史、下载队列记录、可重建缓存（小说/翻译/布局）、feed 内存态。
@@ -65,9 +65,14 @@
 > 交叉印证：`ADR-0187` §背景与 `docs/adr/glossary-tag-mute.md` 均以 `blocked_user_ids`
 > 指称屏蔽用户这一存量键。
 >
+> **示例形态说明（勿把示例当 lynx 现状读）**：本节 JSON 示例是 **app 侧**（已随 `ADR-0203`
+> 删除的 WebView 线）产出的历史快照形态（`engine: "webview"`）；现行唯一客户端 app-lynx
+> 自产的备份恒为 `engine: "lynx"` 且 `sets: {}`。它与 §3.1「屏蔽列表 / 举报记录」进备份域
+> 的描述是同一条规则的两种落点——§3.1 说备份域收什么，本节说它在备份文件里长什么样。
+>
 > **恢复方向的单侧丢弃（2026-10-23 订正，#1059）**：WebView 客户端已随 `ADR-0203` 删除，
 > 本仓库唯一客户端是 app-lynx，而它**没有屏蔽/举报 store**：`collect()` 恒返回 `sets: {}`
-> （`packages/app-lynx/src/services/backupWiring.ts:71-72`）。因此**不再有对侧引擎承接 `sets`**，
+> （`packages/app-lynx/src/services/backupWiring.ts` 的 `collect()`）。因此**不再有对侧引擎承接 `sets`**，
 > 恢复方向是单侧丢弃——app-lynx 的 `apply()` 只写回 `apply` 键，旧备份里的 `sets`
 > （屏蔽用户 / 举报记录）无落点即被丢弃。
 >
@@ -77,6 +82,12 @@
 > `sets` 为 `{}` 或全部数组为空时**不告警**（本客户端自产备份恒为空 ⇒ 零噪声）。
 > 依据：测试硬约束「禁止静默降级」（`docs/testing/conventions.md` #3）——有数据丢失就必须可见。
 > 该告警只落日志，不做用户可见提示（恢复摘要页与 i18n 文案不变）。
+>
+> **与 `ADR-0203`「恢复时归入 `skipped`」的差别（#1059 已裁定，不改裁定）**：
+> `ADR-0203` 处理的是「备份里有键、但单引擎已无该设置」⇒ 归入 `skipped`、在用户可见的
+> 恢复摘要里报出；`sets` 不是一个可写回的设置键，没有对应的键槽位，**无法进 `skipped` 列表**，
+> 故本票改用**只落日志**的告警。代价是这次丢弃对用户不可见（用户看不到「屏蔽/举报没恢复」），
+> 属已知取舍，接受。
 
 引擎无关单文件；恢复端按自身已知键过滤（app/lynx 各自不认识的键跳过）。
 

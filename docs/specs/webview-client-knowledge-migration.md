@@ -177,7 +177,7 @@ _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 | `docs/adr/glossary-android-lifecycle-restore.md:13` | `packages/app/CONTEXT.md` | 已阅读基线 |
 | `docs/adr/glossary-cross-engine.md:13` | `packages/app/CONTEXT.md` | 已阅读基线 |
 | `docs/adr/ADR-0103:82`、`ADR-0153:12`、`ADR-0155:51`、`ADR-0156:46`、`ADR-0065:26,31`、`ADR-0067:40`、`ADR-0098:34,64`、`ADR-0113:5`、`ADR-0197:6` | `packages/app/CONTEXT.md` | 各 ADR 的「关联 / 术语」元数据行，**记录的是决策当时的落点**，属历史索引，按 ADR 惯例不改写 |
-| `docs/specs/account-scoped-content-settings.md:136`、`engine-availability-fallback.md:12,212`、`imagehost-native-fix.md:3`、`work-type-badges.md:4`、`webdav-backup.md:5,134` | `packages/app/CONTEXT.md` | 各 spec 的术语出处行，同上 |
+| `docs/specs/account-scoped-content-settings.md:136`、`engine-availability-fallback.md:12,212`、`imagehost-native-fix.md:3`、`work-type-badges.md:4`、`webdav-backup.md:5,§8` | `packages/app/CONTEXT.md` | 各 spec 的术语出处行，同上 |
 
 > **判定口径**：ADR / spec 的「关联」「术语出处」是**决策当时的溯源元数据**，
 > 按仓库 ADR 惯例（「保留原文以便追溯」）**不改写**；

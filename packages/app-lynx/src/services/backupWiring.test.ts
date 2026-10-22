@@ -67,9 +67,11 @@ vi.mock("../utils/webdavCredentials", () => ({
 }))
 
 import { useSettingsStore } from "../stores/settingsStore"
+import { applyPreparedRestore, prepareRestore } from "../utils/backupService"
 import {
   PRE_RESTORE_KEY,
   clearPreRestoreSnapshot,
+  createLynxBackupDeps,
   createLynxBackupWiring,
   loadPreRestoreSnapshot,
   runStartupAutoBackup,
@@ -83,14 +85,15 @@ function fresh() {
   return useSettingsStore()
 }
 
-describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => {
-  beforeEach(() => {
-    env.prefs.clear()
-    env.idb.clear()
-    mockUser.id = 42
-    vi.clearAllMocks()
-  })
+/** 文件级前置：清空 prefs/idb 夹具 + 复位登录 uid + 清 mock 记录（各 describe 共用同一套） */
+beforeEach(() => {
+  env.prefs.clear()
+  env.idb.clear()
+  mockUser.id = 42
+  vi.clearAllMocks()
+})
 
+describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => {
   it("collect：设备级键 + 当前账号级键进入 raw；异账号键排除；sets 为空", async () => {
     env.idb.set("settings_ugoira_mode", "fflate") // idbKV 源（ugoiraMode/detailQuality）
     env.prefs.set("show_r18_42", "true")
@@ -169,17 +172,12 @@ describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => 
 
 describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
   // oracle 溯源（期望值不来自被测实现的输出）：
-  //   - 「非空 = 至少一个数组 length > 0」（≠ 键数 > 0）= #1059 裁定
+  //   - 阈值口径「非空 = 至少一个数组 length > 0」（≠ 键数 > 0）
+  //     = docs/specs/webdav-backup.md §3.2「丢弃必须可见」（#1059 裁定已落 spec；
+  //       issue #1059 为该裁定的来源票，spec 是书面依据）
   //   - 「降级路径必须 console.warn 且带模块前缀」= docs/testing/conventions.md 硬约束 #3
   //     「禁止静默降级」+ 本模块既有前缀约定（[backupWiring]）
   //   - 键名与条数 = 输入夹具本身（blocked_user_ids / reported_ids 是 spec §3.2 钉住的键名）
-  beforeEach(() => {
-    env.prefs.clear()
-    env.idb.clear()
-    mockUser.id = 42
-    vi.clearAllMocks()
-  })
-
   afterEach(() => {
     // 失败路径也收尾（约定 #6）：还原 console.warn spy，避免跨用例污染
     vi.restoreAllMocks()
@@ -233,16 +231,43 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     expect(store.ugoiraMode).toBe("range")
     expect(res.applied).toEqual(["settings_ugoira_mode"])
   })
+
+  it("编排路径（prepareRestore → applyPreparedRestore）：非空 sets → 恰好一条 warn（告警点唯一）", async () => {
+    // oracle：spec §3.2「丢弃必须可见」——告警只落在这一个客户端接线层，
+    // 且**每次恢复至多一条**；引擎无关层（planRestore）不得另发一条（否则重复告警）。
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    fresh()
+    const deps = createLynxBackupDeps()
+    // 旧备份夹具（真实样例形态 = spec §3.2 的快照 v1 字段序；engine 为历史 webview 线）
+    const legacySnapshot = {
+      format: "pictelio-backup",
+      schemaVersion: 1,
+      appVersion: "1.2.3",
+      engine: "webview",
+      createdAt: "2026-09-11T17:30:00+08:00",
+      excludedKeys: [],
+      deviceKeys: { settings_ugoira_mode: "range" },
+      accountKeys: {},
+      sets: { blocked_user_ids: [111], reported_ids: [] },
+    }
+    env.bridge.download.mockResolvedValueOnce(
+      new TextEncoder().encode(JSON.stringify(legacySnapshot)),
+    )
+
+    const prepared = await prepareRestore(deps, {
+      name: "pictelio-backup-20260911-173000.json",
+      encrypted: false,
+    })
+    const res = await applyPreparedRestore(deps, prepared)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    const message = String(warn.mock.calls[0][0])
+    expect(message.startsWith("[backupWiring]")).toBe(true)
+    expect(res.applied).toContain("settings_ugoira_mode")
+  })
 })
 
 describe("backupWiring（lynx）— T9 应急快照与撤销", () => {
-  beforeEach(() => {
-    env.prefs.clear()
-    env.idb.clear()
-    mockUser.id = 42
-    vi.clearAllMocks()
-  })
-
   it("保存 → 读取 → 清除全流程（idbKV 单键）", async () => {
     env.idb.set("settings_ugoira_mode", "fflate")
     const wiring = createLynxBackupWiring()
@@ -280,16 +305,29 @@ describe("backupWiring（lynx）— T9 应急快照与撤销", () => {
     expect(await undoLastRestore(wiring)).toBe(true)
     expect(store.ugoiraMode).toBe("fflate")
   })
+
+  it("快照缺 sets → 撤销不抛、照常写回 raw、零告警（无数据可丢）", async () => {
+    // oracle：spec §3.2「丢弃必须可见」——只有**真有数据**被丢弃才告警；
+    // 快照缺 sets ⇒ 没有数据可丢 ⇒ 不告警。且 loadPreRestoreSnapshot 的结构校验
+    // 只认 at + raw（撤销语义不变），缺 sets 的快照仍被接受并写回 raw。
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const store = fresh()
+    store.setUgoiraMode("range")
+    const wiring = createLynxBackupWiring()
+    // 旧形态快照：只有 at + raw，没有 sets
+    env.idb.set(
+      PRE_RESTORE_KEY,
+      JSON.stringify({ at: "2026-10-01T00:00:00.000Z", raw: { settings_ugoira_mode: "fflate" } }),
+    )
+
+    expect(await undoLastRestore(wiring)).toBe(true)
+    expect(store.ugoiraMode).toBe("fflate")
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
 })
 
 describe("backupWiring（lynx）— T8 启动时自动备份（spec §7）", () => {
-  beforeEach(() => {
-    env.prefs.clear()
-    env.idb.clear()
-    mockUser.id = 42
-    vi.clearAllMocks()
-  })
-
   it("开关关 → 零桥调用（不联网）", async () => {
     fresh()
     expect(await runStartupAutoBackup()).toBeNull()

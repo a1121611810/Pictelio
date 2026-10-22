@@ -71,7 +71,7 @@
 |---|---|---|---|
 | **小说文本选择菜单** | `textSelection` 匹配 **0 文件** | `createTextSelection.ts` / `useTextSelection.ts` / `lynxSelectionEngine.ts` / `selectionToolbarGeometry.ts`（13 文件） | **lynx 独有** |
 | **小说导出（共享 `@pictelio/novel-export`）** | `ExportSheet.tsx` | `NovelExportSheet.vue`（同样 import `NOVEL_EXPORT_FORMATS`） | **双端都有**（修正旧文档"webview 独有"） |
-| **用户屏蔽列表（blocklist）** | `blockStore.ts`（`blockUser`/`unblockUser`/`isBlocked`）+ `BlocklistSheet.tsx` + i18n `blocklist.*` | **源码明写"lynx 无屏蔽列表能力"**：`relatedInjection.ts:6`、`backupWiring.ts:53`「app-lynx 暂无屏蔽/举报 store」 | **webview 独有**（修正旧文档"双端都有"） |
+| **用户屏蔽列表（blocklist）** | `blockStore.ts`（`blockUser`/`unblockUser`/`isBlocked`）+ `BlocklistSheet.tsx` + i18n `blocklist.*` | **源码明写"lynx 无屏蔽列表能力"**：`relatedInjection.ts:6`、`backupWiring.ts` 的 `collect()`「app-lynx 暂无屏蔽/举报 store」 | **webview 独有**（修正旧文档"双端都有"） |
 | 三层缓存设置 UI | `ImageCacheSettings.tsx`（14 文件命中） | `imageCache` 匹配 **0 文件** | **webview 独有** |
 | 镜像 4 模式设置 UI | `ImageHostSettings.tsx`（14 文件命中） | 4 文件命中（部分） | webview 完整 |
 | 三次级布局（瀑布/单列/网格） | `GridCard` / `VirtualFeed` | 仅单列 | **webview 独有** |

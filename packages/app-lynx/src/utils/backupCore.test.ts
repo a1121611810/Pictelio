@@ -2,7 +2,7 @@
 // 与 app tests/unit/utils/backupCore.test.ts 同用例同 oracle（双端差分对齐）：
 // spec 字面（format 标识 / schemaVersion 1 / 账号级键三类前缀 / 错误文案分类）
 // 与规格派生边界（schemaVersion 过高拒绝、merge-by-keys 不触碰额外键）。
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import {
   utf8Decode,
   utf8Encode,
@@ -181,6 +181,15 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
 
   it("sets 原样进入计划", () => {
     expect(planRestore(snapshotWith(), 42).sets).toEqual({ blocked_user_ids: [1, 2], reported_ids: [] })
+  })
+
+  it("planRestore 零告警：丢弃可见性只由客户端接线层承担（spec §3.2「丢弃必须可见」）", () => {
+    // oracle：spec §3.2 —— 告警落在 app-lynx 的 apply()（接线层），
+    // 引擎无关的解析/计划层不得再发一条（否则一次恢复出两条重复告警）。
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    planRestore(snapshotWith(), 42)
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it("summarize 统计与恢复确认摘要一致", () => {

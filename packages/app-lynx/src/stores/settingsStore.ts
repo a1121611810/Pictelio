@@ -127,7 +127,9 @@ const LANGUAGE_KEY = "settings_language"
 /**
  * 备份域设备级键清单（spec docs/specs/webdav-backup.md §3.1）：与 app settingsStore
  * 的持久化设置键对齐；集合型账号级键（mute_tags_${uid}，ADR-0187 / #732）走
- * backupAccountKeys 不在本清单，lynx 备份的 sets 仍为空对象（跨引擎恢复时由 app 侧 sets 覆盖）。
+ * backupAccountKeys 不在本清单。app-lynx 无屏蔽/举报 store ⇒ 备份的 sets 恒为空对象
+ * （spec §3.2）；恢复旧备份时 sets 无落点即被丢弃，可见性由接线层的 `[backupWiring]`
+ * 告警承担（issue #1059），不再有对侧引擎承接（ADR-0203 已删除 WebView 客户端）。
  */
 export const BACKUP_DEVICE_KEYS = [
   UGOIRA_MODE_KEY,

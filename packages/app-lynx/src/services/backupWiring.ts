@@ -35,7 +35,8 @@ export interface CollectedBackupData {
 
 export interface LynxBackupWiring {
   collect(): Promise<CollectedBackupData>
-  apply(plan: { apply: Record<string, string>; sets: BackupSets }): Promise<{
+  /** sets 可缺省：撤销路径读的历史快照可能没有该字段（缺 = 无数据可丢 ⇒ 无告警） */
+  apply(plan: { apply: Record<string, string>; sets?: BackupSets | null }): Promise<{
     applied: string[]
     skipped: string[]
   }>
@@ -47,10 +48,14 @@ export interface LynxBackupWiring {
  * 恢复旧备份时 sets 里的数据会被丢弃。丢弃必须可见（测试硬约束 #3「禁止静默降级」）。
  * 判定口径：**至少一个数组有元素**（≠ 键数 > 0；`{ blocked_user_ids: [] }` 无数据，不告警）。
  * 只落日志，不做用户可见提示（恢复摘要页与 i18n 不变）。
+ *
+ * 入参允许 null/undefined：撤销路径的应急快照是 idbKV 里的历史 JSON，
+ * `loadPreRestoreSnapshot` 的结构校验只认 `at` + `raw`，`sets` 可能整个缺失。
+ * 缺失 = 没有数据可丢 ⇒ 不告警；且绝不能抛（否则撤销被一条日志打断）。
  */
-function warnDroppedSets(sets: BackupSets): void {
+function warnDroppedSets(sets: BackupSets | null | undefined): void {
   const dropped: string[] = []
-  for (const [key, value] of Object.entries(sets)) {
+  for (const [key, value] of Object.entries(sets ?? {})) {
     if (Array.isArray(value) && value.length > 0) dropped.push(`${key}(${value.length})`)
   }
   if (dropped.length === 0) return
@@ -83,7 +88,8 @@ export function createLynxBackupWiring(): LynxBackupWiring {
 export interface PreRestoreSnapshot {
   at: string
   raw: Record<string, string>
-  sets: BackupSets
+  /** 可能缺失：旧形态快照只存 at + raw（结构校验只认这两项，撤销语义不变） */
+  sets?: BackupSets
 }
 
 /** 恢复前应急快照（T9）：写 idbKV 单键；失败必须可见 */
