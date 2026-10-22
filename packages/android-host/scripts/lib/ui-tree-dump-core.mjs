@@ -4,7 +4,7 @@
 // import 即产生副作用，无法直接单测——先例：release-version-json.mjs（release.mjs 的
 // plan/execute 分离）。
 //
-// 本模块承载五件事：
+// 本模块承载六件事：
 // ① **跨端协议常量**（与宿主侧 io.pictelio.app.UiTreeDump 逐字对应，由宿主侧
 //    UiTreeDumpProtocolContractTest 做两侧比对——Java/Node 两套运行时无共享代码）；
 // ② **产物名解析**（从文件名反解采样点 + 采样档位）；
@@ -13,10 +13,14 @@
 // ⑤ **输出目录安全校验**（assertSafeOutDir：拒绝把输出目录指到工作目录或其祖先；
 //    resolveOutDir：默认路径与显式 `--out` 的**单一出口**——取值与校验收在一起，
 //    避免「只有显式路径有校验」的两条路径分叉）。
+// ⑥ **「哪一份最完整」的单一出口**（pickBestArtifact：诊断编排层与 e2e 消费侧共用）。
 //
 // ⑤ 为什么在这里：编排层（dump-ui-tree.mjs）要真跑 adb 才能进，**无法在 CI 里单测**
 // ——第 4 轮 review 的阻塞缺陷（`--out ""` 会删掉整个工作目录）正是这样漏出去的。
 // 把判据下沉到本模块，它才有机器防线（见 tests/unit/scripts/ui-tree-dump-outdir.test.ts）。
+//
+// ⑥ 为什么在这里：同上，且**两侧各写一份排序规则会分叉**——「最完整的那份」正是
+// e2e 断言要挂的那份，两处选出不同产物 ⇒ 症状与「树抓坏了」无法区分。
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -123,6 +127,32 @@ export function planWait(names, expectedDelays = SAMPLE_DELAYS_MS) {
     if ([...expected].every((d) => unique.includes(d))) settled = true;
   }
   return { settled, seenDelays: [...new Set(seenDelays)].toSorted((a, b) => a - b), groups: out };
+}
+
+/**
+ * 选「最完整的那一份」产物。**单一出口**——诊断编排层（`dump-ui-tree.mjs`）与
+ * e2e 消费侧（`tests/android-e2e/ui-tree.ts`）都调它。
+ *
+ * <p>为什么必须单一出口：「两份产物里哪份才是完整树」是**同一个问题的两个答案**。
+ * 两侧各写一份排序规则时，只要其中一份改了键序，两处就会选出**不同的产物**——
+ * 而「最完整的那份」正是断言要挂的那份 ⇒ 分叉表现为「断言挂在一棵半成品树上」，
+ * 症状与「树抓坏了」无法区分。
+ *
+ * <p>排序键（依次比较）：**节点数**多者胜 → **采样档位**大者胜（4s 档通常是完整树）
+ * → **字节数**多者胜。
+ *
+ * @template {{nodeCount: number, delayMs: number, bytes: number}} T
+ * @param {T[]} artifacts 候选产物（每项须带 nodeCount / delayMs / bytes 三个可比字段）
+ * @returns {T | null} 最完整的那一份；空集合返回 null
+ */
+export function pickBestArtifact(artifacts) {
+  return (
+    artifacts.toSorted((a, b) => {
+      if (b.nodeCount !== a.nodeCount) return b.nodeCount - a.nodeCount;
+      if (b.delayMs !== a.delayMs) return b.delayMs - a.delayMs;
+      return b.bytes - a.bytes;
+    })[0] ?? null
+  );
 }
 
 /**

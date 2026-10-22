@@ -277,11 +277,15 @@ export function judgeContentLoaded(params: {
 
 // ─── 放射 FAB 几何（2026-09-28 #816 R2 订正）───
 //
-// 为什么要推导而不是写死坐标：本轮 R2 的真因就是「FAB_SEARCH_ITEM_TAP 是魔数」。
-// 该常量首跑写成 (906,1760)，与实机差 87px 横 / 213px 纵 → 落在两环之间的空隙里，
+// 为什么要推导而不是写死坐标：本轮 R2 的真因就是「内环搜索项的落点是魔数」。
+// 该落点首跑写成 (906,1760)，与实机差 87px 横 / 213px 纵 → 落在两环之间的空隙里，
 // 点下去菜单收起、回到列表，报错却写「SearchSheet 未打开」（把人引向布局回归）。
 // 与 `FAB_TAP` 同款失败模式已连续三轮复发，故把落点改为**由组件几何算出**：
 // 组件改了半径/起始角/边距，spec 自动跟随；不改就由单测拦下。
+//
+// ⚠️ **#1047 第 4 轮（S-N1）**：spec 侧不再直接用这个绝对落点，而是拆成
+//   「**圆心（树给的）+ 偏移（这里算出的）**」——因为该落点几何上就是相对
+//   FAB 圆心定义的，圆心改用树给的之后，偏移量随屏宽稳定、圆心随布局动。
 //
 // 数值唯一事实源 = packages/app-lynx/src/components/GlobalFab.vue
 //   :40-46  FAB_RIGHT_VW=4.267 / FAB_SIZE_VW=14.933 / R_INNER_VW=20
@@ -355,7 +359,7 @@ export function fabInnerItemPx(
  * 内环「搜索」项落点（px）= `innerPair[0]`。
  *
  * 恒定 `INNER_START` 的依据（不随内环项数变化，故不需在 spec 里数项数）：
- *   - `createGlobalFab.ts:131` 的 `const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]`
+ *   - `createGlobalFab.ts:159` 的 `const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]`
  *     以**数组字面量首元素**固定搜索项首位（激活页动作在其后 `push`）；
  *   - `GlobalFab.vue` 模板 `v-for="e in innerPair"` **不按 `visible()` 过滤**，序号即渲染序；
  *   - `spread(start, end, count)` 的第 0 项恒为 `start`（`i=0` 时分母项为 0）。

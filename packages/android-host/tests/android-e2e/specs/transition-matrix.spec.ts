@@ -58,8 +58,8 @@
  *
  * ── 驱动方式（全部沿用既有 spec 已验证的交互，无新发明）────────────────────
  * - 深链：`am start -n <pkg>/.LynxActivity --es benchNav <scenario>`——benchNav extra
- *   由 LynxActivity 自行读取（`LynxActivity.java:504` getStringExtra("benchNav") +
- *   `:660` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
+ *   由 LynxActivity 自行读取（`LynxActivity.java:543` getStringExtra("benchNav") +
+ *   `:733` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
  * - 点击/滑动：adb `input tap|swipe|motionevent|keyevent`（fab / lynx-bookmark-tags 先例）；
  * - 登录：dev intent hook（prefs.loginViaDevIntent，替换原 webview 登录页注入）；
  * - 断言证据：截图逐帧落盘 test-results/android-e2e/transition-matrix/。
@@ -79,6 +79,14 @@ import {
   runCapture,
   runOrThrow,
 } from "../env";
+import {
+  expectSettled,
+  assertFabTree,
+  collectUiTree,
+  fabCenter,
+  snapshotRemoteArtifacts,
+  type UiTreeNode,
+} from "../ui-tree";
 import {
   currentTopActivity,
   forceStopApp,
@@ -310,8 +318,21 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
  *
  * 首跑写死 (906,1760)：距推导圆心 80px > 圆盘半径 57.6px ⇒ 点在环项之间的**空隙**，
  * 菜单收起、回到列表，报错却写「SearchSheet 未打开」，把排查引向布局回归。已由单测钉死。
+ *
+ * ⚠️ 这里存的是**相对 FAB 圆心的偏移**，不是绝对坐标（#1047 第 4 轮 Standards 轴 S-N1）：
+ *   `fabSearchItemPx` = `fabCenterPx` + 极坐标偏移 ⇒ 它**几何上就是相对圆心定义的**。
+ *   圆心改用**树给的**之后，若这里仍写绝对坐标 ⇒ FAB 一动它就偏 ⇒ 第二跳点空 ⇒
+ *   报出「点击内环搜索项后放射菜单未收起」这种**误导性**失败信息（把排查引向
+ *   布局回归，而真实原因是本测试的坐标口径陈旧）。
+ *
+ * ⚠️ **今天的落点逐字不变**：偏移取**取整后**两者之差（(901,1680) − (953,1889)
+ *   = (-52,-209)）⇒ 树给的圆心 (953,1889) + 该偏移 = **(901,1680)**，与改动前的
+ *   绝对常量**逐字一致** ⇒ 本次改动**不改变任何当前行为**。
  */
-const FAB_SEARCH_ITEM_TAP = roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT));
+const FAB_SEARCH_ITEM_OFFSET = {
+  x: roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT)).x - FAB_TAP.x,
+  y: roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT)).y - FAB_TAP.y,
+};
 
 // ── 帧对比阈值（差异采样点数，步长 2；fab spec 同量纲。首跑如误判优先校准这里）──
 /** 稳定判定：两次连拍差异 ≤ 此值视为画面已静止 */
@@ -570,13 +591,21 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 
 /**
  * benchNav 深链启动（probe spec 同款）：force-stop → 清 logcat →
- * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:504`
+ * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:543`
  * getStringExtra("benchNav") 后按场景 sendGlobalEvent；单引擎下已无 MainActivity 转发环节）。
  */
-async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
+async function launchBenchNav(
+  scenario: "illust" | "carousel",
+  opts: { captureTree?: boolean } = {},
+): Promise<UiTreeNode | null> {
   forceStopApp(serial);
   runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
-  runOrThrow(adbPath(), [
+  // ⚠️ #1047：抓树时**合并进这条 intent**（`--es uiTreeDump 1`），**不另发一条**——
+  //   另发会走 `onNewIntent` → `setIntent` **覆盖 Activity 的 intent** ⇒ 把 benchNav
+  //   这个深链目标冲掉（`LynxActivity` 是 singleTask，intent 会被替换）。合并则：
+  //   ① 抓到的树正好就是这条深链打开的那个页面；② 不动既有 intent 的语义。
+  const before = opts.captureTree ? snapshotRemoteArtifacts(serial) : null;
+  const args = [
     "-s",
     serial,
     "shell",
@@ -587,10 +616,25 @@ async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
     "--es",
     "benchNav",
     scenario,
-  ]);
+  ];
+  if (opts.captureTree) args.push("--es", "uiTreeDump", "1");
+  runOrThrow(adbPath(), args);
   await waitForTopActivity(LYNX_ACTIVITY);
   await waitForLynxRenderReady();
   await SLEEP(2_000);
+  if (!before) return null;
+  const captured = await collectUiTree(serial, {
+    before,
+    outDir: resolve(EVIDENCE_DIR, "ui-tree", scenario),
+  });
+  // 落齐判据**进断言**（#1047 第 1 轮 Spec 轴）：未落齐 ⇒「最完整的那份」可能
+  // 没到（缺 4s 档）⇒ 半成品树会让下游「找不到 FAB」报出误导性失败信息。
+  expectSettled(captured, `benchNav ${scenario}`);
+  console.log(
+    `[transition-matrix] benchNav ${scenario} 树：${captured.best.name}（${captured.best.point} / ` +
+      `${captured.best.delayMs}ms / ${captured.best.nodeCount} 节点）`,
+  );
+  return captured.best.tree;
 }
 
 /**
@@ -1052,7 +1096,22 @@ describe.skipIf(SKIPPED)(
 
     it("R2 lynx SearchSheet：搜 original 翻页 → 行数推进且无失败横幅 → 切「小说」scope 内容整体替换", async (t) => {
       // 深链重进 /illusts（与 R1 状态解耦），经放射 FAB 内环搜索项打开 SearchSheet
-      await launchBenchNav("illust");
+      const r2Tree = await launchBenchNav("illust", { captureTree: true });
+      // 树抓不到 ⇒ **显式失败**，不静默退回 vw 推算常量（#1047 第 1 轮 Standards 轴 J1：
+      // 静默回退会让「树缺失」表现为「点偏了」，两种病因混成一种症状）。
+      expect(r2Tree, "R2：抓不到运行时 UI 树 ⇒ 无法用树给的 FAB 落点").not.toBeNull();
+      if (!r2Tree) throw new Error("缺运行时 UI 树");
+      // ── 树断言（#1047）：这一问像素答不了 ──
+      // 「那个元素在不在 / 能不能点 / 多大」只有树能答；像素只能答「画面变没变」。
+      // 树断言判据**只有一份**：共享模块的 `assertFabTree`（跨 spec 的同一件事）。
+      // ⚠️ 原先本 spec 与 `fab-hit-testing-regression` 各写了一份 32 行、归一化后只差
+      //   变量名与消息前缀（#1047 第 6 轮 Standards 轴 S-N3）⇒ 收口到共享模块，
+      //   避免「改一处漏一处」。
+      assertFabTree(r2Tree, {
+        prefix: "R2：",
+        contentRight: CONTENT_RIGHT,
+        contentBottom: CONTENT_BOTTOM,
+      });
       // #821：R2 的 `it` 回调原先**没有 `t` 形参**，因而用不了 `t.skip()`，低桶放行
       // 之后只能让后续断言在空画面上判红（票面那条「放射菜单未收起 expected 8 > 800」
       // 就是这么来的）。补上形参，与 R1/R3 同一套口径。
@@ -1062,14 +1121,58 @@ describe.skipIf(SKIPPED)(
         t.skip(untrustedContentSkip("R2", r2IllustsLoad));
       }
       const beforeFab = await screenshot("r2-before-fab");
-      tap(FAB_TAP.x, FAB_TAP.y);
+      // FAB 落点**树优先**（#1047）：树给的真实盒子 vs vw 推算的常量
+      // （推算口径是「设计常量 + 稳定区高度」⇒ 布局一改就偏）。
+      // ⚠️ 不再有「树缺失就退回推算常量」的分支：树缺失是**显式失败**（见上）。
+      const fabPoint = fabCenter(r2Tree);
+      // ── 两套独立推导的**对照**（#1047 第 2 轮 Standards 轴 N5）──
+      // 树给的落点（当下这一帧的事实）与 vw 推算口径（设计常量 + 稳定区高度）是
+      // **两个互相独立的来源**。今天实测两者**完全相同**（漂移 = 0）⇒ 这条是
+      // 一支**哑炮**：它只会在布局真的动了之后才响。
+      //
+      // ⚠️ 为什么**只告警、不升为断言**：布局**合法**变更同样会让两者分开
+      //   （那正是「树优先」要支持的方向）——做成断言就成了「布局一改就假红」。
+      // ⚠️ 文案也**不能**断言成因：「布局已变」与「推算口径陈旧」从这一项测量上
+      //   **分不开**（本仓 #819 / #920 两次返工的成因恰是后者）⇒ 只报事实 +
+      //   指明**该动哪一侧**（推算口径），不替读者猜。
+      const fabDrift = Math.hypot(fabPoint.x - FAB_TAP.x, fabPoint.y - FAB_TAP.y);
+      console.log(
+        `[transition-matrix] R2 FAB 落点：树 = (${Math.round(fabPoint.x)}, ${Math.round(fabPoint.y)})` +
+          `；vw 推算 = (${FAB_TAP.x}, ${FAB_TAP.y})；差 ${Math.round(fabDrift)}px`,
+      );
+      if (fabDrift > 8) {
+        console.warn(
+          `[transition-matrix] R2 树给的 FAB 落点 (${Math.round(fabPoint.x)}, ${Math.round(fabPoint.y)}) ` +
+            `与 vw 推算口径 (${FAB_TAP.x}, ${FAB_TAP.y}) 相差 ${Math.round(fabDrift)}px > 8px。` +
+            `**从这一项测量本身分不出成因**（布局变了 / 推算口径陈旧了 / 抓到的树不是当前这一帧，` +
+            `三者都与此兼容——不要据此断定是产品回归）。以树为准（树是当下这一帧的真实盒子）；` +
+            `vw 推算口径 fabCenterPx 需要重新校准，或在树已全面接管后直接删掉。`,
+        );
+      }
+      // ⚠️ **这里刻意没有「点击坐标 ∈ 屏幕盒」那类断言**（#1047 第 3 轮 Standards 轴 B1）：
+      //   点击坐标 `fabPoint` 就是**这棵树同一个节点**的布局盒中心
+      //   （`fabCenter(r2Tree)` 算出来的），断言「圆心落在自己那个盒内」
+      //   在**结构上不可能失败** ⇒ 它是一条恒真断言。
+      // ⇒ 「点到的到底是不是那个元素」由**独立来源**回答，不由树自证：
+      //   ① 上面那两条**位置判据**（盒子不越出内容区 ⇒ 坐标系用错就转红）；
+      //   ② 点击**之后**的帧差（`diffRegion(beforeFab, afterFab) > CHANGE_TH`）
+      //      ——画面真的变了，说明这一击打到了 FAB（没点空）。
+      const tapX = Math.round(fabPoint.x);
+      const tapY = Math.round(fabPoint.y);
+      tap(tapX, tapY);
       await SLEEP(1_500);
       const afterFab = await screenshot("r2-after-fab");
       expect(
         await diffRegion(beforeFab, afterFab, REGION_TOPREF),
         "点击 FAB 后放射菜单未展开（坐标或层级回归，证据 r2-*-fab.png）",
       ).toBeGreaterThan(CHANGE_TH);
-      tap(FAB_SEARCH_ITEM_TAP.x, FAB_SEARCH_ITEM_TAP.y);
+      // 内环「搜索」项：**树给的圆心 + 固定偏移**（见 `FAB_SEARCH_ITEM_OFFSET`
+      // 的说明）——今天与旧的绝对常量逐字相同 (901,1680)，布局变了才跟着走。
+      const searchItemTap = {
+        x: tapX + FAB_SEARCH_ITEM_OFFSET.x,
+        y: tapY + FAB_SEARCH_ITEM_OFFSET.y,
+      };
+      tap(searchItemTap.x, searchItemTap.y);
       await SLEEP(2_000);
       const afterSearchItem = await screenshot("r2-search-sheet");
       const menuRegion: Region = { x0: 500, y0: 1400, x1: 1000, y1: 2050 };

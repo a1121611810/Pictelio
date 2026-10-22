@@ -1,0 +1,564 @@
+// @vitest-environment node
+/**
+ * `ui-tree.ts` 纯查询层 + **共享树断言**单测（issue #1047 · ADR-0223；不碰 adb / 模拟器）。
+ *
+ * ## oracle 溯源（测试硬约束 #2「契约测试必须使用真实样例」）
+ *
+ * 期望值全部来自**真实抓取样本**：`tests/fixtures/ui-tree/recommend-page.sample.json`
+ * （模拟器 `pictelio_ui`，2026-10-20，推荐页，140 节点 / 深度 10；脱敏只改内容值，
+ * 不改结构）。该样本的入库与摘要口径由
+ * `tests/unit/scripts/ui-tree-dump-core.test.ts` 承担。
+ *
+ * ## 本文件守的是什么
+ *
+ * ① **坐标系口径**（`frameInScreen` vs `frameInRoot`，实测差 81px）——这条错了，
+ *    所有几何断言都会挂在偏了 81px 的盒上，而**数字看着仍然合理**（不报错、只是错）。
+ * ② **按 class 定位的唯一性**——`absolute` 这类 token 在树里命中多处（实测样本
+ *    `absolute` 5 处），「任一命中」返回的就不是一个元素。
+ * ③ **模块不导出 `frameInRoot` 访问器**——把口径从「写在注释里」变成「运行时导出守卫」
+ *    （⚠️ **不是**「编译期做不到」：`UiTreeNode` 类型仍导出 `position.frameInRoot`，
+ *    消费方写 `node.position?.frameInRoot` 仍能编译；真正的防线是「只提供一个
+ *    accessor」这条约定 + 下面那条运行时守卫断言）。
+ *
+ * ## 已知失效面
+ *
+ * 样本是**单页快照**（推荐页）：换页面 / 换引擎版本后字段分布会漂 ⇒ 本文件断言的是
+ * 「口径对这份样本成立」，不是「所有页面都长这样」。
+ */
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import * as uiTree from "../ui-tree";
+import {
+  FAB_CLASS_TOKENS,
+  PINNED_DENSITY_SCALE,
+  assertFabTree,
+  classTokens,
+  deriveBleedLowerBound,
+  describeNode,
+  dpToPx,
+  expectSettled,
+  fabCenter,
+  findByClass,
+  findBySemanticId,
+  findByText,
+  findFab,
+  nodeEventNames,
+  nodeHasEvent,
+  pickBest,
+  screenFrame,
+  surfaceWindowsFromTree,
+  walkNodes,
+  type CaptureUiTreeResult,
+  type UiTreeArtifact,
+  type UiTreeFrame,
+  type UiTreeNode,
+} from "../ui-tree";
+
+const FIXTURE = resolvePath(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../fixtures/ui-tree/recommend-page.sample.json",
+);
+
+const tree = JSON.parse(readFileSync(FIXTURE, "utf-8")) as UiTreeNode;
+
+/**
+ * 主 CTA 的 class 定位口径**直接取共享模块的 `FAB_CLASS_TOKENS`**（不复制一份）。
+ *
+ * ⚠️ 为什么不能在本文件里手写一份（`["absolute","z-30","bg-primary-container"]`）：
+ *   手写副本 ⇒ 出厂常量漂移时（加/减 token）本文件**仍全绿** ⇒ 护栏失守，
+ *   而「按 class 定位的唯一性」恰恰是本文件要守的东西。测试硬约束 #2：
+ *   契约测试必须使用**真实来源**的字段，不得手写自洽副本。
+ *
+ * ⚠️ 三个 token **必须全部命中**：`absolute` / `z-30` 单独用都命中多处
+ *   （实测样本 `absolute` **5** 处 / `z-30` **2** 处）。
+ */
+
+/**
+ * 取出唯一命中的节点。
+ *
+ * ⚠️ 不用 `hits[0]!`：可选链后接非空断言在 lint 规则
+ *   `typescript(no-non-null-asserted-optional-chain)` 下是**错误**（可选链按设计可能
+ *   返回 undefined，非空断言是错的），且 `expect(...)` **不参与** TS 的类型窄化
+ *   ⇒ 断言过了类型上仍可能 undefined。这里显式抛错，类型与运行时都对。
+ */
+function only(hits: UiTreeNode[]): UiTreeNode {
+  expect(hits.length, "应唯一命中").toBe(1);
+  const hit = hits[0];
+  if (!hit) throw new Error("应唯一命中");
+  return hit;
+}
+
+/** 取出节点的屏幕布局盒（缺失就抛错）。 */
+function frameOf(node: UiTreeNode): UiTreeFrame {
+  const frame = screenFrame(node);
+  if (!frame) throw new Error("节点缺 frameInScreen");
+  return frame;
+}
+
+describe("ui-tree 纯查询层（真实样本驱动）", () => {
+  it("样本规模：140 节点（与 core 门禁的摘要口径同源）", () => {
+    expect(walkNodes(tree)).toHaveLength(140);
+  });
+
+  it("按 class 全命中定位到**唯一**的主 CTA", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    expect(classTokens(cta)).toEqual(expect.arrayContaining([...FAB_CLASS_TOKENS]));
+  });
+
+  it("坐标系口径：CTA 的 frameInScreen = (872,1808,162,162)，与像素实测经验值逐字一致", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    expect(screenFrame(cta)).toEqual({ x: 872, y: 1808, width: 162, height: 162 });
+    // 既有 e2e 的像素实测经验值（md3-visual-tokens 的注释里逐字记着 x 872..1033 / y 1808..1969）
+    const f = frameOf(cta);
+    expect([f.x, f.x + f.width - 1]).toEqual([872, 1033]);
+    expect([f.y, f.y + f.height - 1]).toEqual([1808, 1969]);
+  });
+
+  it("坐标系口径：frameInRoot 与 frameInScreen 差 81px ⇒ 用错坐标系会静默挂错盒", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    const screen = frameOf(cta);
+    const root = cta.position?.frameInRoot;
+    if (!root) throw new Error("样本节点应带 frameInRoot（用于对照两套坐标系）");
+    // 差值就是横向 swiper 的滚动偏移（81px）——**不是**测量误差，是两套坐标系的不同。
+    expect(root.x - screen.x).toBe(81);
+    expect(root.y - screen.y).toBe(81);
+    // 反证：若两套坐标系本就相同，上面这条恒 0 ⇒ 「用错坐标系」这件事就发现不了。
+    expect(root.x).not.toBe(screen.x);
+  });
+
+  it("模块**不导出** frameInRoot 的访问器（把「只用 screen 坐标系」变成运行时守卫，不是编译期不可能）", () => {
+    // ⚠️ 措辞要说准：类型 `UiTreeNode` **仍然导出** `position.frameInRoot` ⇒ 消费方写
+    //   `node.position?.frameInRoot` **仍能编译**。这条断言守的是「模块的**运行时导出面**
+    //   里没有 root 访问器」——配合「只提供一个 accessor」的约定，让用错坐标系这件事
+    //   在读代码时就能看见，而不是靠 review 抓。
+    const exported = Object.keys(uiTree);
+    expect(
+      exported.filter((k) => /root/iu.test(k)),
+      `出现了疑似 frameInRoot 的导出：${exported.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("语义 id 定位：hero-root 唯一、hero-source 占位符 15 处（与 core 门禁同数）", () => {
+    expect(findBySemanticId(tree, "pictelio-hero-root")).toHaveLength(1);
+    expect(findBySemanticId(tree, "pictelio-hero-source-<illustId>")).toHaveLength(15);
+  });
+
+  it("可交互性：CTA 绑定了 tap 事件（树能答「能不能点」，像素答不了）", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    expect(nodeEventNames(cta)).toEqual(["tap"]);
+    expect(nodeHasEvent(cta, "tap")).toBe(true);
+    expect(nodeHasEvent(cta, "longpress")).toBe(false);
+  });
+
+  it("尺寸换算：162px = 54dp ≥ 48dp（触控目标门限成立）", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    const f = frameOf(cta);
+    // density scale 只写一处（`PINNED_DENSITY_SCALE`），三份副本会漂
+    const minPx = dpToPx(48, PINNED_DENSITY_SCALE);
+    expect(minPx).toBe(144);
+    expect(f.width).toBeGreaterThanOrEqual(minPx);
+    expect(f.height).toBeGreaterThanOrEqual(minPx);
+  });
+
+  it("describeNode 把 frame / events / class 都带进失败信息", () => {
+    const cta = only(findByClass(tree, FAB_CLASS_TOKENS));
+    const text = describeNode(cta);
+    expect(text).toContain("frame=(872,1808,162,162)");
+    expect(text).toContain("events=[tap]");
+    expect(text).toContain("bg-primary-container");
+  });
+
+  it("describeNode 把**作品 id**脱敏（失败信息会被贴进 issue ⇒ 作品 id 会外发）", () => {
+    // 形状来自生产侧语义 id：`pictelio-hero-source-<illustId>`
+    // （`packages/app-lynx/src/composables/heroTransition.ts`）。
+    const node: UiTreeNode = {
+      tag: "view",
+      nodeId: 42,
+      attributes: { id: "pictelio-hero-source-123456789" },
+      position: { frameInScreen: { x: 1, y: 2, width: 3, height: 4 } },
+    };
+    const text = describeNode(node);
+    expect(text, "真实作品 id 不得出现在失败信息里").not.toContain("123456789");
+    // 可读部分保留 ⇒ 「这是哪一类节点」的信息不丢
+    expect(text).toContain("pictelio-hero-source-<n>");
+    // nodeId 是**序号**不是作品 id ⇒ 不脱敏（它是定位节点的关键）
+    expect(text).toContain("nodeId=42");
+    // ⚠️ **阈值两侧 + 带上界形态都钉住**（下界 = #1047 第 11 轮 Spec 轴 F2 · 上界 =
+    //   #1047 第 14 轮 Standards 轴 S-R14-N2 · 带上界 = #1047 第 15 轮 Standards 轴
+    //   S-R15-N6）：正则收窄成 `\d{3}` CI 仍全绿（4 位串脱敏成 `<n>4` ⇒ 尾部数字照样
+    //   泄漏）；`\d{3,N}`（带上界）会把长串**切段**、泄漏尾部 ⇒ 用 64 位长样本推出去。
+    //   期望值出处 = `ui-tree.ts` `redactArtworkId` 的 JSDoc 契约（上不封顶 ⇒ 整段脱敏），不是从实现反推。
+    const three = describeNode({ ...node, attributes: { id: "pictelio-hero-source-123" } });
+    const two = describeNode({ ...node, attributes: { id: "pictelio-hero-source-12" } });
+    expect(three, "3 位数字串也必须脱敏（阈值下界 = 3）").toContain("pictelio-hero-source-<n>");
+    expect(two, "不足 3 位的不脱敏（阈值不是 1 也不是 2）").toContain("pictelio-hero-source-12");
+    const four = describeNode({ ...node, attributes: { id: "pictelio-hero-source-1234" } });
+    expect(four, "4 位串必须整段脱敏（上不封顶）").toMatch(/id=pictelio-hero-source-<n> /);
+    const longId = `pictelio-hero-source-${"7".repeat(64)}`;
+    const long = describeNode({ ...node, attributes: { id: longId } });
+    expect(long, "64 位长串必须整段脱敏").toMatch(/id=pictelio-hero-source-<n> /);
+  });
+
+  it("describeNode 对**非字符串** id 不崩（引擎哪天改成数字 id，失败信息不能变成崩溃）", () => {
+    // #1047 第 3 轮 Standards 轴 N6：`id` 来自引擎 JSON，类型不保证；直接 `.replace`
+    // 会抛 TypeError ⇒ 把一条可读的断言失败变成崩溃。
+    const node: UiTreeNode = {
+      tag: "view",
+      nodeId: 7,
+      attributes: { id: 123456789 as unknown as string },
+    };
+    const text = describeNode(node);
+    expect(text).not.toContain("123456789");
+    expect(text).toContain("id=<n>");
+    expect(text).toContain("nodeId=7");
+  });
+
+  it("按文本定位：样本里的文本节点可被 findByText 命中（脱敏后是「文本#N」形态）", () => {
+    // 样本的文本被脱敏成「文本#N」⇒ 这里只断言「机制可用」：命中数与位置自洽。
+    const hits = findByText(tree, "文本#1");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(screenFrame(hits[0]!)).not.toBeNull();
+    expect(findByText(tree, "文本#1").length).toBe(1);
+  });
+});
+
+describe("ui-tree · 采样窗推导（树给布局事实，不用像素反推）", () => {
+  it("渗色带下界 = 树里第一个「全宽且非零起始 y」的节点（样本实测 72px）", () => {
+    // oracle：真实样本里全宽 x=0 节点的起始 y 集合 = {0, 72, 213, 1201} ⇒ 下界 72，
+    // 与 spec 注释里的 safeTop=72 独立吻合。
+    expect(deriveBleedLowerBound(tree, 1080)).toBe(72);
+  });
+
+  it("下界是**推出来的**不是写死的：换一棵 y=200 的树 ⇒ 返回 200（防「硬编码 72」蒙对）", () => {
+    // 样本那份恰好是 72 ⇒ 若实现把 72 写死，上面那条照样绿（判据恒真的老毛病）。
+    // 这里换一棵 y=200 的树，期望值就必须是 200 ⇒ 写死 72 会**当场转红**。
+    const shifted: UiTreeNode = {
+      tag: "page",
+      children: [
+        // y=0 的全宽节点（页面底色本身）按判据被排除（要求 y>0）
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 0, width: 1080, height: 400 } },
+        },
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 200, width: 1080, height: 400 } },
+        },
+      ],
+    };
+    expect(deriveBleedLowerBound(shifted, 1080)).toBe(200);
+  });
+
+  it("窄节点（宽 < 屏宽 90%）不参与 ⇒ 下界仍取全宽节点那个 y", () => {
+    // 「全宽」是判据的一半：卡片里的小元素（x≠0 / 窄）不是「横贯整屏的一行内容」。
+    const mixed: UiTreeNode = {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 100, y: 50, width: 200, height: 20 } },
+        },
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 0, y: 300, width: 1080, height: 400 } },
+        },
+      ],
+    };
+    expect(deriveBleedLowerBound(mixed, 1080)).toBe(300);
+  });
+
+  it("采样窗：y 区间由树给出，x 区间沿用人工校准的中央带", () => {
+    const xRanges = [
+      { x0: 380, x1: 600 },
+      { x0: 620, x1: 840 },
+    ];
+    expect(surfaceWindowsFromTree(tree, 1080, xRanges)).toEqual([
+      { x0: 380, y0: 0, x1: 600, y1: 72 },
+      { x0: 620, y0: 0, x1: 840, y1: 72 },
+    ]);
+  });
+
+  it("推不出来就抛错（不静默退回常量）", () => {
+    // 只有根节点的树 ⇒ 找不到全宽非零起始 y 的节点
+    const bare: UiTreeNode = {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          position: { frameInScreen: { x: 10, y: 0, width: 100, height: 50 } },
+        },
+      ],
+    };
+    expect(() => deriveBleedLowerBound(bare, 1080)).toThrow(/渗色带下界/u);
+  });
+
+  it("半成品树（只有根）同样抛错 —— 抓到半棵树时不能默默给出一个错的窗口", () => {
+    const rootOnly: UiTreeNode = { tag: "page" };
+    expect(() => deriveBleedLowerBound(rootOnly, 1080)).toThrow(/渗色带下界/u);
+  });
+});
+
+describe("ui-tree 纯查询层 · 反事实（判据不是恒真）", () => {
+  it("不存在的 class token ⇒ 命中 0 处（定位失败要能显式判否）", () => {
+    expect(findByClass(tree, [...FAB_CLASS_TOKENS, "no-such-class-xyz"])).toEqual([]);
+  });
+
+  it("单 token 命中多处 ⇒ 「全部命中」这条口径承重", () => {
+    // 若实现退化成「任一命中」，这一条会从「多处」变成「唯一」——反证用的就是它。
+    const absoluteOnly = findByClass(tree, ["absolute"]);
+    expect(absoluteOnly.length).toBeGreaterThan(1);
+    expect(findByClass(tree, FAB_CLASS_TOKENS)).toHaveLength(1);
+  });
+
+  it("不存在的语义 id ⇒ 命中 0 处", () => {
+    expect(findBySemanticId(tree, "pictelio-no-such-id")).toEqual([]);
+  });
+
+  it("缺 position 的节点 ⇒ screenFrame 返回 null（**不静默回退**到 frameInRoot）", () => {
+    const bare: UiTreeNode = {
+      tag: "view",
+      position: { frameInRoot: { x: 1, y: 2, width: 3, height: 4 } },
+    };
+    expect(screenFrame(bare)).toBeNull();
+  });
+});
+
+describe("ui-tree · FAB 定位口径（findFab / fabCenter）", () => {
+  it("findFab 在真实样本上唯一命中，且就是那个 class 组合的节点", () => {
+    const fab = findFab(tree);
+    expect(classTokens(fab)).toEqual(expect.arrayContaining([...FAB_CLASS_TOKENS]));
+    expect(screenFrame(fab)).toEqual({ x: 872, y: 1808, width: 162, height: 162 });
+  });
+
+  it("树里没有 FAB ⇒ 抛错并说清「可能不是推荐页 / FAB 未挂载」（0 命中分支）", () => {
+    const bare: UiTreeNode = { tag: "page", children: [{ tag: "view" }] };
+    expect(() => findFab(bare)).toThrow(/定位到 0 个节点/);
+  });
+
+  it("命中多处 ⇒ 抛错并说清「口径漂了」（>1 命中分支：改 token 组合前先转红）", () => {
+    const dup: UiTreeNode = {
+      tag: "page",
+      children: [1, 2].map((i) => ({
+        tag: "view",
+        attributes: { class: [...FAB_CLASS_TOKENS] },
+        position: { frameInScreen: { x: i, y: 0, width: 10, height: 10 } },
+      })),
+    };
+    expect(() => findFab(dup)).toThrow(/定位到 2 个节点/);
+  });
+
+  it("命中了但没有 frameInScreen ⇒ 抛错（不静默用 frameInRoot 顶替）", () => {
+    const noFrame: UiTreeNode = {
+      tag: "page",
+      children: [{ tag: "view", attributes: { class: [...FAB_CLASS_TOKENS] } }],
+    };
+    expect(() => findFab(noFrame)).toThrow(/没有 frameInScreen/);
+  });
+
+  it("fabCenter = 布局盒圆心（872+81=953 / 1808+81=1889）", () => {
+    // oracle：162px 见方的盒子 ⇒ 圆心 = 左上角 + 81
+    expect(fabCenter(tree)).toEqual({ x: 953, y: 1889 });
+  });
+});
+
+/**
+ * FAB 的**树断言**（共享判据 `assertFabTree`）——两个 e2e spec 的那 32 行判据收口到一处。
+ *
+ * ## 为什么这些断言要有 CI 内单测
+ *
+ * 它们原先只存在于 e2e spec 里，而 **e2e 不进 CI**（ADR-0084）⇒ 这组判据在 CI 里
+ * 覆盖率为零：判据写坏了（阈值改了、容差写反了）只有真机手动跑才看得见。
+ * 收口到共享模块后，它变成**纯函数**（吃一棵树 ⇒ 断言或抛错）⇒ 可以在这里钉住。
+ *
+ * ## oracle 的独立来源
+ *
+ * 期望值全部来自**真实样本** `recommend-page.sample.json`（主 CTA 实测
+ * `frameInScreen = (872,1808,162,162)` ⇒ 162px = 54dp）与**设备几何常量**
+ * （内容区右界 1080 = 屏宽；下界 2016 = 2160 − 144 系统栏），**不是**从实现反推。
+ */
+describe("ui-tree · FAB 树断言（共享判据 assertFabTree）", () => {
+  const CONTENT_RIGHT = 1080;
+  const CONTENT_BOTTOM = 2016;
+
+  /** 造一棵只含一个 FAB 的树（`frame` 是它的 `frameInScreen`）。 */
+  function fabTree(
+    frame: { x: number; y: number; width: number; height: number },
+    opts: { tap?: boolean } = {},
+  ): UiTreeNode {
+    return {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          attributes: { class: [...FAB_CLASS_TOKENS] },
+          position: { frameInScreen: frame },
+          events: opts.tap === false ? [] : [{ eventName: "tap" }],
+        },
+      ],
+    };
+  }
+
+  const opts = { contentRight: CONTENT_RIGHT, contentBottom: CONTENT_BOTTOM };
+
+  it("真实样本上通过（162px = 54dp ≥ 48dp=144px，且盒不越出内容区）", () => {
+    expect(() => assertFabTree(tree, opts)).not.toThrow();
+  });
+
+  it("树上没有 FAB ⇒ 抛错（不是「安静地跳过」）", () => {
+    const bare: UiTreeNode = { tag: "page", children: [{ tag: "view" }] };
+    expect(() => assertFabTree(bare, opts)).toThrow(/按 class 定位主 FAB 应唯一/);
+  });
+
+  it("FAB 命中多处 ⇒ 抛错（定位口径漂了 ⇒ 先转红，别拿错的那个继续断言）", () => {
+    const dup: UiTreeNode = {
+      tag: "page",
+      children: [1, 2].map((i) => ({
+        tag: "view",
+        attributes: { class: [...FAB_CLASS_TOKENS] },
+        position: { frameInScreen: { x: i, y: 0, width: 162, height: 162 } },
+      })),
+    };
+    expect(() => assertFabTree(dup, opts)).toThrow(/按 class 定位主 FAB 应唯一/);
+  });
+
+  it("没绑 tap 事件 ⇒ 抛错（「点得动」这条契约没了）", () => {
+    const noTap = fabTree({ x: 872, y: 1808, width: 162, height: 162 }, { tap: false });
+    expect(() => assertFabTree(noTap, opts)).toThrow(/未绑定 tap 事件/);
+  });
+
+  it("缺 frameInScreen ⇒ 抛错（不静默用 frameInRoot 顶替）", () => {
+    // ⚠️ 必须**先**绑上 `tap`：判据顺序是「唯一 → tap → frameInScreen」⇒
+    //   不绑 tap 会先被上一条拦下，测不到 frame 这条。
+    const noFrame: UiTreeNode = {
+      tag: "page",
+      children: [
+        {
+          tag: "view",
+          attributes: { class: [...FAB_CLASS_TOKENS] },
+          events: [{ eventName: "tap" }],
+        },
+      ],
+    };
+    expect(() => assertFabTree(noFrame, opts)).toThrow(/缺 frameInScreen/);
+  });
+
+  it("盒子小于 48dp ⇒ 抛错（触控目标尺寸不达标）", () => {
+    const small = fabTree({ x: 872, y: 1808, width: 100, height: 100 });
+    expect(() => assertFabTree(small, opts)).toThrow(/< 48dp=144px/);
+  });
+
+  it("**宽**不足 48dp（高够）⇒ 抛错（宽高两条判据**分维度**钉住）", () => {
+    // ⚠️ 为什么要分维度：只给「宽高同时不足」的样本时，**单独去掉宽比较或单独去掉
+    //   高比较，测试仍全绿** ⇒ 判据变成「联合钉住」，任一条被写坏都发现不了
+    //   （#1047 第 7 轮 Spec 轴 P-N1 的变异实测：M3 / M10 去掉任一条比较 ⇒ 40 例全绿）。
+    //   本例的盒高 162 合格 ⇒ 只有宽那条判据能触发 ⇒ 宽比较被去掉就会漏。
+    const narrow = fabTree({ x: 872, y: 1808, width: 100, height: 162 });
+    expect(() => assertFabTree(narrow, opts)).toThrow(/布局盒宽/);
+  });
+
+  it("**高**不足 48dp（宽够）⇒ 抛错（同上：把高比较单独钉住）", () => {
+    const flat = fabTree({ x: 872, y: 1808, width: 162, height: 100 });
+    expect(() => assertFabTree(flat, opts)).toThrow(/布局盒高/);
+  });
+
+  it("盒右缘越过内容区右界 ⇒ 抛错（**坐标系用错时这条才转红**）", () => {
+    // ⚠️ 这正是 `frameInRoot` 的坐标：(953,1889,162,162) ⇒ 右缘 1115 > 1080。
+    //   「盒多大 / 有没有 tap」那几条对坐标系替换**完全不敏感** ⇒ 只有这条能拦住它。
+    const wrongCoords = fabTree({ x: 953, y: 1889, width: 162, height: 162 });
+    expect(() => assertFabTree(wrongCoords, opts)).toThrow(/越过内容区右界 1080px/);
+  });
+
+  it("盒下缘越过内容区下界 ⇒ 抛错（纵向同上）", () => {
+    const tooLow = fabTree({ x: 872, y: 1889, width: 162, height: 162 });
+    expect(() => assertFabTree(tooLow, opts)).toThrow(/越过内容区下界 2016px/);
+  });
+
+  it("prefix 进失败信息（各 spec 的场景标识不丢）", () => {
+    const small = fabTree({ x: 872, y: 1808, width: 100, height: 100 });
+    expect(() => assertFabTree(small, { ...opts, prefix: "R2：" })).toThrow(/R2：/);
+  });
+});
+
+describe("ui-tree · 「哪一份最完整」（pickBest）", () => {
+  /** 造一份产物（只有排序用的三个字段与名字是承重的）。 */
+  function artifact(
+    name: string,
+    nodeCount: number,
+    delayMs: number,
+    bytes: number,
+  ): uiTree.UiTreeArtifact {
+    return {
+      name,
+      point: "hot",
+      delayMs,
+      tree: { tag: "page" },
+      nodeCount,
+      bytes,
+      localPath: `/tmp/${name}`,
+    };
+  }
+
+  it("节点数多者胜（这是主键：半成品树的节点数少）", () => {
+    const best = pickBest([artifact("a", 10, 4000, 100), artifact("b", 140, 0, 50)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("节点数相同 ⇒ 比**采样档位**（4s 档通常是完整树）", () => {
+    const best = pickBest([artifact("a", 140, 0, 900), artifact("b", 140, 4000, 100)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("节点数与档位都相同 ⇒ 比字节数", () => {
+    const best = pickBest([artifact("a", 140, 4000, 100), artifact("b", 140, 4000, 900)]);
+    expect(best.name).toBe("b");
+  });
+
+  it("空集合 ⇒ 抛错（不返回 undefined 让调用方拿到空树）", () => {
+    expect(() => pickBest([])).toThrow(/产物集合为空/);
+  });
+});
+
+/**
+ * 「采样落齐」共享判据 `expectSettled`——#1047 第 10 轮 Standards 轴 S-N1 补上的 CI 覆盖。
+ *
+ * **为什么必须有**：它原本只活在三个 e2e spec 里（e2e 不进 CI ⇒ ADR-0084）⇒ 把它**变异成
+ * 空操作**（`void captured; void prefix;`）后，整条 CI 门禁仍 **59/59 全绿**（#1047 第 10 轮变异
+ * 实测）。它现在被三处 spec 共用 ⇒ 判据写坏了要等真机手动跑才看得见。
+ *
+ * **oracle**：判据自身对失败的承诺（不是从实现反推）——落齐 ⇒ 放行；未落齐 ⇒ 抛错，且信息
+ * 必须说清「没等齐」并带**场景前缀**（否则三处 spec 的失败信息分不清是哪一段没落齐）。
+ */
+describe("ui-tree · 「采样落齐」共享判据 expectSettled", () => {
+  /** 造一份抓树结果（判据只读 `settled`，其余字段占位）。 */
+  function capture(settled: boolean): CaptureUiTreeResult {
+    const best: UiTreeArtifact = {
+      name: "ui-tree-hot-4000ms-0-0.json",
+      point: "hot",
+      delayMs: 4000,
+      tree: { tag: "page" },
+      nodeCount: 1,
+      bytes: 1,
+      localPath: "/tmp/fake-ui-tree.json",
+    };
+    return { artifacts: [best], best, settled, timedOut: !settled };
+  }
+
+  it("落齐 ⇒ 放行（不抛）", () => {
+    expect(() => expectSettled(capture(true), "Me 页")).not.toThrow();
+  });
+
+  it("未落齐 ⇒ 抛错，且失败信息说清「没等齐」并带场景前缀", () => {
+    let message = "";
+    try {
+      expectSettled(capture(false), "Me 页");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message, "未落齐时必须抛错，不能静默继续往下走").not.toBe("");
+    expect(message).toContain("Me 页");
+    expect(message).toContain("未落齐");
+  });
+});
