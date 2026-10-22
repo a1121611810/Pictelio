@@ -85,6 +85,21 @@ function fresh() {
   return useSettingsStore()
 }
 
+/**
+ * 只取本模块前缀（`[backupWiring]`）的告警消息（约定 #6「告警计数按模块前缀过滤」）。
+ *
+ * 为什么不能数进程级 `console.warn` 总量：spy 窗口里只要落进任何**无关模块**的模块级
+ * 告警（如 `darkMode` 的 matchMedia 兜底告警），全局计数就会多出一条 ⇒ 断言变成
+ * 顺序依赖的假红（整文件跑时那条告警恰好发生在更早的用例里、被静默消耗，
+ * `--sequence.shuffle` 下则间歇性变红）。按前缀过滤后，断言说的就是裁定原话：
+ * 「恰好一条 `[backupWiring]` 告警」/「零条 `[backupWiring]` 告警」。
+ */
+function backupWiringWarnings(warn: { mock: { calls: unknown[][] } }): string[] {
+  return warn.mock.calls
+    .map((call) => String(call[0]))
+    .filter((message) => message.startsWith("[backupWiring]"))
+}
+
 /** 文件级前置：清空 prefs/idb 夹具 + 复位登录 uid + 清 mock 记录（各 describe 共用同一套） */
 beforeEach(() => {
   env.prefs.clear()
@@ -186,6 +201,8 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
   //   - 「降级路径必须 console.warn 且带模块前缀」= docs/testing/conventions.md 硬约束 #3
   //     「禁止静默降级」+ 本模块既有前缀约定（[backupWiring]）
   //   - 键名与条数 = 输入夹具本身（blocked_user_ids / reported_ids 是 spec §3.2 钉住的键名）
+  // 告警计数口径 = **按模块前缀过滤**（`backupWiringWarnings` 助手，见约定 #6）：
+  // 数的是「[backupWiring] 告警条数」，不是进程级 console.warn 总量。
   // 失败路径的收尾由文件级 `afterEach(vi.restoreAllMocks)` 统一承担（约定 #6）。
 
   it("sets 含非空数组 → 恰好一条带前缀的 warn；写回与 applied/skipped 不变", async () => {
@@ -196,8 +213,10 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
       sets: { blocked_user_ids: [111, 222], reported_ids: [333] },
     })
 
-    expect(warn).toHaveBeenCalledTimes(1)
-    const message = String(warn.mock.calls[0][0])
+    // 恰好一条 `[backupWiring]` 告警（按前缀计数，不数进程级总量）
+    const warnings = backupWiringWarnings(warn)
+    expect(warnings).toHaveLength(1)
+    const message = warnings[0]
     expect(message.startsWith("[backupWiring]")).toBe(true)
     expect(message).toContain("屏蔽")
     expect(message).toContain("无法恢复")
@@ -219,7 +238,8 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
       sets: {},
     })
 
-    expect(warn).not.toHaveBeenCalled()
+    // 零条 `[backupWiring]` 告警（按前缀计数，不数进程级总量）
+    expect(backupWiringWarnings(warn)).toHaveLength(0)
     expect(store.ugoiraMode).toBe("range")
     expect(res.applied).toEqual(["settings_ugoira_mode"])
   })
@@ -232,7 +252,8 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
       sets: { blocked_user_ids: [], reported_ids: [] },
     })
 
-    expect(warn).not.toHaveBeenCalled()
+    // 零条 `[backupWiring]` 告警（按前缀计数，不数进程级总量）
+    expect(backupWiringWarnings(warn)).toHaveLength(0)
     expect(store.ugoiraMode).toBe("range")
     expect(res.applied).toEqual(["settings_ugoira_mode"])
   })
@@ -265,8 +286,10 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     })
     const res = await applyPreparedRestore(deps, prepared)
 
-    expect(warn).toHaveBeenCalledTimes(1)
-    const message = String(warn.mock.calls[0][0])
+    // 恰好一条 `[backupWiring]` 告警（按前缀计数，不数进程级总量）
+    const warnings = backupWiringWarnings(warn)
+    expect(warnings).toHaveLength(1)
+    const message = warnings[0]
     expect(message.startsWith("[backupWiring]")).toBe(true)
     expect(res.applied).toContain("settings_ugoira_mode")
   })
@@ -327,7 +350,8 @@ describe("backupWiring（lynx）— T9 应急快照与撤销", () => {
 
     expect(await undoLastRestore(wiring)).toBe(true)
     expect(store.ugoiraMode).toBe("fflate")
-    expect(warn).not.toHaveBeenCalled()
+    // 零条 `[backupWiring]` 告警（按前缀计数，不数进程级总量）
+    expect(backupWiringWarnings(warn)).toHaveLength(0)
     warn.mockRestore()
   })
 })

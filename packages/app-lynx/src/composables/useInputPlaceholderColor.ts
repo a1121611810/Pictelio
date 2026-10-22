@@ -7,7 +7,7 @@
 //
 // ── 为什么读 `resolvedDark` 而**不是** `currentDarkMode` ──
 // `currentDarkMode` 只在 `system` 分支被消费；手动切 `light`/`dark` 时它**不动**
-// （settingsStore.ts:1002 注释：哑桥 ref）。读它会让「手动切到暗色」这条最常见的路径
+// （settingsStore.ts:1004 注释：哑桥 ref）。读它会让「手动切到暗色」这条最常见的路径
 // 拿到陈旧的亮色值 —— 且这种错误在亮色下不可见，只在用户切暗色时才显形。
 // `resolvedDark`（settingsStore.ts:397）是三态归一后的唯一出口，手动与系统跟随都在此汇合。
 //

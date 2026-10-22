@@ -2,7 +2,7 @@
 // 与 app tests/unit/utils/backupCore.test.ts 同用例同 oracle（双端差分对齐）：
 // spec 字面（format 标识 / schemaVersion 1 / 账号级键三类前缀 / 错误文案分类）
 // 与规格派生边界（schemaVersion 过高拒绝、merge-by-keys 不触碰额外键）。
-import { describe, it, expect, vi } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import {
   utf8Decode,
   utf8Encode,
@@ -32,6 +32,16 @@ const RAW = {
   show_r18_99: "true",
   blocked_user_ids: '["1","2"]',
 }
+
+/**
+ * 文件级收尾：失败路径也收尾（约定 #6「失败路径必须收尾」）。
+ * 本文件首个 `console.warn` spy 出现在「planRestore 零告警」用例；若该用例断言失败，
+ * 用例内的 `warn.mockRestore()` 不会执行 ⇒ spy 泄漏到后续用例的窗口里，
+ * 制造与被测代码无关的失败。故收尾提到文件级（与 backupWiring.test.ts 同形）。
+ */
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function snapshotWith(overrides: Partial<BackupSnapshotV1> = {}): BackupSnapshotV1 {
   return {

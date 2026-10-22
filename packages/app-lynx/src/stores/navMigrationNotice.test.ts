@@ -73,7 +73,7 @@ describe("navMigrationNotice store · 一次性迁移提示", () => {
     const spy = vi.spyOn(await import("./settingsStore"), "prefs").mockReturnValue({
       get: get as never,
       set: (async () => {}) as never,
-      // PrefsStorage 三方法齐全（settingsStore.ts:183）：少一个就是类型不完整
+      // PrefsStorage 三方法齐全（settingsStore.ts:185）：少一个就是类型不完整
       remove: (async () => {}) as never,
     })
     const s = useNavMigrationNoticeStore()
