@@ -62,7 +62,7 @@ webview 图床支持多 host 同时启用（`fluent-checkbox` 多选），但那
    **一条 ADR 红线**：ADR-0147 决策 1（不可变）——app-lynx 中交互控件**不得以 absolute/fixed 覆层盖在 `<scroll-view>` 之上**（真机实测覆层收不到 tap）。故「透明热区 overlay」方案被否决为默认形态。
 4. **上传通道不存在**：`PictelioImageService` 非 JS 桥（无 `@LynxMethod`），Gallery/Downloader 只回 uri。若某引擎只能上传，需新增"图片字节回传 JS"的原生通道。
 5. **各引擎是否支持 URL 检索（而非仅上传）未实测**。`i.pximg.net` 是否强制 Referer 亦**未能验证**——国内网络下连接在 TLS 握手阶段即被 RST，三种请求（无 Referer / 带 Referer / 裸请求）均拿不到 HTTP 状态码；仓内证据仅表明本项目自身下载必须注入 `Referer: https://app-api.pixiv.net/`（`PixivImageLoader.java:176`），**不能推出**第三方引擎也会被拒（`i.pximg.net` 通常是公开 CDN）。→ 见 D4 与 spec 首条验收项。
-6. **图床配置不进 WebDAV 备份**：`imageHostStore` 用独立存储键 `image_host_settings`，不在 `settingsStore` 备份域内（`backupWiring.ts:34-46` 只备份 settingsStore 的 rawValues + `BACKUP_SET_KEYS` 两个 set 键）。这是设备级配置的既有先例。
+6. **图床配置不进 WebDAV 备份**：`imageHostStore` 用独立存储键 `image_host_settings`，不在 `settingsStore` 备份域内（备份域 = settingsStore 的 rawValues + sets 键，见 `packages/app-lynx/src/services/backupWiring.ts` 的 `collect()`；app-lynx 无屏蔽/举报 store ⇒ sets 恒为空，两个 set 键 `blocked_user_ids` / `reported_ids` 属已随 `ADR-0203` 删除的 WebView 客户端）。这是设备级配置的既有先例。
 
 ## 原型验证结论（LOGIC prototype · 2026-09-27）
 

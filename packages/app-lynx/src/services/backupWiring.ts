@@ -35,8 +35,11 @@ export interface CollectedBackupData {
 
 export interface LynxBackupWiring {
   collect(): Promise<CollectedBackupData>
-  /** sets 可缺省：撤销路径读的历史快照可能没有该字段（缺 = 无数据可丢 ⇒ 无告警） */
-  apply(plan: { apply: Record<string, string>; sets?: BackupSets | undefined }): Promise<{
+  /**
+   * sets 可缺省：快照的结构校验只认 `at` + `raw`（不校验 `sets`）⇒ `sets` 可能缺失；
+   * 缺失 = 无数据可丢 ⇒ 无告警。
+   */
+  apply(plan: { apply: Record<string, string>; sets?: BackupSets }): Promise<{
     applied: string[]
     skipped: string[]
   }>
@@ -49,10 +52,9 @@ export interface LynxBackupWiring {
  * 判定口径：**至少一个数组有元素**（≠ 键数 > 0；`{ blocked_user_ids: [] }` 无数据，不告警）。
  * 只落日志，不做用户可见提示（恢复摘要页与 i18n 不变）。
  *
- * 入参可能 undefined：撤销路径的应急快照是 idbKV 里的历史 JSON，
- * `loadPreRestoreSnapshot` 的结构校验只认 `at` + `raw`，`sets` 可能整个缺失。
- * 缺失 = 没有数据可丢 ⇒ 不告警；且绝不能抛（否则撤销被一条日志打断）。
- * 运行时仍以 `sets ?? {}` 兜底（历史快照若出现 null 也不抛）。
+ * 入参可能 undefined：`loadPreRestoreSnapshot` 的结构校验只认 `at` + `raw`（不校验 `sets`），
+ * 故 `sets` 可能缺失。缺失 = 没有数据可丢 ⇒ 不告警；且绝不能抛（否则撤销被一条日志打断）。
+ * 运行时仍以 `sets ?? {}` 兜底（防御性：值不可读时也不抛）。
  */
 function warnDroppedSets(sets: BackupSets | undefined): void {
   const dropped: string[] = []
@@ -89,7 +91,12 @@ export function createLynxBackupWiring(): LynxBackupWiring {
 export interface PreRestoreSnapshot {
   at: string
   raw: Record<string, string>
-  /** 可能缺失：旧形态快照只存 at + raw（结构校验只认这两项，撤销语义不变） */
+  /**
+   * 可能缺失：结构校验只认 `at` + `raw`（不校验 `sets`）⇒ `sets` 可能不在。
+   * app-lynx 自 T7 起写出的快照恒含 `sets`（`savePreRestoreSnapshot` 落 `{ at, ...collect() }`，
+   * 而 `collect()` 恒带 `sets`），此处是**防御性**处理。
+   * 把类型放宽成「可能缺失」属**类型层求真**，运行期机制未变。
+   */
   sets?: BackupSets
 }
 

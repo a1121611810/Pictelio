@@ -1,7 +1,7 @@
 // backupWiring 单测（app-lynx，spec docs/specs/webdav-backup.md §3.1/§3.2/§6/§7；T7/T8/T9）
 // oracle：spec §3.1 键域、§6 merge-by-keys + uid 过滤、§6 应急快照保留、§7 启动钩子语义。
 // 与 app tests/unit/services/backupWiring.test.ts 同用例同判据（双端差分对齐）。
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { ref } from "vue"
 
@@ -94,7 +94,7 @@ function fresh() {
  * `--sequence.shuffle` 下则间歇性变红）。按前缀过滤后，断言说的就是裁定原话：
  * 「恰好一条 `[backupWiring]` 告警」/「零条 `[backupWiring]` 告警」。
  */
-function backupWiringWarnings(warn: { mock: { calls: unknown[][] } }): string[] {
+function backupWiringWarnings(warn: MockInstance<typeof console.warn>): string[] {
   return warn.mock.calls
     .map((call) => String(call[0]))
     .filter((message) => message.startsWith("[backupWiring]"))
@@ -167,13 +167,13 @@ describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => 
   it("S10：运行时键 settings_webdav_last_backup 不进备份域 + 恰好 N 天跳过", async () => {
     env.prefs.set("settings_webdav_last_backup", "2026-09-01T00:00:00+08:00")
     env.idb.set("settings_ugoira_mode", "fflate")
+    const store = fresh()
     const { raw } = await createLynxBackupWiring().collect()
     expect(raw.settings_ugoira_mode).toBe("fflate")
     expect(raw.settings_webdav_last_backup).toBeUndefined()
 
     const { maybeAutoBackup } = await import("../utils/backupService")
     const now = new Date(2026, 8, 11, 12, 0, 0)
-    const store = fresh()
     store.setWebdavEnabled(true)
     store.setWebdavUrl("https://dav.example.com/")
     const exactly7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -220,9 +220,9 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     expect(message.startsWith("[backupWiring]")).toBe(true)
     expect(message).toContain("屏蔽")
     expect(message).toContain("无法恢复")
-    // 被丢弃的键名与条数（条数取自夹具：2 / 1）
-    expect(message).toMatch(/blocked_user_ids[^\d]*2/)
-    expect(message).toMatch(/reported_ids[^\d]*1/)
+    // 被丢弃的键名与条数（条数取自夹具：2 / 1；锚到右括号 ⇒ 错误条数不能蒙混过关）
+    expect(message).toMatch(/blocked_user_ids\(2\)/)
+    expect(message).toMatch(/reported_ids\(1\)/)
 
     // 告警之外，apply 行为不变
     expect(store.ugoiraMode).toBe("range")
@@ -298,6 +298,7 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
 describe("backupWiring（lynx）— T9 应急快照与撤销", () => {
   it("保存 → 读取 → 清除全流程（idbKV 单键）", async () => {
     env.idb.set("settings_ugoira_mode", "fflate")
+    fresh()
     const wiring = createLynxBackupWiring()
     await savePreRestoreSnapshot(wiring)
 
@@ -342,7 +343,7 @@ describe("backupWiring（lynx）— T9 应急快照与撤销", () => {
     const store = fresh()
     store.setUgoiraMode("range")
     const wiring = createLynxBackupWiring()
-    // 旧形态快照：只有 at + raw，没有 sets
+    // 缺 sets 的快照（结构校验只认 at + raw ⇒ 仍被接受，属防御路径，非历史形态）
     env.idb.set(
       PRE_RESTORE_KEY,
       JSON.stringify({ at: "2026-10-01T00:00:00.000Z", raw: { settings_ugoira_mode: "fflate" } }),
