@@ -100,6 +100,19 @@ function backupWiringWarnings(warn: MockInstance<typeof console.warn>): string[]
     .filter((message) => message.startsWith("[backupWiring]"))
 }
 
+/**
+ * 按**载荷关键词**（「屏蔽」）选出「丢弃 sets」的那条告警——**不按前缀过滤**。
+ *
+ * 用途：给「告警消息自带 `[backupWiring]` 前缀」这条断言提供**独立选法**。
+ * 若直接拿 `backupWiringWarnings()` 的结果去断言前缀，前缀已被那道过滤白送
+ * ⇒ 断言永真、不是 oracle（约定 #5「期望值溯源」：禁同义反复断言）。
+ */
+function droppedSetsWarnings(warn: MockInstance<typeof console.warn>): string[] {
+  return warn.mock.calls
+    .map((call) => String(call[0]))
+    .filter((message) => message.includes("屏蔽"))
+}
+
 /** 文件级前置：清空 prefs/idb 夹具 + 复位登录 uid + 清 mock 记录（各 describe 共用同一套） */
 beforeEach(() => {
   env.prefs.clear()
@@ -219,9 +232,7 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     const message = warnings[0]
     // 前缀不能由上面的「按前缀过滤」白送（那会把本断言变成同义反复）：
     // 另按载荷关键词独立选出该条，再断言它自带 `[backupWiring]` 前缀。
-    const dropped = warn.mock.calls
-      .map((call) => String(call[0]))
-      .filter((text) => text.includes("屏蔽"))
+    const dropped = droppedSetsWarnings(warn)
     expect(dropped).toHaveLength(1)
     expect(dropped[0].startsWith("[backupWiring]")).toBe(true)
     expect(dropped[0]).toBe(message)
@@ -297,7 +308,11 @@ describe("backupWiring（lynx）— sets 丢弃告警（#1059）", () => {
     const warnings = backupWiringWarnings(warn)
     expect(warnings).toHaveLength(1)
     const message = warnings[0]
-    expect(message.startsWith("[backupWiring]")).toBe(true)
+    // 前缀同样不能由「按前缀过滤」白送：按载荷独立选出该条，再断言它自带前缀
+    const dropped = droppedSetsWarnings(warn)
+    expect(dropped).toHaveLength(1)
+    expect(dropped[0].startsWith("[backupWiring]")).toBe(true)
+    expect(dropped[0]).toBe(message)
     expect(res.applied).toContain("settings_ugoira_mode")
   })
 })
