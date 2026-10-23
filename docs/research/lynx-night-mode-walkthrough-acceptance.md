@@ -99,9 +99,64 @@ splash 显示窗口 <400ms，设备侧 screencap 轮询（~350ms/帧）只能稳
 
 **挂账（显式）**：切换**时已打开**的常驻弹层（SearchSheet 等，不经 RouterView，样式冻结同机制未定性）→ [#1018](https://github.com/a1121611810/Pictelio/issues/1018)。非发版阻断（切暗路径上弹层一般已关闭；GlobalFab 已实证会更新）。
 
+## Round-3 · #1018 常驻弹层（SearchSheet）实时切暗定性（2026-10-23）
+
+**挂账来源**：Round-2 挂账「切换**时已打开**的常驻弹层（SearchSheet 等，不经 RouterView，样式冻结同机制未定性）」→ [#1018](https://github.com/a1121611810/Pictelio/issues/1018)。
+
+**结论：冻结未复现 —— 弹层在系统 uiMode 实时翻转时跟随换色（双向）。** 原假设（#1016 同机制：根 `<page>` 类翻转不重算已创建元素的 CSS 变量）**不适用于**根级常驻弹层。
+
+**环境**：模拟器 `emulator-5556`（1080×2160@480dpi / Android 14 API 34）· 已装 debug 包 `io.pictelio.app`（versionName 6.10.0，lastUpdateTime 2026-10-22 12:17，**含 #1016 的 epoch 键修复**）· 外观三态 = 缺省 = `system`（跟随系统）· 系统侧 uiMode 由 `night no` 切到 `night yes` 再切回。
+（⚠️ 本轮取证发生在 **ADR-0227 落地之前** ⇒ 当时的 debug 包名仍是 `io.pictelio.app`；#1037 之后 debug 变体的 applicationId 改为 `io.pictelio.app.debug`，release 仍是 `io.pictelio.app`。本节结论只依赖「同一棵原生子树就地重绘」，与包名无关。）
+
+**方法**：首页 → FAB 放射菜单 → 搜索项打开全局搜索弹层（SearchSheet：根 `<page>` 直下的 `v-if` 单例，**不经 RouterView**）→ `adb shell cmd uimode night yes` → 取帧 → `night no` → 再取帧。
+**进程 pid 前后一致（31413）** ⇒ 未经 Activity 重建（manifest `configChanges` 含 `uiMode`）⇒ 观测的是「同一棵原生子树就地重绘」，不是重建后的新页面。
+
+**实测像素**（同一坐标点，1080×2160 原图）：
+
+| 采样点 | 亮态（弹层开） | 切暗后 | 切回亮 |
+|---|---|---|---|
+| 弹层上部背景 | (230,232,238) | **(39,42,47)** | (230,232,238) |
+| 弹层输入行 | (255,255,255) | **(11,15,18)** | (255,255,255) |
+| 弹层标题区 | (255,255,255) | **(11,15,18)** | (255,255,255) |
+| 页面顶部栏 | (124,125,128) | (8,10,12) | (124,125,128) |
+
+两帧里弹层**都保持打开**（「搜索」标题 + 输入框 + scope/sort chips 可见），其令牌面随明暗**双向**切换 ⇒ 无样式冻结。
+
+**帧**：`t2-livesheet-round3-light.png` / `t2-livesheet-round3-dark.png` / `t2-livesheet-round3-relight.png`
+
+**与 #1016 的机制差异（定性）**：#1016 冻结的是 **KeepAlive 复用的页面原生子树**（页面级底色冻结、组件级绑定正常）；本轮观测的常驻弹层**不在 KeepAlive 内**，其元素在根类翻转时重新解析了 CSS 变量 ⇒ 「同机制」假设不成立。冻结条件只出现在 KeepAlive 缓存页上，而那类页面**已由 #1016 的 epoch 键覆盖**。
+
+**GlobalFab 反例的回扣（#1018 验收条件第 2 条要求「反例被确认或被解释掉」）**：Round-2 挂账已记「GlobalFab 已实证会更新」——即 GlobalFab 这一侧**同样不冻结**，与本轮 SearchSheet 的实测**同向**。两者共同支持同一结论：**根级常驻元素（FAB / 弹层）随根类翻转重算样式，冻结只发生在 KeepAlive 缓存页上**。
+
+**触发路径可达性（补充实测）**：SearchSheet 是**底 sheet**（顶缘 ~y=432px，其余盖住底部导航）⇒ 打开期间**无法**切到「我的 → 外观」⇒ 原票面假设的「在设置页切暗、弹层仍开着」路径**不可达**；唯一可达触发是**系统 uiMode 翻转**（外观三态 = `system` 时），本轮已实测通过。
+
+**残留（未取证项，不建票）**：`exitHint`（再按一次退出）与 `muteTagHint`（标签静音轻提示）两条**根级瞬态提示**未单独取帧——二者是 2s 自动消失的 snackbar，主题翻转后无法在同一会话内取到第二帧；且用 inverse 令牌（`bg-inverse-surface` / `text-inverse-on-surface`），影响面 = 2 秒内看到一次旧色 snackbar。
+
+**CI 防线（本轮定性结论要求把「弹层跨翻转跟随」钉成机器防线，不止于设备取证）**：
+Round-3 结论落在「If correct」分支（弹层跟随翻转），故该性质**不能只靠设备取证**，已补源级门禁
+`packages/app-lynx/tests/dialogThemeFlipContract.test.ts`（9 例）钉住这条级联的每一环：
+
+1. **位置**——`<SearchSheet>` 必须是根 `<page>` 的**直接子节点**，不在 `<RouterView>`/`<KeepAlive>` 内
+   （否则它会落进 #1016 的 epoch-key 重建语义，性质随之改变）；
+2. **不快照主题**——SearchSheet 不读 `resolvedDark` / `themeColor`、不自带 `appearanceClasses(...)`
+   （主题一律从根 `<page>` 的 CSS 变量继承）；
+3. **触发器**——根 `<page>` 的类绑定仍由 `appearanceClasses(theme, resolvedDark)` 驱动，且该纯函数在
+   light/dark 下必产出不同类 ⇒ 翻转必然改根类。
+
+门禁有牙（变异验证）：把 `<SearchSheet>` 挪进 `<RouterView>` 子树 ⇒ 该门禁转红（1 failed / 8 passed）；
+另有两条**阳性对照**（合成源码：弹层在 RouterView 内 / 在 KeepAlive 内 ⇒ 抽取器必须判负）。
+**已知失效面**（门禁自述）：源级断言只看接线、不渲染不取像素 ⇒ 像素结论仍以本节设备取证为准；
+`exitHint` / `muteTagHint` 两条瞬态 snackbar 不在门禁面内。
+
+**门禁规模登记（规模线 30%，Standards 轴 2026-10-23 复核）**：`tests/dialogThemeFlipContract.test.ts`
+**151 行**；按**最保守的单一被测对象**口径（`src/App.vue` **442 行**）= **34.2%**（超线），
+按多被测对象读法（App.vue + SearchSheet.vue = 1416 行）= 10.7%。此处按最保守口径登记为 **34.2%**。
+处置：9 条断言各对应级联的一环（位置 / 不快照 / 触发器）+ 两条阳性对照，删任一条都留一个无人钉的分支；
+**后续若再扩测点，须先拆文件**，不得继续加码。
+
 ## 结论
 
 1. ~~gate 保持~~ → **gate 解除（2026-10-16，第 1 轮 + round-2 同日）**：唯一 ❌ 项 #1016 已修复并设备复验；其余全部 ✅ 或 ⚠️ 接受项（判定列口径：⚠️ = 记录即可）。
 2. **[#1016](https://github.com/a1121611810/Pictelio/issues/1016) 关闭**（修复 + 复验证据如上）；**[#1014](https://github.com/a1121611810/Pictelio/issues/1014) 关闭**（解除判据逐条达成：矩阵全勾 + 落档存在 + ADR 对齐 + checklist 勾选）。
-3. 非阻断遗留：[#1017](https://github.com/a1121611810/Pictelio/issues/1017)（矩阵文本订正）/ [#1018](https://github.com/a1121611810/Pictelio/issues/1018)（弹层定性）——不影响发版。
+3. 非阻断遗留：[#1017](https://github.com/a1121611810/Pictelio/issues/1017)（矩阵文本订正）——不影响发版；**[#1018](https://github.com/a1121611810/Pictelio/issues/1018) 已于 2026-10-23 定性完成并关闭**（Round-3：弹层跟随重绘，冻结未复现）。
 4. ADR-0180 状态行改为「真机走查 gate 已执行并解除」；release-checklist 第 6 条已勾。

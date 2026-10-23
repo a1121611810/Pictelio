@@ -57,7 +57,7 @@ const health = useApiQuery<{ illusts: unknown[] }>({
 // 「发现」，这个数字会让人判反。指标叫「触达」而不是「切入」：到达即计。
 //
 // ⚠️ **不用 `immediate: true`**：routeState 的初值是 `DISCOVER_PATH` 这个**占位**
-//   （router.ts:207，afterEach 尚未跑），真正的落点在 initRouter() 的
+//   （router.ts:221，afterEach 尚未跑），真正的落点在 initRouter() 的
 //   `navigate(ok ? DISCOVER_PATH : '/login')` 里异步发生。immediate 会把占位值
 //   记成一次触达 —— 未登录用户启动时甚至会凭空多出一次「发现」。
 //   initRouter() 在下方 onMounted 里调用，晚于本 watch 注册 ⇒ 首次真实落点必被捕获。
@@ -66,10 +66,10 @@ const health = useApiQuery<{ illusts: unknown[] }>({
 //   （P2-1 的机制），故这里无需自己排队。
 //
 // ⚠️⚠️ 监听的是 **routeState.value 这个对象**，不是 `.value.path`。这是被真机打脸后
-//   改的写法：routeState 的占位初值（router.ts:207）就是 `DISCOVER_PATH`，而冷启动的
+//   改的写法：routeState 的占位初值（router.ts:221）就是 `DISCOVER_PATH`，而冷启动的
 //   真实落点**也是** `DISCOVER_PATH` ⇒ 监听 `.path` 时新旧值相同，**watcher 根本不触发**
 //   （首次实测：面板仍显示「发现 0%」，而 3760 条测试全绿）。
-//   afterEach 每次都整体替换 `routeState.value = {…}`（router.ts:218，生产代码唯一赋值点、
+//   afterEach 每次都整体替换 `routeState.value = {…}`（router.ts:230，生产代码唯一赋值点、
 //   无原地改字段），故监听对象引用必然触发，且首次真实落点也不会漏。
 watch(
   () => routeState.value,
@@ -270,8 +270,8 @@ const routeTransition = useRouteTransition()
              单 resolvedDark 会让全部白名单页共享 2 个全局桶、跨页导航实例错配崩坏（review 轮 1
              blocking 实证）。$route.name 不含 fullPath：同路由参数变化不重建，ADR-0049 导航复用语义不变。
              代价（登记）：切换明暗会重置各页滚动位/页内瞬态；缓存桶 = 页 ×2 epoch（默认无 max，
-             静态 6 页可接受）。挂账：切换时已打开的常驻弹层（SearchSheet 等，不经 RouterView）
-             样式冻结未定性——见走查落档 round-2。设备实证：docs/research/lynx-night-mode-walkthrough-acceptance.md -->
+             静态 6 页可接受）。挂账已结（#1018）：常驻弹层（SearchSheet 等，不经 RouterView）的样式冻结
+             **未复现**——弹层在根 <page> 直下、样式随根类继承而重算；设备实证见走查落档 §Round-3，门禁 tests/dialogThemeFlipContract.test.ts。 -->
         <KeepAlive :include="['discover', 'updates', 'shelf', 'me', 'ranking', 'mypixiv']">
           <component :is="Component" :key="`${settings.resolvedDark}:${String($route.name)}`" />
         </KeepAlive>
