@@ -22,7 +22,7 @@
 
 1. t0 用户点击「翻译」→ S1 起流（`ACTIVE_CALLS.put("S1", call1)` `:364`）
 2. t1 用户点「停止」→ `provider.abort()` → `abortHandle?.abort()`（在 #653 修复前**结构死路径**，research §2；fix in commit `6e1ad678`）
-3. t2 用户再点「翻译」→ store 复用守卫失败（status 已非 translating/pending，`novelTranslateStore.ts:615-621`）→ 起 S2 → `frameQueue.clear()`（`:393`）+ `sseParser = new`（`:396`） → S1 仍在读 SSE → M2 把 S1 后续帧灌进 S2 解析器
+3. t2 用户再点「翻译」→ store 复用守卫失败（status 已非 translating/pending，`novelTranslateStore.ts:672-678`）→ 起 S2 → `frameQueue.clear()`（`PictelioTranslateModule.java`@`c7019273` `:393`）+ `sseParser = new`（同文件 `:396`） → S1 仍在读 SSE → M2 把 S1 后续帧灌进 S2 解析器
 4. S2 收尾合并 → `done` 帧含 S1+S2 文本 → JS 写入 S2 缓存（污染）
 
 ### 第四项缺口：JS→Java 取消路径
@@ -33,7 +33,7 @@
 
 ### 为什么「并发=1」救不了
 
-`concurrency: provider.id === "native-bridge" ? 1 : undefined`（`packages/app-lynx/src/stores/novelTranslateStore.ts:785`）只约束**单次翻译运行内**的 chunk 级并发（`runChunkPool` `createNovelTranslator.ts:206-207`），对**跨翻译运行**与**原生侧**均无约束力（research #649 §1）。
+`concurrency: provider.id === "native-bridge" ? 1 : undefined`（`packages/app-lynx/src/stores/novelTranslateStore.ts:849`）只约束**单次翻译运行内**的 chunk 级并发（`runChunkPool` `createNovelTranslator.ts:242`），对**跨翻译运行**与**原生侧**均无约束力（research #649 §1）。
 
 ---
 
@@ -234,7 +234,7 @@ Robolectric JVM 单测可达性已由 ADR-0174 D2 验证。
 - `PictelioTranslateModule.java` HEAD `c7019273` 行号全集：
   - `:104` `ACTIVE_CALLS` / `:115` `USER_ABORTED` / `:122` `sseParser`（D1 删除） / `:135-137` `STREAM_FRAMES` / `:145` `STREAM_TERMINAL` / `:147` `STREAM_TERMINAL_MSG` / `:156-157` `frameQueue`（D1 删除） / `:303-304` streamId 入口 + prune / `:366` `ACTIVE_CALLS.put` / `:393-396` 每流新建 parser（替换为 D2 入口） / `:397` 旧 sseParser 赋值（D1 删除） / `:401-405` `flushIfAny`（替换为 D4 state-sourced） / `:409-416` drain from frameQueue（替换为 D3 state-sourced） / `:418` `sseParser.terminalError()`（替换为 D4 state-sourced） / `:474-488` `pruneFinishedStreams` 4 循环（新增第 5 个清 `STREAM_PARSE_STATE`） / `:536-537` `STREAM_SEQ` / `:714-732` `abortStream`（streamId-direct，已 #653 落地） / `:861-862` `processSseLine` 读字段（替换为 D4 state-sourced） / `:875` sink offer frameQueue（替换为 D2 state-sourced）
 - `nativeTranslate.ts`（`packages/app-lynx/src/api/nativeTranslate.ts:474/478/589/602-607/675`，与本 ADR D6 / D2 JS 侧 streamId 共享键对齐）
-- `novelTranslateStore.ts`（`packages/app-lynx/src/stores/novelTranslateStore.ts:615-621` 复用守卫 / `:785` `concurrency: 1` 边界）
+- `novelTranslateStore.ts`（`packages/app-lynx/src/stores/novelTranslateStore.ts:672-678` 复用守卫 / `:849` `concurrency: 1` 边界）
 - `LynxActivity.java:222/231/234` 模块注册表单例（research #649 §3）
 - commit `c7019273`（#654 删除 `deltaSeen` / commit `6e1ad678`（#653 同步 abortHandle = streamId-direct）/ commit `6a648ab5`（STREAM_FRAMES 保留而非 drain）/ commit `13b1f58d`（24 轮审计三连击收尾）
 

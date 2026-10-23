@@ -157,11 +157,27 @@ const inFlightByChapter = new Map<number, Promise<void>>()
 /** 当前活动的 AbortController（abort() 取消 in-flight 调用） */
 let activeController: AbortController | null = null
 
+/**
+ * 取消纪元（ADR-0226）：与 `gen` **正交**，只表达「这次调用是否已被取消」。
+ *
+ * <p>为什么要与 `gen` 分开两个变量：`gen` 回答「哪个 invocation 是最新的」
+ * （generation-gate 用它挡陈旧响应）；取消纪元回答「这次调用是不是已经被取消了」。
+ * `gen` 的 bump 时机（只有 `reset()` 与新 invocation 启动时变）被既有早退路径依赖
+ * （`runWithProvider` 的 `gen !== genNow` 早退 + 「先写缓存后 gate」的顺序），
+ * 让 `abort()` 去 bump 它会连带改写那些语义（裁决见 ADR-0226 §2.3）。
+ *
+ * <p>作用域 = 模块级（与 `activeController` 同域）：`abort()` / `reset()` 取消的是
+ * **模块级**的在飞请求，取消纪元必须与被取消的对象同域，否则会出现
+ * 「请求被 abort 了但纪元没 bump」的错配（窗口内的 invocation 漏接住）。
+ */
+let cancelEpoch = 0
+
 /** 测试钩子：清空模块级单例，避免用例间串扰（仅测试 import；导出见末尾） */
 function resetNovelTranslateStoreForTest(): void {
   activeController?.abort()
   activeController = null
   inFlightByChapter.clear()
+  cancelEpoch = 0
 }
 
 // ─────────── endpoint 元数据持久化（ADR-0170 §D5.1） ───────────
@@ -404,6 +420,9 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     //   ③ status 被旧结果推成 completed / failed，覆盖新章节的状态。
     activeController?.abort()
     activeController = null
+    // ADR-0226：取消纪元 bump —— 让「provider 启动前」窗口内的 invocation 醒来后
+    // 静默退出（不建 controller / 不 ++gen / 不外发请求）。
+    cancelEpoch += 1
     gen += 1
     status.value = "idle"
     progress.value = null
@@ -658,10 +677,21 @@ function classifyProvider(
       return inFlightByChapter.get(chapterId)!
     }
 
+    // ── 取消纪元取号（ADR-0226）──
+    // 取号必须在**任何 await 之前**（否则「取号时就已经被取消」会漏判）。
+    // 之后每个 await 之后、**创建 controller 之前**核对：不匹配即静默退出。
+    const epochEntry = cancelEpoch
+
     // ── 立刻占位：标记同 chapterId 进入 in-flight 状态（同步步骤；后续 await 不阻塞复用判定）──
     // inFlightByChapter 同步注册，保证同 chapterId 第二次同步触发能在检查时命中。
     const placeholder = Promise.resolve()
     inFlightByChapter.set(chapterId, placeholder)
+    /** 释放同章节的 in-flight 占位（缓存命中 / 取消早退共用；正常路径由 finally 兜底） */
+    const releasePlaceholder = (): void => {
+      if (inFlightByChapter.get(chapterId) === placeholder) {
+        inFlightByChapter.delete(chapterId)
+      }
+    }
     currentChapter.value = chapterId
     status.value = "pending"
     progress.value = { chapterId, done: 0, total: paragraphs.length }
@@ -672,6 +702,13 @@ function classifyProvider(
     // endpoint 必须自动 miss，否则会命中另一模型/另一服务商产出的译文（脏数据）。
     const targetLang = settings.language ?? "zh-CN"
     const endpointMeta = await loadEndpointMetadataForCache()
+    // ADR-0226 闸门 1：本次调用在「provider 启动前」被取消（reset()/abort()）⇒
+    // 静默退出：不建 controller、不 ++gen、不外发请求（正文零外发、不扣费）。
+    // 状态由取消方负责（reset() → idle；abort() → aborted），此处**不得**写状态。
+    if (cancelEpoch !== epochEntry) {
+      releasePlaceholder()
+      return
+    }
     const cacheKeyMeta = makeCacheKey({
       novelId,
       chapterId: String(chapterId),
@@ -684,6 +721,12 @@ function classifyProvider(
     // 缓存层不可用（真机 PrimJS 无 IndexedDB）→ 不发这次读，直接走 provider；
     // 降级在 cache 层显式 warn（不静默）。
     const cached = isTranslationCacheAvailable() ? await getTranslation(cacheKeyMeta.key) : null
+    // ADR-0226 闸门 2：缓存读是窗口内的第二个 await 点（真机原生 FS 缓存 / web IndexedDB）。
+    // 与闸门 1 同理：被取消 ⇒ 静默退出（缓存命中分支也不得落地）。
+    if (cancelEpoch !== epochEntry) {
+      releasePlaceholder()
+      return
+    }
     // 二次 in-flight 复用判定：缓存 IO 期间可能同 chapterId 被再次触发，复用现有 promise
     // （注意：cached 命中分支不需要新 promise，因同步路径上已置 pending；本 await 之后若复用，
     // 当前 invocation 继续执行 cached 路径——重复赋值同字段无副作用）
@@ -702,9 +745,7 @@ function classifyProvider(
       showTranslation.value = true
       refreshDisplay()
       // 清理 placeholder：缓存命中是同步收敛，已无需等待 in-flight promise
-      if (inFlightByChapter.get(chapterId) === placeholder) {
-        inFlightByChapter.delete(chapterId)
-      }
+      releasePlaceholder()
       return
     }
     // 缓存 miss / 长度不匹配 → 继续走 provider 路径
@@ -1184,6 +1225,8 @@ function classifyProvider(
     paragraphs: string[],
     xRestrict: 0 | 1 | 2 = 0,
   ): Promise<void> {
+    // ADR-0226：与 translateChapter 同理，取号必须在任何 await 之前
+    const epochEntry = cancelEpoch
     try {
       const settings = useSettingsStore()
       const endpointMeta = await loadEndpointMetadataForCache()
@@ -1201,6 +1244,10 @@ function classifyProvider(
       // 缓存失效失败不阻断重译（最坏情况是命中旧译文，随后被新译文覆盖）；但必须可见
       console.warn("[novelTranslateStore] retranslate 缓存失效失败", err)
     }
+    // ADR-0226 闸门：重译在「缓存失效」阶段也可能被取消（切章节 / 点停止）。
+    // 此刻若继续走 translateChapter，它会取到**新的**纪元号 ⇒ 等于「取消后重新发起」，
+    // 仍会把被取消章节的正文发出去 ⇒ 必须在此处拦一次。
+    if (cancelEpoch !== epochEntry) return
     await translateChapter(novelId, chapterId, paragraphs, xRestrict)
   }
 
@@ -1235,6 +1282,10 @@ function classifyProvider(
   /** 取消当前 in-flight translation（UI 按钮 / 章节切换 / 路由离开） */
   function abort(): void {
     activeController?.abort()
+    // ADR-0226：取消纪元 bump —— `abort()` 之前**不** bump `gen`（见 ADR-0226 §2.3），
+    // 「provider 启动前」窗口内的 invocation 只能靠纪元接住：醒来后静默退出，
+    // 不会把用户的「停止」变成「照发请求、照跑完」。
+    cancelEpoch += 1
     // status 由 runViaX 路径收敛；显式置 aborted 防止 caller 在 abort 后立即读取 status='translating' 误导 UI
     if (status.value === "translating" || status.value === "pending") {
       status.value = "aborted"

@@ -8,7 +8,7 @@
 
 #### 1. Target / Source Language 选择器（数据层 done）
 - **现状**：5 个表单字段只实现 3 个（Base URL / API Key / Model）。`SettingsEndpoint.vue:273/294/311` 只有 3 个 `<input>`
-- **数据层**：`stores/novelTranslateStore.ts:229/:233/:338-339/:435` 已 ready；`api/translate.ts:44-55` 支持 `targetLang`
+- **数据层**：`stores/novelTranslateStore.ts:250-251/:362-363/:482-483/:456-465` 已 ready（`targetLang?`/`sourceLang?` 类型 → `webEndpointConfig` 取值 → 持久化 → 端点元数据合并）；`api/translate.ts:44-55` 支持 `targetLang`
 - **交付**：
   - SettingsEndpoint.vue 新增 2 个 `<select>`：Target Language（zh-CN 默选）/ Source Language（ja 默选）
   - i18n 键 `endpoint.targetLang.label` / `endpoint.sourceLang.label` / `endpoint.value.label`（zh-CN/en 各 3 条）
@@ -59,7 +59,7 @@
 ### P3 — 可选（UX 增益）
 
 #### 6. 测试连接无延迟数据
-- **现状**：`stores/novelTranslateStore.ts:540-542` `testConnection` 返回 `{ok, code, detail}` 无 `elapsedMs`
+- **现状（2026-10-23 订正）**：`stores/novelTranslateStore.ts` 的 `testConnection`（`:591`）**已返回** `{ok, code, detail, elapsedMs}`（类型声明 `:133` / `:596`，返回点 `:615` / `:623` / `:631`），UI 侧 `src/components/SettingsEndpoint.vue:292` 也已内联展示 `(${result.elapsedMs}ms)` ⇒ **本条已完成，无需再交付**
 - **ADR-0173 D5 偏离**：反馈形态走页内内联 4s 淡出，**不是**残余反馈形态问题
 - **交付**：
   - `testConnection` 内部用 `performance.now()` 包一下，返回 `{ok, code, detail, elapsedMs}`

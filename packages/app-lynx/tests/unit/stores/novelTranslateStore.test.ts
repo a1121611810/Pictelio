@@ -1072,7 +1072,7 @@ describe.each(TIMING_PROFILES)('半成品策略（ADR-0171 §5）[$profile]', ({
       d.push({ type: 'delta', paragraphIndex: 0, text: '半截' })
       // 同步点：等 delta **真的落到 store**（`translatedParagraphs[0] === '半截'`）。
       // 这里不能只等 `getNextCallCount` 增长：`abort()` 会**同步**把 status 置 'aborted'
-      // （novelTranslateStore.ts:1228），且 cacheSet 此刻必然未被调 —— 若 delta 没落地，
+      // （novelTranslateStore.ts:1283），且 cacheSet 此刻必然未被调 —— 若 delta 没落地，
       // 下面两条负向断言会**空转通过**，用例退化成「什么都没发生就 abort」。等 store 的
       // 可观测状态而非迭代器计数，才把负向断言钉在确定发生的事件之后（硬约束 #6）。
       await vi.waitFor(
