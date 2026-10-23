@@ -149,3 +149,85 @@ describe('#1018 ③ 触发器：翻转 ⇒ 根类必变（弹层跟随翻转的�
     expect(dark).not.toEqual(light)
   })
 })
+
+/**
+ * #1018 ④ 瞬态轻提示（exitHint / muteTagHint）：**源级守卫**，非取帧。
+ *
+ * <p>为什么是源级守卫而不是真机取帧：这两条提示 2 秒自动消失（瞬态），
+ * #1018 的取证方法是「翻转主题 → 取第二帧」—— 要取到第二帧，就得在提示仍在屏上的
+ * 那 2 秒内完成一次翻转，时序上极不可靠 ⇒ **只能定性，不能取证**。
+ *
+ * <p>那为什么要守：它们**会**经过主题翻转（挂在根 `<page>` 直下），若配色哪天从
+ * 「CSS 变量引用」退化成「静态色值」，就会出现「提示还在屏上但颜色是旧主题的」
+ * —— 这正是 #1018 想防的形态。守卫钉住的正是这条**不变量**：不得出现字面量颜色。
+ *
+ * <p>当前实现用 `bg-inverse-surface` / `text-inverse-on-surface`，二者展开为
+ * `var(--md-inverse-surface)` / `var(--md-inverse-on-surface)`
+ * （`packages/app-lynx/tailwind.config.ts` 的 inverse 色组）⇒ 主题类一变，
+ * 浏览器立即重新求值并重绘 ⇒ **不存在「2 秒内看到旧色」的窗口**。
+ *
+ * <p>取证与结论：[docs/research/issue-1018-and-755-residual-findings-2026-10.md](../../docs/research/issue-1018-and-755-residual-findings-2026-10.md)
+ */
+describe('#1018 ④ 瞬态轻提示配色必须走令牌（不得退化成静态色值）', () => {
+  const appBody = strip(appVue)
+
+  /**
+   * 两条瞬态轻提示的宿主 view：各自带 v-if 判据。
+   *
+   * <p>⚠️ 切片边界：配色 class 在**内层** view 上（外层 view 只管定位），故必须取到
+   * **配对闭合**的整个 view 块，不能按「下一个 `<view` 起始」截断 —— 那样只会拿到
+   * 外层定位 view，恒不含配色 class（断言恒假 ⇒ 门禁无牙）。
+   */
+  const hintBlocks = (): string[] => {
+    const out: string[] = []
+    for (const marker of ['v-if="exitHint"', 'v-if="settings.muteTagHint"']) {
+      const i = appBody.indexOf(marker)
+      if (i === -1) continue
+      // 从该 marker 所在的 <view 起，按 <view …>…</view> 配对取出整个块
+      const openStart = appBody.lastIndexOf('<view', i)
+      let depth = 0
+      let pos = openStart
+      let end = -1
+      while (pos !== -1) {
+        const nextOpen = appBody.indexOf('<view', pos + 1)
+        const nextClose = appBody.indexOf('</view>', pos + 1)
+        if (nextClose === -1) break
+        if (nextOpen !== -1 && nextOpen < nextClose) {
+          depth += 1
+          pos = nextOpen
+        } else {
+          if (depth === 0) {
+            end = nextClose + '</view>'.length
+            break
+          }
+          depth -= 1
+          pos = nextClose
+        }
+      }
+      out.push(end === -1 ? appBody.slice(openStart) : appBody.slice(openStart, end))
+    }
+    return out
+  }
+
+  it('两条瞬态轻提示都存在（抽取器前提）', () => {
+    const blocks = hintBlocks()
+    expect(blocks).toHaveLength(2)
+  })
+
+  it('两条瞬态轻提示都用 inverse 令牌配色（bg-inverse-surface + text-inverse-on-surface）', () => {
+    for (const block of hintBlocks()) {
+      expect(block).toContain('bg-inverse-surface')
+      expect(block).toContain('text-inverse-on-surface')
+    }
+  })
+
+  it('两条瞬态轻提示均不出现字面量颜色（否则主题翻转后不跟随 —— #1018 要防的形态）', () => {
+    for (const block of hintBlocks()) {
+      // 十六进制 / rgb() / hsl() / 具名色 —— 一律禁止
+      expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+      expect(block).not.toMatch(/\brgba?\(/)
+      expect(block).not.toMatch(/\bhsla?\(/)
+      expect(block).not.toMatch(/\b(?:white|black|red|blue|gray|grey)\b/)
+    }
+  })
+})
