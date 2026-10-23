@@ -92,7 +92,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
   `@pictelio/android-host`、`@pictelio/search-core`、`@pictelio/ranking-core` 三个包
   **都没有 `check:` 脚本**。宿主包的 TS 从不进类型门禁，但它的单测却进了 `test:all`（不对称，无文档说明）
 - **三份现行 spec 把不存在的命令当验收门禁**：`app-lynx-recommended-carousel.md:107`、
-  `app-lynx-detail-multi-image-list.md:95`、`lynx-night-mode-audit.md:100` 要求 `pnpm lint:app-lynx` 全绿，
+  `app-lynx-detail-multi-image-list.md:95`、`lynx-night-mode-audit.md:109` 要求 `pnpm lint:app-lynx` 全绿，
   实测 `Command "lint:app-lynx" not found`（ADR-0185 改根单配置源后已删）。照着跑必红
 - **`vp run --filter` 对不存在的 task 静默忽略**：`dev:all` / `build:all` / `preview:all` /
   `check:all` / `test:all` 里的 `:all` filter 共 8 个**一直空转而无人察觉**
@@ -100,12 +100,17 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 ### 5. 死文档与「现行规范指向空符号」（31 条）
 
-- **`AGENTS.md:131` 把 `EngineRouting.resolve` 列为关键设计决策硬规则**——
-  而 `EngineRouting` Java 类已随 #610 删净（`packages/android-host/**/*.java` 零命中）。
-  违反这条「硬约束」在今天**无法执行也无法判定**：这是指向空符号的架构违规条款
+- ~~**`AGENTS.md:131` 把 `EngineRouting.resolve` 列为关键设计决策硬规则**~~ —— **复核结论（2026-10-23）：假阳性，本条撤销**。
+  原断言「AGENTS.md 把 `EngineRouting.resolve` 列为关键设计决策硬规则，而该 Java 类已随 #610 删净」**不成立**：
+  `grep -c "EngineRouting" AGENTS.md` = **0**（全文零命中）；`AGENTS.md:131` 现文为
+  「单引擎路由（ADR-0164 状态行 / ADR-0201）：Lynx 是唯一渲染引擎，入口 `LynxActivity.java`；
+  原预热/路由共用与双向降级机制已随 #610 删除；10s 加载超时只落错误页、永不自动跳」
+  —— **AGENTS.md 已随 #610 同步订正**，不指向任何空符号，「违反这条硬约束无法判定」的前提不成立。
+  `EngineRouting` Java 类确已随 #610 删净（`packages/android-host/**/*.java` 零命中），
+  但该事实**不构成 AGENTS.md 的契约断链**。
 - `docs/specs/engine-availability-fallback-tickets.md` 是唯一仍以 `to-tickets` 可执行票据格式
   呈现已下线引擎机制的文档，T5 状态还是 `todo（需真机）`；同族三份 spec 都已加存档横幅，唯独它没有
-- `qa-defense-lines.md:37-38` 与 `release-checklist.md:218` 直接矛盾（前者要求 transition checklist 全过，
+- `qa-defense-lines.md:37-38` 与 `release-checklist.md:220` 直接矛盾（前者要求 transition checklist 全过，
   后者称该清单不可执行）；同文件 :5 的「webview OTA」已随 ADR-0202 下线，而 T2 已按单引擎更新——
   **现行 spec 内部自相矛盾**，而它是 `NOTES.md` 指定的矩阵事实源
 - 6 份已下线 spec 缺 ADR-0201 决策 4 要求的存档横幅
@@ -146,7 +151,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
    ③ 修 `noDeadKeys` 扫描范围至 `pages.ts`
    —— 契约断链、覆盖缺口、假活锚点三类的**根因都是缺门禁**，不补就会复发
 2. 删已验证的死代码与死测试（见主题 3 清单），连带清掉假活锚点
-3. 修 `AGENTS.md:131` 的空符号硬规则；给缺横幅的 spec 补横幅
+3. ~~修 `AGENTS.md:131` 的空符号硬规则~~（**复核结论 2026-10-23：假阳性，AGENTS.md 已随 #610 同步订正、该项撤销**；详见 §5 首条）；给缺横幅的 spec 补横幅
 4. `/illusts`、`/novels` 可达性属**产品决策**（恢复入口 or 把取证改道到生产可达页）
 
 ## 覆盖度与局限
@@ -287,7 +292,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 ## 补充取证：门禁条件的精确范围（强化上述前两条）
 
-- [覆盖缺口] packages/app-lynx/lynx.config.ts:117 — `__BENCH_NAV__: JSON.stringify(process.env.BENCH_NAV === '1')` 全仓**只有两处**设 `BENCH_NAV=1`，且都在 e2e 手工脚本里：`packages/android-host/tests/android-e2e/tools/verify-translation.sh:32` 与 `verify-abort.sh:57`（均配 `NODE_ENV=production`）；Gradle 构建脚本、`scripts/deploy.mjs`、CI workflow 均不设置 — 推论：`/illusts`、`/novels` **不是「debug 包可达」**，而是「仅当 e2e 脚本用 `BENCH_NAV=1` 重建 bundle 时可达」；普通 debug APK 虽然 `BuildConfig.DEBUG=true`，但 JS 侧 `registerBenchNavHandler()` 在 router.ts:450 `if (!__BENCH_NAV__) return` 整块消除，故这两页在**任何非 e2e 专用构建**（含开发自用 debug 包）中都进不去 — 可删规模：0 行（收敛证据，供删除决策用）
+- [覆盖缺口] packages/app-lynx/lynx.config.ts:118 — `__BENCH_NAV__: JSON.stringify(process.env.BENCH_NAV === '1')` 全仓**只有两处**设 `BENCH_NAV=1`，且都在 e2e 手工脚本里：`packages/android-host/tests/android-e2e/tools/verify-translation.sh:35` 与 `verify-abort.sh:60`（均配 `NODE_ENV=production`）；Gradle 构建脚本、`scripts/deploy.mjs`、CI workflow 均不设置 — 推论：`/illusts`、`/novels` **不是「debug 包可达」**，而是「仅当 e2e 脚本用 `BENCH_NAV=1` 重建 bundle 时可达」；普通 debug APK 虽然 `BuildConfig.DEBUG=true`，但 JS 侧 `registerBenchNavHandler()` 在 router.ts:451 `if (!__BENCH_NAV__) return` 整块消除，故这两页在**任何非 e2e 专用构建**（含开发自用 debug 包）中都进不去 — 可删规模：0 行（收敛证据，供删除决策用）
 
 - 佐证（仓库自认）: packages/app-lynx/scripts/lynx-router-back-regression.sh:577 — 脚本注释自陈「当前产品代码无此通道（full 包 Intent 参数丢弃 + 默认 bundle 无 `__BENCH_NAV__`）」 — 该注释是对 benchNav 生产不可达性的独立确认，与本分片结论同向；仅引用，不单列为发现
 
@@ -419,7 +424,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 # 07 · 依赖脚本与 CI 覆盖（只读审计）
 
 - [覆盖缺口] package.json:26 — `check:all` 的 filter 列表漏了 `@pictelio/android-host`，而该包有可跑通的 `check`（`tsc --noEmit -p tsconfig.json`，include = `vitest.config.ts` + `tests/android-e2e`）且根 `check:android-host`（package.json:21）存在；`.github/workflows/ci.yml:41` 的「Type check (all packages)」只跑 `check:all` ⇒ 原生 E2E 的 TypeScript 从不进类型门禁 — 宿主包在 `test:all`（package.json:42）里有、在 `check:all` 里没有，这个不对称无任何文档说明（AGENTS.md「门禁边界」称 CI 覆盖全部包）— 非删代码，`:1` 处补 `--filter @pictelio/android-host`（**待确认**：是否有意排除）
-- [契约断链] docs/specs/app-lynx-recommended-carousel.md:107 — 把 `pnpm lint:app-lynx` 列为验收门禁命令，但根 `package.json` 无该脚本，实测 `Command "lint:app-lynx" not found`；ADR-0185 改根单配置源后所有 `lint:*` / `fmt:*` 变体被删（现存仅 dev/build/preview/check/test/kill/sync 七个 `:app-lynx` 别名），spec 未同步 — 同病另见 docs/specs/app-lynx-detail-multi-image-list.md:95、docs/specs/lynx-night-mode-audit.md:100，共 3 行
+- [契约断链] docs/specs/app-lynx-recommended-carousel.md:107 — 把 `pnpm lint:app-lynx` 列为验收门禁命令，但根 `package.json` 无该脚本，实测 `Command "lint:app-lynx" not found`；ADR-0185 改根单配置源后所有 `lint:*` / `fmt:*` 变体被删（现存仅 dev/build/preview/check/test/kill/sync 七个 `:app-lynx` 别名），spec 未同步 — 同病另见 docs/specs/app-lynx-detail-multi-image-list.md:95、docs/specs/lynx-night-mode-audit.md:109，共 3 行
 - [契约断链] packages/app-lynx/scripts/lynx-device-check.sh:18 — 步骤 1 经 `adb run-as` 往 `CapacitorStorage.xml` 写 `pictelio_client_kind=lynx`，但该键的 Java 写方 `EngineRouting.resolve` 已删（`packages/android-host/android/**` 全仓无 `EngineRouting`/`pictelio_client_kind`，只剩 `LynxRuntimeInitializer.java:123` 读编译期常量 `BuildConfig.CLIENT_KINDS = {"lynx"}`），TS 侧唯一读者 `engineState.ts:2` 已确认死 ⇒ 写一个无人读的键；同文件 :10 另有 `ANALYZE="node -e ''"  # placeholder` 死占位 — 约 10 行
 - [死配置] .husky/pre-push:5 — 注释仍写「三域触碰校验：`packages/app/(src|tests/agent-browser)` → E2E 锚点静态校验」，但承载全部逻辑的 scripts/check-push-refs.mjs:28-30 已在 ADR-0203 移除该域、`DOMAINS` 只剩 app-lynx 与 .agents 两项（check-push-refs.mjs:31-52），且 `packages/app` 目录已不存在（`ls` 确认）⇒ 注释描述的机制早于实现即已下线 — 1 行注释
 - [死配置] packages/app-lynx/scripts/check-app-lynx-anchors.mjs:9 — 注释称「锚点模式参考 `packages/app/scripts/check-e2e-anchors.mjs`」，该文件随 ADR-0203 整包删除，参考对象已不存在；同文件 :34-36 是「未来扩展」占位段（`当前简化：仅 tests 失败时拦截`，注释自陈未实现 commit-message 校验）— 约 4 行
@@ -435,7 +440,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 ## 判断困难 / 已排除（避免误报）
 
 - `packages/app-lynx/scripts/test-lynx-web.sh` + `test:lynx-web`：web-core 是活的 dev 预览目标（`rspeedy dev` 提供 `__web_preview`），脚本锁的是 TDZ 白屏回归，不报。
-- `scripts/capture-readme-shots.sh`：全仓除自引用外无引用，但产物目标是 README.md:18-22 实际引用的 `packages/website/public/screenshots/*.png`，且面向 Lynx 客户端（脚本头引 `LynxActivity.java:503` / `router.ts:449`），属活的维护脚本，不报。
+- `scripts/capture-readme-shots.sh`：全仓除自引用外无引用，但产物目标是 README.md:18-22 实际引用的 `packages/website/public/screenshots/*.png`，且面向 Lynx 客户端（脚本头引 `LynxActivity.java:542` / `router.ts:451`），属活的维护脚本，不报。
 - `scripts/generate-adr-index.mjs`：docs/adr/README.md:3 有「本文件由该脚本确定性生成，勿手改」锚，无 package.json 入口但契约在，不报。
 - `release:android-host:transition`（package.json:52）：`PICTELIO_RELEASE_BRANCH` 在 release.mjs:19/144/633 与 scripts/lib/release-branch.mjs:7-14 有完整消费方，docs/release-checklist.md:187 有对应章节（#816），不报。
 - `verify-agent-skills.mjs` / `check-push-refs.mjs`：均被 .husky/pre-push 经 DOMAINS 接线（check-push-refs.mjs:35、:45），有真实触发路径，不报。
@@ -455,7 +460,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 ## 契约断链（现行规范指向已不存在的符号/文件）
 
-- [契约断链] AGENTS.md:131 — 「引擎决策（ADR-0164）… 硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键」 — `EngineRouting` Java 类已随 #610「引擎机制全链删除」删净：`grep -rn "EngineRouting" packages/android-host --include=*.java` 零命中，`find packages/android-host -type d -name engine` 空；删除事实见 `docs/specs/lynx-only-sandbox.md:48`（engine 包 7 类含 `EngineRouting` 全列）。AGENTS.md 是全仓最高现行规范、该条被列为「关键设计决策 / 违反视为架构违规」，现指向空符号 — 1 行
+- ~~[契约断链] AGENTS.md:131 — 「引擎决策（ADR-0164）… 硬规则 = 预热与路由**必须**共用 `EngineRouting.resolve`，禁止各自读键」~~ — **复核结论（2026-10-23）：假阳性，本条撤销，不计入契约断链**。`EngineRouting` Java 类确已随 #610「引擎机制全链删除」删净（`grep -rn "EngineRouting" packages/android-host --include=*.java` 零命中，`find packages/android-host -type d -name engine` 空；删除事实见 `docs/specs/lynx-only-sandbox.md:54`），但**现行 `AGENTS.md` 全文 `EngineRouting` 零命中**（`grep -c "EngineRouting" AGENTS.md` = 0）：`AGENTS.md:131` 现文是「单引擎路由（ADR-0164 状态行 / ADR-0201）：Lynx 是唯一渲染引擎，入口 `LynxActivity.java`；原预热/路由共用与双向降级机制已随 #610 删除」，**已随 #610 同步订正**，不存在「指向空符号的架构违规条款」 ⇒ 原条目所述问题在现行仓库**不存在**
 - [契约断链] packages/android-host/CONTEXT.md:17 — 「`LynxRuntimeInitializer` / `PictelioAppLynx` … 预热与路由**必须**共用 `EngineRouting.resolve`（ADR-0164）」 — 与 AGENTS.md:131 同源断言。两个类本身仍在（`packages/android-host/android/app/src/lynx/java/io/pictelio/app/`），但「可用性回退 / 共用 resolve」这半句是死约束；本文件是 `CONTEXT-MAP.md:8` 指定的 android-host 词汇层活入口 — 1 行
 - [契约断链] packages/app-lynx/CONTEXT.md:28,47,271,274,277 — 5 处词条写「详见 / 语义见 `packages/app/CONTEXT.md`」 — 该文件随 ADR-0203 整包删除（`ls packages/app` = No such file）；同文件 :680、:716-718、:753-754 的同类引用都加了「原位置不再存在」旁注，这 5 处**漏加**，是活词条里的死指针 — 5 处
 - [契约断链] packages/app-lynx/CONTEXT.md:274,277 — 词条正文仍写「实现在**双引擎共享的** Java 传输层」/「决策收敛在**双引擎共享的** Java 下载层，lynx 静态图与 ugoira zip 自动继承 **webview 侧配置**的图床（lynx 无设置 UI）」 — 双引擎与 webview 侧配置入口均已下线，"自动继承" 的上游已不存在（:789 同一词条又写一次「双引擎共享」） — 3 行
@@ -465,7 +470,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 - [死文档] docs/specs/engine-availability-fallback-tickets.md:1-12 — 「规则：每个 ticket 声明前置依赖；blocker 未完成不得开工。状态：`todo`/`doing`/`done`」，T0-T5 全部指向已删链路（`MainActivity` 降级分支、`full`/`webview` flavor、`EngineFallbackNotice.java`、`packages/app/tests/**` 契约测试） — T5 状态仍是 **`todo（需真机）`**，是全仓唯一以 AGENTS.md「to-tickets」可执行票据格式呈现的已下线机制文档；同族的 `engine-availability-fallback.md` / `engine-default-lynx-bidirectional-fallback.md` / `engine-switch-e2e-recovery.md` 均已加存档横幅，唯独它没有。全文件零入站引用 — 25 行（整文件）
 - [死文档] docs/specs/qa-defense-lines.md:5 — 「分发事实：**不经 Play**（GitHub Releases APK + **webview OTA**）」 — webview OTA 通道已随 ADR-0202 下线，`docs/specs/ota-web-bundle.md:3-12` 已明写「已整体下线」。同 spec 的 T2 已按单引擎更新（:50 R4 删除、:78 覆盖面收窄）而头部未同步 — 1 行
-- [死文档] docs/specs/qa-defense-lines.md:37-38 — T1「`docs/agents/qa-transition-checklist.md`（新文件）：发版前**双引擎**转换清单…头部注明每行源自真实缺陷，**发版前必过**」+「`docs/release-checklist.md`：追加…引用 qa-transition-checklist **全过**」 — `docs/release-checklist.md:218` 已判定该清单「不可执行、待 #805 重新定义」，`NOTES.md:83` 也已登记；本 spec 仍写「必过」⇒ 同一事实在两处现行文档里互相矛盾。本文件被 `NOTES.md` 三.2 指定为 transition-matrix 的「矩阵事实源」而该门是活的（`packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts`，AGENTS.md 列为发版前门） — 2 行
+- [死文档] docs/specs/qa-defense-lines.md:37-38 — T1「`docs/agents/qa-transition-checklist.md`（新文件）：发版前**双引擎**转换清单…头部注明每行源自真实缺陷，**发版前必过**」+「`docs/release-checklist.md`：追加…引用 qa-transition-checklist **全过**」 — `docs/release-checklist.md:220` 已判定该清单「不可执行、待 #805 重新定义」，`NOTES.md:83` 也已登记；本 spec 仍写「必过」⇒ 同一事实在两处现行文档里互相矛盾。本文件被 `NOTES.md` 三.2 指定为 transition-matrix 的「矩阵事实源」而该门是活的（`packages/android-host/tests/android-e2e/specs/transition-matrix.spec.ts`，AGENTS.md 列为发版前门） — 2 行
 - [死文档] docs/specs/ranking.md:1 — 标题「Spec: 排行榜（插画榜；**双端：app webview + app-lynx**）」 — 本文件是 `CONTEXT-MAP.md:13` 指定的 ranking-core 词汇层入口、且是活代码的 spec anchor（`packages/ranking-core/src/date.ts:2`、`package.json:4`、4 个测试的 oracle 注释），读者会按「双端」理解现行设计 — 1 行
 - [死文档] docs/specs/ranking.md:195,219 — §6.2「webview（pictelio-app）」整节 + §「webview 数据层」以已删包为对象描述接入与差异 — 同上，anchor 链上的现行 spec 保留了单数引擎之外的实施章节 — 约 8 行
 - [死文档] docs/specs/ranking.md:242 — 「正式实现落地时，原型文件（`packages/app/src/components/home/RankingPrototype.tsx`、`packages/app-lynx/src/components/RankingPrototype.vue`）…**应一并移除**」 — 两个文件都已不存在，这是一条永不收敛的待办 — 1 行
@@ -489,7 +494,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 ## 待确认（已登记跟踪，不建议重复计入）
 
-- [待确认] docs/agents/qa-transition-checklist.md:1 — 标题「发版前 QA 转换清单（**双引擎转换矩阵** · 手工版）」、R4 整节以 webview 为基线 — 但 `NOTES.md:77,83` 与 `docs/release-checklist.md:218` 均已显式登记「整份待 #805 重新定义、重新定义前视为未设防」⇒ 属**已知跟踪中的未竟项**，不是未登记的废弃项。同理 `docs/release-checklist.md:218,221` 两条自述属主动标注，不计
+- [待确认] docs/agents/qa-transition-checklist.md:1 — 标题「发版前 QA 转换清单（**双引擎转换矩阵** · 手工版）」、R4 整节以 webview 为基线 — 但 `NOTES.md:77,83` 与 `docs/release-checklist.md:220` 均已显式登记「整份待 #805 重新定义、重新定义前视为未设防」⇒ 属**已知跟踪中的未竟项**，不是未登记的废弃项。同理 `docs/release-checklist.md:220,223` 两条自述属主动标注，不计
 
 ---
 
@@ -511,13 +516,13 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 
 - [死文档] docs/release-checklist.md:191 — 非 main 分支发布命令写作 `PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 pnpm run release` — 根 `package.json` **没有 `release` 脚本**（实测 `release -> ABSENT`，只有 `release:android-host` 与 `release:android-host:transition`），该命令一执行即 Missing script。发布 checklist 是被当作现行规范引用的操作文档（AGENTS.md「部署」节指向 docs/release-checklist.md） — 可删规模：1 行命令 + 建议改为 `pnpm release:android-host`
 
-- [死文档] packages/app-lynx/CONTEXT.md:42 — benchNav 词条把生产消除门禁写成「前端 `if (__DEV__)`（生产构建死代码消除，同 auth.ts 凭证范式）」 — 实际代码是 `src/router.ts:450` `if (!__BENCH_NAV__) return`；且 `lynx.config.ts:114-116` 明确说明 `__BENCH_NAV__` 之所以独立存在，正因为 `__DEV__` 在 debug APK 上恒 false 会误杀钩子（`src/utils/debugBuild.ts:3-6` 同一论证）。CONTEXT.md 是 AGENTS.md「四层词」的地图层事实源且被当作现行导航依据，故此处指错宏会误导后续维护 — 可删规模：1 处括注改写（`if (__DEV__)` → `if (!__BENCH_NAV__)`）
+- [死文档] packages/app-lynx/GLOSSARY.md:42 — benchNav 词条把生产消除门禁写成「前端 `if (__DEV__)`（生产构建死代码消除，同 auth.ts 凭证范式）」 — 实际代码是 `src/router.ts:451` `if (!__BENCH_NAV__) return`；且 `lynx.config.ts:114-116` 明确说明 `__BENCH_NAV__` 之所以独立存在，正因为 `__DEV__` 在 debug APK 上恒 false 会误杀钩子（`src/utils/debugBuild.ts:3-6` 同一论证）。CONTEXT.md 是 AGENTS.md「四层词」的地图层事实源且被当作现行导航依据，故此处指错宏会误导后续维护 — 可删规模：1 处括注改写（`if (__DEV__)` → `if (!__BENCH_NAV__)`）
 
 - [死配置] package.json:52 — `release:android-host:transition` 固定 `PICTELIO_RELEASE_BRANCH=release/transition-6.2.0`【待确认】 — 在 main 上**永远无法成功**：`release-branch.mjs:22-30 assertOnReleaseBranch` 要求当前分支必须就是 `release/transition-6.2.0`，而一旦切到该分支，git 取回的是**该分支自己的 package.json**，用不到 main 这条脚本。但 `release/transition-6.2.0` 分支本地与 origin 均仍存在（`git branch -a` 实证），过渡分支发版路径可能是有意保留的，故不判死 — 可删规模：1 行（需先确认过渡分支是否仍需独立发版通道）
 
 ## 已实证存活，勿误报（本分片核对过）
 
-- 七个构建宏**全部**有写方（`lynx.config.ts:108-131` + `src/rspeedy-env.d.ts:5-50` 类型声明）与活的生产读方：`__CREDENTIALS__`→`api/auth.ts:42`；`__PUBLIC_CONFIG__`→`api/userAgent.ts:2-6`；`__APP_VERSION__`→`stores/updateStore.ts:103`/`pages/UpdatePage.vue:24`/`services/backupWiring.ts` 的 `createLynxBackupDeps()` 内 `appVersion:`/`pages/NetworkCheck.vue:54`；`__DEV__`→`App.vue:52`/`api/auth.ts:39`；`__DISABLE_UPDATE_CHECK__`→`stores/updateStore.ts:23`；`__BENCH_NAV__`→`router.ts:450`、`IllustList.vue:232`、`NovelList.vue:178`；`__HOME_BLEED_HEADER__`→`router.ts:107`、`pages/Recommended.vue:59`。无一死宏。
+- 七个构建宏**全部**有写方（`lynx.config.ts:108-131` + `src/rspeedy-env.d.ts:5-50` 类型声明）与活的生产读方：`__CREDENTIALS__`→`api/auth.ts:42`；`__PUBLIC_CONFIG__`→`api/userAgent.ts:2-6`；`__APP_VERSION__`→`stores/updateStore.ts:103`/`pages/UpdatePage.vue:24`/`services/backupWiring.ts` 的 `createLynxBackupDeps()` 内 `appVersion:`/`pages/NetworkCheck.vue:54`；`__DEV__`→`App.vue:49`/`api/auth.ts:39`；`__DISABLE_UPDATE_CHECK__`→`stores/updateStore.ts:23`；`__BENCH_NAV__`→`router.ts:451`、`IllustList.vue:235`、`NovelList.vue:178`；`__HOME_BLEED_HEADER__`→`router.ts:107`、`pages/Recommended.vue:59`。无一死宏。
 - `homeBleedHeaderFlag.ts` 被 `lynx.config.ts:9` import，活。
 - `vitest.fallback.config.ts` 名字有歧义但**活**：它属首页顶栏回退阀（#906/#907/ADR-0216），与已删的引擎回退子系统无关；`include: ['src/**/*.fallback.test.ts']` 实有 1 个文件 `src/utils/homeHeaderMode.fallback.test.ts`。
 - `android-e2e/specs/lynx-network-check.spec.ts:22` 的 `process.env.BENCH_NAV = "1"` **有效**（易误判为死代码）：链路为 spec → `build-install.ts:38` `env: cleanEnv()`（`env.ts:157` 展开 process.env，继承 BENCH_NAV）→ `pnpm run build:android-host` → `packages/android-host/package.json` 的 `build:android` 内含 `NODE_ENV=production pnpm --dir ../app-lynx run build` → rspeedy 读 `lynx.config.ts:117`。`__BENCH_NAV__` 不依赖 NODE_ENV，故 debug APK 亦生效。

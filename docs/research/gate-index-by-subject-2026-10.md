@@ -4,6 +4,19 @@
 
 标记说明：`A/B/C` = 锚点档次（见锚点审计）；`误红N` = 字面量普查判定的「因合理重构会误红」条目数，**数字越高越可能在你不改需求时被拦**。
 
+> ⚠️ **保鲜注（2026-10-23）**：本表是 **2026-10-18 盘点快照**——每行的「门禁数 / 档次·误红数」
+> 取自那两次盘点（[锚点审计](./gate-requirement-anchor-audit-2026-10.md)、
+> [字面量普查](./unanchored-literal-census-2026-10.md)）。**未参与那两次盘点的门禁没有档位可填**
+> （不编造数据），故它们**不在本表内**。此后新增的门禁（2026-10-23 一轮 issue 收口）列在下方；
+> 改到对应被测对象时请**一并看**它们。下次做盘点时把这几道并入「一、按被测对象索引」即可。
+>
+> | 表外新增门禁 | 被测对象 | 来源票 |
+> | --- | --- | --- |
+> | `tests/meThemeColorOptions.test.ts` | `src/pages/Me.vue` | #776 主题色块清单收敛 |
+> | `tests/dialogThemeFlipContract.test.ts` | `src/App.vue` + `src/components/SearchSheet.vue` | #1018 常驻弹层跨明暗翻转 |
+> | `tests/novelIntroNarrowViewport.test.ts` | `src/pages/NovelIntro.vue` + `src/components/AppIcon.vue` | #756 极窄屏降级矩阵 |
+> | `tests/unit/stores/novelTranslateStoreCancelWindow.test.ts` | `src/stores/novelTranslateStore.ts` | #760 翻译 store 取消窗口竞态 |
+
 ## 用法
 
 1. 改了 `src/` 下的文件 → 在「一」里查该路径，只读它列出的门禁

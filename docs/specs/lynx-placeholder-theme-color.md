@@ -106,13 +106,15 @@
 
 ### 4.4 消费点清单（15 处）
 
-| # | 位置 | 所属 | placeholder 可见性 |
+**坐标口径（2026-10 统一）**：一律取该处 `:placeholder` **绑定行** —— 与下方备注「枚举基准 = 全库带 `placeholder` 的 `<input>`」同口径。此前各行锚点取法不一（指向 label 元素、字段块首行、甚至 `return` 语句），随被引用文件改动即失真，且 WebDAV 六个坐标实际落在字段 1/2/3/5/5/6（`webdavDir` 无锚点、`webdavBackupPassword` 重复）⇒ 已按语义锚点整体重取。
+
+| # | 位置（`:placeholder` 绑定行） | 所属 | placeholder 可见性 |
 |---|---|---|---|
-| 1 | `SearchSheet.vue:404` | 搜索面板 | **空字段直接可见** |
-| 2 | `BookmarkPanel.vue:300` | 收藏面板 | **空字段直接可见** |
-| 3 | `Me.vue:1110` | 下载 · 命名模板 | **空字段直接可见** |
-| 4-9 | `Me.vue` 1338 / 1366 / 1392 / 1415 / 1437 / 1571 | WebDAV 六字段 | 浮层 label 覆盖，**仅「聚焦 + 空」时露出** |
-| 10-15 | `SettingsEndpoint.vue` 411 / 463 / 478 / 551 / 586 / 618 | LLM 翻译设置六字段 | 空字段直接可见 |
+| 1 | `SearchSheet.vue:513` | 搜索面板 | **空字段直接可见**（无条件下发） |
+| 2 | `BookmarkPanel.vue:299` | 收藏面板 | **空字段直接可见**（无条件下发） |
+| 3 | `Me.vue:1101` | 下载 · 命名模板 | **空字段直接可见**（无条件下发；该字段按 ADR-0209 决策 6 **不设浮动 label**，字段名由区块上方常驻标题承担） |
+| 4-9 | `Me.vue` 1329 / 1357 / 1383 / 1406 / 1428 / 1562 | WebDAV 六字段（url / 用户名 / 密码 / 目录 / 备份密码 / 恢复输入密码） | 浮层 label 覆盖，**聚焦时**才下发 placeholder（`isPlaceholderShown` ≡ `fieldFocus[id] === true`，静止态下发空串） |
+| 10-15 | `SettingsEndpoint.vue` 420 / 475 / 490 / 563 / 599 / 632 | LLM 翻译设置**六处绑定**（五个逻辑字段，apiKey 有 password/masked 两个 type 变体） | **静止态下发空串**（`isFloated` ≡ `isFocused ‖ value.length > 0`，静止且为空时为 false）⇒ 原生 placeholder 不出现、由居中 label 占位；**聚焦或有值后**才下发 |
 
 ⚠️ **第 10–15 处是首版遗漏的**（2026-10-15 真机走查发现）：首版清单按「谁 import 了
 `INPUT_PLACEHOLDER_COLOR`」倒推，而这 6 处**从未绑定过**该属性（只挂了 `placeholder-class="text-outline"`，
@@ -172,7 +174,7 @@
 | 表 ≡ `tokens.css`（新） | 只验**字面量一致**；不验「这个角色是语义上正确的选择」—— 口径选错它照样绿 |
 | 表 ≡ `tokens.css`（新） | 扫 `.theme-*.dark` 段；若将来 tokens.css 改为运行时注入的 `styles/` 段，抽取器会扫空集 ⇒ 须断言命中数下界（ArchUnit `failOnEmptyShould` 教训） |
 | `hardcodeColorGate`（已有） | 文件级豁免 ⇒ `lynxPlatformColors.ts` 内**任何** hex 都不进 offenders，包括手滑写错的颜色 |
-| 像素验收（#1014） | 人工走查，非 CI；漏跑 = 无人发现（这正是 `release-checklist.md:231` 把 gate 挂在发版清单上的原因） |
+| 像素验收（#1014） | 人工走查，非 CI；漏跑 = 无人发现（这正是 `release-checklist.md:233` 把 gate 挂在发版清单上的原因） |
 
 ### 平台升级风险（非门禁失效面，但同属「构建绿 ≠ 正确」类）
 
