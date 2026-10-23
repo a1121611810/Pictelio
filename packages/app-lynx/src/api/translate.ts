@@ -23,6 +23,7 @@
 
 // URL 解析唯一入口（ADR-0172 §3：lynx 侧禁用 URL 全局）
 import type { NovelId } from './id'
+import { isContentPolicyCode, isContentPolicyRejection } from './contentPolicy'
 import { extractHostname } from '../utils/safeParseUrl'
 
 // ───────────────────────── 类型 ─────────────────────────
@@ -476,6 +477,13 @@ export function mapUsage(
 
 /**
  * Responses API error.code → TranslationErrorCode 映射（research §Q4.1）。
+ *
+ * <p>内容策略拒绝（issue #1063 · ADR-0173 D7a）：判据在 `api/contentPolicy.ts`
+ * （与 native 路径共用同一份，避免两端漂移）。本函数只负责「不是内容策略时」的
+ * 常规映射。
+ *
+ * <p>⚠️ 调用点纪律：内容策略判定**已在上游**（HTTP 错误处理）先于状态码分流做过一次
+ * （`isContentPolicyCode`）—— 拦截也可能带 4xx，先按状态码分流会漏判。
  */
 function mapErrorCode(code: string | undefined, message: string | undefined): TranslationErrorCode {
   if (!code) return 'unknown'
@@ -696,7 +704,22 @@ export class OpenAIResponsesProvider implements TranslationProvider {
       }
       const finalMessage = message ?? `HTTP ${status}`
       let errorCode: TranslationErrorCode
-      if (status === 401) errorCode = 'unauthorized'
+      // ADR-0173 D7a：**内容策略判定必须先于 HTTP 状态码分流**。
+      // 拦截也可能带 4xx 状态码（MiniMax 兼容层实测 = 400），先按状态码分流会把它吞成
+      // invalid_request / unauthorized ⇒ 归因错误（让用户去改 endpoint / model，而真实
+      // 原因是正文被内容策略拦了）。此处与 native 路径同纪律。
+      // ⚠️ 覆盖「仅 400 才调 mapErrorCode」的旧口径：内容策略可能出现在任意 4xx
+      // （Azure 用 403、部分服务商用 422），旧口径下非 400 一律按状态码分流 ⇒ 漏判。
+      //
+      // ⚠️ **code 与 message 两个信号都要看**（Standards 轴 2026-10-23 复核实测）：
+      // 同一 body `{"error":{"code":"invalid_request_error","message":"input
+      // new_sensitive (1026)"}}` —— native 侧读消息全文 ⇒ 命中 `new_sensitive` ⇒
+      // content_filter；web 侧若只看 code ⇒ `invalid_request` ⇒ **跨路径漂移**。
+      // ⇒ web 侧同时消费 `isContentPolicyCode(code)` 与 `isContentPolicyRejection(message)`，
+      // 与 native 侧**共用同一份判据**（`api/contentPolicy.ts`）。
+      if (isContentPolicyCode(code) || isContentPolicyRejection(message)) {
+        errorCode = 'content_filter'
+      } else if (status === 401) errorCode = 'unauthorized'
       else if (status === 402) errorCode = 'insufficient_balance'
       else if (status === 404) {
         // 404：可能是 model 错也可能是 endpoint 不支持 /v1/responses（OpenRouter / 智谱 / Qwen）
@@ -749,11 +772,19 @@ export class OpenAIResponsesProvider implements TranslationProvider {
         }
         // 错误响应：status === 'failed'
         if (fullJson.status === 'failed') {
+          // ADR-0173 D7a：内容策略判定**先于**兜底的 `server`。
+          // ⚠️ 旧口径把本形态一律归 `server` + `retryable=true` ⇒ 若实为内容策略拦截，
+          // 会**误触发整批回退**（重发同一份被拦的正文，必然再被拒，且再耗一次计费）。
+          // 与 HTTP 错误分支同纪律：拦截也是失败，判据共用 `api/contentPolicy.ts`。
+          const failedCode = fullJson.error?.code
+          const failedMessage = fullJson.error?.message
+          const isPolicy =
+            isContentPolicyCode(failedCode) || isContentPolicyRejection(failedMessage)
           yield {
             type: 'error',
-            code: 'server',
-            message: fullJson.error?.message ?? 'response failed',
-            retryable: true,
+            code: isPolicy ? 'content_filter' : 'server',
+            message: failedMessage ?? 'response failed',
+            retryable: !isPolicy,
           }
           return
         }

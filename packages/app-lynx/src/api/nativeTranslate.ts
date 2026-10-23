@@ -12,6 +12,7 @@
 // API key 全程不出 Java 堆（ADR-0037 字节零进 JS 堆）；JS 侧永不持有明文 key（ADR-0170 §D5.1）。
 // web-core 预览 / node 测试无 NativeModules → 走降级适配器（明示失败，禁假成功 #568）。
 import { unquoteNativeString } from "../utils/tokenStorage"
+import { isContentPolicyRejection } from "./contentPolicy"
 import { buildSystemInstructions } from "./translate"
 import type { TranslationChunk, TranslationErrorCode, TranslationProvider } from "./translate"
 
@@ -269,9 +270,18 @@ function isRetryableNativeError(code: TranslationErrorCode): boolean {
   return RETRYABLE_NATIVE_CODES.has(code)
 }
 
+/**
+ * 原生侧错误消息 → 错误码（ADR-0173 D7 + D7a）。
+ *
+ * <p>判定顺序有纪律：**内容策略拒绝先于 HTTP 状态码分支** —— 拦截也返回 400，
+ * 先按状态码判就会把它吞成 `invalid_request`（归因错误：让用户去改 endpoint / model，
+ * 而真实原因是正文被内容策略拦了）。内容策略的判据本体在 `api/contentPolicy.ts`
+ * （与 web 路径共用同一份，避免跨路径漂移）；完整取证见该模块头注释与
+ * `docs/research/translation-content-policy-classification-2026-10.md`。
+ */
 export function classifyNativeError(message: string | undefined): TranslationErrorCode {
   const m = message ?? ""
-  if (m.includes("content policy") || m.includes("content_filter") || m.includes("未返回任何译文")) {
+  if (isContentPolicyRejection(m)) {
     return "content_filter"
   }
   const http = /HTTP (\d{3})/.exec(m)

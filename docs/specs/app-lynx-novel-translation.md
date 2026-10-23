@@ -832,7 +832,7 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | Chunk 规约 | `response.output_text.delta` → `delta`；`response.reasoning_text.delta` → `reasoning_delta`；`response.completed` → `done`；`response.failed` / `response.incomplete` → `error` 或 `done`(incomplete=true) | 调研 `research/openai-responses-api.md` §Q2 / §Q4 |
 | SSE 帧解析 | 30+ Responses API 事件类型正确分派；DeepSeek 无 `[DONE]` 兼容；reasoning 与 text 双通道分离 | 调研 §Q3 |
 | 原生交付信封 | `delta_all` 段落数组（index + 已 trim 的 text）；`done` / `error` / `pending`；非法载荷必须 warn 并丢弃；按 streamId 归属过滤 | **ADR-0170「跨端信封契约」**（输出侧）/ 调研 §Q2（输入侧事件名） |
-| 错误码分类 | `401/403 → unauthorized`、`402 → insufficient_balance`、`429 → rate_limit`、`404/405 → model_not_found`、`400 → invalid_request`、`5xx → server`、内容策略拒答 → `content_filter`、`aborted` → aborted、其余 → network | ADR-0173 D7 + 仓库 `TranslationErrorCode` 联合类型（以 `classifyNativeError` 的实现分支为准） |
+| 错误码分类 | `401/403 → unauthorized`、`402 → insufficient_balance`、`429 → rate_limit`、`404/405 → model_not_found`、`400 → invalid_request`、`5xx → server`、内容策略拒答 → `content_filter`、`aborted` → aborted、其余 → network。**内容策略判定优先于状态码分流**（ADR-0173 D7a，issue #1063）：服务商错误体含 `content_policy_violation` / `image_content_policy_violation` / 裸 `content_filter` / `new_sensitive` 时一律归 `content_filter`（拦截也可能带 4xx：实测 400、Azure 403、部分服务商用 422） | ADR-0173 D7 + D7a + 仓库 `TranslationErrorCode` 联合类型（判据单一事实源 = `src/api/contentPolicy.ts`；native 与 web 两条路径共用） |
 | 缓存键 | FNV-1a 32-bit 拼接；sourceHash 改 → miss；model 改 → miss；baseURL 改 → miss | spec §4.5 / §9.5 |
 | 缓存写策略 | `partial` / `failed` / `aborted` 不写；`done` 之后才写 | spec §7.2 / §9.6 |
 | 缓存通道 | app-lynx 原生 = filesystem cacheDir（ADR-0175 D1）；SharedPreferences/SQLite 显式 REJECTED；LRU manifest 形态同 `ImageCachePlugin` | ADR-0175 |

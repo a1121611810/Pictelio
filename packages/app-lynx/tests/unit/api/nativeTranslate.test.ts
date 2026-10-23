@@ -779,7 +779,8 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
  *
  * <p>Java 侧空流终态消息字面量 = {@code "LLM 未返回任何译文（可能被服务端内容策略拦截）"}，
  * 必须在 JS 端 {@code classifyNativeError} 命中 {@code content_filter} 分支（与
- * {@code content policy} / {@code content_filter} 同列，{@code nativeTranslate.ts:253}）。
+ * {@code content policy} / {@code content_filter} 同列，判定集中在
+ * {@code isContentPolicyRejection}）。
  *
  * <p>这条契约两端守：Java Robolectric 在
  * {@code PictelioTranslateModuleEmptyStreamTest}，JS Vitest 在本文件。任一端字面量
@@ -798,5 +799,53 @@ describe("classifyNativeError 空流识别（issue #654 跨端契约）", () => 
 
   it("content policy 字符串命中", () => {
     expect(classifyNativeError("blocked by content policy")).toBe("content_filter")
+  })
+})
+
+/**
+ * MiniMax 兼容层的真实 400 body（2026-10-23 真机实跑取证）。
+ *
+ * <p>oracle 来源：模拟器 debug 包对 MiniMax-M3.1-Flash-Preview 发起真实章节翻译，
+ * logcat 原文（`PictelioTranslateModule`）为
+ * {@code translateStream HTTP 400 body=HTTP 400: {"error":{"message":"input
+ * new_sensitive (1026)","code":"image_content_policy_violation"}}}。
+ * 该 body 是 MiniMax OpenAI 兼容层对「输入内容涉敏」的包装：其内层 `code` 沿用
+ * OpenAI 风格的 {@code image_content_policy_violation}，内层 `message` 携带 MiniMax
+ * 自有错误码 {@code 1026}（官方错误码表：1026 = 输入内容涉敏）。
+ *
+ * <p>为什么这条必须被识别为 {@code content_filter} 而不是 {@code invalid_request}：
+ * 服务端已经明确说了「是内容策略拦的」，但旧分类器只认「content policy」（空格）
+ * 与「content_filter」两个串 —— 真实 body 用的是下划线 {@code content_policy}
+ * 与 {@code new_sensitive}，两者都命不中 ⇒ 落到 HTTP 状态码分支 ⇒ 400 ⇒
+ * {@code invalid_request} ⇒ UI 展示「请求参数无效（400）：请检查模型与 endpoint 配置」。
+ * 那是**归因错误**：让用户去改 endpoint / model 配置，而真实原因是章节正文被
+ * 服务端内容策略拦截，换任何 endpoint 都不会好。
+ *
+ * <p>与「Java 侧空流」是两种不同的拦截形态（空流 = 200 但零输出；本条 = 400 直接
+ * 拒绝），二者都必须归到同一 {@code content_filter} 语义，UI 文案才自洽。
+ */
+describe("classifyNativeError 服务端内容策略拒绝（MiniMax 真实 400 body）", () => {
+  /** 真机实跑原文（HTTP 400 + OpenAI 兼容层 error 体），逐字取自 logcat。 */
+  const MINIMAX_REAL_400 =
+    'HTTP 400: {"error":{"message":"input new_sensitive (1026)","code":"image_content_policy_violation"}}'
+
+  it("MiniMax 真实 400 body 被分类为 content_filter（不得落到 invalid_request）", () => {
+    expect(classifyNativeError(MINIMAX_REAL_400)).toBe("content_filter")
+  })
+
+  it("OpenAI 风格的 content_policy_violation code 命中（下划线形态）", () => {
+    expect(classifyNativeError('{"error":{"code":"content_policy_violation"}}')).toBe(
+      "content_filter",
+    )
+  })
+
+  it("MiniMax 自有涉敏语义 new_sensitive 命中（与 code 无关的独立信号）", () => {
+    expect(classifyNativeError("input new_sensitive (1026)")).toBe("content_filter")
+  })
+
+  it("普通 400（参数错）仍归 invalid_request —— 不得把 400 一律当拦截", () => {
+    expect(classifyNativeError('HTTP 400: {"error":{"message":"bad request"}}')).toBe(
+      "invalid_request",
+    )
   })
 })

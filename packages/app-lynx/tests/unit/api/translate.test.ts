@@ -568,6 +568,34 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     }
   })
 
+
+  it('HTTP 400 + 普通参数错 → 仍 emit error(invalid_request)（不得把 400 一律当拦截）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'invalid_request_error', message: 'bad param' } }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('invalid_request')
+    }
+  })
+
+  /**
+   * 内容策略判定**必须先于** HTTP 状态码分流（ADR-0173 D7a 的顺序纪律）。
+   *
+   * <p>拦截不一定只带 400：Azure 用 403、部分服务商用 422。旧口径「仅 400 才查
+   * error.code」⇒ 非 400 的内容策略 body 一律按状态码分流 ⇒ 落 `unauthorized` /
+   * `unknown` ⇒ 归因错误。
+   */
+
+
+
+
   it('HTTP 429 → emit error(rate_limit, retryable=false)（ADR-0178 D2：429 不自动 retry）', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: { code: 'rate_limit_exceeded' } }), {
@@ -664,6 +692,33 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     }
   })
 
+  /**
+   * `status: 'failed'` 形态的内容策略判定（ADR-0173 D7a · Standards 轴 2026-10-23 复核）。
+   *
+   * <p>旧口径把本形态一律归 `server` + `retryable=true` ⇒ 若实为内容策略拦截，会
+   * **误触发整批回退**（重发同一份被拦的正文，必然再被拒，且再耗一次计费）。
+   */
+  it('stream=false + status=failed + 内容策略 code → error(content_filter, retryable=false)（不得误触发整批回退）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'failed',
+          error: { code: 'image_content_policy_violation', message: 'input new_sensitive (1026)' },
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+      expect(first.value.retryable).toBe(false)
+    }
+  })
+
   // ─── code-review P4 阻塞项：截断不得当成功（否则 store 会写 completed 缓存） ───
 
   it('stream=false + status=incomplete(max_output_tokens) → error(incomplete, retryable=false)', async () => {
@@ -727,4 +782,122 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+/**
+ * HTTP 错误分类（ADR-0173 D7a + ADR-0178 D2）。
+ *
+ * <p>内容策略拒绝的判定必须**先于** HTTP 状态码分流（拦截也带 4xx），且
+ * **code 与 message 两个信号都要看** —— 否则真机（native，读消息全文）与
+ * web 预览（读 error.code）会对同一个服务端响应判出两个码。
+ */
+describe('HTTP 错误分类（ADR-0173 D7a：内容策略优先于状态码）', () => {
+  let controller: AbortController
+  beforeEach(() => {
+    controller = new AbortController()
+  })
+  /**
+   * 服务端内容策略拒绝（issue #1063）—— web 路径与 native 路径必须同语义。
+   *
+   * <p>oracle：2026-10-23 真机实跑 MiniMax 真实 400 body（逐字取自 logcat
+   * `translateStream HTTP 400 body=` 行）：其 `error.code` 是 OpenAI 兼容层的
+   * `image_content_policy_violation`，`error.message` 携带 MiniMax 自有错误码
+   * 1026（官方错误码表：1026 = 输入内容涉敏）。
+   *
+   * <p>旧映射表只认 `invalid_request_error` 等，`image_content_policy_violation`
+   * 落 `unknown` ⇒ UI 显示「未知错误」，用户拿不到可行动信息。归到
+   * `content_filter` 后 UI 显示「服务端未返回译文：内容可能被内容策略拦截」。
+   */
+  it('HTTP 400 + MiniMax 内容策略 code → emit error(content_filter)（不得落 unknown/invalid_request）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            message: 'input new_sensitive (1026)',
+            code: 'image_content_policy_violation',
+          },
+        }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+      // 内容策略拦截重试无用 ⇒ 不得触发整批回退（ADR-0178 D2 子集表）
+      expect(first.value.retryable).toBe(false)
+    }
+  })
+  it('HTTP 403 + 内容策略 code → emit error(content_filter)（不得被状态码吞成 unauthorized）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'content_policy_violation', message: 'blocked' } }),
+        { status: 403, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+    }
+  })
+  it('裸 code = content_filter → emit error(content_filter)（部分服务商直接用它当 code）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'content_filter' } }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+    }
+  })
+  it('只给 error.type 不给 error.code 时同样识别（type 兜底读点）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { type: 'content_policy_violation' } }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+    }
+  })
+  /**
+   * 跨路径不漂移（Standards 轴 2026-10-23 复核实测）：同一 body，native 与 web 必须同判。
+   *
+   * <p>该 body 的 `code` 是 `invalid_request_error`（普通参数错），但 `message` 里带着
+   * MiniMax 的涉敏语义 `new_sensitive`。native 侧读**消息全文**⇒ 命中 ⇒ content_filter；
+   * web 侧若只看 `code` ⇒ invalid_request ⇒ **跨路径漂移** ⇒ 真机与 web 预览两套说法。
+   */
+  it('message 级涉敏信号（code 正常）→ content_filter（与 native 同判，不漂移）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: 'invalid_request_error', message: 'input new_sensitive (1026)' },
+        }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const iter = p.translate(SAMPLE_REQUEST, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('content_filter')
+      expect(first.value.retryable).toBe(false)
+    }
+  })
 })

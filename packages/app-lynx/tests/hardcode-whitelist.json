@@ -16,6 +16,10 @@
     "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
   },
   {
+    "path": "api/contentPolicy.ts",
+    "reason": "错误分类层的契约串识别（判据本体，非用户可见文案）：「未返回任何译文」是 Java 侧空流终态消息的字面量（#654），用于把该错误消息归类为 content_filter；展示层文案由 error code → i18n 派生（ADR-0173 D7 / D7a），此串永不被直接渲染给用户。与 api/nativeTranslate.ts 同款契约串豁免"
+  },
+  {
     "path": "api/nativeTranslate.ts",
     "reason": "Native bridge 包装层 message 快照/契约串（错误串从 Java 侧透传，console.warn 用，与 ADR-0053 / 0157 D6 同款）"
   },

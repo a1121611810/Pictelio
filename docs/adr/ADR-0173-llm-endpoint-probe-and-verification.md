@@ -112,8 +112,85 @@ spec/ADR 里**没有**任何关于「已验证状态」「免密钥重测」「�
 
 `store.error` 目前全仓无渲染点（`translate-error` emit 也无人监听）→ 翻译失败对用户完全静默。补一条**内联失败条**（§6.4 的最小形态）：显示错误文案 + 「更换 endpoint」入口。完整 §6.4（error-container 配色 + 查看文档链接）留待后续票。
 
+#### D7a · 错误码归因必须准确（**修订 2026-10-23 · issue #1063**）
+
+D7 要求「失败可见」，但**可见的文案本身也可能说错原因** —— 那比不可见更坏：
+用户会照着错误指引去改，而真实原因在别处。
+
+**实测暴露的缺陷**：2026-10-23 真机实跑（MiniMax + 真实 R-18G 章节正文）拿到服务端
+`HTTP 400: {"error":{"message":"input new_sensitive (1026)","code":"image_content_policy_violation"}}`
+（MiniMax 兼容层对「输入内容涉敏」的包装；官方错误码 1026 = 输入内容涉敏）。
+旧分类器只认 `content policy`（**空格**）与 `content_filter`，真实 body 用的是**下划线**
+`content_policy_violation` 与 MiniMax 自有 `new_sensitive` ⇒ 全部命不中 ⇒ 落到 HTTP 状态码
+分支 ⇒ 400 ⇒ `invalid_request` ⇒ UI 显示「请求参数无效（400）：请检查模型与 endpoint 配置」。
+
+⇒ **归因错误**：服务端明明说了「是内容策略拦的」，UI 却让用户去改 endpoint / model 配置；
+而真实原因是正文被内容策略拦了，换任何 endpoint 都不会好。
+
+**修订后的规约**：
+
+1. **拦截识别必须先于 HTTP 状态码判定**。拦截也返回 400；先按状态码判就会把它吞成
+   `invalid_request`。两处分类器（native 路径 `classifyNativeError`、web 路径 `mapErrorCode`）
+   的判定顺序据此锁定。
+2. **服务端已明说「内容策略」时，一律归 `content_filter`**（不归 `invalid_request` / `unknown`），
+   与 #654 的「HTTP 200 但零输出」空流形态**同语义、同 UI 文案** —— 同一件事不许两种说法。
+3. **不得把服务商技术错误串直接渲染给用户**（本条即 D7 的原意：文案由 code → i18n 派生）。
+   服务商专有细分字段（MiniMax 的 `input_sensitive_type` 1–7 类、`base_resp.status_msg`）
+   **不读**（会把错误分类绑死在某一家服务商的私有扩展上）。
+4. **普通 400 仍是 `invalid_request`** —— 不得把 400 一律当拦截（两条路径各配一条反向边界用例）。
+
+**门禁规模登记（规模线 30%，Standards 轴 2026-10-23 复核）**：
+
+⚠️ **行数口径统一为 `splitlines`**（`len(open(f).read().splitlines())`）—— 多个被测文件
+**末行无换行符**，`wc -l` 会少 1；本块全部数字用 `splitlines` 口径，**复算命令见末尾**。
+
+| 门禁 | 行数 | 被测对象 | 行数 | 比例 |
+| --- | --- | --- | --- | --- |
+| `tests/unit/api/nativeTranslate.test.ts` | 851 | `src/api/nativeTranslate.ts` | 719 | **118.4%**（超线） |
+| `tests/unit/api/translate.test.ts` | 903 | `src/api/translate.ts` | 915 | **98.7%**（超线） |
+| （判据本体，无独立门禁文件） | — | `src/api/contentPolicy.ts` | **62** | — |
+
+⚠️ 两个门禁**本轮之前即已超线**（HEAD 版：native 门禁 801 / 源 709 = **113.0%**；
+translate 门禁 729 / 源 883 = **82.6%**）。
+**本轮增量**（`git diff --numstat`，增/删）：native 门禁 **50/1**、translate 门禁 **174/1**、
+native 源 **11/1**、translate 源 **35/4**。
+
+**新增用例构成**（逐条核对 `git diff` 的 `^+  it(` 计数）：native **4 条**、translate **7 条**
+⇒ 合计 **11 条**。分述：
+- native（4 条）：3 正向（真实 body / `content_policy_violation` code / `new_sensitive`）
+  + 1 反向（普通 400 仍归 `invalid_request`）；
+- translate（7 条）：5 正向（真实 400 + code / HTTP 403 + 内容策略 code / 裸 `content_filter`
+  / 仅给 `error.type` / **message 级涉敏信号（跨路径不漂移）** / `stream=false` + `status=failed`
+  内容策略）+ 2 反向（普通参数错仍归 `invalid_request`；`status=failed` 非内容策略仍归 `server`）。
+
+**处置**：11 条用例各钉一个独立分支，**不删**；但**已达「后续若再扩测点须先拆文件」的红线**
+⇒ **下轮扩测前必须先拆**，不得继续加码。
+
+**变异验证（实测判别力，三轮）**：
+| 轮次 | 变异 | 结果 |
+| --- | --- | --- |
+| ① | native 去掉形态 ②③ + web 去掉后缀映射 | **4 failed \| 81 passed**（红） |
+| ② | 删掉 web 侧「内容策略先于状态码」的判定 | **4 failed \| 42 passed**（红） |
+| ③ | 去掉 web 侧 message 级判据（2 处：HTTP 错误分支 / `status=failed` 分支） | 各 **1 failed**（红） |
+| 恢复 | — | **90 passed**（绿） |
+
+⇒ 门禁确实能抓到该缺陷，不是恒绿。
+
+**复算命令**（Standards 轴 2026-10-23 要求「行数必须连口径一起写」）：
+```bash
+git diff --numstat -- packages/app-lynx/src/api/{nativeTranslate,translate}.ts \
+  packages/app-lynx/tests/unit/api/{nativeTranslate,translate}.test.ts
+python3 -c "print(len(open(f,encoding='utf-8').read().splitlines()))"   # 逐文件
+```
+⚠️ **提交前必须重算一次** —— 本块数字随用例搬移（新增独立 describe）而漂移过一次。
+
+取证与修复全链：[`docs/research/translation-content-policy-classification-2026-10.md`](../research/translation-content-policy-classification-2026-10.md)。
+
 ## 后果
 
 - 正面：用户看到的每个状态都对得上它的来源；未配置时有明确引导；翻译中能停；失败不再是黑箱；已保存配置免密钥可重测。
 - 代价：设置页多**两行**状态（兼容性 chip + 凭据徽章）与一个内联结果区；新增 3 个存储键 + **20 个 i18n 键**（每语种）。
 - 偏离 spec 两处（D5 Snackbar → 内联提示；D6 5 态 → 4 态）已在本 ADR 显式记录，不属遗漏。
+- **D7a（2026-10-23）**：错误文案不再误报成因；代价是错误分类器多认两类形态
+  （下划线 `content_policy_violation` / `new_sensitive`）—— 判定串与 web 路径的 code 后缀匹配
+  是**两份需同步的判据**，已登记为下轮扩测前须拆文件的对象。

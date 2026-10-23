@@ -16,6 +16,8 @@
 > | `tests/dialogThemeFlipContract.test.ts` | `src/App.vue` + `src/components/SearchSheet.vue` | #1018 常驻弹层跨明暗翻转 |
 > | `tests/novelIntroNarrowViewport.test.ts` | `src/pages/NovelIntro.vue` + `src/components/AppIcon.vue` | #756 极窄屏降级矩阵 |
 > | `tests/unit/stores/novelTranslateStoreCancelWindow.test.ts` | `src/stores/novelTranslateStore.ts` | #760 翻译 store 取消窗口竞态 |
+> | `tests/unit/api/nativeTranslate.test.ts`（内容策略分类组） | `src/api/contentPolicy.ts`（**判据本体**）+ `src/api/nativeTranslate.ts` | #1063 服务端内容策略拦截归因 |
+> | `tests/unit/api/translate.test.ts`（内容策略分类组） | `src/api/contentPolicy.ts`（**判据本体**）+ `src/api/translate.ts` | #1063 服务端内容策略拦截归因 |
 
 ## 用法
 
