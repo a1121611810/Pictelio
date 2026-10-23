@@ -107,10 +107,24 @@ app-lynx 目前提供 6 支主题色（sky/violet/pink/green/orange/teal），�
 
 好测试标准：只断言外部可见行为（类名输出、tokens.css 内容、对比度数值），不断言内部实现；oracle 取自真实源文件（tokens.css / 脚本源码），禁手写自洽值。
 
+### 门禁规模登记（#776 收敛防线 · Standards 轴 2026-10-23 复核）
+
+规模线 = 单门禁文件 ≤ 被测对象 30%。`packages/app-lynx/tests/meThemeColorOptions.test.ts`
+**134 行**（Standards 轴复核时点 122 行，补「已知失效面」段后 134 行）；按**最保守的单一被测对象**
+`Me.vue`（**1673 行**）计 = **134 / 1673 = 8.0%**，**未超 30% 线**。
+
+- **被测对象**：本门禁同时读 `Me.vue`（清单抽取）、`src/utils/themeColor.ts`（主题色单一事实源）、
+  `src/utils/accessibility.ts`（a11y 注册表）、`src/i18n/locales/{zh-CN,en}/pages.ts`（词条表）。
+  比例按**最大单一对象**（`Me.vue`）计，口径偏保守。
+- **已知失效面**：见门禁文件头注释「已知失效面（不假装已覆盖）」段 —— 核心两条是**只验接线不渲染**
+  （色块实际渲染数量/顺序/像素不在本门禁面内）与**只验 i18n 键存在不验文案内容**。
+- **决策来源**：ADR-0198 D5「Me.vue 第 7 色块沿用既有同构手写模板（不做 v-for 收敛重构）」——
+  该挂账由 [#776](https://github.com/a1121611810/Pictelio/issues/776) 承接并于 2026-10-23 实施。
+
 ## Out of Scope
 
 - webview 端（`packages/app`）的任何主题改动（用户明示；Fluent 2 无 accent 主题概念）。
-- Me.vue 色块 v-for 收敛重构（「实施范围不扩散」；挂账给未来重构票）。
+- ~~Me.vue 色块 v-for 收敛重构~~（「实施范围不扩散」；挂账给未来重构票）→ **已实施（2026-10-23，[#776](https://github.com/a1121611810/Pictelio/issues/776)）**：收敛为**清单驱动的单块 `v-for`**（`Me.vue` 的 `themeColorOptions` 清单 + 单块模板，7 份手写重复模板消失），新增源级门禁 `packages/app-lynx/tests/meThemeColorOptions.test.ts`（10 例，钉住清单成员/顺序 ≡ `THEME_COLOR_OPTIONS`、i18n 键与 a11y 键的双向闭合）。规模登记与失效面见上文「门禁规模登记」。
 - 暗色板手调 bili 暗值（ADR-0198 D3 否决）。
 - bilibili 字体/圆角/动效体系的引入（那是一次换设计体系的独立工程）。
 - `ErrorPagePreview.vue`（errorPrototype）的 6 处硬编码 hex 处理。

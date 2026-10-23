@@ -22,7 +22,7 @@ import M3Switch from '../components/M3Switch.vue'
 import M3SegmentedButton, { type M3SegmentOption } from '../components/M3SegmentedButton.vue'
 import FabAllowanceSpacer from '../components/FabAllowanceSpacer.vue'
 import { appearanceClasses } from '../utils/appearanceClasses'
-import type { DarkModeId } from '../utils/darkMode'
+import type { DarkModeId, ResolvedDark } from '../utils/darkMode'
 import {
   createLynxBackupDeps,
   createLynxBackupWiring,
@@ -485,6 +485,104 @@ const detailQualityOptions = computed<M3SegmentOption<ImageQuality>[]>(() => [
   { value: 'original', label: t('me.quality.original'), a11yLabel: ME_A11Y_LABELS.detailQualityOriginal },
 ])
 
+// ─── 外观组·主题色选项（#776：清单驱动收敛；原为 7 份手写重复色块模板）──────────
+// 顺序 = UI 顺序（sky → bili），与 utils/themeColor.ts 的 THEME_COLOR_OPTIONS 一致。
+// ⚠️ 逐 id 的 appearanceClasses / setThemeColor **字面量调用是刻意保留**的：既有门禁按 id
+//   断言源码字面量（unit.test.ts「Me.vue 外观卡片为每个色板提供入口」、
+//   appearanceClasses.test.ts「Me.vue 每个色块走 appearanceClasses」），改成 id 变量传参
+//   会让这两条门禁失去着力点（改门禁属门禁变更，不在本票范围）。
+// classes 收「渲染期解包后的暗色态」作形参（模板传参），形参名与 storeToRefs 的同名 ref
+//   一致 ⇒ 闭包内取到的永远是明文值而非 ref；色板类不可预先求值（会把色块冻结在旧色板）。
+// a11y 两项随选项走：模板内逐条绑定会破坏「每条 accessibility-label 都配一个
+//   accessibility-element」的源码配平不变量（unit.test.ts / meMyPixivTemplate.test.ts /
+//   meWatchLaterTemplate.test.ts 三处同判据）。
+const themeColorOptions = [
+  {
+    // 天蓝（默认）
+    id: 'sky',
+    labelKey: 'me.appearance.colorSky',
+    a11yLabel: ME_A11Y_LABELS.themeColorSky,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'sky' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('sky', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('sky'),
+  },
+  {
+    // 紫罗兰
+    id: 'violet',
+    labelKey: 'me.appearance.colorViolet',
+    a11yLabel: ME_A11Y_LABELS.themeColorViolet,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'violet' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('violet', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('violet'),
+  },
+  {
+    // 樱花粉
+    id: 'pink',
+    labelKey: 'me.appearance.colorPink',
+    a11yLabel: ME_A11Y_LABELS.themeColorPink,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'pink' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('pink', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('pink'),
+  },
+  {
+    // 松柏绿
+    id: 'green',
+    labelKey: 'me.appearance.colorGreen',
+    a11yLabel: ME_A11Y_LABELS.themeColorGreen,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'green' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('green', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('green'),
+  },
+  {
+    // 落日橙
+    id: 'orange',
+    labelKey: 'me.appearance.colorOrange',
+    a11yLabel: ME_A11Y_LABELS.themeColorOrange,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'orange' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('orange', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('orange'),
+  },
+  {
+    // 深青
+    id: 'teal',
+    labelKey: 'me.appearance.colorTeal',
+    a11yLabel: ME_A11Y_LABELS.themeColorTeal,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'teal' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('teal', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('teal'),
+  },
+  {
+    // 哔哩粉
+    id: 'bili',
+    labelKey: 'me.appearance.colorBili',
+    a11yLabel: ME_A11Y_LABELS.themeColorBili,
+    a11yElement: A11Y_ELEMENT_ENABLED,
+    classes: (resolvedDark: ResolvedDark) => [
+      themeColor.value === 'bili' ? 'border-primary' : 'border-transparent',
+      ...appearanceClasses('bili', resolvedDark),
+    ],
+    select: () => settings.setThemeColor('bili'),
+  },
+] as const
+
 function pickUgoiraMode(m: 'fflate' | 'range') {
   if (m === 'fflate') {
     ugoiraConfirm.value = false
@@ -772,114 +870,24 @@ function pickAppearanceMode(mode: DarkModeId) {
         <text class="text-label-medium text-surface-on-variant mb-2">{{ t('me.appearance.mode') }}</text>
         <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统（spec §4.4：分解写法，副作用走 pickAppearanceMode；mb-4 随 class 透传落在容器根） -->
         <M3SegmentedButton class="mb-4" :model-value="darkMode" :options="appearanceOptions" @update:modelValue="pickAppearanceMode" />
-        <!-- 色板行：7 个色块的选中态 ✓ 裸字形统一换 Material Symbols `check`（T12/ADR-0208），
+        <!-- 色板行：主题色色块（块数与顺序由 themeColorOptions 清单决定，见脚本段），
+             选中态 ✓ 裸字形统一换 Material Symbols `check`（T12/ADR-0208），
              :size=2.93vw = 原 text-label-small（11sp = 22rpx = 11px @375），视觉尺寸不变；
              「已选中」语义仍由色块的 accessibility-label + border/bg 表达，图标只画形状不承载语义 -->
         <view class="flex flex-row items-start justify-between">
-          <view class="flex flex-col items-center gap-1">
-            <!-- 天蓝（默认） -->
+          <view v-for="option in themeColorOptions" :key="option.id" class="flex flex-col items-center gap-1">
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'sky' ? 'border-primary' : 'border-transparent', ...appearanceClasses('sky', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorSky"
-              @tap="settings.setThemeColor('sky')"
+              :class="option.classes(resolvedDark)"
+              :accessibility-element="option.a11yElement"
+              :accessibility-label="option.a11yLabel"
+              @tap="option.select()"
             >
               <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'sky'" name="check" :size="2.93" class="text-primary-on" />
+                <AppIcon v-if="themeColor === option.id" name="check" :size="2.93" class="text-primary-on" />
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorSky') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 紫罗兰 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'violet' ? 'border-primary' : 'border-transparent', ...appearanceClasses('violet', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorViolet"
-              @tap="settings.setThemeColor('violet')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'violet'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorViolet') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 樱花粉 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'pink' ? 'border-primary' : 'border-transparent', ...appearanceClasses('pink', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorPink"
-              @tap="settings.setThemeColor('pink')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'pink'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorPink') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 松柏绿 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'green' ? 'border-primary' : 'border-transparent', ...appearanceClasses('green', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorGreen"
-              @tap="settings.setThemeColor('green')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'green'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorGreen') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 落日橙 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'orange' ? 'border-primary' : 'border-transparent', ...appearanceClasses('orange', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorOrange"
-              @tap="settings.setThemeColor('orange')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'orange'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorOrange') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 深青 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'teal' ? 'border-primary' : 'border-transparent', ...appearanceClasses('teal', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorTeal"
-              @tap="settings.setThemeColor('teal')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'teal'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorTeal') }}</text>
-          </view>
-          <view class="flex flex-col items-center gap-1">
-            <!-- 哔哩粉 -->
-            <view
-              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'bili' ? 'border-primary' : 'border-transparent', ...appearanceClasses('bili', resolvedDark)]"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.themeColorBili"
-              @tap="settings.setThemeColor('bili')"
-            >
-              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <AppIcon v-if="themeColor === 'bili'" name="check" :size="2.93" class="text-primary-on" />
-              </view>
-            </view>
-            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorBili') }}</text>
+            <text class="text-label-small text-surface-on-variant">{{ t(option.labelKey) }}</text>
           </view>
         </view>
         <!-- 界面语言（spec docs/specs/i18n.md §3：跟随系统 + 手动覆盖 + 即时切换；autonym 按 ui-copy R8 不翻译） -->

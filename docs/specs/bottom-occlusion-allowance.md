@@ -23,8 +23,9 @@
     **完全落在 FAB 之上、且实测点击被接收**（点后弹出「服务器返回错误，请稍后重试」
     ——该功能因未配 WebDAV 必然如此，但足以证明 tap 到达了末项而非被 FAB 吞掉）。
     另实测「退出登录」同样可点（成功导航到登录页）。
-    ⚠️ 顺带订正一处措辞：先前把「退出登录」称作「末项」是**错的** —— 它下方还有 12 个
-    `@tap`（WebDAV 凭据/自动备份/测试/备份/恢复等，`Me.vue:1373` 起），**不是**末项。
+    ⚠️ 顺带订正一处措辞：先前把「退出登录」称作「末项」是**错的** —— 它下方还有 14 个
+    `@tap`（自 `Me.vue:1311` 的 `toggleWebdavEnabled` 起，其中 `Me.vue:1460` 起 13 个：
+    WebDAV 凭据/自动备份/测试/备份/恢复等），**不是**末项。
     首页无底部空带；插画页榜单/列表间隙恢复。
 - 决策来源：[ADR-0217](../adr/ADR-0217-bottom-occlusion-allowance-scoped-to-scroll-content.md)
 - 术语文档（权威）：[glossary-bottom-occlusion-allowance.md](../adr/glossary-bottom-occlusion-allowance.md)

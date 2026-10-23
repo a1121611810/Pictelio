@@ -23,13 +23,13 @@
 ## Step 1 — endpoint 配置 + Keystore 持久化
 
 **操作**：
-1. 启动 app-lynx → 进「我」→「翻译」分组（Me.vue:1096-1099）
+1. 启动 app-lynx → 进「我」→「翻译」分组（Me.vue:1283）
 2. 填 Base URL（OpenAI `https://api.openai.com/v1`）+ API Key（≥20 字符）+ Model（`gpt-5`）
 3. 点「保存」
 
 **断言**：
 - ✅ 保存成功 → 设置页出现「✓ 已保存」内联提示（ADR-0173 D5：页内内联，非 Snackbar）
-- ✅ 杀掉 app 进程（`adb shell am force-stop io.pictelio.app`）→ 重启 → endpoint 仍在设置页
+- ✅ 杀掉 app 进程（`adb shell am force-stop io.pictelio.app.debug`）→ 重启 → endpoint 仍在设置页
 - ✅ 重启后 inline probe 仍能跑（说明 baseURL/model 在 Keystore 外层 metadata 也持久化了）
 
 **截图**：`step1-keystore.png` —— 重启前后 endpoint 一致
