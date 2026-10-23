@@ -115,9 +115,10 @@ debug 侧（`/data/data/io.pictelio.app.debug/shared_prefs/`）：
 >    applicationId 就是 `io.pictelio.app`，与 release 同 id ⇒ `adb install -r` 会因**签名不匹配**
 >    失败）。卸载顺带清掉了旧 debug 包的数据目录 ⇒ 它**不能**替代「同 id 覆盖安装后 release 读不到
 >    dev 键」的验证。⇒ 隔离结论的依据是 §3.4 的**键名枚举**，**不是**卸载这一步。
-> 4. **仍缺的一项取证（如实登记）**：#1037 验收条件第 3 条的「**翻译闸门放行**」——
->    `dev_force_translate_r18` 这一键已**播种并验证隔离**（键位层面），但「实际发起一次 R18 翻译并被
->    放行」需要可用的 LLM 端点配置 + 受限章节，**本轮未实跑**，仍属机制论证。
+> 4. **「翻译闸门放行」已补跑（2026-10-23 14:16–14:21）**——见 [§3.6](#36-翻译闸门放行实跑补跑)。
+>    起因：维护者指出 `packages/app-lynx/.env` 里有可用的 LLM 端点配置（本节原先登记的
+>    `https://example.invalid/v1` 占位值**只用于键位隔离**，不是可用配置）⇒ 用真实端点补跑了
+>    #1037 验收条件第 3 条。结论：**闸门放行成立**（本地 `_translateR18` 未拦截，受限正文确实外发）。
 
 ### 3.5 用户可见（帧）
 
@@ -127,6 +128,51 @@ debug 侧（`/data/data/io.pictelio.app.debug/shared_prefs/`）：
 | release | `assets/debug-release-isolation/io-pictelio-app-release-login.png` | **停在登录页**：「粘贴 Pixiv refresh_token」输入框 + 「登录」按钮 |
 
 ⇒ **会话零继承**：同一个 refresh_token 播在 debug 侧，release 侧仍要求重新登录。
+
+### 3.6 翻译闸门放行实跑（补跑）
+
+> 补跑时间：2026-10-23 14:16–14:21（模拟器 `emulator-5556`，debug 变体 `io.pictelio.app.debug`）。
+> 起因：维护者指出 `packages/app-lynx/.env` 里有可用的 LLM 端点配置（§3.4 登记的
+> `https://example.invalid/v1` 只是**键位隔离**用的占位值，不是可用配置）。
+
+**端点来源**（凭据值不入文档、不入库、不入聊天）：`packages/app-lynx/.env`（`.gitignore:49` 已忽略、
+未跟踪）里的 `PICTELIO_AI_*`（服务商 A：`https://api.minimax.cn/v1`、模型 `MiniMax-M3.1-Flash-Preview`、
+协议 `chat`）与 `DEEPSEEK_API_KEY`（服务商 B：`https://api.deepseek.com/v1`、模型 `deepseek-chat`）。
+
+**dev 播种**（5 个 extra，`BuildConfig.DEBUG` 门禁内）：
+
+```bash
+adb shell am force-stop io.pictelio.app.debug   # 必须先 force-stop，否则 singleTask 不重跑 onCreate 里的 dev hook
+adb shell am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity \
+  --es pictelio_dev_llm_base_url "<服务商端点>" --es pictelio_dev_llm_model "<模型>" \
+  --es pictelio_dev_llm_api_key "<key>" \
+  --es pictelio_dev_force_r18 true --es pictelio_dev_force_translate_r18 true
+```
+
+**路径**：小说 tab → `#R-18G` 标签下的受限小说 → 「开始阅读」→ 章节页「翻译本章」按钮。
+
+**判据（为什么这能证明「闸门放行」）**：本地 `_translateR18` 闸门若拦截，Java 侧
+`PictelioTranslateModule.translateStream` 的**入口日志**（打印 `baseURL` / `model`）与随后的
+**HTTP 交互**都**不会发生**。实测两者都发生了 ⇒ 请求**确实离开了设备** ⇒ 闸门放行。
+
+| 服务商 | 实测 | 帧统计 | UI 终态 |
+| --- | --- | --- | --- |
+| **A** | 首个 chunk `translateStream HTTP 200 开始读流`；随后 6 个 chunk `HTTP 400`：`{"error":{"message":"input new_sensitive (1026)","code":"image_content_policy_violation"}}` | `reasoning_delta` 323 · `delta_all` 1 · `error` 9 | 「**服务端未返回译文：内容可能被内容策略拦截**」+「重试」按钮 |
+| **B** | **5/5 chunk 全部 `translateStream HTTP 200 开始读流`** | `delta_all` 5 · `done` 5 | **中文译文正文已渲染**（原文段落旁出现译文）+ 进度「翻译中 N%」 |
+
+⇒ **两条同时成立**：
+① **本地闸门放行**——受限（R-18G）章节正文**实际外发**给第三方 LLM（两个服务商都收到了请求）；
+② **服务商侧内容策略是另一道闸**——A 家按其自有内容审核拒绝了多数 chunk（HTTP 400 明确标注
+`image_content_policy_violation`），B 家放行并返回了完整译文。**应用对 A 家的拒绝给出了正确的错误态**
+（「内容可能被内容策略拦截」），不是静默失败。
+
+⚠️ **口径与边界**：
+- 本次实跑**确实把该 R-18G 章节正文发给了两家第三方 LLM**——这正是 `dev_force_translate_r18`
+  （「允许把受限正文发给第三方 LLM」，与 `dev_force_r18`「允许看见受限内容」是**两个独立决定**，
+  见 `LynxActivity` 的 `DEV_EXTRA_FORCE_TRANSLATE_R18` 注释与 ADR-0173 D4b）的**预期行为**。
+- 实测证明的是**闸门语义**（放行 / 不放行）与**错误态呈现**，**不是**「受限内容能被成功翻译」——
+  后者取决于各服务商的审核策略，属**外部变量**。
+- 证据为**模拟器**单次实跑（非回归门禁）；服务商策略可变 ⇒ 重跑结果可能不同。
 
 ## 4. 已知失效面
 

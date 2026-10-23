@@ -144,6 +144,7 @@ debug 与 release 共用同一个 `applicationId` ⇒ 共用一份 SharedPrefere
 | dev 播种键写入应用私有目录 | dev hook 写 `PictelioPrefs` / Keystore（宿主私有数据目录）⇒ 随 applicationId 隔离 |
 | release 构建链可用 | `packages/android-host/android/app/pictelio-release.keystore` 存在 + `PICTELIO_KEYSTORE_PASSWORD` / `PICTELIO_KEY_PASSWORD` 已注入 ⇒ `assembleRelease` 可本地构建（release 验签见 `docs/release-signing.md`） |
 | **运行时验证（存储层隔离）** | 模拟器 `emulator-5556` 实测：两包共存（`pm list packages` 同时列出 `io.pictelio.app` 与 `io.pictelio.app.debug`）；dev 播种键 `dev_force_r18` **只在 debug 侧**；refresh_token 的 Keystore 落点 `WSSecureStorageSharedPreferences.xml` **只在 debug 侧**、release 侧不存在 ⇒ release 读不到任何一个；用户可见：debug 已登录出作品流、release 停在登录页。帧与逐步实测见 [`docs/research/debug-release-isolation-2026-10.md`](../research/debug-release-isolation-2026-10.md)（帧在 `docs/research/assets/debug-release-isolation/`）。⚠️ 口径：release 侧**首次启动后**会自建 `shared_prefs`（键 `usage_metrics_v1`，App 自身产物）⇒ 判据是「读不到 dev 播种键与凭据落点」，不是「目录不存在」 |
+| **运行时验证（翻译闸门放行，AC-3）** | 模拟器 `emulator-5556` 实测（2026-10-23 14:16–14:21）：`packages/app-lynx/.env` 的真实 LLM 端点做 dev 播种 + `dev_force_r18` / `dev_force_translate_r18` ⇒ 进 `#R-18G` 受限小说的章节页点「翻译本章」：**服务商 A 首 chunk `HTTP 200`、余下 chunk `HTTP 400 image_content_policy_violation`（服务商侧内容审核）**；**服务商 B 5/5 chunk 全 `HTTP 200`**、中文译文落地渲染。判据：本地 `_translateR18` 闸门若拦截，Java 侧 `translateStream` 入口日志与 HTTP 交互都不会发生——实测都发生了 ⇒ **闸门放行成立**。详见 [research §3.6](../research/debug-release-isolation-2026-10.md) |
 
 ---
 
