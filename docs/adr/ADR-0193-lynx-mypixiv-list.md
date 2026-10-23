@@ -2,13 +2,17 @@
 
 - 状态：Accepted（已采纳）
 - 日期：2026-09-27
+- **订正（2026-10-23，坐标口径）**：正文「背景」段引用的 webview 端 `packages/app/src/api/types.ts:266` 随
+  ADR-0203 整包删除（`packages/app/` 目录已不存在）⇒ **该坐标是历史留痕**，锚在删包前的 `packages/app/`，
+  不再指向任何现行文件；app-lynx 侧的 `packages/app-lynx/src/api/types.ts:197` 才是现行坐标。
+  正文按 ADR 惯例原样保留作决策史。
 - 关联：`docs/adr/glossary-lynx-four-features.md`（术语表——好P友/UserPreview/UserRow）、`docs/specs/lynx-mypixiv.md`（规格，随 /to-spec 产出）、ADR-0194（公共组件层——UserRow 复用）、ADR-0150（页级首载三态 deriveFirstLoadView）、ADR-0136（benchNav 验证钩子）、ADR-0188（Me 页功能入口卡区先例）、ADR-0037（PixivApiPlugin 网关——Java 零改动前提）
 
 ## 背景
 
 好P友（MyPixiv）是 Pixiv 的**双向**社交关系（双方互相关注才成立），官方 App 有独立的好P友页。Pictelio 现状（file:line 实证）：
 
-- **仅存在计数字段**：`PixivProfile.total_mypixiv_users`（`packages/app-lynx/src/api/types.ts:190`，optional；webview `packages/app/src/api/types.ts:266`）——用户主页能**看到数字**，却没有任何入口看到**人**。
+- **仅存在计数字段**：`PixivProfile.total_mypixiv_users`（`packages/app-lynx/src/api/types.ts:197`，optional；webview `packages/app/src/api/types.ts:266`）——用户主页能**看到数字**，却没有任何入口看到**人**。
 - **无列表能力**：双端 `api/user.ts` 只有 `getUserFollowing` / `getUserFollowers`（单向关系族），无 mypixiv 端点封装。
 - **端点经六独立客户端交叉验证**：`GET /v1/user/mypixiv`，参数 `user_id` + 可选 `offset`，响应 `{ user_previews, next_url }`，元素为 `PixivUserPreview` 形状（`{ user, illusts, novels, is_muted }`）——与 following/follower 响应同构，分页机制可直接复用。
 - **Java 零改动可行**：lynx 数据通道 `PictelioApiModule.request()`（与 webview `PixivApiPlugin.request()`）均为 path 直拼、无白名单（ADR-0188 已验证同一前提）。
@@ -49,4 +53,6 @@ Me 页功能入口卡区新增「好P友」行（i18n key `me.mypixiv`，文案�
 - 正面：`total_mypixiv_users` 数字背后的列表能力补齐，用户主页数字首次可点达；数据层新增代码仅一个端点封装（续页/分页/三态全复用既有管道）；UserRow 借此完成第二消费方验证（ADR-0194 抽取收益落地）；benchNav 注册让验证成本趋零。
 - 取舍（已接受）：`novels` 字段本批不消费（仅类型对齐）；好P友申请/审批流未求证不做（留待端点取证）；`is_muted` 不本地过滤；webview 端暂无对等页面（双端不对称是现状常态）。
 - 风险：`/v1/user/mypixiv` 为六客户端交叉验证结论而非本仓抓包实证——spec 落地时以真实账号抓包 fixture 钉 schema（对齐测试硬约束 #2 真实样例要求），字段出入按宽容解析处置。
+  - **订正（2026-10-23，issue #755）**：该风险**已兑现关闭**——本仓完成一手真实抓包（3 份响应：空态 / 28 条分页 / 同族 following 对照），逐项量测见 [`docs/research/mypixiv-real-capture-2026-10.md`](../research/mypixiv-real-capture-2026-10.md)；契约 fixture 换成真实响应，抓包实测条目键（`user/illusts/novels/is_muted` 28/28 齐全）、`user.is_accept_request`（28/28 + 30/30 均在，true/false 两侧都出现过）；契约 fixture 取真实分页**前 9 项**逐字未改 ⇒ 断言按 9/9 钉、`novels` 元素形状（样本含 3 条非空，类型与 `PixivNovel` 逐项一致）、`is_muted` 布尔透传、`next_url` 服务端原文。
+  - **同时订正两处推断**：①「following/follower 响应**无** `novels` 字段」被实测推翻（两端点均带该键）⇒ `PixivUserPreview.novels` 仍**可选**（编译期防线，勿收紧），但注释改为「可选性是保守选择」；② `PixivUser` 类型**缺** `is_accept_request` 声明（真包一直有该键）⇒ 已补为可选字段。
 - 后续候选（不在本期）：好P友申请/审批流（端点取证后立项）、`/v2/illust/mypixiv` / `/v1/novel/mypixiv` 作品流、好P友作品聚合 feed、webview 端对等实现。

@@ -18,7 +18,7 @@
 
 - **vs 屏蔽用户（blockStore `blocked_user_ids`）**：屏蔽按**作者**维度、设备级集合；标签静音按**标签**维度、账号级集合。两者同处 `filterFeedIllusts` 谓词链，互不替代。
 - **vs R18/R18G 分级、AI 三态**：分级与 AI 是**内容属性**判定（开关/模式驱动）；标签静音是**用户词表**判定（集合成员驱动）。注入层级相同（同一过滤函数内并排）。
-- **vs pixiv 官方静音（mute）**：官方静音是账号级服务端能力（`is_muted` 字段下发）；本功能是纯本地词表，不调用任何服务端端点、不与服务端状态同步（`api/types.ts:248` 的 `is_muted` 字段消费仍是独立挂账项）。
+- **vs pixiv 官方静音（mute）**：官方静音是账号级服务端能力（`is_muted` 字段下发）；本功能是纯本地词表，不调用任何服务端端点、不与服务端状态同步（`api/types.ts:229` 的 `is_muted` 字段消费仍是独立挂账项）。
 - **vs 搜索关键词**：搜索入口以原始 `tag.name` 发起（webview `SearchableTag.tsx`、lynx `IllustDetail.vue` 标签行）；静音集合同样以原始 name 为锚，两者语义同源。
 
 ## 歧义记录

@@ -13,6 +13,13 @@ export interface PixivUser {
     px_170x170?: string;
   };
   is_followed?: boolean;
+  /**
+   * 好P友申请状态（布尔）。**2026-10-23 真实抓包实测**：mypixiv 28/28 条目、following 30/30
+   * 条目的 user 块均带该键（fixture 取前 9 项逐字未改，契约断言按 9/9 钉）（取值 true/false 两侧都出现过）。
+   * 此前类型未声明它——fixture 里有真值但类型缺字段（消费方无从读取）。本仓页面当前不消费，
+   * 声明为可选是保守选择（其它端点的 user 块是否带该键未逐一实测）。
+   */
+  is_accept_request?: boolean;
 }
 
 export interface PixivAuthResponse {
@@ -110,7 +117,7 @@ export interface PixivNovelDetailResponse {
  * 字段分层（spec app-lynx-novel-intro-action-row §3.2）：
  * - `novel_series_detail` = 顶层追更元数据（id/title/content_count/is_concluded/watchlist_added），
  *   对齐 lynx 既有消费面 `loadNovelSeries`；兼容 NovelDetail / NovelIntro watchlist 预取，不破坏既有契约
- *   （验收 #5：NovelIntro.vue:76 读 `novel_series_detail.watchlist_added` 必须继续工作）
+ *   （验收 #5：NovelIntro.vue:104 读 `novel_series_detail.watchlist_added` 必须继续工作）
  * - `novels` / `next_url` = 章节列表与分页游标；同端点 `/v2/novel/series` 服务端一并返回，
  *   分页时 `last_order` 增量追加；envelope 取 Pixiv App API 真实响应形状
  */
@@ -203,15 +210,20 @@ export interface PixivUserPreview {
   illusts: PixivIllust[];
   /**
    * 好P友端点 /v1/user/mypixiv 与用户搜索 /v1/search/user 响应含该字段（UserPreview 形状 =
-   * { user, illusts, novels, is_muted }）；following/follower 响应**无**该字段——必需声明会
-   * 类型失真，故可选（该可选性是 user.test.ts「无 novels 也要能构造」的编译期防线，勿收紧）。
+   * { user, illusts, novels, is_muted }）。
+   *
+   * **可选性是保守选择，不是「某些端点无此字段」的事实**——2026-10-23 真实抓包实测
+   * mypixiv 28/28 条目、following 30/30 条目**都带 novels 键**（mypixiv 样本里 3 条非空）；
+   * 旧注释「following/follower 响应无该字段」已被实测推翻。可选性保留的理由是
+   * user.test.ts「无 novels 也要能构造」的**编译期防线**（勿收紧）：类型放宽不掩盖形状，
+   * 消费方按可选处理即可。
    *
    * ⚠️ 元素形状的证据边界：`/v1/search/user` 侧为**一手实测**——spec
    * docs/specs/search-user-scope.md §3.1 零缺失、§3.3 实测 image_urls 只有
-   * square_medium/medium/large（无 original）。`/v1/user/mypixiv` 侧**未独立验证**：
-   * 该端点 fixture（__fixtures__/mypixiv-users.json）里 novels 是空数组，无元素可查。
-   * 两端点同属 UserPreview 形状，故按 search/user 的实测收窄；若将来 mypixiv 形状分叉，
-   * 以本类型为准的调用点会由 tsc 暴露。
+   * square_medium/medium/large（无 original）；`/v1/user/mypixiv` 侧**已由 2026-10-23 真实
+   * 抓包独立验证**（样本含 3 条非空 novels，其元素 id/title/page_count/text_length/x_restrict/
+   * is_bookmarked/total_bookmarks/create_date/tags 的类型与本类型逐项一致），
+   * 见 docs/research/mypixiv-real-capture-2026-10.md。
    */
   novels?: PixivNovel[];
   is_muted: boolean;

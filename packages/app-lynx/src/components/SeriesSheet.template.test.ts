@@ -40,7 +40,7 @@ vi.mock('../api/novel', () => ({
   loadNovelSeriesChaptersNext,
 }))
 
-// ─── 真实字段形状 mock（oracle: api/types.ts:74-92 PixivNovel）───
+// ─── 真实字段形状 mock（oracle: api/types.ts:81-99 PixivNovel）───
 // 测试硬约束 #2 真实样例：mock 字段名/形状对齐 PixivNovel（id/title/text_length 等真实字段），
 // 不手写自洽字段。
 function makePixivNovel(

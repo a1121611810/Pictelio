@@ -75,6 +75,6 @@
 ## Further Notes
 
 - **seam 决策声明（无人值守）**：本 spec 产出于无人值守会话，测试 seam 沿用仓库当前最高可用 seam 惯例（api 层 mock-transport 单测 + template 快照测试 + 路由注册守卫测试，未引入新测试基建），供事后审阅。
-- **端点证据来源注记**：`GET /v1/user/mypixiv`（参数 `user_id` + 可选 `offset`，响应 `{ user_previews, next_url }`，元素为 UserPreview 形状）经 pixivpy / skana_pix / Pixora 等六个独立客户端交叉验证；网传 `/v1/mypixiv/users` 路径**不存在**（正确路径为 `/v1/user/mypixiv`）。该端点为跨客户端交叉验证结论而非本仓抓包实证——实现落地时以真实账号抓包 fixture 钉 schema，字段出入按宽容解析处置。
+- **端点证据来源注记**：`GET /v1/user/mypixiv`（参数 `user_id` + 可选 `offset`，响应 `{ user_previews, next_url }`，元素为 UserPreview 形状）经 pixivpy / skana_pix / Pixora 等六个独立客户端交叉验证；网传 `/v1/mypixiv/users` 路径**不存在**（正确路径为 `/v1/user/mypixiv`）。**2026-10-23 起本仓已有一手抓包实证**（issue #755 兑现）：3 份真实响应（空态 / 28 条分页 / 同族 following 对照），逐项量测与抓包通道见 [`docs/research/mypixiv-real-capture-2026-10.md`](../research/mypixiv-real-capture-2026-10.md)——条目键 `user/illusts/novels/is_muted` 28/28 齐全、`user.is_accept_request` 布尔且 true/false 两侧均出现、`novels` 元素形状与 `PixivNovel` 逐项一致、`is_muted` 布尔透传、`next_url` 为服务端原文。契约 fixture 已换成真实响应（`__fixtures__/mypixiv-users.json` + `mypixiv-users.empty.json`）。字段出入按宽容解析处置。
 - **与 ADR/术语表双锚**：领域语言锚 `docs/adr/glossary-lynx-four-features.md`（好P友（MyPixiv）／用户预览（UserPreview）／UserRow（用户行）逐字对齐；「MyPixiv ≠ Following/Follower」辨析见术语表 #5）；决策锚 ADR-0193。本文与 ADR/源码不一致时，以 ADR/源码为准绳。
 - **与 FollowList 的复用边界**：复用**表现层**（UserRow、UserPreview 形状、刷新/分页容器、toggleFollow 单飞锁模式），不复用页面容器语义——好P友是双向关系（无 `restrict` 维度、无 following 列表 `is_followed` 播种特判），塞进 FollowList 第三 mode 已被 ADR-0193 否决。
