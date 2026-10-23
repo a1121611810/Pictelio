@@ -240,7 +240,7 @@ export interface RunResult {
 /**
  * runCapture 输出缓冲上界：logcat -d 逐帧日志（lynx OnPatchFinishForFiber 级）
  * 可达数 MB，Node 默认 1MB 会抛 ENOBUFS（#543 实测触发，导致空响应绕过重试）。
- * 先例：scripts/audit-real-interaction/run_regression.mjs adbBuffer 同款 64MB。
+ * 先例：真机回归脚本的 adbBuffer 同款 64MB。
  */
 const MAX_CAPTURE_BUFFER = 64 * 1024 * 1024;
 

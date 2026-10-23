@@ -434,7 +434,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 - [死配置] package.json:30 — `preview:all` 同样过滤 ugoira 与 novel-export，二者无 `preview` 脚本 ⇒ 2 个 filter 恒空转；另该脚本漏了同为库包的 update-check / net-diagnostics / search-core / ranking-core（后三者本无 preview，属正常）— 同上
 - [死配置] package.json:26 — `check:all` 过滤 `pictelio-website`，而 website 只有 `dev`/`build`/`preview`（`packages/website/package.json`），无 `check` ⇒ 该 filter 恒空转，CI 的「all packages」实际少一个包 — 1 个 filter
 - [死配置] package.json:42 — `test:all` 同样过滤 `pictelio-website`，无 `test` 脚本 ⇒ 恒空转 — 1 个 filter
-- [死配置] packages/app-lynx/package.json:13 — `lint` / `fmt` 两个 echo 豁免桩（`lint: 'echo 暂豁免…'`）无人调用：ADR-0185 后根 `lint`/`fmt`（package.json:43、45）是根单进程 `pnpm vp lint` / `pnpm vp fmt`，不再按包 fan-out；实际豁免由 vite.config.ts:63 与 :191 的 `packages/app-lynx/**` ignorePatterns 承担 ⇒ 桩已不承载任何行为（**待确认**：是否作为显式豁免留痕有意保留）— 2 行
+- [死配置] packages/app-lynx/package.json:13 — `lint` / `fmt` 两个 echo 豁免桩（`lint: 'echo 暂豁免…'`）无人调用：ADR-0185 后根 `lint`/`fmt`（package.json:43、45）是根单进程 `pnpm vp lint` / `pnpm vp fmt`，不再按包 fan-out；实际豁免由 vite.config.ts:60 与 :187 的 `packages/app-lynx/**` ignorePatterns 承担（坐标随本轮删除 lint/fmt 排除规则而前移） ⇒ 桩已不承载任何行为（**待确认**：是否作为显式豁免留痕有意保留）— 2 行
 - [覆盖缺口] scripts/test-consistency.mjs:1 — 全仓无 package.json 脚本、无 CI 引用，唯一提及方是 docs/research/test-consistency-measurement-2026-10.md；脚本自身 :13-14 声明「退出码恒 0 —— 这是度量不是门禁」「要接进 CI 做趋势，需要另开决策」⇒ 判为未接线的手工度量工具而非死代码，但无任何调用入口（**待确认**）— 不删，改加一条 `pnpm` 脚本入口即可
 
 ## 判断困难 / 已排除（避免误报）
@@ -444,7 +444,7 @@ TS 侧完整实现、测试齐备，Java 侧写方随 webview 删除。**同一�
 - `scripts/generate-adr-index.mjs`：docs/adr/README.md:3 有「本文件由该脚本确定性生成，勿手改」锚，无 package.json 入口但契约在，不报。
 - `release:android-host:transition`（package.json:52）：`PICTELIO_RELEASE_BRANCH` 在 release.mjs:19/144/633 与 scripts/lib/release-branch.mjs:7-14 有完整消费方，docs/release-checklist.md:187 有对应章节（#816），不报。
 - `verify-agent-skills.mjs` / `check-push-refs.mjs`：均被 .husky/pre-push 经 DOMAINS 接线（check-push-refs.mjs:35、:45），有真实触发路径，不报。
-- `scripts/audit-real-interaction/**`：被 vite.config.ts:57/189 显式排除于 lint/fmt，并被 6 份 research/spec 引用，不报。
+- ~~`scripts/audit-real-interaction/**`：被 vite.config.ts:57/189 显式排除于 lint/fmt，并被 6 份 research/spec 引用，不报。~~ → **已删除（2026-10-23，用户指令「webview 残留的删除掉，不用留」）**：该目录 254 个 git 跟踪文件 / 104MB，全部指向已随 ADR-0203 删除的 `.MainActivityWebview` / `.MainActivity`（webview 时代一次性探针与原始录屏数据）⇒ 属 webview 残留，已可恢复删除（移入回收站）；随之清理 `vite.config.ts` 的两处 lint/fmt 排除规则（**删除前的坐标是 `vite.config.ts:57` / `:189`**）、ADR-0185 排除表，并订正 6 份引用该目录的 research/spec/代码注释。
 - `packages/app-lynx/vitest.fallback.config.ts` 与 `src/utils/homeHeaderMode.fallback.test.ts`：名字里的 "fallback" 是 `__HOME_BLEED_HEADER__` 构建宏的回退阀（票 #906/#907、ADR-0216），与已确认死亡的引擎回退子系统无关，是活的逃生阀 CI 覆盖，不报。
 - `packages/android-host/vitest.config.ts:17` 的双 include 与 `passWithNoTests: false`：有回归防线测试 `tests/unit/e2eContractSuiteCollected.test.ts` 逐个钉住，是刻意的门禁配置，不报。
 - 未审：docs/adr/** 与 docs/research/** 的历史正文（ADR-0201 决策 4 存档）、webview 字样的其他分片范围。

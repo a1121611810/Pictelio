@@ -37,7 +37,7 @@
 ## 4. 交付物清单
 
 - **代码修复**：3 个分支（`fix/ri-364-back-feel` / `fix/ri-365-coldstart`→并入后链 / `fix/ri-366-shimmer`→`fix/ri-367-viewer`→`fix/ri-368-regression` 链），全链门禁：tsc strict + **1264 单测全绿** + lint 0 警告 + code-review 闭环（FT-1A/FT-2 审查代理执行、FT-3 因基础设施故障主会话按 skill 清单亲审，均经复检）。
-- **回归脚本**：`scripts/audit-real-interaction/run_regression.mjs` + README（六场景一键复跑、判定线出处、全坑位沉淀）。
+- **回归脚本**（当时）：`scripts/audit-real-interaction/run_regression.mjs` + README（六场景一键复跑、判定线出处、全坑位沉淀）——⚠️ 订正 2026-10-23：该目录已随 webview 残留删除。
 - **过程报告**：`docs/research/ri-36x-*.md` 五份（体检/冷启动/back/shimmer/viewer）+ 本最终报告。
 - **Tracker**：地图 [#361](https://github.com/a1121611810/Pictelio/issues/361)，FT 票 #364-#368 全部关闭，P5/P6 观察 [#369](https://github.com/a1121611810/Pictelio/issues/369)。
 - **未动**：分支合并/推送 main 由用户决定（PR 时注意拆分 `cb8a2aee` 混入的 ri-364 证据文件）。

@@ -11,7 +11,7 @@
 
 ## 方法与局限
 
-- 录屏：`adb shell screenrecord --bit-rate 4M`，**VFR（变帧率）编码**——帧间隔 = 可见变化间隔，逐帧 pts 由 ffmpeg showinfo 解析，因此帧时间戳即「用户看到画面变化的时机」，可精确计时卡顿与空白（工具：`scripts/audit-real-interaction/analyze_rec.py`，依赖 imageio_ffmpeg 自带 ffmpeg 7.1 + numpy + PIL）。
+- 录屏：`adb shell screenrecord --bit-rate 4M`，**VFR（变帧率）编码**——帧间隔 = 可见变化间隔，逐帧 pts 由 ffmpeg showinfo 解析，因此帧时间戳即「用户看到画面变化的时机」，可精确计时卡顿与空白（当时工具：`scripts/audit-real-interaction/analyze_rec.py`，依赖 imageio_ffmpeg 自带 ffmpeg 7.1 + numpy + PIL；⚠️ 订正 2026-10-23：该脚本已随 webview 残留删除，本文的帧数据结论保留、工具不可再复跑）。
 - 帧差异：相邻帧降采样（90×160 灰度）绝对差均值，阈值 2.0 判定显著变化。
 - 输入锚点：pointer_location 触摸指示条在录屏中直接可见（无需额外标定 adb input 延迟）；冷启动以 `am start` 命令发出时刻 ≈ 录屏 t+1000ms 对齐。
 - 局限：①模拟器（无真机 GPU/IO 特性），结论仅代表该 AVD；②`am start` 冷启动比桌面点击略少 launcher 动画开销；③单用户账号、单网络环境；④screenrecord 不录 SurfaceFlinger vsync 以下的丢帧，体感卡顿时长可能略低估。
@@ -198,7 +198,7 @@ screenrecord 为 VFR：显示无变化时编码器收不到新帧，mp4 只含�
 5. **滚动**：`swipe 360 1100→360 400, 500ms` 与 `swipe 360 1200→360 200, 150ms`。判定：滚动窗内 VFR delta p90 ≤34ms、无 >200ms 停滞（现状满帧）。
 6. **查看器**：详情 → `tap 360 550` 开；`swipe 600 640→120 640, 200ms` 翻页。判定：开启占位 ≤200ms（现状 61ms）；翻页释放→新页首帧 ≤500ms 或期间有可见加载反馈（现状 ~2.0s 黑屏，P4 修复验收线）。
 
-脚本：`scripts/audit-real-interaction/`（start_rec.sh / stop_rec.sh / analyze_rec.py / cdp_login.mjs）。
+脚本（当时）：`scripts/audit-real-interaction/`（start_rec.sh / stop_rec.sh / analyze_rec.py / cdp_login.mjs）——⚠️ 订正 2026-10-23：该目录已随 webview 残留删除（用户指令「webview 残留不用留」）。
 
 ## 覆盖范围与诚实声明
 

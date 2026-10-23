@@ -193,7 +193,7 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 5. **E2E**：agent-browser 搜索筛选主流程（设筛选 → URL 回填 → 刷新/返回保持）；S 端切换回归。
    - **交付状态（2026-09-12 实施 + 模拟器批次补验）**：1-4 已交付（自动化门禁 check:all / test:all / lint:all 全绿）。
      **模拟器批次已补验**（emulator pictelio_ui / WebView 113，webview+lynx 双引擎）：
-     ① webview CDP 冒烟 11/11 PASS（脚本 `scripts/audit-real-interaction/search_filter_smoke.mjs`）——
+     ① webview CDP 冒烟 11/11 PASS（当时用 `scripts/audit-real-interaction/search_filter_smoke.mjs` 实跑；⚠️ 订正 2026-10-23：该脚本已随 webview 残留删除，此处保留的是**当时的实测结论**，不可再复跑）——
      期间预设落 URL（fp）/结果集刷新/横图 w≥h 语义/★ 下限/热门置灰标注+比例透传可用/scope=小说
      置灰+值保留标注/清除全部清 URL；② lynx 真机驱动：FAB 直达搜索 → 输入即搜 → 筛选折叠区
      **点击可达性通过**（pointer-events 怪癖未复现：chip 点击生效、徽标计数、清除全部浮现、

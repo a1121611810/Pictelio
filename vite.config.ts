@@ -52,9 +52,6 @@ export default defineConfig({
       "**/*.d.ts",
       // 研究产物与基准数据不进门禁（docs/research 下的 .ts 基准数据曾误入 lint 范围）
       "docs/**",
-      // 真机交互审计取证脚本（#363）：一次性探针，刻意保持紧凑写法；字节原状保证
-      // 与归档审计报告的复跑口径一致，不纳 lint/fmt
-      "scripts/audit-real-interaction/**",
       // 范围裁定（ADR-0185）：astro 组件（.astro）不在 oxlint/oxfmt 支持面
       "packages/website/**",
       // 范围裁定（ADR-0185）：app-lynx 首次纳入 lint 面暴露 ~150 条存量风格债
@@ -186,7 +183,6 @@ export default defineConfig({
       // oxfmt 0.70 起 md 规则变更：md 全域退出 fmt（冻结现状；AGENTS.md 有行数锚点契约测试）
       "**/*.md",
       "docs/**",
-      "scripts/audit-real-interaction/**",
       "packages/website/**",
       "packages/app-lynx/**",
     ],

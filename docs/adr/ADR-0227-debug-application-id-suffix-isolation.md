@@ -78,7 +78,7 @@ debug 与 release 共用同一个 `applicationId` ⇒ 共用一份 SharedPrefere
 | CI 专用工作流 | `.github/workflows/sysbars-acceptance.yml`（`PKG=io.pictelio.app.debug`，`workflow_dispatch` 手动位） |
 | dev 脚本（宿主侧） | `packages/android-host/scripts/dev-android.mjs`、`packages/android-host/scripts/lib/ui-tree-dump-core.mjs`、`packages/android-host/tests/android-e2e/tools/*.sh` |
 | dev 脚本（客户端侧） | `packages/app-lynx/scripts/capture-md3-matrix.sh`、`packages/app-lynx/scripts/lynx-device-check.sh`、`packages/app-lynx/scripts/lynx-flow-check.sh`、`packages/app-lynx/scripts/lynx-router-back-regression.sh`、`packages/app-lynx/scripts/verify-statusbar-contrast.mjs`、`scripts/capture-readme-shots.sh` |
-| **已知残留（死脚本，不在本决策范围）** | `scripts/audit-real-interaction/{switch_baseline,search_filter_smoke,run_regression,cdp_login}.mjs` 仍写死 `io.pictelio.app` + `.MainActivityWebview` / `.MainActivity`——但这 4 个脚本指向的 Activity **已随 ADR-0203 整包删除**（`git ls-files \| grep -i MainActivity` = 空），是 webview 时代的**死脚本**；登记为残留、不在本决策改动范围（见 §6 复核记录） |
+| **已知残留 → 已删除（2026-10-23）** | `scripts/audit-real-interaction/{switch_baseline,search_filter_smoke,run_regression,cdp_login}.mjs` 原写死 `io.pictelio.app` + `.MainActivityWebview` / `.MainActivity`——这 4 个脚本指向的 Activity **已随 ADR-0203 整包删除**（`git ls-files \| grep -i MainActivity` = 空），是 webview 时代的**死脚本**；后按用户指令「webview 残留不用留」**整目录删除**（254 文件 / 104MB），随之清理 `vite.config.ts` 的 lint/fmt 排除规则与 ADR-0185 排除表 |
 | 文档坐标 | `docs/release-checklist.md` 等处写死的包名 |
 
 **「无残留字面量」是验收项，不是风格偏好**：E2E 那一处若只改咽喉点而漏掉两个自写字面量的 spec，改动会**静默漏检**（装不上包 / 抓不到 UI 树），而不是报错。

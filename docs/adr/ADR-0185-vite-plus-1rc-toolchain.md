@@ -35,7 +35,7 @@ vite-plus 1.0.0-rc.0（2026-09-22，npm `latest` tag，MIT）相对 app 原钉�
 | `packages/website/**` | .astro 不在 oxlint/oxfmt 支持面 |
 | `.husky/**` | shell 钩子薄壳（ADR-0142），非应用代码 |
 | `**/tests/fixtures/**` | 字节一致性契约数据（sample-payload.json 与 Java test resource 逐字节比对） |
-| `docs/**`、`scripts/audit-real-interaction/**` | 研究产物 / 真机审计取证脚本（字节原状保证复跑口径） |
+| `docs/**` | 研究产物（字节原状保证复跑口径）——⚠️ 订正 2026-10-23：`scripts/audit-real-interaction/**` 一项已删除（webview 时代死脚本随死脚本清理一并删除，见 `docs/research/dead-subsystem-audit-2026-10.md`） |
 | `**/*.md` | oxfmt 0.70 md 规则变更；openwiki 为 CI 生成物禁手改，AGENTS.md 有行数锚点契约 |
 
 **D5 · 存量告警当场清偿（10 项）+ 新规则口径**——oxlint 1.85 新启用 `unicorn/consistent-function-scoping`（10 条），与既有 `no-await-in-loop` 同口径关闭（调用点内联回调是本仓惯用法，提升外层属纯风格重构）。清偿项：search-core `filters.ts` 三数组改 `ReadonlySet.has`；ugoira `stream.ts` 错误补 `cause`、测试 `toReversed()`；`kill-dev-server.mjs`/`verify-agent-skills.mjs`/`stryker.config.ts` 死代码与 API 换新。search-core 改动经 21 个受影响测试回归验证。

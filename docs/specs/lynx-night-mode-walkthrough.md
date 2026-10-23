@@ -41,7 +41,7 @@ adb shell run-as io.pictelio.app.debug sh -c \
 
 # ── 冷启动 / 截图 ─────────────────────────────────────────────────────
 # launcher activity 名**按 flavor 注入**，manifest 里没有硬编码类名（`android:name="${launcherActivity}"`）。
-# 因此命令骨架不能写死某个类——先解析再启动（同 scripts/audit-real-interaction/run_regression.mjs 的解析式）：
+# 因此命令骨架不能写死某个类——先解析再启动（用 `cmd package resolve-activity` 解析 launcher，再按解析结果启动）：
 LAUNCHER=$(adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER io.pictelio.app.debug | tail -1 | tr -d '\r')
 adb shell am force-stop io.pictelio.app.debug
 adb shell am start -n "$LAUNCHER"      # debug 变体 → io.pictelio.app.debug/io.pictelio.app.LynxActivity
@@ -70,7 +70,7 @@ adb shell dumpsys window | grep -i appearance
 | T2-6 | teal | 同上 | 同上 | `t2-teal-light.png` / `t2-teal-dark.png` |
 | T2-7 | bili | 同上 | 同上；bili 在 `tokens.css` 明暗两套色板俱全（同为其余 6 支），故与其余主题同法载重验证 | `t2-bili-light.png` / `t2-bili-dark.png` |
 
-- **像素采样（可选但推荐，作为「真是这套色板」的证据）**：`screencap` 取页面大面积区域中心点，与该主题 `.theme-X.dark` 的 `--md-surface` 比对（worked example：`.theme-sky.dark --md-surface = #101418`，其余主题从 `tokens.css` 读）。取色脚本可复用 `scripts/audit-real-interaction/analyze_rec.py` 一族（必要时临时扩一个单图取色入口，不要提交进 main）。
+- **像素采样（可选但推荐，作为「真是这套色板」的证据）**：`screencap` 取页面大面积区域中心点，与该主题 `.theme-X.dark` 的 `--md-surface` 比对（worked example：`.theme-sky.dark --md-surface = #101418`，其余主题从 `tokens.css` 读）。取色脚本按需临时自写（取单点像素即可；必要时扩一个临时取色入口，**不要提交进 main**）。⚠️ 订正 2026-10-23：原此处指向的 `scripts/audit-real-interaction/analyze_rec.py` 已随 webview 残留一并删除。
 - **交叉项**：每主题暗色下另确认**主题色色块预览**显示的是该主题暗色 primary（`appearanceClasses` 同源，Me 页色块与整树不能分叉）。
 - 判定：14 张全 ✅ 才过；任一主题暗色「半吊子」（部分角色未覆盖）→ ❌。
 

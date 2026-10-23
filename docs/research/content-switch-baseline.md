@@ -1,6 +1,6 @@
 # 内容切换等待剖面基线（地图 #371 / 基线票 #372）
 
-- 日期：2026-09-06；测量脚本 `scripts/audit-real-interaction/switch_baseline.mjs`（原始数据 `regression-out/switch_baseline_20260905-173207/`）
+- 日期：2026-09-06；测量脚本 `scripts/audit-real-interaction/switch_baseline.mjs`（原始数据 `regression-out/switch_baseline_20260905-173207/`）——⚠️ 订正 2026-10-23：该脚本与原始数据已随 webview 残留一并删除（用户指令「webview 残留不用留」），本文保留的是**当时测得的基线结论**，原始数据不可再复算
 - 用户主诉：内容切换即时性差，「看起来是等待数据加载完才切换过去的」，需求是立即切过去
 
 ## 环境
