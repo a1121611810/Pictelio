@@ -26,11 +26,10 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:enableOnBackInvokedCallback="true">
-        <!-- 启用 Android 16+ 预测性返回手势；运行时由 JS 层通过
-             @capacitor/app.toggleBackButtonHandler() 控制是否交由系统处理。 -->
+        <!-- 启用 Android 16+ 预测性返回手势。 -->
 
-        <!-- LAUNCHER Activity 按 flavor 注入（#116/#117）：
-             full/webview → MainActivity 系，lynx → LynxActivity -->
+        <!-- LAUNCHER Activity 单引擎唯一入口（flavor 维度已随 ADR-0203 下线，manifestPlaceholders 写死 .LynxActivity）。
+             深链策略：本应用不注册自有 deep-link scheme（唯一 intent-filter 仅 MAIN/LAUNCHER）⇒ debug/release 共存无 scheme 抢注风险、保持不变（理由与取证见 ADR-0227 §1.3）。 -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name="${launcherActivity}"

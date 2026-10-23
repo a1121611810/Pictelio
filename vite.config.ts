@@ -24,9 +24,9 @@ export default defineConfig({
       //   不是 android/.gradle/。旧条目漏了真实路径 ⇒ oxlint 扫进 Gradle 发行版的
       //   Javadoc/JS，`pnpm lint` 恒 exit≠0 而诊断 0 条来自本仓源码。
       // ② **/build/ 是 AGP 构建产物
-      // ③ 源树里 oxfmt 真正会碰的只有两类：res/raw/upgrade.html（Android 资源，
-      //      随 APK 分发）与 src/test/resources/*.json（Java 测试资源，与
-      //      novel-export payload 逐字节比对，重排即破契约）
+      // ③ 源树里 oxfmt 真正会碰的只剩一类：src/test/resources/*.json（Java 测试资源，与
+      //      novel-export payload 逐字节比对，重排即破契约）——另一类 res/raw/upgrade.html
+      //      已随 #1061 作为零引用死资源删除
       // Java / .gradle / .pro / .xml 不在两者的支持面内，不列。
       "packages/.gradle/**",
       "packages/android-host/.gradle/**",
@@ -160,7 +160,7 @@ export default defineConfig({
       // 与上方 lint 块同一条收窄纪律（ADR-0186 review P2：不能用 **/android/** 通配，
       // 那会误伤 packages/android-host/tests/unit/android/ 的 R8 keep 规则契约测试），
       // 逐条理由见上：oxfmt 不读 .gitignore，故 .gradle/ 与 **/build/ 显式排除；
-      // 源树里只有 res/raw/upgrade.html 与 src/test/resources/*.json 两类会被碰。
+      // 源树里只剩 src/test/resources/*.json 一类会被碰（res/raw/upgrade.html 已随 #1061 删除）。
       // ⚠️ 与上方 lint 块（line 31）**必须保持同一组路径**：ADR-0203 迁移后真实
       // GRADLE_USER_HOME 在包根（`build:android` 用 `GRADLE_USER_HOME=$(pwd)/.gradle`），
       // 本块曾只列 android/.gradle/ 而漏了它 ⇒ oxfmt 扫进 Gradle 发行版的 JDK 文档，

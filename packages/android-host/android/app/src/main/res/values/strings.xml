@@ -2,6 +2,4 @@
 <resources>
     <string name="app_name">Pictelio</string>
     <string name="title_activity_main">Pictelio</string>
-    <string name="package_name">io.pictelio.app</string>
-    <string name="custom_url_scheme">io.pictelio.app</string>
 </resources>

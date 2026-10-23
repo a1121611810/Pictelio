@@ -155,7 +155,8 @@ export const routes: RouteRecordRaw[] = [
   // 登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）；不标 requiresAuth
   { path: '/network-check', name: 'network-check', component: NetworkCheck, meta: { topInset: 'self' } },
   // 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：debug 页，
-  // 不标 requiresAuth（避免登录耦合）、不进任何导航入口——仅 benchNav 深链可达
+  // 不标 requiresAuth（避免登录耦合）；「高级」页有活入口（AdvancedSettings.vue 的
+  // navigate('/platform-check')），另有 benchNav 深链
   { path: '/platform-check', name: 'platform-check', component: PlatformCheck, meta: { topInset: 'self' } },
 ]
 
@@ -488,7 +489,7 @@ function registerBenchNavHandler(): void {
     // 真机验收经 benchNav 深链到 /network-check，再以原生 NetDiag 日志为证据。
     pictelioBenchNavNetDiag: '/network-check',
     // 平台一致性自检直达（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：
-    // debug 自检页唯一入口（不进导航），对齐 /network-check 深链先例。
+    // 「高级」页行内入口之外的设备取证深链，对齐 /network-check 深链先例。
     pictelioBenchNavPlatformCheck: '/platform-check',
     // 「我」页直达（#640 step 5：LLM endpoint 设置页的 inline probe 需在表单里输入才触发
     // `@input` debounce，而设置区挂在 /me 底部 —— 从 tab 栏三段式点进去在合成点击下不稳定。

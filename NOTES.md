@@ -23,7 +23,7 @@
 - `sync:app-lynx-bundle`、`kill:all` —— `package.json:54,57`
 - 宿主包独有：`appium:setup`、`sync:android-version`、`sync:credentials` —— `packages/android-host/package.json`
 - `test:lynx-web` —— `packages/app-lynx/package.json`
-- pre-push 三域触碰校验（app → E2E 锚点 / app-lynx → 单测 / `.agents/` → skill 校验）+ fmt 门禁 —— `.husky/pre-push:2`、`scripts/check-push-refs.mjs:2,7,181`
+- pre-push 两域触碰校验（app-lynx → 单测 / `.agents/` → skill 校验）+ fmt 门禁 —— `.husky/pre-push:2`、`scripts/check-push-refs.mjs:2,7,181`
 - commit-msg 走 commitlint —— `.husky/commit-msg:3`；**pre-commit 当前是空壳** —— `.husky/pre-commit:2`
 - CI 三个 job：check / test / android-unit-test（Robolectric）—— `.github/workflows/ci.yml:16,41,68`
 - 第四个 workflow 未在 `AGENTS.md` 提及：`.github/workflows/sysbars-acceptance.yml`
@@ -74,11 +74,12 @@
 - **门禁只做无歧义断言**，且文件头明写「不做全站枚举」 —— `docs/adr/ADR-0215-fail-safe-aux-mechanisms.md:56`
 - **E2E 只钉「只有真机能证伪」的链路**；门禁职责由单测与跨端契约承担 —— `docs/testing/conventions.md:37-39`
 - **差分测试语义退化的合法形态只有两种**（`X ↔ Java/spec 契约` / `X 单端行为基准`）—— `docs/testing/conventions.md:58-60`
-- **单引擎后待重定义项** —— `docs/agents/qa-transition-checklist.md:16-17`；且 `docs/release-checklist.md:70` 明确「在重新定义前本项视为未设防」
+- **单引擎后待重定义项** —— `docs/agents/qa-transition-checklist.md:17-18`；且 `docs/release-checklist.md:220` 明确「在重新定义前本项视为未设防」
 
 ---
 
 ## 六、待办（有人在跟进，不是笔误）
 
 - `docs/agents/qa-transition-checklist.md` 整份待 #805 重新定义
-- `docs/release-checklist.md:70` 第 1 项在重定义前**视为未设防**
+- `docs/release-checklist.md:220` 第 1 项在重定义前**视为未设防**
+- [#1062](https://github.com/a1121611810/Pictelio/issues/1062) 小说介绍页极窄屏两处触控/观感问题（主 CTA 在 <312.5dp 视口下触控高度 <40dp · 320dp 边界档收藏计数 chip 折行）——取证见 `docs/research/novel-intro-narrow-viewport-2026-10.md` §9

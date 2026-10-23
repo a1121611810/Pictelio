@@ -2,6 +2,7 @@
 
 - 状态：Accepted（已采纳）
 - 日期：2026-09-27
+- **订正（2026-10-23，[#1061](https://github.com/a1121611810/Pictelio/issues/1061)）**：文中「**三域**」的字面已不成立——`packages/app/(src|tests/agent-browser)` → E2E 锚点一域随 [ADR-0203](./ADR-0203-webview-client-source-removal.md) 删除 WebView 客户端而整体移除（编排器 `scripts/check-push-refs.mjs` 的 `DOMAINS` 当时即已只余两域，ADR-0203 决策九列「E2E 锚点静态校验脚本」为无被测对象资产）。本次同步订正了 `.husky/pre-push` 钩子注释、`NOTES.md` 与 `packages/android-host/GLOSSARY.md` 的「三域」措辞。**本 ADR 的核心（fmt 门禁纳入 pre-push 编排器、路径无关）不受影响，仍然生效**；正文按 ADR 惯例原样保留作为决策史。
 - 关联：
   - [ADR-0142](./ADR-0142-pre-push-fetch-fallback-and-release-preflight.md)（pre-push 编排器 / fail 语义分层——本 ADR 在其编排器上追加第 3 步门禁）
   - [ADR-0185](./ADR-0185-vite-plus-1rc-toolchain.md)（lint/fmt 唯一配置源=根 `vite.config.ts`）

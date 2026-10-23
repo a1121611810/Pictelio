@@ -13,7 +13,8 @@ import { useMotion } from '../composables/motion'
 // ─── 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4，issue #550）───
 // debug 自检路由：对项目依赖的平台 API 面跑规范派生断言，渲染 PASS/FAIL 矩阵，
 // 把 lynx 平台事实（如 URL 全局 .hostname 为 undefined，取证 2026-09-15，ADR-0163）
-// 常驻可见。仅 benchNav 深链可达（pictelioBenchNavPlatformCheck），不进任何导航入口。
+// 常驻可见。「高级」页有活入口（AdvancedSettings.vue 的 navigate('/platform-check')），
+// 另有 benchNav 深链（pictelioBenchNavPlatformCheck）。
 // 预期基线：矩阵项 1 预期 FAIL（记录平台事实）、项 2~5 预期 PASS——页面如实展示，
 // 不做「预期即通过」的美化（FAIL 掩蔽 = 本页要防的事故本身）。
 
@@ -196,7 +197,8 @@ const topInsetSpacer = useTopInsetSpacer()
 
 <!--
   平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4 / issue #550）：
-  仅 benchNav 深链可达的 debug 页。矩阵 5 项 = 平台 API 面规范派生断言；
+  「高级」页有活入口（AdvancedSettings.vue 的 navigate('/platform-check')），另有 benchNav 深链；
+  矩阵 5 项 = 平台 API 面规范派生断言；
   顶部大字 N/M PASS 总体结论。样式对齐 M3（不求美化，求可读）。
 -->
 <template>

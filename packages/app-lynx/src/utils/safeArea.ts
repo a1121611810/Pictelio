@@ -79,7 +79,7 @@ export function initSafeArea(): void {
     return
   }
   emitter.addListener('pictelioInsets', (...args: unknown[]) => {
-    // 原生侧 JavaOnlyArray.of(top, bottom) → 参数展开（router.ts:384 illust-detail 同款）
+    // 原生侧 JavaOnlyArray.of(top, bottom) → 参数展开（router.ts:529 illust-detail 同款）
     const top = Number(args[0])
     const bottom = Number(args[1])
     // 非法载荷不污染现值，但 debug 可见（非静默；正常链路不应出现）

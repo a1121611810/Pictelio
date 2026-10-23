@@ -54,7 +54,7 @@ _Avoid_: 「UI source map / 源码反解」（Vue 侧无 producer，判死）·�
 _Avoid_: 「E2E 进 CI」（防线职责划分见 `docs/testing/conventions.md`）
 
 ### 发布链（release chain）
-版本单源 = `packages/app-lynx/package.json` → `scripts/sync-android-version.mjs` 回写 Gradle → `sync-credentials.mjs`（凭据注入）→ rspeedy 生产构建 → `sync-android-assets.mjs` → `gradlew assembleRelease`（签名环境变量见 `docs/release-signing.md`）。发布前校验：`release-preflight` / `release-branch` / `release-build-steps` 单测 + pre-push 三域校验（`scripts/check-push-refs.mjs`，分叉报错文案见 ADR-0142）。
+版本单源 = `packages/app-lynx/package.json` → `scripts/sync-android-version.mjs` 回写 Gradle → `sync-credentials.mjs`（凭据注入）→ rspeedy 生产构建 → `sync-android-assets.mjs` → `gradlew assembleRelease`（签名环境变量见 `docs/release-signing.md`）。发布前校验：`release-preflight` / `release-branch` / `release-build-steps` 单测 + pre-push 两域校验（`scripts/check-push-refs.mjs`，分叉报错文案见 ADR-0142）。
 
 ## 桥接面（JS ↔ 原生）
 
