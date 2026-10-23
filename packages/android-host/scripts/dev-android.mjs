@@ -56,7 +56,7 @@ async function main() {
     await run("adb", ["install", "-r", APK_PATH]);
 
     console.log("\n✅ 完成！APK 已安装。");
-    console.log("   启动：adb shell monkey -p io.pictelio.app 1");
+    console.log("   启动：adb shell monkey -p io.pictelio.app.debug 1");
   } catch (error) {
     console.error("\n❌ 出错:", error.message);
     process.exit(1);

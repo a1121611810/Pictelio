@@ -13,9 +13,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APK_PATH,
+  APP_NAMESPACE,
+  APP_PACKAGE,
   E2E_FLAVOR,
   ENTRY_ACTIVITIES,
   LYNX_ACTIVITY,
+  LYNX_ACTIVITY_COMPONENT,
   MAIN_ACTIVITY,
   apkRelativePath,
   resolveE2eFlavor,
@@ -62,6 +65,8 @@ describe("apkRelativePath", () => {
 
 describe("MAIN_ACTIVITY / ENTRY_ACTIVITIES（单引擎，无 flavor 维度）", () => {
   it("MAIN_ACTIVITY 恒为 LynxActivity，且绝不是已删除的 MainActivity", () => {
+    // ⚠️ MAIN_ACTIVITY 是**类 FQN**，不是组件串：类 FQN 的根是 namespace，
+    // **不随变体变化** ⇒ 加了 debug applicationId 后缀后这条断言**逐字不变**。
     expect(MAIN_ACTIVITY).toBe("io.pictelio.app.LynxActivity");
     expect(MAIN_ACTIVITY).toBe(LYNX_ACTIVITY);
     expect(MAIN_ACTIVITY.endsWith(".MainActivity")).toBe(false);
@@ -69,6 +74,31 @@ describe("MAIN_ACTIVITY / ENTRY_ACTIVITIES（单引擎，无 flavor 维度）", 
 
   it("ENTRY_ACTIVITIES 只有唯一入口（不存在第二选项）", () => {
     expect(ENTRY_ACTIVITIES).toEqual([LYNX_ACTIVITY]);
+  });
+});
+
+describe("包名坐标（ADR-0227：applicationId 与类 FQN 是**两个**坐标）", () => {
+  it("E2E 跑在 debug 变体上 ⇒ applicationId 带 .debug 后缀", () => {
+    expect(APP_PACKAGE).toBe("io.pictelio.app.debug");
+  });
+
+  it("类 FQN 的根是 namespace，不随变体变化（release 侧 applicationId 仍是 io.pictelio.app）", () => {
+    expect(APP_NAMESPACE).toBe("io.pictelio.app");
+    expect(LYNX_ACTIVITY).toBe(`${APP_NAMESPACE}.LynxActivity`);
+  });
+
+  it("组件串 = applicationId + 类 FQN（`am start -n` 的参数）", () => {
+    expect(LYNX_ACTIVITY_COMPONENT).toBe("io.pictelio.app.debug/io.pictelio.app.LynxActivity");
+  });
+
+  it("反向对照：相对类名形态在 debug 下会解析成不存在的类（**不可**用它拼组件串）", () => {
+    // `io.pictelio.app.debug/.LynxActivity` 会被 `ComponentName.unflattenFromString`
+    // 展开成 `io.pictelio.app.debug.LynxActivity` —— 那个类不存在（类住在 namespace 包）。
+    const relative = `${APP_PACKAGE}/.LynxActivity`;
+    expect(relative).not.toBe(LYNX_ACTIVITY_COMPONENT);
+    const expanded = APP_PACKAGE + relative.slice(relative.indexOf("/") + 1);
+    expect(expanded).toBe("io.pictelio.app.debug.LynxActivity");
+    expect(expanded).not.toBe(LYNX_ACTIVITY);
   });
 });
 

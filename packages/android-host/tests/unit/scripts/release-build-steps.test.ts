@@ -210,8 +210,8 @@ describe("apkPathsFor：路径形状必须与 build.gradle 的重命名规则一
   });
 
   it("目录段与文件名段都由 build.gradle 推导（APK_DIR 不自证）", () => {
-    // build.gradle:110  def apkDirStr = "${project.layout.buildDirectory.get()}/outputs/apk/${bt}"
-    // build.gradle:118  def destApk   = new File("${apkDirStr}/pictelio-${versionName}-${bt}.apk")
+    // build.gradle:117  def apkDirStr = "${project.layout.buildDirectory.get()}/outputs/apk/${bt}"
+    // build.gradle:125  def destApk   = new File("${apkDirStr}/pictelio-${versionName}-${bt}.apk")
     const dirRule = gradleSrc.match(/buildDirectory\.get\(\)\}\/(outputs\/apk\/\$\{bt\})"/u);
     expect(dirRule).not.toBeNull(); // 阳性对照：锚点本身要能命中，否则后面恒真
     const nameRule = gradleSrc.match(/def\s+destApk\s*=\s*new File\("\$\{apkDirStr\}\/([^"]+)"\)/u);

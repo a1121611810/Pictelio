@@ -1115,8 +1115,8 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     stubNativeExtract((url, json, illustId, cb) => {
       calls.push({ url, json, illustId })
       cb(0, JSON.stringify([
-        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.png',
-        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg',
+        'file:///data/user/0/io.pictelio.app.debug/cache/ugoira/frame_0.png',
+        'file:///data/user/0/io.pictelio.app.debug/cache/ugoira/frame_1.jpg',
       ]))
     })
     const bundle = await ugoiraExtractFrames(123)
@@ -1128,8 +1128,8 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     ])
     expect(bundle).toEqual({
       urls: [
-        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.png',
-        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg',
+        'file:///data/user/0/io.pictelio.app.debug/cache/ugoira/frame_0.png',
+        'file:///data/user/0/io.pictelio.app.debug/cache/ugoira/frame_1.jpg',
       ],
       delays: [100, 120],
     })

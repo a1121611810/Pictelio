@@ -23,9 +23,13 @@ Android 模拟器到宿主的两条路：
 2. **`adb reverse tcp:8811 tcp:8811` + `http://127.0.0.1:8811`** —— 推荐：走回环，且
    `PictelioTranslateModule` 明确放行 `127.0.0.1` / `localhost` 的 http base URL（仅本地联调窗口）。
 
+> ⚠️ 下面的包名是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+> 只给 debug 加 `.debug` 后缀，release 变体仍是 `io.pictelio.app`）。组件串 =
+> **applicationId + 类 FQN**，类 FQN 的根是 namespace（`io.pictelio.app`，不随变体变）。
+
 ```bash
 adb reverse tcp:8811 tcp:8811
-adb shell am start -n io.pictelio.app/io.pictelio.app.LynxActivity \
+adb shell am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity \
   --es pictelio_dev_refresh_token "$PIXIV_REFRESH_TOKEN" \
   --es pictelio_dev_force_r18 true \
   --es pictelio_dev_llm_base_url "http://127.0.0.1:8811/v1" \

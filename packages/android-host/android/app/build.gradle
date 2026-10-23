@@ -71,19 +71,35 @@ android {
         }
     }
     buildTypes {
+        // ── debug 变体：applicationId 加后缀（ADR-0227 D1/D2）────────────────────
+        //
+        // 目的：debug 与 release 可**共存安装**，两者的应用数据（SharedPreferences /
+        // 文件目录 / Keystore 条目）互不可见——dev 播种的一切（受限内容闸门键、
+        // LLM 端点 base_url/model、refresh_token）随 debug 数据目录走，不再随
+        // 「先装 debug 再覆盖装 release」这条**已发布文档写明的正常发版路径**
+        // 残留进 release 安装。
+        //
+        // 口径（ADR-0227 D1）：#802 红线「包名 io.pictelio.app 不动」约束的是**已发布
+        // 产物的身份**，故 **release 侧 applicationId 一字不动**（仍为 io.pictelio.app，
+        // 已发布用户零影响，升级路径与 Keystore 绑定不变）；被改的只有 debug 变体的
+        // 有效 applicationId ⇒ 不引入新的构建维度（产物仍是一个 debug + 一个 release）。
+        //
+        // ⚠️ namespace（= Java 包名）与 applicationId **解耦**（ADR-0227 D3）：
+        // namespace 仍是 io.pictelio.app ⇒ 类 FQN（io.pictelio.app.LynxActivity 等）
+        // 逐字不变，~130 个 Java 源文件的包声明全部不受影响。
+        // ⚠️ 代价：组件启动串必须写成「applicationId + 类 FQN」=
+        //    `io.pictelio.app.debug/io.pictelio.app.LynxActivity`；
+        //    **不可**用相对类名 `io.pictelio.app.debug/.LynxActivity`——相对类名在
+        //    `am start -n` 里按 **applicationId 的包** 展开，会解析成不存在的
+        //    io.pictelio.app.debug.LynxActivity ⇒ 组件解析失败、Activity 起不来。
+        debug {
+            applicationIdSuffix ".debug"
+        }
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
-    }
-}
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        // bcprov multi-release jar 的 META-INF/versions/9 对 Android 运行时无效
-        // （#248：AGP 对 MRJAR 重复路径冲突的预案，docs/research/ota-ed25519-android.md §3.1）
-        variant.packaging.resources.excludes.add('META-INF/versions/9/**')
     }
 }
 

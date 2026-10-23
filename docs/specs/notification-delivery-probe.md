@@ -222,10 +222,10 @@ ADR-0188 原文要求「系统推送需自建后台基础设施，独立立项�
 ```bash
 ADB=~/Library/Android/sdk/platform-tools/adb
 # ① 计数（注意 &quot; 是 XML 存储层的转义，JS 拿到的是真引号）
-$ADB shell run-as io.pictelio.app cat shared_prefs/CapacitorStorage.xml \
+$ADB shell run-as io.pictelio.app.debug cat shared_prefs/CapacitorStorage.xml \
   | grep -o '<string name="delivery_probe_v1">[^<]*'
 # ② 权限是否真的授予（决定了「没数据」是用户拒绝还是探测器坏了）
-$ADB shell dumpsys package io.pictelio.app | grep POST_NOTIFICATIONS
+$ADB shell dumpsys package io.pictelio.app.debug | grep POST_NOTIFICATIONS
 ```
 
 把 ① 的 JSON 与 ② 的 granted/denied 放在一起人工判读（报告格式化器已随死代码清理删除，

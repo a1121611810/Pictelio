@@ -59,11 +59,17 @@
 
 ### 4.2 手术五项（#610 的执行项）
 
-1. **Gradle**：`app/build.gradle` 删 `flavorDimensions "client"` 与全部 `productFlavors`；删 `webviewImplementation` / `fullImplementation` 对 `capacitor-android` / `capacitor-cordova-android-plugins` 的依赖（实测位于 `app/build.gradle:227-230` 与 `:256-258`）。`[码]`
+> ⚠️ **坐标口径订正（2026-10-23）**：本节 `app/build.gradle` 的行号**锚在本文基线 `53005dd6` 的
+> `packages/app/android/app/build.gradle`**——该文件随 ADR-0203 整包删除，现已不存在。
+> 2026-10-23 一轮坐标漂移回填误按**现行** `packages/android-host/android/app/build.gradle` 的行偏移平移，
+> 把基线坐标挪到了与本节语义无关的行上（现行文件的 `:243-246` / `:272-274` / `:190-191` 落在
+> Lynx 注释与 release 门禁任务上）。**已回退为基线原值**并在此登记口径，避免再被平移。
+
+1. **Gradle**：`app/build.gradle` 删 `flavorDimensions "client"` 与全部 `productFlavors`；删 `webviewImplementation` / `fullImplementation` 对 `capacitor-android` / `capacitor-cordova-android-plugins` 的依赖（实测位于 `app/build.gradle:227-230` 与 `:256-258`，基线 `53005dd6`）。`[码]`
 2. **Manifest 入口写死**：`manifestPlaceholders` 改固定为 `launcherActivity: ".LynxActivity"` / `appClass: ".PictelioAppLynx"`（即现有 `lynx` flavor 的取值）。`[码]`
 3. **`buildConfigField "String[]", "CLIENT_KINDS"`** 从 `{"lynx","webview"}` / `{"webview"}` 收敛为 `{"lynx"}`，并删除消费方。⚠️ 注意 ADR-0164 曾定「`CLIENT_KINDS[0]` 是 Java 侧缺省引擎的单一事实来源」——**单引擎后该机制失去意义**，须一并清理，**但 ADR-0164 本身不重开**。`[重建]`
 4. **根 `package.json` 的 `build:android`**：改为 `lynx bundle 构建 → sync-android-assets → gradle assembleDebug`；**删除** web build 与 `cap:sync` 步骤。`[票 #610]`
-5. **`capacitor.config.json` / `capacitor.plugins.json`** 的处理（现有构建已从 assets 排除它们，见 `app/build.gradle:174-175`）。`[码]`
+5. **`capacitor.config.json` / `capacitor.plugins.json`** 的处理（现有构建已从 assets 排除它们，见 `app/build.gradle:174-175`，基线 `53005dd6`）。`[码]`
 
 ### 4.3 保留不动（手术红线）`[票 #609]`
 
@@ -74,6 +80,13 @@
 | **签名** | 不动 |
 | **`minSdkVersion = 28`** | 不动 |
 | **共享 Java 深模块全部保留** | `PixivApiCore` / `PixivImageLoader` / `SecureStorageCompat` / `BackupCrypto` / `WebDavClient` / `NovelExporter` 系 / 各 `LynxModule`（`app/src/lynx/`，**20 个类**）`[码]` |
+
+> ⚠️ **口径注（ADR-0227 D1，2026-10-23 追加）**：上表的「包名不动」红线约束的是**已发布产物的身份**
+> （release 变体的 applicationId 仍是 `io.pictelio.app`，已发布用户零影响、升级路径与 Keystore 绑定不变）。
+> 它**不禁止**给 debug 变体加 `applicationIdSuffix`——那是 dev 变体的存储隔离手段，
+> 裁定见 [ADR-0227](../adr/ADR-0227-debug-application-id-suffix-isolation.md)（debug 变体 applicationId =
+> `io.pictelio.app.debug`；namespace / Java 包名不动 ⇒ 类 FQN 逐字不变）。
+> 本 spec 上表的其余红线（签名、`minSdkVersion`、深模块）仍然全部有效。
 
 ## 5. 已知破损表（接受不修复）
 

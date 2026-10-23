@@ -33,8 +33,8 @@ adb shell settings put secure ui_night_mode 1|2    # 兜底通道（需重启 ap
 
 # ── 三态设置键 settings_dark_mode（debug 包）──────────────────────────
 # 先经 UI 在「我的 → 外观」切一次（保证键已写入），再直读/直改：
-adb shell run-as io.pictelio.app cat shared_prefs/CapacitorStorage.xml | grep -A1 settings_dark_mode
-adb shell run-as io.pictelio.app sh -c \
+adb shell run-as io.pictelio.app.debug cat shared_prefs/CapacitorStorage.xml | grep -A1 settings_dark_mode
+adb shell run-as io.pictelio.app.debug sh -c \
   "sed -i 's/name=\"settings_dark_mode\">[a-z]*/name=\"settings_dark_mode\">dark/' shared_prefs/CapacitorStorage.xml"
 # ⚠️ 直改 prefs **绕过 JS 通知路径**（applyDarkModePreference 不会触发）——只用于 §T3-4 的滞后窗口
 #    确认；「正常路径」断言一律走 UI 切换。
@@ -42,9 +42,9 @@ adb shell run-as io.pictelio.app sh -c \
 # ── 冷启动 / 截图 ─────────────────────────────────────────────────────
 # launcher activity 名**按 flavor 注入**，manifest 里没有硬编码类名（`android:name="${launcherActivity}"`）。
 # 因此命令骨架不能写死某个类——先解析再启动（同 scripts/audit-real-interaction/run_regression.mjs 的解析式）：
-LAUNCHER=$(adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER io.pictelio.app | tail -1 | tr -d '\r')
-adb shell am force-stop io.pictelio.app
-adb shell am start -n "$LAUNCHER"      # lynx flavor → io.pictelio.app/.LynxActivity
+LAUNCHER=$(adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER io.pictelio.app.debug | tail -1 | tr -d '\r')
+adb shell am force-stop io.pictelio.app.debug
+adb shell am start -n "$LAUNCHER"      # debug 变体 → io.pictelio.app.debug/io.pictelio.app.LynxActivity
 adb exec-out screencap -p > t3-splash-xxx.png      # splash 首帧窗口 < 1s：需轮询抓帧或录屏
 adb shell screenrecord --time-limit 5 /sdcard/splash.mp4 && adb pull /sdcard/splash.mp4
 
@@ -141,7 +141,7 @@ adb shell dumpsys window | grep -i appearance
 | T4-5 | 滚动指示条 | `ScrollIndicator` | 暗色下滚动长列表并抓帧 | 指示条为该主题 `.theme-X.dark` 的 `--md-outline` + 35% alpha（sky ≈ `rgba(140,145,152,0.35)`，其余读 `tokens.css`） | `t4-scrollbar-dark.png` |
 | T4-6 | 输入框占位符 | `SearchSheet` · `BookmarkPanel` · `Me`（命名模板 + WebDAV 六字段） | 暗色下打开上述输入框并聚焦；**WebDAV 六字段必须「聚焦 + 空」**（空态时被浮层 label 覆盖，按 label 采样会得到假结论） | placeholder 对比度 **≥ 4.5:1**（WCAG AA）。修复前 **1.31:1**；修复后取 `.theme-X.dark --md-on-surface-variant`，实测 **7.20–7.29**。不达标即 ❌ | `t4-placeholder-dark.png` |
 
-- 冷缓存技巧：`adb shell pm clear io.pictelio.app` 会清登录态——优先改用 force-stop + 未缓存页面（例如首访的分类页）或先记录后清理。
+- 冷缓存技巧：`adb shell pm clear io.pictelio.app.debug` 会清登录态——优先改用 force-stop + 未缓存页面（例如首访的分类页）或先记录后清理。
 - **T4-6 判据来自 [#693](https://github.com/a1121611810/Pictelio/issues/693)**：该票原将本项登记为「已知接受项 · 走查不判 ❌」，2026-10-15 改判实施后转为**硬判据**（实现取 `.theme-X.dark --md-on-surface-variant`）。机制与取值见 [ADR-0180](../adr/ADR-0180-lynx-dark-mode.md) 代价段与 `docs/specs/lynx-placeholder-theme-color.md`。
 
 ## 5. 收口

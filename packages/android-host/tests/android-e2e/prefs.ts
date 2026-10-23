@@ -14,7 +14,16 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { adbPath, APP_PACKAGE, MAIN_ACTIVITY, runCapture, runOrThrow, TIMEOUTS } from "./env";
+import {
+  adbPath,
+  APP_NAMESPACE,
+  APP_PACKAGE,
+  LYNX_ACTIVITY,
+  MAIN_ACTIVITY,
+  runCapture,
+  runOrThrow,
+  TIMEOUTS,
+} from "./env";
 
 /** CapacitorStorage.xml 在 app 数据目录内的相对路径（run-as 需相对路径，绝对路径被 SELinux 拒） */
 const PREFS_REL = "shared_prefs/CapacitorStorage.xml";
@@ -270,8 +279,10 @@ const DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
  * 非空时调 `autoLoginWithRefreshToken(token)` 持久化进 SecureStorage 并登录。
  * 门禁 `BuildConfig.DEBUG` ⇒ 只有 debug 包有该钩子，release 包被 R8 整段移除。
  *
- * 显式打 `io.pictelio.app/.LynxActivity` 而非 `MAIN_ACTIVITY`：该钩子只在
- * LynxActivity 内实现，落到别的 Activity 上 intent 会被静默忽略。
+ * 显式打 `io.pictelio.app.debug/io.pictelio.app.LynxActivity` 而非 `MAIN_ACTIVITY`：
+ * 该钩子只在 LynxActivity 内实现，落到别的 Activity 上 intent 会被静默忽略。
+ * ⚠️ 组件串 = **applicationId + 类 FQN**；**不可**用相对类名 `io.pictelio.app.debug/.LynxActivity`
+ * ——相对类名按 applicationId 的包展开，会解析成不存在的类（ADR-0227 D3/D4）。
  */
 export function devLoginIntentArgs(
   token: string,
@@ -285,14 +296,14 @@ export function devLoginIntentArgs(
     "am",
     "start",
     "-n",
-    `${APP_PACKAGE}/.LynxActivity`,
+    `${APP_PACKAGE}/${LYNX_ACTIVITY}`,
     "--es",
     DEV_EXTRA_REFRESH_TOKEN,
     quoted,
   ];
   // 强制 R-18 可见（默认开）。不强制时，受限作品会渲染成灰色占位「受浏览限制，不予显示」——
   // 既没有真实像素（像素判据恒等），又点不进去（导航断言必败）。项目内已有先例：
-  // tools/verify-translation.sh:47 与 tools/README.md:42 都带这个 extra。
+  // tools/verify-translation.sh:60 与 tools/README.md:46 都带这个 extra。
   if (forceR18) args.push("--es", DEV_EXTRA_FORCE_R18, "true");
   // 播种「允许翻译 R18/R18G」外发授权（spec §9.7 / ADR-0173 D4b）。**默认关闭**：
   // 翻译闸门在真机上照常工作，只有显式要验受限章节翻译的用例才该打开它——
@@ -473,12 +484,18 @@ export function currentTopActivity(serial: string): string | null {
     raw = m2 ? m2[1] : null;
   }
   if (!raw) return null;
-  // 归一化 "io.pictelio.app/io.pictelio.app.LynxActivity" → "io.pictelio.app.LynxActivity"；
-  // "io.pictelio.app/.LynxActivity" → 同。
+  // 归一化 → **类 FQN**（"package.Class" 形态）：
+  //   "io.pictelio.app.debug/io.pictelio.app.LynxActivity" → "io.pictelio.app.LynxActivity"；
+  //   "io.pictelio.app.debug/.LynxActivity" → 同。
+  //
+  // ⚠️ 相对类名（`.LynxActivity`）必须按 **namespace** 展开，**不能**按 applicationId
+  // 展开：debug 变体的 applicationId 是 io.pictelio.app.debug，而类住在
+  // io.pictelio.app（namespace 不随变体变，ADR-0227 D3）——按 applicationId 展开会
+  // 得到不存在的 io.pictelio.app.debug.LynxActivity ⇒ 与 MAIN_ACTIVITY 的比对恒不成立。
   if (raw.includes("/")) {
-    const [pkg, cls] = raw.split("/", 2);
-    if (cls.startsWith(".")) return pkg + cls;
-    return cls.includes(".") ? cls : `${pkg}.${cls}`;
+    const [, cls] = raw.split("/", 2);
+    if (cls.startsWith(".")) return APP_NAMESPACE + cls;
+    return cls.includes(".") ? cls : `${APP_NAMESPACE}.${cls}`;
   }
   return raw;
 }

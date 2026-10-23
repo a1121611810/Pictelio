@@ -4,11 +4,11 @@
 
 | 类别 | 数量 |
 | --- | --- |
-| 编号 ADR（ADR-NNNN） | 205 |
+| 编号 ADR（ADR-NNNN） | 207 |
 | 术语表（glossary-*.md） | 47 |
 | 遗留编号（0001-0021，无 ADR- 前缀） | 21 |
 | 其他（迁移计划 / spikes 等） | 2 |
-| **合计** | **275** |
+| **合计** | **277** |
 
 ## 编号 ADR（按编号排序）
 
@@ -217,6 +217,8 @@
 - [ADR-0223-runtime-ui-tree-observation-channel.md](ADR-0223-runtime-ui-tree-observation-channel.md) — ADR-0223：运行时 UI 树观测通道——上游 UI source map 的 React-only 边界与本仓选定形态
 - [ADR-0224-domain-doc-rename-to-glossary.md](ADR-0224-domain-doc-rename-to-glossary.md) — ADR-0224：领域文档约定对齐上游——`CONTEXT.md` / `CONTEXT-MAP.md` 改名为 `GLOSSARY.md` / `GLOSSARY-MAP.md`
 - [ADR-0225-code-review-skill-upstream-alignment.md](ADR-0225-code-review-skill-upstream-alignment.md) — ADR-0225：code-review skill 对齐上游——上游骨架 + 本仓 override + 三方机检
+- [ADR-0226-translate-store-cancel-window.md](ADR-0226-translate-store-cancel-window.md) — ADR-0226：翻译 store 取消窗口——用「取消纪元」闸门禁止 provider 启动前被取消的 invocation 外发请求
+- [ADR-0227-debug-application-id-suffix-isolation.md](ADR-0227-debug-application-id-suffix-isolation.md) — ADR-0227：debug 变体 applicationIdSuffix 隔离——#802 红线口径裁定与落地
 
 ## 术语表（glossary）
 
@@ -302,10 +304,10 @@
 | ADR | 被引次数 |
 | --- | --- |
 | ADR-0207 | 103 |
+| ADR-0203 | 76 |
 | ADR-0205 | 64 |
-| ADR-0203 | 61 |
+| ADR-0171 | 49 |
 | ADR-0123 | 47 |
-| ADR-0171 | 47 |
 | ADR-0103 | 43 |
 | ADR-0037 | 42 |
 | ADR-0170 | 40 |
@@ -319,8 +321,8 @@
 | ADR-0206 | 26 |
 | ADR-0111 | 23 |
 | ADR-0168 | 23 |
+| ADR-0097 | 22 |
 | ADR-0211 | 21 |
-| ADR-0050 | 20 |
 
 ## 消费规则
 

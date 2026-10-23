@@ -38,7 +38,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
 import { assertDebugApkInstalled, forceStopApp, loginViaDevIntent, writePrefKey } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
-import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
+import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
 import { SLEEP } from "../helpers";
 
 /** 证据落盘目录（相对 android-e2e/）。失败时人能直接翻出卡在哪一步。 */
@@ -78,9 +78,10 @@ function logHas(serial: string, needle: string): boolean {
 /**
  * 当前前台 Activity 的组件名。
  *
- * ⚠️ dumpsys 给的是**短形式** `io.pictelio.app/.LynxActivity`，而 env 里的常量是
- * 全限定名 `io.pictelio.app.LynxActivity` —— 直接 endsWith 比对**恒不成立**
- * （本轮 e2e 就卡在这一步，而前面所有链路其实都已通过）。故两种形式都认。
+ * ⚠️ dumpsys 可能给**短形式**（`io.pictelio.app.debug/.LynxActivity`），也可能给全限定名
+ * （`io.pictelio.app.debug/io.pictelio.app.LynxActivity`）—— 类 FQN 的根是 **namespace**
+ * （`io.pictelio.app`），与 applicationId（`io.pictelio.app.debug`）**不是同一个坐标**
+ * （ADR-0227 D3）⇒ 不可拿 applicationId 去拼类名。判据只做 endsWith，两种形态都认。
  */
 function resumed(serial: string): string {
   const d = adb(serial, ["shell", "dumpsys", "activity", "activities"]);
@@ -147,7 +148,7 @@ describe("android-e2e 触达探测 · 冷启动点通知（手动发布门，不
     // 步骤 1：启动 App（登录态由 devLoginIntent 在外层 spec 播种；此处只验链路）
     runOrThrow(
       adbPath(),
-      ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/.LynxActivity`],
+      ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/${LYNX_ACTIVITY}`],
       60_000,
     );
     await waitFor(

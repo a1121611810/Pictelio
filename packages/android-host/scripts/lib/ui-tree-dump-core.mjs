@@ -24,15 +24,26 @@
 import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-/** 应用包名（宿主侧 applicationId）。 */
-export const APP_PACKAGE = "io.pictelio.app";
+/**
+ * Java 包名 / namespace —— **类 FQN 的根**，不随变体变化（ADR-0227 D3）。
+ */
+export const APP_NAMESPACE = "io.pictelio.app";
 
 /**
- * 组件名必须写成 `pkg/.Class` 形态。
- * 写成 `pkg.Class`（少个斜杠）会被 ActivityManager 判为「Bad component name」——
- * `am start` 直接 exit 255，且**不启动任何东西**（静默失败，最容易误判成「能力没落地」）。
+ * **debug 变体**的 applicationId（ADR-0227 D2：只给 debug 加 ".debug" 后缀）。
+ * 脚本跑在 debug 设备上 ⇒ 取 debug 值；release 变体仍是 `io.pictelio.app`。
  */
-export const LYNX_ACTIVITY = `${APP_PACKAGE}/.LynxActivity`;
+export const APP_PACKAGE = "io.pictelio.app.debug";
+
+/**
+ * 组件名必须写成 `pkg/<类 FQN>` 形态。
+ *
+ * ⚠️ **不可**写成 `pkg/.Class`（少个点）：相对类名在 `am start -n` 里按
+ * **applicationId 的包** 展开（`ComponentName.unflattenFromString`）⇒ debug 下会
+ * 展开成不存在的 `io.pictelio.app.debug.LynxActivity` ⇒ 组件解析失败、
+ * `am start` exit 255 且**不启动任何东西**（静默失败，最容易误判成「能力没落地」）。
+ */
+export const LYNX_ACTIVITY = `${APP_PACKAGE}/${APP_NAMESPACE}.LynxActivity`;
 
 /** intent extra 键（必须与宿主侧 UiTreeDump.EXTRA_TRIGGER 逐字一致）。 */
 export const EXTRA_TRIGGER = "uiTreeDump";

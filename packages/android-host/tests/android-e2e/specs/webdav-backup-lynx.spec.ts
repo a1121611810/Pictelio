@@ -22,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { LYNX_ACTIVITY } from "../env";
 import {
   currentTopActivity,
   forceStopApp,
@@ -34,7 +35,10 @@ const DAV_ROOT = process.env.WEBDAV_E2E_ROOT ?? "/tmp/pictelio-dav";
 const DAV_URL = process.env.WEBDAV_E2E_URL ?? "http://127.0.0.1:8081/";
 const DAV_DIR = "Pictelio/backup";
 const BACKUP_DIR = path.join(DAV_ROOT, DAV_DIR);
-const LYNX_ACTIVITY = "io.pictelio.app.LynxActivity";
+// 入口 Activity 的**类 FQN**（不是组件串）：本 spec 把它与 `currentTopActivity()`
+// 的归一化结果比对，后者返回的正是类 FQN（ADR-0227 D3：类 FQN 不随变体变化）。
+// ⚠️ 此前这里是写死的字面量 —— 绕过 env.ts 咽喉点，加 debug 后缀后会与归一化结果分叉。
+// （组件串 = applicationId + 类 FQN，由 env.ts 的 `LYNX_ACTIVITY_COMPONENT` 提供。）
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

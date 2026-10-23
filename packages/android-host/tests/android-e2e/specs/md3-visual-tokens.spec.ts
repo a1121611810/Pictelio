@@ -78,7 +78,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ensureEmulator } from "../avd";
 import { buildDebugApk, installApk } from "../build-install";
-import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
+import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import { CONTENT_BOTTOM } from "../transition-geometry";
 import {
   assertDebugApkInstalled,
@@ -192,7 +192,7 @@ const SCREEN_H = 2160;
  * ✅ **已取证（2026-10-22 真机登录态实跑 · #1047 第 4 轮 Standards 轴 S-N2 那一项已收口）**：
  *   旧的 y 区间是**写死**的 `y ∈ [0, 48)`，改由树推导后实测下界 = **72** ⇒
  *   **y 48..71 这 24 行是新增的采样区**。⚠️ **此前登记的「设备 refresh token 失效
- *   ⇒ A1/A2 未实跑」是误判**（真因是 `prefs.ts:402-408` 早已登记的**间歇性连接
+ *   ⇒ A1/A2 未实跑」是误判**（真因是 `prefs.ts:413-419` 早已登记的**间歇性连接
  *   重置**：模拟器→Pixiv 链路连续 3 次里 2 次成功、1 次 `Connection reset`）
  *   ⇒ 2026-10-22 登录态实跑 **A1/A2 全绿**，并**逐帧复算**了这 24 行的纯度：
  *   **窗 A / 窗 B 各 1.0000**（浅色帧众数色 (248,250,255) · 暗色帧 (16,20,24)，
@@ -636,7 +636,7 @@ describe.skipIf(SKIPPED)(
             "-s",
             serial,
             "shell",
-            `run-as io.pictelio.app sh -c 'echo ${b64} | base64 -d > shared_prefs/CapacitorStorage.xml'`,
+            `run-as ${APP_PACKAGE} sh -c 'echo ${b64} | base64 -d > shared_prefs/CapacitorStorage.xml'`,
           ]);
         }
       } catch (e) {

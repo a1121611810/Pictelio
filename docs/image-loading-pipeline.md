@@ -784,7 +784,8 @@ registerPlugin(ImageCachePlugin.class);  // 在 super.onCreate() 之前
           ↓
 文件命名: Base64URL-safe(key)   // key = 图片原始 URL
           ↓
-示例: /data/data/io.pictelio.app/cache/pictelio-images/aHR0cHM6Ly9pLnB4aW1nLm5ldC9jLzU0...
+示例: /data/data/io.pictelio.app.debug/cache/pictelio-images/aHR0cHM6Ly9pLnB4aW1nLm5ldC9jLzU0...
+          （debug 变体；release 变体为 /data/data/io.pictelio.app/…）
 ```
 
 ### 8.3 saveImage 写入

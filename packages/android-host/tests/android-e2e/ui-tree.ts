@@ -57,7 +57,7 @@
  * ## 抓树不破坏被测状态（硬约束）
  *
  * `LynxActivity` 的 `android:launchMode="singleTask"` ⇒ 对已在跑的 App 再发一条
- * `am start -n io.pictelio.app/.LynxActivity`，**intent 走 `onNewIntent` 投递**，
+ * `am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity`，**intent 走 `onNewIntent` 投递**，
  * Activity **不重建**、页面不重载、被测状态保留。
  *
  * ⚠️ `onNewIntent` 里除抓树外还会调 `dispatchNotificationTarget(intent)`——它只认

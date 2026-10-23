@@ -6,7 +6,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."   # 定位到 packages/app-lynx（.env 所在）
 
-PKG="io.pictelio.app"
+# ⚠️ `PKG` 是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+#    release 变体仍是 `io.pictelio.app`）。组件串用「applicationId + 全限定类名」——
+#    **不可**用相对类名 `$PKG/.LynxActivity`：相对类名在 `am start -n` 里按
+#    applicationId 的包展开 ⇒ 会解析成不存在的 `io.pictelio.app.debug.LynxActivity`。
+PKG="io.pictelio.app.debug"
 ANALYZE_PY="scripts/lynx-screen-analyze.py"
 TOKEN=$(grep -oE '^PIXIV_REFRESH_TOKEN=.*' .env | head -1 | cut -d= -f2-)
 if [ -z "$TOKEN" ]; then echo "❌ .env 缺 PIXIV_REFRESH_TOKEN"; exit 1; fi
@@ -25,7 +29,7 @@ echo "── 2. 重启 app ──"
 adb logcat -c
 adb shell am force-stop $PKG
 sleep 1
-adb shell am start -n $PKG/.LynxActivity >/dev/null
+adb shell am start -n $PKG/io.pictelio.app.LynxActivity >/dev/null
 sleep 8
 
 echo "── 3. 等待页面稳定（blank=恢复中，images=已登录，login=登录页） ──"

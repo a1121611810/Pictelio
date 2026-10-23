@@ -6,7 +6,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."   # packages/app-lynx
 
-PKG="io.pictelio.app"
+# ⚠️ `PKG` 是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+#    release 变体仍是 `io.pictelio.app`）。
+PKG="io.pictelio.app.debug"
 ANALYZE="python3 scripts/lynx-screen-analyze.py"
 TOKEN=$(grep -oE '^PIXIV_REFRESH_TOKEN=.*' .env | head -1 | cut -d= -f2-)
 [ -n "$TOKEN" ] || { echo "❌ .env 缺 PIXIV_REFRESH_TOKEN"; exit 1; }
@@ -61,7 +63,7 @@ sy() { echo $(( $1 * WM_W / 1080 )); }   # 纵向（lynx vw 布局 → 同样按
 echo "   屏幕: ${WM_W}x${WM_H}（坐标按基准 1080x2400 缩放）"
 
 echo "════ 0. 重置（清 prefs + 清 token） ════"
-# 单引擎后 pictelio_client_kind 无读点，2026-10-18 已删该键写入（先例 lynx-device-check.sh:16）。
+# 单引擎后 pictelio_client_kind 无读点，2026-10-18 已删该键写入（先例 lynx-device-check.sh:20）。
 # 本步原意保留：「重置 prefs」= CapacitorStorage 覆写成空 map（与旧写法覆盖整份文件等价），
 # 「清 token」= 删 WSSecureStorage 里的 refresh_token（见下方 run-as 段）。
 # ⚠️ 必须**前置守卫**：第 0 步靠 `run-as` 改 SharedPreferences，而 run-as 只对
@@ -90,12 +92,15 @@ adb shell am force-stop $PKG; sleep 1
 #   `.MainActivity` 在 lynx flavor 上不存在 ⇒ `am start` 报
 #   「Activity class {io.pictelio.app/io.pictelio.app.MainActivity} does not exist」，
 #   整条真机流程在第 0 步就死掉、后面所有步骤从未被执行过（2026-10-17 实测）。
-#   实测当前解析结果是 `io.pictelio.app/.LynxActivity`。这里改成向系统问，
+#   实测当前解析结果是 `io.pictelio.app.debug/io.pictelio.app.LynxActivity`。这里改成向系统问，
 #   解析失败才回退到已知的 lynx 类名。
+#   ⚠️ 回退值用**全限定类名**：`$PKG/.LynxActivity` 这种相对类名在 `am start -n` 里按
+#   **applicationId 的包**展开 ⇒ debug 下会解析成不存在的
+#   `io.pictelio.app.debug.LynxActivity`（ADR-0227 D3：类 FQN 的根是 namespace）。
 LAUNCH_ACTIVITY=$(adb shell cmd package resolve-activity --brief \
   -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PKG" 2>/dev/null \
   | tr -d '\r' | grep -E "^$PKG/" | head -1)
-[ -n "$LAUNCH_ACTIVITY" ] || LAUNCH_ACTIVITY="$PKG/.LynxActivity"
+[ -n "$LAUNCH_ACTIVITY" ] || LAUNCH_ACTIVITY="$PKG/io.pictelio.app.LynxActivity"
 echo "   launcher: $LAUNCH_ACTIVITY"
 adb shell am start -n "$LAUNCH_ACTIVITY" >/dev/null
 sleep 9

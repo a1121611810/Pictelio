@@ -10,6 +10,12 @@
  * 期望值来源：**真实 Pixiv refresh_token 的字符形态**（本项目 token 为 43 字符
  * 的 URL-safe base64 串，实测含 `_` / `-`）+ shell 单引号包裹的设备侧转义规则，
  * 以及实测 2026-09-28 在 pictelio_ui 上抓到的成功日志串，非被测实现反推。
+ *
+ * 坐标（ADR-0227）：断言里的包名是 **debug 变体的 applicationId**
+ * （`io.pictelio.app.debug`）；组件串 = **applicationId + 类 FQN**
+ * （`io.pictelio.app.debug/io.pictelio.app.LynxActivity`）——类 FQN 的根是 namespace
+ * （不随变体变），**不可**写成相对类名 `io.pictelio.app.debug/.LynxActivity`
+ * （相对类名按 applicationId 的包展开 ⇒ 解析成不存在的类）。
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { devLoginIntentArgs, loginViaDevIntent, readAppLogcat, redactSecrets } from "../prefs";
@@ -56,7 +62,7 @@ describe("devLoginIntentArgs", () => {
       "am",
       "start",
       "-n",
-      "io.pictelio.app/.LynxActivity",
+      "io.pictelio.app.debug/io.pictelio.app.LynxActivity",
       "--es",
       "pictelio_dev_refresh_token",
       "'TOKEN_VALUE'",
@@ -67,7 +73,7 @@ describe("devLoginIntentArgs", () => {
   });
 
   it("默认带 force_r18 extra（否则受限作品渲染灰占位、像素判据恒等）", () => {
-    // oracle = tools/verify-translation.sh 与 tools/README.md:42 里既有的下发写法；
+    // oracle = tools/verify-translation.sh 与 tools/README.md:46 里既有的下发写法；
     // 消费侧：原生 LynxActivity 的 DEV_EXTRA_FORCE_R18 extra → settingsStore 的
     // applyDevSeed("dev_force_r18", ...) 读该键。**两处都刻意不写行号**——行号会随
     // 重构腐坏（本文件此前就因写死 `LynxActivity.java:697-706` 而指向了无关代码）。
@@ -226,7 +232,7 @@ describe("loginViaDevIntent", () => {
         "shell",
         "am",
         "force-stop",
-        "io.pictelio.app",
+        "io.pictelio.app.debug",
       ]);
       const [bin, args] = runOrThrow.mock.calls[1]!;
       expect(bin).toBe("/fake/adb");
@@ -237,7 +243,7 @@ describe("loginViaDevIntent", () => {
         "am",
         "start",
         "-n",
-        "io.pictelio.app/.LynxActivity",
+        "io.pictelio.app.debug/io.pictelio.app.LynxActivity",
         "--es",
         "pictelio_dev_refresh_token",
         "'ENV_TOKEN'",

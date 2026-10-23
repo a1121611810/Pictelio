@@ -111,7 +111,10 @@ jobs:
           set -euo pipefail
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           LOG=/tmp/acceptance.log
-          PKG=io.pictelio.app
+          # debug 变体的 applicationId（ADR-0227 D2：只给 debug 加 ".debug" 后缀，
+          # release 变体仍是 io.pictelio.app）。本 job 装的是 **debug** APK
+          # （run-as / dumpsys grep 都只对 debuggable 包可用）。
+          PKG=io.pictelio.app.debug
           : > "$LOG"
           say() { echo "$1" | tee -a "$LOG"; }
           pull_shot() { adb exec-out screencap -p > "/tmp/$1"; }

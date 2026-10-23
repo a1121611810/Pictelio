@@ -64,7 +64,7 @@
  *   不设代理则推荐流与图片都拉不到（实测）。
  * - 登录：`setupAndroidE2e` 的 `pm clear` 会清掉 Keystore 里的 refresh_token，
  *   故走 LynxActivity 的 **dev intent hook**（`prefs.loginViaDevIntent`）真实登录：
- *   `am start -n io.pictelio.app/.LynxActivity --es pictelio_dev_refresh_token <token>`
+ *   `am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity --es pictelio_dev_refresh_token <token>`
  *   → `LynxActivity.applyDevIntentHooks()` 调 `autoLoginWithRefreshToken` 持久化并登录
  *   （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。单引擎化后 webview 登录页已不存在
  *   （APK 内无 WebView），跨引擎共享 WSSecureStorage 种子恢复那条路随之失效。

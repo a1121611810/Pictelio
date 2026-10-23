@@ -15,6 +15,19 @@
  *  - 措辞门禁只覆盖 `ensure_session` 的**第一块**。
  *  - 行为断言的 `low`（12.91 / 200）从不与阈值比对，「低读数」是**装饰名**。
  *  - `awk -v` 会解释转义而 `grep -F` 不会，两者**可证发散**（方向假红，当前无命中）。
+ *  - `PKG` **取值**门禁只覆盖本文件的被测脚本（`capture-md3-matrix.sh`）；同族另外 6 个
+ *    shell 脚本（`lynx-device-check.sh` / `lynx-flow-check.sh` / `lynx-router-back-regression.sh` /
+ *    `scripts/capture-readme-shots.sh` / `verify-abort.sh` / `verify-translation.sh`）的
+ *    `PKG` 取值**无门禁**——2026-10-23 #1037 落地时其中一个曾漏改（Standards 轴独立复核发现）。
+ *    ⚠️ 另有 **1 个 `.mjs` 脚本**同样带包名坐标且**不在**上面的 `.sh` 枚举内：
+ *    `packages/app-lynx/scripts/verify-statusbar-contrast.mjs`（2026-10-23 Spec 轴 Round 2 指出
+ *    两类清单同时漏了它：既不在 D4 坐标表，也不在本条已知失效面 ⇒ 已一并补入两处）。
+ *
+ * **2026-10-23 冻结期例外（一次，一处）**：#1037（ADR-0227）落地时本脚本 `PKG` 取值漏改
+ * （新增注释说 debug、代码仍是 release ⇒ 注释与代码互相矛盾，且脚本会因 `pidof` 为空而中止），
+ * 由 Standards 轴独立复核发现（非自测）。据此在**既有**「组件名只有一个来源」断言块内补 1 条
+ * `PKG` 取值断言——它是该块同一事实（组件身份）的另一半，**不是新增检测面**；同时在上方
+ * 「已知失效面」登记同族脚本无门禁的残留面。
  *
  * 续做前先读 `AGENTS.md`「门禁冻结线」与 `docs/research/md3-visual-regression-2026-09.md` §8.8。
  * 不要在没有**外部复核**的情况下往里加检测器。
@@ -901,7 +914,21 @@ describe('⑥ 证据门禁：尺寸必须对得上、撕裂帧不算数（D-6 / 
     expect(body, 'relaunch 不得再写一遍字面量组件名').not.toMatch(/\$PKG\/\.LynxActivity/)
     // 断言 `ACT` 有定义，否则 `"$ACT"` 展开成空串 ⇒ am start 报组件不存在。
     // ⚠️ 不能锚 `^ACT=`：它与 `PKG` **写在同一行**（`PKG="…"; ACT="…"`），行首锚匹配不到。
-    expect(SH, 'ACT 必须有定义（与 PKG 同行）').toMatch(/ACT="\$PKG\/\.LynxActivity"/)
+    // ⚠️ 组件串必须是「applicationId + **全限定类名**」：`$PKG/.LynxActivity` 这种**相对类名**
+    //    在 `am start -n` 里按 **applicationId 的包**展开（`ComponentName.unflattenFromString`）
+    //    ⇒ debug 变体（applicationId = io.pictelio.app.debug）会解析成**不存在的**
+    //    `io.pictelio.app.debug.LynxActivity`（类住在 namespace 包 io.pictelio.app，
+    //    ADR-0227 D3）⇒ am start exit 255 且不启动任何东西（静默失败）。
+    expect(SH, 'ACT 必须有定义（与 PKG 同行）').toMatch(/ACT="\$PKG\/io\.pictelio\.app\.LynxActivity"/)
+    // 反向对照：脚本里**不得**再出现相对类名形态（applicationId ≠ namespace 时不可用）。
+    expect(SH, '组件串不得用相对类名（$PKG/.LynxActivity）').not.toMatch(/\$PKG\/\.LynxActivity/)
+    // ⚠️ `PKG` 的**取值**是同一事实的另一半（ADR-0227 D2：debug 变体 applicationId =
+    //    `io.pictelio.app.debug`）。本脚本跑在**debug 安装**上 ⇒ 取值错成 release id 时
+    //    `pidof io.pictelio.app` 恒空 ⇒ `relaunch` 走到「✗ 进程不存在」中止，
+    //    矩阵采集**静默不出图**（ADR-0227 D4「静默漏检」家族）。
+    //    实测事故：2026-10-23 #1037 落地时本脚本只改了注释没改取值（注释说 debug、
+    //    代码写 release ⇒ 注释与代码互相矛盾），由 Standards 轴独立复核发现。
+    expect(SH, 'PKG 必须取 debug 变体的 applicationId').toMatch(/PKG="io\.pictelio\.app\.debug"/)
   })
 
   it('frame_settled 必须**三态**：把「探针读不出来」并入「撕裂」会指错根因（F2）', () => {

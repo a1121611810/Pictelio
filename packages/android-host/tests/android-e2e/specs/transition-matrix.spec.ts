@@ -57,7 +57,8 @@
  * 收藏行窗口/列表底部）承载内容断言，禁止整帧无差别 diff（那是 #374 存在性口径的换皮）。
  *
  * ── 驱动方式（全部沿用既有 spec 已验证的交互，无新发明）────────────────────
- * - 深链：`am start -n <pkg>/.LynxActivity --es benchNav <scenario>`——benchNav extra
+ * - 深链：`am start -n <applicationId>/io.pictelio.app.LynxActivity --es benchNav <scenario>`
+ *   ——benchNav extra
  *   由 LynxActivity 自行读取（`LynxActivity.java:543` getStringExtra("benchNav") +
  *   `:733` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
  * - 点击/滑动：adb `input tap|swipe|motionevent|keyevent`（fab / lynx-bookmark-tags 先例）；

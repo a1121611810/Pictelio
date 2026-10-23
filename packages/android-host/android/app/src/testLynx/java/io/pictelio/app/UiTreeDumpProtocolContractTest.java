@@ -52,7 +52,8 @@ import org.robolectric.annotation.Config;
  *       （{@code ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json}）本门禁只比对<b>前缀与后缀</b>，
  *       中间的序号/时间戳是运行时变量，静态比不了；采样点与档位由另外两个常量
  *       （{@code POINT_IDS_CSV} / {@code SAMPLE_DELAYS_CSV}）逐字比对兜住。</li>
- *   <li><b>不覆盖路径中的包名</b>：脚本的远程目录里写死了包名（{@code io.pictelio.app}），
+ *   <li><b>不覆盖路径中的包名</b>：脚本的远程目录里写死了包名（<b>debug 变体的
+ *       applicationId</b>：{@code io.pictelio.app.debug}，ADR-0227 D2），
  *       而宿主侧用 {@code getExternalFilesDir(null)} 动态取——两者靠平台约定相等，
  *       不靠字面量相等。</li>
  * </ul>

@@ -14,7 +14,10 @@
 # Oracle 锚定（硬约束 #6）：期望值的来源 = ADR-0170 §D7「cancel 命中活 call → Log.i
 # 'abortStream 取消:'」+ spec §7.2「aborted 状态不回调本 cb」，不依赖 mock 内部行为。
 set -eo pipefail
-PKG=io.pictelio.app
+# debug 变体的 applicationId（ADR-0227 D2：只给 debug 加 ".debug" 后缀，
+# release 变体仍是 io.pictelio.app）。ACT 是**组件串** = applicationId + 类 FQN；
+# 类 FQN 的根是 namespace（不随变体变）⇒ 这里写全限定类名。
+PKG=io.pictelio.app.debug
 ACT=$PKG/io.pictelio.app.LynxActivity
 MODE="${1:-abort}"
 # 仓库根从本脚本位置推导（tools → android-e2e → tests → android-host → packages → root），

@@ -26,7 +26,8 @@
  *
  * ## oracle
  *
- * - **协议字面量**（extra 键 `uiTreeDump` / 组件名 `io.pictelio.app/.LynxActivity`）——
+ * - **协议字面量**（extra 键 `uiTreeDump` / 组件名
+ *   `io.pictelio.app.debug/io.pictelio.app.LynxActivity`）——
  *   与宿主侧 `UiTreeDumpProtocolContractTest` 逐字比对的是同一组值。
  * - **落齐判据**（0 / 1500 / 4000 三档齐 ⇒ 落齐）——`scripts/lib/ui-tree-dump-core.mjs`
  *   的 `planWait`，其单测在 `tests/unit/scripts/ui-tree-dump-core.test.ts`。
@@ -59,8 +60,16 @@ vi.mock("../env", async (importOriginal) => {
   return { ...actual, adbPath, runOrThrow, runCapture };
 });
 
-/** 协议字面量（与宿主侧 `UiTreeDump` 逐字对应，跨端契约门禁比对同一组值）。 */
-const LYNX_ACTIVITY_LITERAL = "io.pictelio.app/.LynxActivity";
+/**
+ * 协议字面量（与宿主侧 `UiTreeDump` 逐字对应，跨端契约门禁比对同一组值）。
+ *
+ * ⚠️ 组件串 = **applicationId + 类 FQN**：applicationId 是 debug 变体的
+ * `io.pictelio.app.debug`（ADR-0227 D2），类 FQN 的根是 namespace
+ * `io.pictelio.app`（D3，不随变体变）。**不可**写成相对类名
+ * `io.pictelio.app.debug/.LynxActivity`——相对类名按 applicationId 的包展开，
+ * 会解析成不存在的 `io.pictelio.app.debug.LynxActivity`。
+ */
+const LYNX_ACTIVITY_LITERAL = "io.pictelio.app.debug/io.pictelio.app.LynxActivity";
 const EXTRA_TRIGGER_LITERAL = "uiTreeDump";
 
 /** 产物名 → 树里的子节点数（⇒ 节点数 = 子节点数 + 1，便于区分哪份最完整）。 */

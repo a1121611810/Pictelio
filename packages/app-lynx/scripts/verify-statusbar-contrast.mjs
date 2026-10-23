@@ -142,8 +142,8 @@ if (pageTopInset === 'self') {
       `  遮罩只存在于 bleed 形态的沉浸式首页（\`Recommended.vue\` 的 \`--md-statusbar-scrim\` 层）。\n` +
       `  在 self 页量到的是实体顶栏的 surface，与「遮罩叠在封面上」不是同一件事。\n` +
       `  ⇒ 停到沉浸式首页再测：\n` +
-      `     adb shell am force-stop io.pictelio.app\n` +
-      `     adb shell am start -n io.pictelio.app/.LynxActivity --es benchNav carousel\n` +
+      `     adb shell am force-stop io.pictelio.app.debug\n` +
+      `     adb shell am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity --es benchNav carousel\n` +
       `  ⚠️ REJECT ≠ 通过。`,
   )
   process.exit(2)

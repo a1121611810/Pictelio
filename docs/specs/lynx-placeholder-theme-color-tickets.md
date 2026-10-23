@@ -9,7 +9,7 @@
 | T2 | `useInputPlaceholderColor()` composable | T1 | `src/composables/useInputPlaceholderColor.ts`（新增）及其单测 | 返回 computed：读 `settingsStore.themeColor` + `settingsStore.resolvedDark`，**禁止读 `currentDarkMode`**（手动模式下 stale，`settingsStore.ts:989`）；亮色返回单值、暗色查表；**不做非法值兜底分支**（store 已拦）；单测覆盖 7 主题 × 亮暗 14 组 + 主题切换后重算 | done |
 | T3 | 9 处消费点改绑 | T2 | `SearchSheet.vue`、`BookmarkPanel.vue`、`Me.vue`（7 处）、`SettingsEndpoint.vue`（6 处） | 9 处全部绑 `placeholderColor`；模板内零 `placeholder-color="#`；**`BookmarkPanel` 新增 `useSettingsStore` 引入**（当前未引）；`Me.vue` 删除 `INPUT_PLACEHOLDER_COLOR` import、`SearchSheet` 同步清理；`BookmarkPanel.template.test.ts:206-208` 三条断言按新形态改写（**保留**「模板不含 `placeholder-color="#`」这条防散写断言） | done |
 | T4 | 终态文档收口 | T3 | ADR-0180、`lynx-night-mode-walkthrough.md:128`、`hardcode-whitelist-colors.json:8`、`lynx-night-mode-audit.md` | ADR「代价 / 风险」段「实施中」→「**已解除**」；走查矩阵 `:128` 由「接受项 / 不判 ❌」改为**判据**「暗色 placeholder 对比度 ≥ 4.5:1，截图留档」；白名单 reason **删掉「关闭 #693 时同步删本豁免」**（采纳 A 后该承诺作废——常量保留即豁免保留）并补「随常量保留」；audit 同行补同款声明 | done |
-| T5 | 验收 + #1014 走查项登记 | T1–T4 | #1014 评论 / 走查矩阵 §4 | `pnpm check:app-lynx` + `pnpm test:app-lynx` + `pnpm fmt:check` 全绿；#1014 走查矩阵新增 **T4-6** 判据「暗色 placeholder 对比度 ≥ 4.5:1」并写明**取样时机**（WebDAV 六字段须「聚焦 + 空」）；已并入 `release-checklist.md:231` 的 gate 枚举。**另含 review 轮补入的两道防线**（见下「review 修复轮」） | done |
+| T5 | 验收 + #1014 走查项登记 | T1–T4 | #1014 评论 / 走查矩阵 §4 | `pnpm check:app-lynx` + `pnpm test:app-lynx` + `pnpm fmt:check` 全绿；#1014 走查矩阵新增 **T4-6** 判据「暗色 placeholder 对比度 ≥ 4.5:1」并写明**取样时机**（WebDAV 六字段须「聚焦 + 空」）；已并入 `release-checklist.md:233` 的 gate 枚举。**另含 review 轮补入的两道防线**（见下「review 修复轮」） | done |
 
 ## 关键路径
 
@@ -30,7 +30,7 @@
 | 1 | 9 处改绑只有 `BookmarkPanel` 有接线守卫 | 把 8/9 处回退成静态常量 → **297 文件 / 4236 测试全绿** | `lynxPlatformColors.test.ts` 增 `②` 组：9 处声明式清单 + 逐处绑 `placeholderColor` + 零裸字面量 + 每个文件真引了 composable + 无组件绕过 composable 直取暗色表 | 同一证伪 → **1 failed** ✅ |
 | 2 | `resolvedDark` 归一语义零覆盖，而 `system` 是缺省模式 | 把 `resolvedDark` 换成 `darkMode` → **6/6 全绿** | `useInputPlaceholderColor.test.ts` 增 `system` 组 6 条：三态键留 `system` + `currentDarkMode` 设 `dark`/`light` 双向断言，并显式断言 `DEFAULT_DARK_MODE === 'system'` | 同一证伪 → **2 failed** ✅ |
 
-同轮另修：ADR-0180:56「方案 A/B 待定」与 :54「已解除」互斥（→ 遗留挂账仅剩 #1014）；走查判据从正文 bullet 提升为矩阵行 **T4-6** 并进 `release-checklist.md:231` 枚举；平台升级风险（#537 遗留属性）落账到 spec §6 + 常量文件头；门禁文件头精简（规模线）；移除重复断言与越界断言（composable 用例名不再断言平台事实）。
+同轮另修：ADR-0180:56「方案 A/B 待定」与 :54「已解除」互斥（→ 遗留挂账仅剩 #1014）；走查判据从正文 bullet 提升为矩阵行 **T4-6** 并进 `release-checklist.md:233` 枚举；平台升级风险（#537 遗留属性）落账到 spec §6 + 常量文件头；门禁文件头精简（规模线）；移除重复断言与越界断言（composable 用例名不再断言平台事实）。
 
 ## 备注
 

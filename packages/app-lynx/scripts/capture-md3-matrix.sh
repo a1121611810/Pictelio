@@ -115,12 +115,18 @@ PKG_ROOT="$(cd "$HERE/.." && pwd)"
 ENV_FILE="$PKG_ROOT/.env"
 ADB="$HOME/Library/Android/sdk/platform-tools/adb"
 OUT="${1:?用法: capture-md3-matrix.sh <输出目录>}"
-PKG="io.pictelio.app"; ACT="$PKG/.LynxActivity"
+# ⚠️ `PKG` 是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+#    只给 debug 加 ".debug" 后缀，release 变体仍是 `io.pictelio.app`）。
 # ⚠️ `ACT` 是**组件名的唯一来源**：`relaunch` 必须用 `"$ACT"` 而不是再写一遍
-#    `"$PKG/.LynxActivity"`。早先 `relaunch` 硬编码了组件名而 `ACT` 只剩注释在用 ⇒
+#    字面量。早先 `relaunch` 硬编码了组件名而 `ACT` 只剩注释在用 ⇒
 #    同一个事实两次书写，改包名/类名时漏一处就**静默起不来**（`am start` 报错被 `2>&1 >/dev/null`
 #    吞掉，只表现为「进程起不来」）。已改为单一来源，由
 #    `tests/captureScriptInvariants.test.ts` 钉住（把 `"$ACT"` 改回字面量即转红）。
+# ⚠️ 组件串必须是「applicationId + **全限定类名**」= `io.pictelio.app.debug/io.pictelio.app.LynxActivity`。
+#    **不可**写相对类名形态（`$PKG` + `.LynxActivity`）：相对类名在 `am start -n` 里按
+#    **applicationId 的包**展开 ⇒ 会解析成不存在的 `io.pictelio.app.debug.LynxActivity`
+#    ⇒ 组件解析失败、Activity 起不来（ADR-0227 D3：类 FQN 的根是 namespace）。
+PKG="io.pictelio.app.debug"; ACT="$PKG/io.pictelio.app.LynxActivity"
 REF_W=1080; REF_H=2160
 # CUR_W/CUR_H 必须**在任何用到它们的常量表达式之前**就有值：`set -u` 下
 # 「先算 MODE_X_LIGHT 再 reset_size」会直接 unbound variable 退出。

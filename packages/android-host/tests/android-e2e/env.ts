@@ -74,9 +74,46 @@ if (E2E_FLAVOR !== "single") {
 /** debug APK 产物路径（随 flavor 变化） */
 export const APK_PATH = resolve(APP_ROOT, apkRelativePath(E2E_FLAVOR));
 
-/** App 包名（APK 路径按 flavor 变化；入口恒为 LynxActivity。冒烟测试断言目标） */
-export const APP_PACKAGE = "io.pictelio.app";
-export const LYNX_ACTIVITY = `${APP_PACKAGE}.LynxActivity`;
+/**
+ * Java 包名 / namespace —— **类 FQN 的根**，**不随变体变化**。
+ *
+ * ADR-0227 D3：namespace 与 Java 包名一律不动 ⇒ `io.pictelio.app.LynxActivity` 等
+ * 类 FQN 在 debug / release 两变体下**逐字相同**。它与 applicationId 是**两个**坐标：
+ * 前者决定「类在哪」，后者决定「装出来的应用 id 是什么」。
+ */
+export const APP_NAMESPACE = "io.pictelio.app";
+
+/**
+ * **debug 变体**的 applicationId（安装后的应用 id）。
+ *
+ * ADR-0227 D2：只给 debug 加 `applicationIdSuffix ".debug"` ⇒ debug 与 release 可共存
+ * 安装，两者的应用数据（SharedPreferences / 文件目录 / Keystore 条目）互不可见。
+ *
+ * ⚠️ **E2E 套件跑在 debug 包上**（`run-as` 访问私有目录需要 debuggable 包）⇒ 此处取
+ * debug 值。
+ * ⚠️ **release 变体的 applicationId 仍是 `io.pictelio.app`** —— release 侧的坐标
+ * （发布、已发布用户升级路径）**不要**用这个常量。
+ */
+export const APP_PACKAGE = "io.pictelio.app.debug";
+
+/**
+ * 入口 Activity 的**类 FQN**（**不是**组件串）。
+ *
+ * 类 FQN 的根是 namespace，不是 applicationId ⇒ 加了 debug 后缀后它**一字不变**。
+ * `am start -n` 用的是「applicationId + 类 FQN」的组合，见 `LYNX_ACTIVITY_COMPONENT`。
+ */
+export const LYNX_ACTIVITY = `${APP_NAMESPACE}.LynxActivity`;
+
+/**
+ * 入口 Activity 的**组件串**（`am start -n` 的参数）：applicationId 在前、类 FQN 在后
+ * ⇒ `io.pictelio.app.debug/io.pictelio.app.LynxActivity`。
+ *
+ * ⚠️ **不可**写成相对类名 `io.pictelio.app.debug/.LynxActivity`：相对类名在
+ * `am start -n` 里是按 **applicationId 的包** 展开的（`ComponentName.unflattenFromString`
+ * 把 `.X` 前接 package），展开后变成**不存在的** `io.pictelio.app.debug.LynxActivity`
+ * ⇒ 组件解析失败、Activity 起不来。debug 与 release 同装一台机器后这是必踩的坑。
+ */
+export const LYNX_ACTIVITY_COMPONENT = `${APP_PACKAGE}/${LYNX_ACTIVITY}`;
 
 /**
  * 主入口 Activity。单引擎下 Lynx 是唯一引擎，入口恒为 LynxActivity——APK 里

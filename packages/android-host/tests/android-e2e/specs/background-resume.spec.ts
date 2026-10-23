@@ -9,7 +9,7 @@
  * 单引擎化（#610）后 MainActivity 路由壳已删除，launcher 入口即 LynxActivity，
  * 本 spec 守护的契约变为：**manifest 的 `android:launchMode="singleTask"`
  * + LynxActivity 不覆写 `onNewIntent`** ⇒ 退后台点桌面图标时，launcher 的
- * MAIN/LAUNCHER intent 被重投递给存活的 task 根实例（AndroidManifest.xml:39），
+ * MAIN/LAUNCHER intent 被重投递给存活的 task 根实例（main/AndroidManifest.xml:38），
  * 既不重建 Activity 实例、也不新建 Lynx JS runtime。机制一旦被破坏（改 launchMode /
  * 引入会重建实例的 onNewIntent / 恢复路径上强制重启 runtime），下面的实例数、
  * 新 runtime 日志、PID 三项断言会立刻变红。

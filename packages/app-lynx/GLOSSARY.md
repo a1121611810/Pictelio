@@ -257,7 +257,7 @@ ugoira（Pixiv 动图）在 lynx 客户端从「元数据 → 帧数据 → 帧�
 _Avoid_：「双端同一管线」——实测（原型报告 `docs/research/ugoira-native-pipeline-proto.md`）证明 data URL 在自研 ImageService 架构下原生模式不可用（OkHttp 拒绝 `data:` scheme），双端管线分叉是架构事实，不是实现分歧。
 
 **帧文件 URL（frame file URL）**：
-解压写盘管线产出的帧引用形态：`file:///data/user/0/io.pictelio.app/cache/ugoira/frame_N.{png|jpg}`。仅原生模式存在；`<image>` 经 `PictelioImageService` 的 file:// 分支直接读盘渲染，不经过 OkHttp。
+解压写盘管线产出的帧引用形态：`file:///data/user/0/<applicationId>/cache/ugoira/frame_N.{png|jpg}`（debug 变体为 `io.pictelio.app.debug`，release 变体为 `io.pictelio.app`）。仅原生模式存在；`<image>` 经 `PictelioImageService` 的 file:// 分支直接读盘渲染，不经过 OkHttp。
 _Avoid_：base64 data URL 用于原生模式（实测不可用，见上）
 
 **动图帧调度（frame scheduler）【2026-08-31 修订】**

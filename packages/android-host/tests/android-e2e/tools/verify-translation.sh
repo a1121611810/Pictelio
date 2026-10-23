@@ -4,7 +4,10 @@ set -eo pipefail
 # 教训（2026-09-20）：曾经用 `gradle ... | grep -E 'error:'` 判构建结果 —— grep 无匹配即返回 0，
 # 于是「编译失败」连续几轮被当成成功，测的一直是旧 APK。构建步骤一律带 pipefail，
 # 并在安装前**校验 APK 时间戳**（比本次构建开始时刻新）。
-PKG=io.pictelio.app
+# debug 变体的 applicationId（ADR-0227 D2：只给 debug 加 ".debug" 后缀，
+# release 变体仍是 io.pictelio.app）。ACT 是**组件串** = applicationId + 类 FQN；
+# 类 FQN 的根是 namespace（不随变体变）⇒ 这里写全限定类名。
+PKG=io.pictelio.app.debug
 ACT=$PKG/io.pictelio.app.LynxActivity
 # 缺省走本地 mock 端点（红线：验证不得依赖活着的付费 provider）。要打真实 provider
 # 必须显式传参 —— 上一版缺省 deepseek，等于每次复跑都真实计费。

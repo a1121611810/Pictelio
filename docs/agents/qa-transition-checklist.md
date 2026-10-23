@@ -5,7 +5,9 @@
 > 单引擎化删除 `MainActivity` / `MainActivityWebview` 与引擎路由，唯一入口是 launcher
 > `LynxActivity`（`build.gradle` 已无 `productFlavors`）。因此本文的：
 > - **R4「webview 引擎基线对照」**与所有「切到 webview 引擎（`/client-switch`）」步骤**不可执行**；
-> - 所有 `am start -n io.pictelio.app/.MainActivity` 深链指向**已不存在的 Activity**；
+> - 原文所有指向 `MainActivity` 的深链**已失效**（该 Activity 随单引擎化删除）；benchNav 钩子
+>   现由 `LynxActivity` 消费（`LynxActivity.java` 读 `benchNav` intent extra），正文命令已改为
+>   **全限定类名**组件串（ADR-0227 D4：相对类名按 applicationId 的包展开 ⇒ 解析到不存在的类）；
 > - 前置条件「full 包即可」同样失效；
 > - 正文 R1 里「卡**内部**存在「相关作品」展开段」这类**文本/形态**判据**不可作为验收依据**：
 >   单引擎下 lynx 无文本读取通道，该行已改用「锚点卡下方区域帧差 > `INJECT_TH`」代理，
@@ -30,7 +32,7 @@
 - **lynx 侧进入目标表面一律用 benchNav 深链，不用模拟点击**（真机 `input tap` 对放射 FAB 环项 hit-test 不可靠，ADR-0136）：
 
   ```bash
-  adb shell am start --es benchNav <scenario> -n io.pictelio.app/.MainActivity
+  adb shell am start --es benchNav <scenario> -n io.pictelio.app.debug/io.pictelio.app.LynxActivity
   ```
 
   场景名：`illust`（`/illusts` 插画流）、`carousel`（推荐轮播）。搜索表（SearchSheet）暂无 benchNav 场景：先 `illust` 进插画流，再手动点 FAB 菜单「搜索」打开。
@@ -42,7 +44,7 @@
 
 **操作步骤**：
 
-1. `adb shell am start --es benchNav illust -n io.pictelio.app/.MainActivity` 进 lynx 插画流。
+1. `adb shell am start --es benchNav illust -n io.pictelio.app.debug/io.pictelio.app.LynxActivity` 进 lynx 插画流。
 2. 等首屏出图后**截图 A**（或记住首屏第一张卡与滚动位置）。
 3. 点击屏幕中部一张插画卡进入详情。
 4. 系统返回回插画流，**截图 B**。
@@ -78,7 +80,7 @@
 
 **操作步骤**：
 
-1. `adb shell am start --es benchNav carousel -n io.pictelio.app/.MainActivity` 进推荐流，定位轮播卡。
+1. `adb shell am start --es benchNav carousel -n io.pictelio.app.debug/io.pictelio.app.LynxActivity` 进推荐流，定位轮播卡。
 2. 记录第 1 张卡的收藏数与标题/图片。
 3. 滑动轮播 ≥2 张，逐张记录收藏数与标题/图片。
 

@@ -18,7 +18,7 @@
  * 更靠后的「webview 侧登录 → 跨引擎共享 WSSecureStorage」也随单引擎化一并失效：
  * APK 内已无 WebView ⇒ Appium 永远等不到 WEBVIEW context，登录页在运行时不存在。
  * 故改走原生 dev intent hook（prefs.loginViaDevIntent，实机已验证）：
- * `am start -n io.pictelio.app/.LynxActivity --es pictelio_dev_refresh_token <token>`
+ * `am start -n io.pictelio.app.debug/io.pictelio.app.LynxActivity --es pictelio_dev_refresh_token <token>`
  * → LynxActivity.applyDevIntentHooks() 调 autoLoginWithRefreshToken 持久化并登录
  * （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。当前阶段划分：
  * - 阶段 A（dev hook 登录）：setup 已 pm clear，Keystore 里没有 token，必须真实登录；

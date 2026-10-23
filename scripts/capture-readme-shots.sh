@@ -6,7 +6,7 @@
 #
 # 1) 必须用 debug APK，不能用 release。
 #    benchNav 深链通道两侧都有门禁：原生侧 `if (BuildConfig.DEBUG)`
-#    （LynxActivity.java:503），JS 侧 `if (!__BENCH_NAV__) return`（router.ts:449）。
+#    （LynxActivity.java:542），JS 侧 `if (!__BENCH_NAV__) return`（router.ts:451）。
 #    实测 release APK 的 bundle 里 pictelioBenchNav 命中 0 次，debug 命中 5 次。
 #    __DEV__ 在 debug 下同样为 false（NODE_ENV=production），所以 UI 与 release 一致。
 #
@@ -44,8 +44,12 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 SER="${SER:-emulator-5554}"
 AVD="${AVD:-pictelio_low}"
-PKG="io.pictelio.app"
-ACT="$PKG/$PKG.LynxActivity"
+# ⚠️ `PKG` 是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+#    release 变体仍是 `io.pictelio.app`）。`ACT` 是**组件串** = applicationId +
+#    **全限定类名**（类 FQN 的根是 namespace，不随变体变）⇒ 不可写相对类名
+#    `$PKG/.LynxActivity`（相对类名按 applicationId 的包展开 ⇒ 解析到不存在的类）。
+PKG="io.pictelio.app.debug"
+ACT="$PKG/io.pictelio.app.LynxActivity"
 OUT="${OUT:-packages/website/public/screenshots}"
 W=540; H=960
 APK="${APK:-packages/android-host/android/app/build/outputs/apk/debug/app-debug.apk}"

@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import { remote, type Browser } from "webdriverio";
 import {
   adbPath,
+  APP_NAMESPACE,
   APP_PACKAGE,
   APP_ROOT,
   ENTRY_ACTIVITIES,
@@ -149,11 +150,15 @@ export class AndroidE2eDriver {
     );
   }
 
-  /** 当前前台 Activity 全限定名（Appium 可能回短名，返回前已按 APP_PACKAGE 归一） */
+  /** 当前前台 Activity 全限定名（Appium 可能回短名，返回前已按 namespace 归一） */
   async currentActivity(): Promise<string> {
     const activity = await this.raw.getCurrentActivity();
-    // Appium 返回 ".LynxActivity" 或全限定名，统一归一化为全限定短比较
-    return activity.startsWith(".") ? `${APP_PACKAGE}${activity}` : activity;
+    // Appium 返回 ".LynxActivity" 或全限定名，统一归一化为全限定短比较。
+    // ⚠️ 短名按 **namespace**（APP_NAMESPACE）展开，**不能**按 APP_PACKAGE 展开：
+    //    类 FQN 的根是 namespace，而 applicationId 是 debug 变体的
+    //    `io.pictelio.app.debug`（ADR-0227 D2/D3）——按 applicationId 展开会得到
+    //    不存在的 `io.pictelio.app.debug.LynxActivity`，与 MAIN_ACTIVITY 比对恒不成立。
+    return activity.startsWith(".") ? `${APP_NAMESPACE}${activity}` : activity;
   }
 
   /** 当前 context（NATIVE_APP / WEBVIEW_io.pictelio.app / ...） */

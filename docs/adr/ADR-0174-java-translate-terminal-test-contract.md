@@ -15,7 +15,7 @@ wayfinder map #644 收尾过程中，跨流污染调研 #649（多窗口竞态 +
 1. **终态被当裸文本交付** = 永久挂起的 UI 状态。`translateStream` 异常分支若 `STREAM_TERMINAL.put(streamId, rawText)`（无 `withSeq(withStreamId(payload, streamId), streamId)` 盖章），JS 侧轮询拿到 `String`，`JSONObject` 解析直接抛 → 状态机卡在「n% 翻译中」直到用户手动重启 App（2026-09-16 历史缺陷复现，参见 ADR-0170 §实现期修订）。
 2. **4 条终态路径共用单一寄存器**（`STREAM_TERMINAL`：`PictelioTranslateModule.java:145`）—— 任一路径（参数校验 / HTTP 非 2xx / 网络异常 / 用户 abort）回归都会让 UI 永久挂起，**不存在「局部失效」**。
 3. **现有先例只覆盖解析器**（`TranslationSseParserTest.java`），不覆盖「解析 + 终态盖章 + 入队 + 派发」这条完整管线（research §2.3）—— 这是 `registerTerminal` 与 `failStream` 之间的真实生产路径。
-4. **CI 门禁原样已可驱动 JVM 单元测试**：`./gradlew testFullDebugUnitTest --no-daemon`（`.github/workflows/ci.yml:103-105`），且 webview 变体的「200 编译错」（research §2.2）是上次会话跑错命令所致，不是源集本身的问题（research §2.2 末段）—— 跑 full 变体即可。
+4. **CI 门禁原样已可驱动 JVM 单元测试**：`./gradlew testFullDebugUnitTest --no-daemon`（`.github/workflows/ci.yml:103-105`；⚠️ 订正 2026-10-23：该坐标锚在 `a619c7d5` 基线，现行同位置已是 `testDebugUnitTest`，见 References 段口径说明），且 webview 变体的「200 编译错」（research §2.2）是上次会话跑错命令所致，不是源集本身的问题（research §2.2 末段）—— 跑 full 变体即可。
 
 调研 #646（CLOSED）以 `app/src/testFull/java/io/pictelio/app/WfScratchTranslateProbeTest.java`（实验性探针文件，实验后已删；研究留存于 `docs/research/app-lynx-translation-java-contract-test-mechanism.md`）证明了：
 
@@ -189,7 +189,7 @@ public static final class FakeKeyStoreSpi extends KeyStoreSpi {
 
 - **事件总线载荷在 JVM 是盲区**（D6）：M2 变异全绿，需 mutation test + 真机 e2e 兜底（≤1 mutation test / release）。
 - **~50 行测试侧平台桥接**（research §0 §5.2）：`TestLynxContext`（约 5 行）+ `FakeKeyStoreSpi`（约 30 行 KeyStoreSpi 抽象方法实现）+ `seedFakeAndroidKeyStore`（约 15 行）。**全部在测试源集内**，零生产代码变更。
-- **CI 环境约束 = full 变体**：测试源集 `app/src/test/java` 是所有 flavor 变体共用，lynx 依赖只挂在 `lynxImplementation` / `fullImplementation`（research §2.2 + `build.gradle:240,260-264`）—— CI 必须跑 `testFullDebugUnitTest`（已是现状，`.github/workflows/ci.yml:103-105`）。**禁止**跑 `test` / `testWebviewDebugUnitTest`（webview 变体 200 编译错逐字命中；research §2.2）。
+- **CI 环境约束 = full 变体**：测试源集 `app/src/test/java` 是所有 flavor 变体共用，lynx 依赖只挂在 `lynxImplementation` / `fullImplementation`（research §2.2 + `build.gradle:240,260-264`；⚠️ 订正 2026-10-23：flavor 维度已随 ADR-0203 下线，`lynxImplementation` / `fullImplementation` 在现行 `build.gradle` 中**已不存在**，本坐标为历史留痕）—— CI 必须跑 `testFullDebugUnitTest`（当时已是现状，`.github/workflows/ci.yml:103-105`；⚠️ 订正 2026-10-23：该坐标锚在 `a619c7d5` 基线，flavor 维度随 ADR-0203 下线后任务**已更名为** `testDebugUnitTest`、落在**现行** `.github/workflows/ci.yml:112-114`）。**禁止**跑 `test` / `testWebviewDebugUnitTest`（webview 变体 200 编译错逐字命中；research §2.2）。
 - **Robolectric 4.14.1+ 要求**：假 `AndroidKeyStore` provider 的 `Provider(String, double, String)` 构造器（实测编译错：Android stub 缺该构造器）需要 Robolectric ≥ 4.14.1（JDK 21 兼容版本）—— 当前仓库版本已满足（research §0 环境声明）。
 - **成功率/稳定性**：research §4 #5 明说每个探针只跑过 1–2 次；P8（abort）含 `Thread.sleep(300)`，CI 负载下可能需放宽到 500ms。implement 阶段需在 CI 跑 3-5 轮验证稳定性。
 - **假 Keystore provider 的选择顺序风险**（research §4 #4）：~~当前 41 个单测文件无此先例，风险可接受~~ → **该风险已实现为真实故障并修复**（PR #657 code-review S1：同跑 13 tests / 8 failed、单跑全绿；逐字证据与泄漏链路见 §D4.1）。现在由共享夹具 `FakeAndroidKeyStore` 单份 SPI + 单次注册 + 抢注守卫承担；新测试类**不得**再各自注册同名 provider。
@@ -241,6 +241,19 @@ public static final class FakeKeyStoreSpi extends KeyStoreSpi {
 ---
 
 ## References
+
+> ⚠️ **坐标与路径口径订正（2026-10-23）**：本节 `packages/app/android/app/**` 与
+> `packages/app/android/app/build.gradle` 各行号**锚在 ADR-0203 删包之前的历史路径**——
+> 该整包（含 `build.gradle`）已随 ADR-0203 删除，**现行仓库中不再存在**，故其行号不再指向任何文件。
+> §后果 / 负面成本段内同类的 `build.gradle:240,260-264` 已就地加订正说明；此处一并登记，
+> 避免被误读为「现行 `build.gradle` 的行号」。
+>
+> ⚠️ **CI 工作流坐标同样是历史留痕**（订正 2026-10-23）：`.github/workflows/ci.yml:103-105`
+> 锚在 `a619c7d5` 基线，当时的 step 名为 `Gradle unit tests (testFullDebugUnitTest)`、
+> 工作目录为 `packages/app/android`。flavor 维度随 ADR-0203 下线后该任务**已更名**为
+> `Gradle unit tests (testDebugUnitTest)`、工作目录改为 `packages/android-host/android`，
+> 位于**现行** `.github/workflows/ci.yml:112-114`（门禁范围不变）。现行仓库中
+> `testFullDebugUnitTest` **零命中**——旧坐标不再指向任何现行 step。
 
 - **调研** [`docs/research/app-lynx-translation-java-contract-test-mechanism.md`](../research/app-lynx-translation-java-contract-test-mechanism.md)（CLOSED #646）—— §0 结论 / §1.2 探针矩阵 / §1.3 变异实验 / §2.1 LynxModule 构造性 / §2.2 变体编译矩阵 / §2.3 缝的形态评估 / §2.4 四条路径全覆盖 / §2.5 断言观察对象 + 成功路径陷阱 / §2.6 事件总线盲区 / §5.1 + §5.2 可复用骨架
 - **ADR-0170** [`docs/adr/ADR-0170-lynx-translate-nativemodule-bridge.md`](./ADR-0170-lynx-translate-nativemodule-bridge.md)—— `translateStream :295` / `translatePoll :608` / `abortStream :714` / `STREAM_TERMINAL :145` / `publishFramesViaEvent :560` / §D7 AbortController token / §D8 测试策略（Java 单测 + Robolectric 模式，本 ADR 是其落地）/ §实现期修订（终态被当裸文本交付 = UI 永久挂起的历史缺陷翻版）

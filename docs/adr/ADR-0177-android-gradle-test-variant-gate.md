@@ -21,7 +21,7 @@
 
 ### 研究结论（#646 §2.2，唯一事实来源）
 
-`packages/app/android/app/src/test/java` 是**所有 flavor 变体共用**的单测源集（`build.gradle:54-69` 只声明了 flavor 的 `java.srcDir` 包含哪些**生产**源，没有按 flavor 排除**测试**源）。Lynx 依赖只挂在 `lynxImplementation` / `fullImplementation`（`build.gradle:240, 260-264`），Lynx 源码只进 `src/lynx/java`（`:60-62`）。于是：
+`packages/app/android/app/src/test/java` 是**所有 flavor 变体共用**的单测源集（`build.gradle:54-69` 只声明了 flavor 的 `java.srcDir` 包含哪些**生产**源，没有按 flavor 排除**测试**源）。Lynx 依赖只挂在 `lynxImplementation` / `fullImplementation`（`build.gradle:240, 260-264`；⚠️ 订正 2026-10-23：flavor 维度已随 ADR-0203 下线，`lynxImplementation` / `fullImplementation` 在现行 `build.gradle` 中**已不存在**，本坐标为历史留痕），Lynx 源码只进 `src/lynx/java`（`:60-62`）。于是：
 
 | 命令 | 实测结果（#646 §1.1） |
 |------|-----------------------|
@@ -138,6 +138,12 @@ android {
 **为什么不需要 `exclude`**：AGP 的 `sourceSets.test.java.srcDirs` 是**追加**语义——`src/test/java` 是默认 base dir，per-flavor 追加的 `src/testFull/java` 等会与 base dir 合并形成该变体的测试源集。本仓库没有 `src/testLynx/java/` 内容（#646 §2.2 已实测空），未来 lynx 变体专属测试直接落到该目录即可。
 
 **为什么不需要动 `testImplementation` dependencies**：`build.gradle:268-275` 的 `testImplementation "junit:junit:..."` / `robolectric` / `okhttp-tls` 是**所有 flavor 共用**（不区分 `fullTestImplementation` / `webviewTestImplementation`）——这正是 #646 §2.2 指出的「lynx + webview 依赖在 main 是 flavor 互斥，但 test 共用」现状。testImplementation 不分 flavor 没问题（testImplementation 永远进所有变体的 classpath），问题仅在**测试源集**引用的**生产类**是 flavor 互斥——D2 把源集拆开即解决。
+
+> ⚠️ **坐标口径订正（2026-10-23）**：`build.gradle:268-275` 锚在 `26eee811` 基线的
+> `packages/app/android/app/build.gradle`（该整包已随 ADR-0203 删除），对应 `// ── Test ──`
+> 块的 junit / robolectric / androidx.test / mockwebserver / okhttp-tls 五条 `testImplementation`。
+> **该坐标不是现行文件行号**——现行仓库中不存在此 `build.gradle`，也无 flavor 维度可言
+> （见本文顶部存档横幅）。
 
 ### D4. 不强制新增 `./gradlew ci-tests` 别名（选 C 下非必需）
 

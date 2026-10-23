@@ -65,7 +65,7 @@
 ### 一、e2e 侧（#1047）
 
 - **观测通道**：复用 ADR-0223 已落地的宿主侧 `UiTreeDump` 与诊断脚本；**不改宿主侧实现**（「三、门禁侧 / 6 项盲区」的收口做法**全在门禁/测试侧**，不涉及宿主侧实现）。
-- **触发协议**：intent extra `uiTreeDump=1` 发到 `io.pictelio.app/.LynxActivity`。采样点 `cold`（`onLoadSuccess`）/ `hot`（`onNewIntent`）；一次触发连拍 0 / 1500 / 4000ms 三档。
+- **触发协议**：intent extra `uiTreeDump=1` 发到 `io.pictelio.app.debug/io.pictelio.app.LynxActivity`。采样点 `cold`（`onLoadSuccess`）/ `hot`（`onNewIntent`）；一次触发连拍 0 / 1500 / 4000ms 三档。
 - **产物位置**：设备上应用专属外部目录 `ui-tree/`，文件名 `ui-tree-<采样点>-<档位>ms-<序号>-<时间戳>.json`；`adb pull` 直取。
 - **抓树不破坏被测状态**：`am start` 打到**前台运行**的 App ⇒ 走 `onNewIntent`（hot 采样点）⇒ Activity 不重建、状态保留。优先**把 extra 合并进该 spec 已经在发的那条导航 intent**（如 `transition-matrix` 已有的 `--es benchNav <scenario>`），让抓到的树正好是被断言的那个状态；若必须单独触发，须落在状态仍成立的位置并写明抓取顺序。
 - **三处共用一份实现**：新增一个共享模块（与既有像素侧的共享模块同构），提供「触发 → 轮询等产物 → `adb pull` → 解析」能力；**不复用诊断脚本的命令行入口**（它的参数解析层无机器防线（**未落地**，见本文档「三、门禁侧 / 6 项盲区」①）；e2e 侧直接调 lib 层纯函数）。

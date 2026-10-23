@@ -69,7 +69,11 @@ cd "$(dirname "$0")/.." # packages/app-lynx
 
 # ─── 参数区（环境变量可覆盖） ─────────────────────────────────────────────
 ADB_SERIAL="${ADB_SERIAL:-emulator-5554}"
-APP_ID="${APP_ID:-io.pictelio.app}"
+# ⚠️ `APP_ID` 缺省是 **debug 变体的 applicationId**（`io.pictelio.app.debug`，ADR-0227 D2：
+#    release 变体仍是 `io.pictelio.app`）。组件串一律用「applicationId + 全限定类名」——
+#    相对类名 `$APP_ID/.LynxActivity` 在 `am start -n` 里按 **applicationId 的包**展开
+#    ⇒ debug 下会解析成不存在的 `io.pictelio.app.debug.LynxActivity`（ADR-0227 D3）。
+APP_ID="${APP_ID:-io.pictelio.app.debug}"
 APK_PATH="${APK_PATH:-../android-host/android/app/build/outputs/apk/debug/app-debug.apk}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}" # 1 = 跳过 assembleDebug + adb install
 S1="${S1:-1}"; S2="${S2:-1}"; S3="${S3:-1}"; S4="${S4:-1}"; S5="${S5:-1}"; S6="${S6:-1}"
@@ -284,7 +288,8 @@ relaunch() {
   # 原 .MainActivity 入口分发已随 #610/ADR-0203 删除）。
   # ⚠️ 不能写成「.MainActivity || .LynxActivity」兜底：am start 对不存在的 Activity 虽报
   # Error type 3，但返回 exit 0 ⇒ 第二条永远不执行（2026-10-18 review 在模拟器实测）。
-  adb shell am start -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
+  # ⚠️ 组件串用**全限定类名**：相对类名按 applicationId 的包展开 ⇒ 解析到不存在的类。
+  adb shell am start -n "$APP_ID/io.pictelio.app.LynxActivity" >/dev/null 2>&1 || true
   say "   …等待首屏（bundle 加载 + 登录态恢复）"
   p="blank"
   for i in $(seq 1 15); do
@@ -364,7 +369,7 @@ enter_detail() {
   #    .LynxActivity（原 .MainActivity 已随 #610/ADR-0203 删除）。失败则落到 ②
   if bundle_has_benchnav; then
     say "   …尝试 benchNav illust（bundle 含钩子标记）"
-    adb shell am start --es benchNav illust -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
+    adb shell am start --es benchNav illust -n "$APP_ID/io.pictelio.app.LynxActivity" >/dev/null 2>&1 || true
     sleep 8
     shot_path=$(shot bench_after)
     chev=$(chevron_dark "$shot_path")
@@ -585,7 +590,7 @@ run_s6() {
     say "   …benchNav $label"
     adb shell am force-stop "$APP_ID" || true
     sleep 1.5
-    adb shell am start --es benchNav "$tgt" -n "$APP_ID/.LynxActivity" >/dev/null 2>&1 || true
+    adb shell am start --es benchNav "$tgt" -n "$APP_ID/io.pictelio.app.LynxActivity" >/dev/null 2>&1 || true
     sleep 8
     local shot_path chev p focus
     shot_path=$(shot "s6_${tgt}_page")

@@ -12,7 +12,7 @@
 
 ## User Stories
 
-1. 作为验证者，我希望 `adb shell am start --es benchNav update -n io.pictelio.app/.MainActivity` 能直达强制更新页，以便验证该页返回键直接退出（meta-exit）
+1. 作为验证者，我希望 `adb shell am start --es benchNav update -n io.pictelio.app.debug/io.pictelio.app.LynxActivity` 能直达强制更新页，以便验证该页返回键直接退出（meta-exit）
 2. 作为验证者，我希望 `--es benchNav error` 能直达会话失效错误页，以便验证该页返回键直接退出
 3. 作为验证者，我希望 full 包（MainActivity→LynxActivity 分发）也能收到 benchNav 参数，以便主安装包可跑 S6
 4. 作为验证者，我希望回归脚本 S6 在钩子存在时自动执行、无钩子时保持 SKIP，以便套装可复跑不被破坏
