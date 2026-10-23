@@ -2,6 +2,11 @@
 
 - 状态：Accepted
 - 日期：2026-09-26
+- **订正（2026-10-23，[#756](https://github.com/a1121611810/Pictelio/issues/756)）**：极窄屏降级口径由「2×2 网格」订正为「**2 列 × 3 行**（5 动作 + 1 空占位，空位固定右下角）」——动作行已随 #751 T3 扩容为**五**动作（收藏·追更·下载·目录·稍后看），2×2 装不下五支；该降级**已实现**（`NovelIntro.vue` 的 `<320dp` 分支），触控尺寸算式与取证见 `docs/research/novel-intro-narrow-viewport-2026-10.md`。正文按 ADR 惯例原样保留作为决策史。
+- **订正（2026-10-23，坐标口径）**：正文引用的 webview 端 `packages/app/src/api/novel.ts:120-132` /
+  `loadSeries:139-141` 随 ADR-0203 整包删除（`packages/app/` 目录已不存在）⇒ **这些坐标是历史留痕**，
+  锚在删包前的 `packages/app/`，不再指向任何现行文件；app-lynx 侧的
+  `packages/app-lynx/src/api/types.ts:115-125` 才是现行坐标。正文按 ADR 惯例原样保留作决策史。
 - 关联：spec `docs/specs/app-lynx-novel-intro-action-row.md`（§2 决策表）、ADR-0167（小说介绍页三段式 / 视觉骨架 / `BookmarkButton` / `createWatchlistPrompt` 入口归属）、ADR-0165（小说文本选择工具栏 — 工具栏避让约束）、ADR-0146（下载队列与 `enqueueNovelExport` — 「已下载」语义来源）、ADR-0123（原生 LynxView hit-testing 平台约束）、ADR-0163（`BookmarkButton` `:key` 重挂载契约）、ADR-0083（dead-code cleanup — 验证清理锚点）
 
 ## 背景
@@ -48,7 +53,7 @@ ADR-0167 把 `NovelIntro.vue` 视觉骨架定型为 D 案（封面 + 底部 scri
 
 ### D4 · 跨端契约同步：扩 `loadNovelSeries` 返回 `novels[]` + `next_url`
 
-`packages/app-lynx/src/api/types.ts:108-118` 的 `NovelSeriesDetailResponse` 简化为 4 字段（`id`/`title`/`content_count`/`is_concluded`/`watchlist_added`），缺章节列表 `novels: PixivNovel[]` + 分页 `next_url: string | null`。本期对齐 webview 端 `packages/app/src/api/novel.ts:120-132` 完整形态，新增 `loadNovelSeriesChapters(seriesId, lastOrder?, signal?)` / `loadNovelSeriesChaptersNext(url, signal?)`，与 webview `loadSeries:139-141` 同形态。
+`packages/app-lynx/src/api/types.ts:115-125` 的 `NovelSeriesDetailResponse` 简化为 4 字段（`id`/`title`/`content_count`/`is_concluded`/`watchlist_added`），缺章节列表 `novels: PixivNovel[]` + 分页 `next_url: string | null`。本期对齐 webview 端 `packages/app/src/api/novel.ts:120-132` 完整形态，新增 `loadNovelSeriesChapters(seriesId, lastOrder?, signal?)` / `loadNovelSeriesChaptersNext(url, signal?)`，与 webview `loadSeries:139-141` 同形态。
 
 **理由**：Pixiv `/v2/novel/series` 端点本就返回 `novels[]` + `next_url`，lynx 端之前简化时省略了——补齐是契约对齐，不是新端点。同端点同解析同字段，避免双端契约分叉；现有消费方（`NovelDetail.vue` 预取 / `NovelIntro.vue` 的 `watchlist_added`）不读 `novels` / `next_url`，类型扩展为零影响。
 

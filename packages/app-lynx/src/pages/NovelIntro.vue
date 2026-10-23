@@ -3,8 +3,10 @@
 // D 轮播同族视觉（票 #583）：全屏封面 aspectFill 铺满 + 底部渐变 scrim 承载全部元信息；页内不滚动。
 // 信息架构（票 #577）：AI 徽章 / 系列行(+已追更 chip) / 标题 / 作者行(→用户主页) / 标签行(→搜索) /
 // 简介 2 行截断（点开弹 NovelCaptionSheet 读全文，#584）/ 统计行 / 评论入口 + 底部两行 CTA 区：
-//   Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看，等宽 flex-1 列；原四动作 + 稍后看第五动作
-//   = ADR-0191 D5 / #751 T3；ADR-0189 挂账的极窄屏 < 320px 2×2 降级矩阵不含 < 320px 真机，沿用既有预案）；
+//   Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看）：宽屏（视口 ≥ 320dp）= 单行等宽 flex-1 列
+//   （原四动作 + 稍后看第五动作 = ADR-0191 D5 / #751 T3）；极窄屏（视口 < 320dp）= 2 列 × 3 行
+//   网格降级（票 #756 落地 ADR-0189 spec §12 挂账的降级矩阵，并按 ADR-0191 D5 后果段
+//   「< 320px 降级矩阵需在 spec 同步扩容」随五动作扩到 2 列 × 3 行）；
 //   Row 2 = 全宽主 CTA「开始阅读」（沿用既有 h-[12.8vw] rounded-full primary 范式）。
 // 受限/AI 语义（票 #580/#581）：谓词复用正文页同款（settings.isRestricted / isAiRestricted）——
 // 封面/标题/作者可见，简介位遮罩（RestrictOverlay/AiOverlay 同款），两行 CTA + 简介展开入口置灰
@@ -27,6 +29,7 @@ import { useTopInsetSpacer } from '../composables/useTopInsetSpacer'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { stripNovelCaptionHtml } from '../utils/novelCaption'
 import { isNovelDownloaded } from '../utils/novelDownloadStatus'
+import { type ViewportSystemInfo } from '../utils/viewportGeometry'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -212,6 +215,41 @@ const readActionLabel = computed(() =>
 const readActionA11yLabel = computed(() =>
   readAction.value === 'continue' ? t('novelIntro.continueReadingA11y') : t('novelIntro.startReadingA11y'),
 )
+
+// ─── 极窄屏判定（票 #756：落地 ADR-0189 spec §12 挂账的降级矩阵）──────────
+// 阈值出处（oracle）：docs/specs/app-lynx-novel-intro-action-row.md §12 风险表那一行
+//   （#756 订正后：视口宽 < 320px ⇒ 降级为 2 列 × 3 行，5 动作 + 1 空占位）。
+// ⚠️ 320 是**逻辑宽（dp）**不是物理像素：判定走 SystemInfo.pixelWidth / pixelRatio
+//   （官方换算口径，见 docs/adr/glossary-lynx-units.md:40「跨边界数值」条的
+//   「本仓既有 5 处同款换算」——本仓第 5 处即本文件下方这处 SystemInfo 换算）。
+// 五动作版本按 ADR-0191 D5 后果段「小说介绍页 Row 1 由四动作增至五动作（…极窄屏 < 320px
+//   降级矩阵需在 spec 同步扩容）」扩到 **2 列 × 3 行**（矩阵见模板注释）。
+const NARROW_VIEWPORT_DP = 320
+
+/**
+ * Lynx 运行时全局（原生 LynxView 内置；web-core 预览环境无此对象 ⇒ 引用处必须 typeof 探测）。
+ * 字段与 utils/viewportGeometry.ts 的 ViewportSystemInfo 对齐（单一事实源，不另立结构）。
+ */
+declare const SystemInfo: ViewportSystemInfo
+
+/**
+ * 视口逻辑宽（dp）：物理像素宽 ÷ 像素密度。
+ * web-core 预览无 SystemInfo ⇒ 兜底 375（iPhone 逻辑宽近似，同 pages/Recommended.vue:187）
+ * ⇒ 预览环境恒走宽屏分支（预览不是取证环境，取证以原生真机为准）。
+ */
+function viewportWidthDp(): number {
+  if (typeof SystemInfo === 'undefined') return 375
+  const dp = SystemInfo.pixelWidth / SystemInfo.pixelRatio
+  return Number.isFinite(dp) && dp > 0 ? dp : 375
+}
+
+/**
+ * 动作行是否走极窄屏 2 列网格降级。
+ * ⚠️ Lynx **没有响应式视口宽度事件**（SystemInfo 是只读全局，仓内既有用法同此：
+ *   components/CarouselSwiper.vue 的默认 prop、pages/Recommended.vue 的 render 期读取），
+ *   故 setup 期取一次快照。本页是全屏不滚动页、无横竖屏切换场景 ⇒ 旋转后需重进页面才重算。
+ */
+const narrowViewport = ref(viewportWidthDp() < NARROW_VIEWPORT_DP)
 
 // ─── 底部动作行：Row 1 = 4 个次级按钮状态（spec #734 §US4 / §US5）───
 // 「已下载」派生自 downloads.state（Pinia setup store 状态自动解包），沿 ADR-0189 D3 / spec D1。
@@ -463,14 +501,22 @@ const topInsetSpacer = useTopInsetSpacer()
         </view>
 
         <!-- 底部固定动作区（spec #734 §US5 D1 / ADR-0189 D1）：
-             Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看，等宽 flex-1 列；
-             稍后看第五动作 = ADR-0191 D5 / #751 T3），追更/系列目录仅 series 存在时渲染；
+             Row 1 = 次级动作行，**两个互斥分支**（同一 narrowViewport 判定，互补条件）：
+               ① 宽屏（视口 ≥ 320dp）：单行 5 等分（既有形态，本分支保持原样不动）；
+               ② 极窄屏（视口 < 320dp）：2 列 × 3 行网格降级（票 #756 落地 ADR-0189 spec §12
+                  挂账项；排布矩阵见下方注释）。
+             两支都是**条件渲染**（v-if），不是「两支都渲染再靠 CSS 隐藏」——只有一支进 DOM，
+             可被模板源级断言钉住（tests/novelIntroNarrowViewport.test.ts）。
+             ⚠️ 分支顺序（宽屏在前）是有意为之：既有源级断言
+             （src/pages/watchLaterEntry.template.test.ts）以「首个 @tap.stop 包裹块」为锚点，
+             宽屏在前 ⇒ 该锚点仍指向宽屏分支的第五动作，覆盖不被降级分支稀释。
+             追更/系列目录仅 series 存在时渲染（ADR-0189 D8 / D9）。
              Row 2 = 全宽主 CTA「开始阅读」。两行按钮在 R-18/R-18G/AI 屏蔽态一致置灰（#580 / spec D6）。
              屏蔽态的拦截一律走**处理器守卫**（本文件 `if (masked.value) return`，或
              ActionButton 的 `@tap` 短路），**不靠 CSS**：`pointer-events-none` 在本项目是死类名
              （`@lynx-js/tailwind-preset@0.5.1` 的 `corePlugins: DEFAULT_CORE_PLUGINS` 白名单
              裁掉了 `pointerEvents`），写着也不产生任何规则。 -->
-        <view class="mt-4 flex flex-row items-stretch">
+        <view v-if="!narrowViewport" class="mt-4 flex flex-row items-stretch">
           <!-- 收藏：BookmarkButton 自带 chip+计数；wrap 一道 flex-1 + masked 置灰。
                拦截走 BookmarkButton 自身的 disabled prop（#865 已修）：组件在 tap 入口短路，
                一并关掉长按通道与 burst 动效（否则「按了有动画却没写入」）。
@@ -534,6 +580,96 @@ const topInsetSpacer = useTopInsetSpacer()
               :disabled="masked"
               @tap="toggleWatchLater"
             />
+          </view>
+        </view>
+
+        <!-- 极窄屏降级分支：2 列 × 3 行网格（票 #756 / ADR-0189 spec §12 风险表挂账项）。
+             降级矩阵（**读取顺序 = 单行分支的既有顺序**：收藏 → 追更 → 下载 → 目录 → 稍后看）：
+
+               行 1 │ 收藏      │ 追更
+               行 2 │ 下载      │ 目录
+               行 3 │ 稍后看    │ （空占位）
+
+             · 追更 / 目录 仅 novel.series 存在时渲染（ADR-0189 D8 / D9）⇒ **格位恒在**、
+               条件渲染挂在动作上：缺席时该格即为空占位（与在场格同宽）⇒ 网格恒为规整 2 列，
+               **不出现中间空洞**。
+             · 空位固定在**右下角**（行 3 右列）：五动作填不满 2×3（6 格），缺口放在末尾，
+               网格读序与单行分支一致（不会读成「收藏/追更…稍后看被挤到第三行」）。
+             · 行间距用 spacing 档位（mt-2 = 2.133vw），不写 px 字面量（MD3 令牌纪律）。
+             · 触控下限：每格可点区 = 格宽 × 格高，2 列时格宽 = 可用宽 / 2 ≥ 139dp（320dp 视口；可用宽只扣 scrim 的 px-6），
+               格高 = 16vw（图标 6.4vw + mt-1 1.067vw + 标签行高 32rpx + py-2 ×2），
+               两维均 ≥ 40dp（票 #756 验收口径）；算式与实测值见
+               tests/novelIntroNarrowViewport.test.ts 与 docs/research/novel-intro-narrow-viewport-2026-10.md。 -->
+        <view v-if="narrowViewport" class="mt-4 flex flex-col">
+          <view class="flex flex-row items-stretch">
+            <!-- 收藏：与宽屏分支同形态（wrap 设 flex-1 + masked 置灰；self-center 让 chip 垂直居中） -->
+            <view
+              class="flex-1 flex items-center justify-center"
+              :class="masked ? 'opacity-50' : ''"
+            >
+              <BookmarkButton
+                class="self-center"
+                :key="novel.id"
+                target-kind="novel"
+                :illust-id="novel.id"
+                :initial-bookmarked="novel.is_bookmarked"
+                :bookmark-count="novel.total_bookmarks"
+                :disabled="masked"
+              />
+            </view>
+            <!-- 追更（仅 series 存在，D8）：**格位恒在**（缺席时该格即空占位，与在场格同宽），
+                 条件渲染挂在动作上而不是格上 ⇒ 网格恒为规整 2 列，不出现中间空洞。
+                 :key 强制重挂载承载 series 切换（BookmarkButton :key 同范式） -->
+            <view class="flex-1 min-w-0">
+              <WatchlistAction
+                v-if="novel.series"
+                :key="novel.series.id"
+                :series-id="novel.series.id"
+                :initial-added="prompt?.watchAdded === true"
+                :masked="masked"
+              />
+            </view>
+          </view>
+          <view class="flex flex-row items-stretch mt-2">
+            <!-- 下载（D10：始终渲染；已下载态同样可点，按 D11 重新打开格式选择器） -->
+            <view class="flex-1 min-w-0">
+              <ActionButton
+                :icon="downloaded ? 'check' : 'file_download'"
+                :label="downloaded
+                  ? t('novelIntro.actionDownloaded')
+                  : t('novelIntro.actionDownload')"
+                :active="downloaded"
+                :disabled="masked"
+                @tap="openExportSheet"
+              />
+            </view>
+            <!-- 系列目录（D9：仅 series 存在）：格位恒在，缺席即空占位（同上） -->
+            <view class="flex-1 min-w-0">
+              <ActionButton
+                v-if="novel.series"
+                :icon="'list'"
+                :label="t('novelIntro.actionSeries')"
+                :active="false"
+                :disabled="masked"
+                @tap="openSeriesSheet"
+              />
+            </view>
+          </view>
+          <view class="flex flex-row items-stretch mt-2">
+            <!-- 稍后看（WatchLater，ADR-0191 D5）：第五动作 toggle；@tap.stop 挂包裹 view
+                 （裸修饰符，同宽屏分支——ActionButton 上抛无载荷自定义 emit，.stop 须由原生 view 承载） -->
+            <view class="flex-1 min-w-0" @tap.stop>
+              <ActionButton
+                class="w-full"
+                :icon="LATER_ICON"
+                :label="laterAdded ? t('later.action.added') : t('later.action.add')"
+                :active="laterAdded"
+                :disabled="masked"
+                @tap="toggleWatchLater"
+              />
+            </view>
+            <!-- 第六格（空占位）：保持 2 列规整，缺口固定在右下角 -->
+            <view class="flex-1 min-w-0" />
           </view>
         </view>
 

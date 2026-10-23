@@ -90,7 +90,7 @@ describe('BookmarkButton chip 容器与配色（spec docs/specs/bookmark-color.m
     //    实测 computed display === "flex"、宽不变 → 该声明不可能修好拉伸（前一轮误修坑）；
     //  - self-start = align-self: flex-start（@lynx-js/tailwind-preset 的 alignSelf 插件提供，
     //    构建产物 .self-start { align-self: flex-start } 实证）→ 实测 150px = 内容宽；
-    //  - 同款先例：NovelIntro.vue:187 AI 徽章用 self-start 挡 scrim 内拉伸。
+    //  - 同款先例：NovelIntro.vue:424 AI 徽章用 self-start 挡 scrim 内拉伸。
     expect(code).toMatch(/bookmark-chip[\s"][^"]*\bself-start\b/)
     // 反向锁 1：preset 不提供 .inline-flex utility —— 加这个类名等于空类
     expect(code).not.toMatch(/bookmark-chip[\s"][^"]*\binline-flex\b/)

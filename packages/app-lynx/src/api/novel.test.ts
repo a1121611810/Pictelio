@@ -81,7 +81,7 @@ describe("api/novel loadNovelSeriesChapters（GET /v2/novel/series，带可选 l
     expect(result.next_url).toBe(
       "https://app-api.pixiv.net/v2/novel/series?series_id=3333333&last_order=1",
     )
-    // 既有契约不破：NovelIntro.vue:76 读 novel_series_detail.watchlist_added
+    // 既有契约不破：NovelIntro.vue:107 读 novel_series_detail.watchlist_added
     expect(result.novel_series_detail.watchlist_added).toBe(true)
   })
 

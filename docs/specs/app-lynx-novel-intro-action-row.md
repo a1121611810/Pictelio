@@ -58,7 +58,7 @@
 
 **扩展方案**：将 lynx 端 `NovelSeriesDetailResponse` 改为对齐 webview（含 `novels: PixivNovel[]` + `next_url: string | null`），新增 `loadNovelSeriesChapters(seriesId, lastOrder?, signal?)` / `loadNovelSeriesChaptersNext(url, signal?)`。同端点同解析，仅 lynx 端之前简化时省略了。
 
-字段调整（`packages/app-lynx/src/api/types.ts:108-118`）：
+字段调整（`packages/app-lynx/src/api/types.ts:115-125`）：
 - 保留：id, title, content_count, is_concluded, watchlist_added
 - 新增：`novels: PixivNovel[]`（章节列表，分页返回时增量追加）、`next_url: string | null`
 
@@ -401,5 +401,5 @@ const downloaded = computed(() =>
 | modalStack 弹层在原生 LynxView 返回键关闭失效 | 真机复现 #163 旧症状 | 回退到 `v-if` 全屏遮罩 + 显式 close 按钮 |
 | `setWatchState` 双入口同步漂移 | 介绍页 toggle 后正文页 chip 仍显示旧值 | 暴露 `watchlistStore` 改 Pinia store（reactive 而非 module-level Map） |
 | `isNovelDownloaded` 在大量历史任务下性能 | 任务数 > 100 | 改用 `Map<illustId, true>` 缓存层（一次构造，多次查询） |
-| 4 按钮同行在极窄屏溢出 | 视口宽 < 320px | 改 2×2 网格布局 |
+| ~~4 按钮同行在极窄屏溢出~~ → **已落地（2026-10-23，#756）**：动作行已扩容为**五**动作（收藏·追更·下载·目录·稍后看） | 视口宽 < 320px | **已实现**：降级为 **2 列 × 3 行**（5 动作 + 1 空占位，空位固定右下角；追更/目录格位恒在、条件渲染挂在动作上）。触控尺寸算式与取证见 `docs/research/novel-intro-narrow-viewport-2026-10.md` |
 | `loadNovelSeriesChapters` 端点行为差异 | 实测发现 Pixiv App API 与 Web API 对 `series` 端点的 `novels` 字段行为不同 | 回落单端点策略 + 加类型守卫 `if (response.novels)` 容错 |

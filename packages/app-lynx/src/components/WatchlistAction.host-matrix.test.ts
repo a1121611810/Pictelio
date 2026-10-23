@@ -4,7 +4,7 @@
 //（seriesId / initialAdded → init-only props，此后 props 变更不生效）。
 //
 // 期望值出处（Oracle 溯源，禁止从被测实现反推）：
-// - 组件头注释契约 = NovelIntro.vue:244-251「关键不变量（继承 useNovelWatchlistToggle 6 条 +
+// - 组件头注释契约 = NovelIntro.vue:330-336「关键不变量（继承 useNovelWatchlistToggle 6 条 +
 // :key 重挂载契约）」第 2 条：「series 切换通过 :key="novel.series.id" 强制 remount 承载
 //（BookmarkButton :key 同范式）」——本组件**已具备显式 remount 契约注释**，但缺 host-matrix
 // 测试防线；本文件按 ADR-0163 (c)「init-only props 组件接入新宿主形态 → 必须有宿主矩阵测试或
@@ -18,13 +18,13 @@
 //
 // ─── 为何用 test-local mirror（而非 BookmarkButton 的 compileScript + SFC parse 范式）───
 //
-// WatchlistAction 是 inline 组件（NovelIntro.vue:251-277），无独立 .vue 文件。BookmarkButton
+// WatchlistAction 是 inline 组件（NovelIntro.vue:337-366），无独立 .vue 文件。BookmarkButton
 // host-matrix 范式适用于 standalone SFC：parse + compileScript + 替换 import 映射 + eval。
 // 而 NovelIntro.vue 整个 script setup 块 250+ 行（含路由、API、stores、整页响应式），import
 // 注入图谱巨大且与本测试目标无关——eval 全块需 mock 数十模块，brittle 且超 scope。
 //
 // 故采用「test-local mirror + 真实 useNovelWatchlistToggle 接口形态」策略：
-//   - 在测试文件中**逐字段镜像** NovelIntro.vue:251-277 的 defineComponent 块（注释明确标注
+//   - 在测试文件中**逐字段镜像** NovelIntro.vue:337-366 的 defineComponent 块（注释明确标注
 //     出处，文件头声明与源严格对齐）
 //   - 通过 vi.mock 替换 useNovelWatchlistToggle 为 spy 形态（捕获 setup 调用入参 + 暴露
 //     controllable `added` ref + `toggle` spy）
@@ -37,7 +37,7 @@
 //
 // | 组件                | init-only 读取点                                                  | 宿主形态                                                                                       | 风险结论 |
 // |--------------------|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|---------|
-// | WatchlistAction    | setup 一次传入 useNovelWatchlistToggle({ seriesId, initialAdded }) | ① 介绍页 inline（NovelIntro.vue:392-398，:key="novel.series.id" 强制 remount，当前唯一宿主）；② 复用宿主：未来若被列表卡/详情头复用，须按 series :key remount，否则状态冻结在首卡 | 宿主①有 :key 防御；宿主②的契约语义由本文件锁定（不 remount 状态冻结 + remount 状态跟随新 props） |
+// | WatchlistAction    | setup 一次传入 useNovelWatchlistToggle({ seriesId, initialAdded }) | ① 介绍页 inline（NovelIntro.vue:542-546，:key="novel.series.id" 强制 remount）；② 介绍页极窄屏降级分支（NovelIntro.vue:624，同 :key="novel.series.id" 强制 remount）—— 同一宿主的两个调用点；③ 复用宿主：未来若被列表卡/详情头复用，须按 series :key remount，否则状态冻结在首卡 | 宿主①②均有 :key 防御；宿主③的契约语义由本文件锁定（不 remount 状态冻结 + remount 状态跟随新 props） |
 //
 // 其余 init-only 组件（BookmarkButton 等）见 BookmarkButton.host-matrix.test.ts 头注释。
 //
@@ -144,24 +144,24 @@ const ActionButtonMirror = defineComponent({
   },
 })
 
-// ─── test-local WatchlistAction mirror（严格对齐 NovelIntro.vue:251-277）───
+// ─── test-local WatchlistAction mirror（严格对齐 NovelIntro.vue:337-366）───
 //
-// 镜像源头 NovelIntro.vue:251-277 的 defineComponent 块；props / setup / render 三段均与源一致。
+// 镜像源头 NovelIntro.vue:337-366 的 defineComponent 块；props / setup / render 三段均与源一致。
 // 唯一替换：源 `import ActionButton from '../components/ActionButton.vue'` → 本测试用
 // ActionButtonMirror（同 props / 事件契约）；`useNovelWatchlistToggle` 由上方 vi.mock 替换。
 //
-// 注释 [mirror source: NovelIntro.vue:251-277] 在每段镜像代码前标注，方便漂移审计。
-// 若 NovelIntro.vue:251-277 改动，须同步更新本镜像并在 commit message 标注「WatchlistAction
+// 注释 [mirror source: NovelIntro.vue:337-366] 在每段镜像代码前标注，方便漂移审计。
+// 若 NovelIntro.vue:337-366 改动，须同步更新本镜像并在 commit message 标注「WatchlistAction
 // host-matrix mirror 同步」（测试硬约束 #4「重构行为不变约束」）。
 const WatchlistAction = defineComponent({
   name: 'WatchlistAction',
-  // [mirror source: NovelIntro.vue:253-257]
+  // [mirror source: NovelIntro.vue:339-343]
   props: {
     seriesId: { type: Number, required: true },
     initialAdded: { type: Boolean, required: true },
     masked: { type: Boolean, required: true },
   },
-  // [mirror source: NovelIntro.vue:258-276]
+  // [mirror source: NovelIntro.vue:344-365]
   setup(props) {
     const wl = useNovelWatchlistToggle({
       seriesId: props.seriesId,

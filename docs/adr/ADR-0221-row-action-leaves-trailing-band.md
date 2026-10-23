@@ -130,7 +130,7 @@
 | 站点 | 为什么不处理 |
 |---|---|
 | `components/SearchSheet.vue:438`（历史 ✕） | 在 modal 内 ⇒ `hasOpenModal` 强制 `mode='hidden'`，**不可能重叠** |
-| `pages/NovelIntro.vue:528-536` | 动作行钉在页面底部，与 FAB 竖直带（43.7–58.7vw）不交叠 |
+| `pages/NovelIntro.vue:574-582` | 动作行钉在页面底部，与 FAB 竖直带（43.7–58.7vw）不交叠 |
 
 > ⚠️ **已验伪并移出登记**：`pages/UserHome.vue`（关注数 / 粉丝数 chip）。
 > 本表当初对它的措辞是「非破坏性导航 chip」、**从未声称「同带重叠」**——是票 #951

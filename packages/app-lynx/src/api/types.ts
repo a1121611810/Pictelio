@@ -117,7 +117,7 @@ export interface PixivNovelDetailResponse {
  * 字段分层（spec app-lynx-novel-intro-action-row §3.2）：
  * - `novel_series_detail` = 顶层追更元数据（id/title/content_count/is_concluded/watchlist_added），
  *   对齐 lynx 既有消费面 `loadNovelSeries`；兼容 NovelDetail / NovelIntro watchlist 预取，不破坏既有契约
- *   （验收 #5：NovelIntro.vue:104 读 `novel_series_detail.watchlist_added` 必须继续工作）
+ *   （验收 #5：NovelIntro.vue:107 读 `novel_series_detail.watchlist_added` 必须继续工作）
  * - `novels` / `next_url` = 章节列表与分页游标；同端点 `/v2/novel/series` 服务端一并返回，
  *   分页时 `last_order` 增量追加；envelope 取 Pixiv App API 真实响应形状
  */

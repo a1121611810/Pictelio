@@ -38,7 +38,8 @@ vw 值 = rpx 值 / 7.5
 - **换算**：`逻辑px = 物理px / SystemInfo.pixelRatio`（= density）；
   物理像素要原样落地则用 **`ppx`** 单位（仅原生支持，web 不支持）。
 - **仓库惯例**：一律在**取数的那一层**换算，下游只管消费。本仓既有 5 处同款换算
-  （`viewportGeometry.ts` / `CarouselSwiper.vue` / `Recommended.vue` / `GlobalFab.vue`）
+  （`viewportGeometry.ts` / `CarouselSwiper.vue` / `Recommended.vue` / `GlobalFab.vue` /
+  `NovelIntro.vue`——第 5 处为 #756 极窄屏判定新增）
   —— 它们的共同点都是**除以 `pixelRatio` 后再喂给 `px`**。
 - **实例（已修）**：ADR-0168 的 insets 管线漏了这道换算，导致状态栏 72 物理 px
   被渲染成 216 物理 px，所有页面 header 上方凭空多 144px 空白，且**随设备而变**
